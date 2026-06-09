@@ -1,0 +1,82 @@
+# ✅ 纯 Docker 化：一条命令起全部服务
+# docker compose up -d --build
+# 启动后：
+#   - 前端: http://localhost:5173
+#   - 后端: http://localhost:3001
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: interview-postgres
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_DB: interview
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dev']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: interview-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: interview-qdrant
+    ports:
+      - '6333:6333'
+      - '6334:6334'
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: interview-api
+    ports:
+      - '3001:3001'
+    environment:
+      # compose 内部用 service name
+      DATABASE_URL: postgresql://dev:dev123@postgres:5432/interview
+      REDIS_URL: redis://redis:6379
+      QDRANT_URL: http://qdrant:6333
+      NODE_ENV: production
+      PORT: 3001
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: interview-web
+    ports:
+      - '5173:80'
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
