@@ -1,0 +1,30 @@
+{
+  "name": "interview-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI 面试智能体 - 基于 DeepAgents + Mem0 + Qdrant + Langfuse",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:api": "pnpm --filter @interview-agent/api run start:dev",
+    "dev:web": "pnpm --filter @interview-agent/web run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "infra:up": "docker compose up -d postgres redis qdrant",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "docker:up": "cd apps/api && pnpm build && cd ../.. && cd apps/web && pnpm build && cd ../.. && docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f api web",
+    "db:generate": "pnpm --filter @interview-agent/api run prisma:generate",
+    "db:migrate": "pnpm --filter @interview-agent/api run prisma:migrate",
+    "db:deploy": "pnpm --filter @interview-agent/api run prisma:deploy",
+    "db:studio": "pnpm --filter @interview-agent/api run prisma:studio",
+    "setup": "cp -n .env.example .env 2>/dev/null; pnpm install && pnpm infra:up && pnpm db:generate && pnpm db:migrate"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
