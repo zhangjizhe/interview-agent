@@ -1,0 +1,55 @@
+{
+  "_comment": "MCP 服务器配置 - 商用项目手动维护。添加新 MCP：1) npm install  2) 在本文件加一项  3) 重启 API。运行时不支持 add/delete（避免 token 浪费）",
+  "version": "1.0.0",
+  "servers": [
+    {
+      "name": "bocha_search",
+      "displayName": "联网搜索",
+      "description": "调用博查 AI 搜索最新技术文档、行业资讯",
+      "emoji": "🔍",
+      "category": "search",
+      "transport": "builtin",
+      "builtin": true,
+      "author": "system",
+      "version": "1.0.0"
+    },
+    {
+      "name": "memory_recall",
+      "displayName": "长期记忆",
+      "description": "从候选人历史对话中检索相关记忆（Mem0）",
+      "emoji": "🧠",
+      "category": "knowledge",
+      "transport": "builtin",
+      "builtin": true,
+      "author": "system",
+      "version": "1.0.0"
+    },
+    {
+      "name": "knowledge_bank",
+      "displayName": "面试题库",
+      "description": "按岗位匹配结构化面试题（Agent/前端/测试）",
+      "emoji": "📚",
+      "category": "knowledge",
+      "transport": "builtin",
+      "builtin": true,
+      "author": "system",
+      "version": "1.0.0"
+    },
+    {
+      "name": "github_lookup",
+      "displayName": "GitHub 仓库查询",
+      "description": "查询候选人 GitHub 仓库、贡献统计（占位，待实现）",
+      "emoji": "🐙",
+      "category": "mcp",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "author": "system",
+      "version": "0.0.1",
+      "_note": "占位示例：实际部署需要先 npm install + 配置 GITHUB_TOKEN"
+    }
+  ]
+}

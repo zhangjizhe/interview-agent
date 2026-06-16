@@ -1,0 +1,118 @@
+export interface AppConfig {
+  port: number;
+  webPort: number;
+  nodeEnv: string;
+  corsOrigin: string;
+  database: {
+    url: string;
+  };
+  redis: {
+    url: string;
+    sessionTtl: number;
+  };
+  qdrant: {
+    url: string;
+  };
+  qwen: {
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+  };
+  deepseek: {
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+  };
+  bocha: {
+    apiKey: string;
+    baseUrl: string;
+  };
+  langfuse: {
+    publicKey: string;
+    secretKey: string;
+    baseUrl: string;
+  };
+  mem0: {
+    apiKey?: string;
+    host?: string;
+    orgId?: string;
+    projectId?: string;
+  };
+  milvus: {
+    url: string;
+  };
+  multiAgent: {
+    enabled: boolean;
+  };
+  semanticCache: {
+    enabled: boolean;
+    whitelist: string;
+  };
+  promptCache: {
+    systemVersion: string;
+  };
+  knowledgeBase: {
+    enabled: boolean;
+    jsonPath: string;
+  };
+}
+
+export const configuration = (): AppConfig => ({
+  port: parseInt(process.env.PORT, 10) || 3001,
+  webPort: parseInt(process.env.WEB_PORT, 10) || 5173,
+  nodeEnv: process.env.NODE_ENV || 'development',
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  database: {
+    url: process.env.DATABASE_URL || 'postgresql://dev:dev123@localhost:5432/interview',
+  },
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+    sessionTtl: parseInt(process.env.REDIS_SESSION_TTL, 10) || 3600,
+  },
+  qdrant: {
+    url: process.env.QDRANT_URL || 'http://localhost:6333',
+  },
+  qwen: {
+    apiKey: process.env.QWEN_API_KEY || '',
+    baseUrl: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: process.env.QWEN_MODEL || 'qwen-plus',
+  },
+  deepseek: {
+    apiKey: process.env.DEEPSEEK_API_KEY || '',
+    baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1',
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+  },
+  bocha: {
+    apiKey: process.env.BOCHA_API_KEY || '',
+    baseUrl: process.env.BOCHA_BASE_URL || 'https://api.bochaai.com/v1',
+  },
+  langfuse: {
+    publicKey: process.env.LANGFUSE_PUBLIC_KEY || '',
+    secretKey: process.env.LANGFUSE_SECRET_KEY || '',
+    baseUrl: process.env.LANGFUSE_BASE_URL || 'https://us.cloud.langfuse.com',
+  },
+  mem0: {
+    apiKey: process.env.MEM0_API_KEY,
+    host: process.env.MEM0_HOST,
+    orgId: process.env.MEM0_ORG_ID,
+    projectId: process.env.MEM0_PROJECT_ID,
+  },
+  milvus: {
+    url: process.env.MILVUS_URL || 'http://localhost:19530',
+  },
+  multiAgent: {
+    enabled: process.env.MULTI_AGENT_ENABLED !== 'false', // 默认开
+  },
+  // P0 缓存工程
+  semanticCache: {
+    enabled: process.env.SEMANTIC_CACHE_ENABLED !== 'false', // 默认开
+    whitelist: process.env.SEMANTIC_CACHE_WHITELIST || 'interview_question,general_qa',
+  },
+  promptCache: {
+    systemVersion: process.env.PROMPT_CACHE_SYSTEM_VERSION || 'sys-v1',
+  },
+  knowledgeBase: {
+    enabled: process.env.KNOWLEDGE_BASE_ENABLED !== 'false', // 默认开
+    jsonPath: process.env.KNOWLEDGE_BASE_JSON || '', // 空则用默认路径
+  },
+});

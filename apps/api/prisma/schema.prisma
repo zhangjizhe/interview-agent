@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  interviews Interview[]
+
+  @@map("users")
+}
+
+model Interview {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position        String // 岗位，如"前端开发"
+  level           String          @default("P5") // 职级
+  status          InterviewStatus @default(IN_PROGRESS)
+  startedAt       DateTime        @default(now())
+  endedAt         DateTime?
+  summary         String? // 面试总结（AI 生成）
+  resumeConfirmed Boolean         @default(false) // 用户是否确认过简历（false = 仍显示确认面板）
+
+  messages Message[]
+  report   Report?
+  cost     SessionCost?
+
+  @@index([userId, startedAt])
+  @@map("interviews")
+}
+
+/// 会话级成本面板（P0 缓存工程）
+/// 每场 interview 一行，累加式写入（llm.call 钩子 + 终态结算）
+model SessionCost {
+  id          String    @id @default(cuid())
+  interviewId String    @unique
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  // === 基础计数 ===
+  llmCalls              Int @default(0) // 总 LLM 调用次数
+  totalPromptTokens     Int @default(0) // 累计 prompt tokens
+  totalCompletionTokens Int @default(0) // 累计 completion tokens
+  totalTokens           Int @default(0) // = prompt + completion
+
+  // === 缓存命中 ===
+  promptCacheHits     Int @default(0) // Prompt Cache 命中次数（顶层 cache hit）
+  promptCacheMisses   Int @default(0) // Prompt Cache 未命中次数
+  cachedTokens        Int @default(0) // 实际被缓存命中的 token 数（来自 provider usage）
+  semanticCacheHits   Int @default(0) // 语义缓存命中次数
+  semanticCacheMisses Int @default(0) // 语义缓存未命中次数
+  cacheSavedTokens    Int @default(0) // 通过缓存节省的 token（估算）
+
+  // === 鲁棒性 ===
+  retries   Int @default(0) // 重试次数
+  fallbacks Int @default(0) // 降级到 fallback provider 的次数
+  errors    Int @default(0) // 错误次数
+
+  // === 成本（CNY，按 1k tokens 单价） ===
+  inputCostPer1k   Float @default(0) // 输入 token 单价（CNY / 1k）
+  outputCostPer1k  Float @default(0) // 输出 token 单价
+  cacheDiscount    Float @default(0.4) // 缓存折扣（Qwen 0.4，DeepSeek 0.1）
+  estimatedCostCny Float @default(0) // 估算总成本（元）
+
+  // === 时间 ===
+  startedAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  endedAt   DateTime?
+
+  @@index([interviewId])
+  @@map("session_costs")
+}
+
+model Message {
+  id               String    @id @default(cuid())
+  interviewId      String
+  interview        Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  role             String // 'system' | 'user' | 'assistant' | 'tool'
+  content          String    @db.Text
+  metadata         Json? // 工具调用、token 消耗等
+  promptTokens     Int       @default(0)
+  completionTokens Int       @default(0)
+  createdAt        DateTime  @default(now())
+
+  @@index([interviewId, createdAt])
+  @@map("messages")
+}
+
+model Report {
+  id           String    @id @default(cuid())
+  interviewId  String    @unique
+  interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  overallScore Int // 总分 0-100
+  scores       Json // 多维度评分：技术、表达、逻辑
+  strengths    String    @db.Text // 优点
+  weaknesses   String    @db.Text // 不足
+  suggestions  String    @db.Text // 改进建议
+  createdAt    DateTime  @default(now())
+
+  @@map("reports")
+}
+
+enum InterviewStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+// 用户级 MCP 工具偏好：用户可独立开关每个工具
+// 商用项目"工具治理"的体现
+model UserToolPreference {
+  id        String   @id @default(cuid())
+  userId    String // email 桥接 demo user（与 User.email 形式一致）
+  toolName  String // McpRegistry 的 name
+  enabled   Boolean  @default(true)
+  config    Json? // per-tool 配置（如 max_results、temperature 等，未来扩展）
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, toolName])
+  @@index([userId])
+  @@map("user_tool_preferences")
+}

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- 背景圆角矩形（透明背景，iOS 适配） -->
+  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="#1e1b4b" />
+  
+  <!-- 身体（方形躯干） -->
+  <rect x="128" y="200" width="256" height="200" rx="20" ry="20" 
+        fill="none" stroke="#a5b4fc" stroke-width="10" stroke-linejoin="round" />
+  
+  <!-- 履带（左右各一个） -->
+  <rect x="108" y="360" width="76" height="56" rx="28" ry="28" 
+        fill="none" stroke="#a5b4fc" stroke-width="10" />
+  <rect x="328" y="360" width="76" height="56" rx="28" ry="28" 
+        fill="none" stroke="#a5b4fc" stroke-width="10" />
+  
+  <!-- 履带轮辐（小圆点） -->
+  <circle cx="146" cy="388" r="4" fill="#a5b4fc" />
+  <circle cx="366" cy="388" r="4" fill="#a5b4fc" />
+  
+  <!-- 脖子（连接头部和身体） -->
+  <rect x="216" y="160" width="80" height="56" rx="8" ry="8" 
+        fill="none" stroke="#a5b4fc" stroke-width="10" />
+  
+  <!-- 脖子关节（横线） -->
+  <line x1="216" y1="188" x2="296" y2="188" stroke="#a5b4fc" stroke-width="6" />
+  
+  <!-- 头部（梯形） -->
+  <path d="M 176 80 L 336 80 L 320 160 L 192 160 Z" 
+        fill="none" stroke="#a5b4fc" stroke-width="10" stroke-linejoin="round" />
+  
+  <!-- 左眼（双筒望远镜） -->
+  <rect x="200" y="96" width="44" height="44" rx="6" ry="6" 
+        fill="none" stroke="#a5b4fc" stroke-width="8" />
+  <circle cx="222" cy="118" r="10" fill="#a5b4fc" />
+  
+  <!-- 右眼 -->
+  <rect x="268" y="96" width="44" height="44" rx="6" ry="6" 
+        fill="none" stroke="#a5b4fc" stroke-width="8" />
+  <circle cx="290" cy="118" r="10" fill="#a5b4fc" />
+  
+  <!-- 头顶天线 -->
+  <line x1="256" y1="80" x2="256" y2="48" stroke="#a5b4fc" stroke-width="8" stroke-linecap="round" />
+  <circle cx="256" cy="40" r="8" fill="#a5b4fc" />
+  
+  <!-- 手臂（左） -->
+  <path d="M 128 240 L 88 280" stroke="#a5b4fc" stroke-width="10" stroke-linecap="round" />
+  <circle cx="80" cy="288" r="10" fill="none" stroke="#a5b4fc" stroke-width="8" />
+  
+  <!-- 手臂（右） -->
+  <path d="M 384 240 L 424 280" stroke="#a5b4fc" stroke-width="10" stroke-linecap="round" />
+  <circle cx="432" cy="288" r="10" fill="none" stroke="#a5b4fc" stroke-width="8" />
+</svg>

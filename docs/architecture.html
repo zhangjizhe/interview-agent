@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Interview Agent · 架构图</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f5f0;
+    --card: #ffffff;
+    --line: #e9e3d6;
+    --line-soft: #f0ead9;
+    --text: #14171e;
+    --muted: #7c7a72;
+    --primary: #2f6f5e;
+    --accent: #c97b3f;
+    --warn: #b06367;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', -apple-system, sans-serif;
+    line-height: 1.55;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 双角渐变 */
+  body::before {
+    content: "";
+    position: fixed;
+    top: -200px;
+    right: -200px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(47, 111, 94, 0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    bottom: -200px;
+    left: -200px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(201, 123, 63, 0.05) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 56px 32px 96px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 48px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 32px;
+  }
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 16px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-weight: 400;
+    font-size: 38px;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+  h1 em { font-style: italic; color: var(--primary); }
+  .lede {
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 640px;
+  }
+
+  /* Section */
+  section { margin-bottom: 56px; }
+  h2 {
+    font-family: 'DM Serif Display', serif;
+    font-weight: 400;
+    font-size: 24px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .sub {
+    color: var(--muted);
+    margin-bottom: 28px;
+    font-size: 14px;
+  }
+
+  /* Architecture diagram */
+  .arch {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 32px;
+    overflow-x: auto;
+  }
+  .arch-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 12px;
+    min-width: 920px;
+  }
+  .layer-label {
+    grid-column: 1 / -1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 8px 0 4px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .layer-label.client { color: var(--accent); }
+  .layer-label.api { color: var(--primary); }
+  .layer-label.infra { color: var(--muted); }
+  .layer-label.data { color: var(--warn); }
+  .layer-label.obs { color: var(--accent); }
+
+  .box {
+    grid-column: span 3;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: all 0.2s;
+    cursor: default;
+  }
+  .box:hover {
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px -2px rgba(0,0,0,0.06);
+  }
+  .box.wide { grid-column: span 6; }
+  .box.full { grid-column: span 12; }
+  .box .title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .box .desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .box .port {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--primary);
+    margin-top: 6px;
+  }
+  .box.primary {
+    background: linear-gradient(135deg, rgba(47, 111, 94, 0.04), rgba(47, 111, 94, 0.02));
+    border-color: var(--primary);
+  }
+  .box.warn {
+    background: rgba(176, 99, 103, 0.03);
+    border-color: var(--warn);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+  .dot.accent { background: var(--accent); }
+  .dot.warn { background: var(--warn); }
+
+  /* Data flow */
+  .flow {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    align-items: stretch;
+  }
+  .flow .step {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px;
+    position: relative;
+  }
+  .flow .step::after {
+    content: "→";
+    position: absolute;
+    right: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 18px;
+  }
+  .flow .step:last-child::after { display: none; }
+  .flow .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .flow .step-name {
+    font-weight: 600;
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .flow .step-detail {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+
+  /* KV card */
+  .kv-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .kv-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .kv-card h3 {
+    font-family: 'DM Serif Display', serif;
+    font-weight: 400;
+    font-size: 18px;
+    margin-bottom: 4px;
+  }
+  .kv-card .why {
+    font-size: 12px;
+    color: var(--primary);
+    font-weight: 500;
+    margin-bottom: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .kv-card dl {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    row-gap: 6px;
+    column-gap: 12px;
+  }
+  .kv-card dt {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .kv-card dd {
+    font-size: 13px;
+    margin: 0;
+  }
+
+  /* Bench comparison */
+  .bench-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 80px;
+    gap: 14px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .bench-row:last-child { border-bottom: none; }
+  .bench-label {
+    font-weight: 500;
+    font-size: 14px;
+  }
+  .bench-track {
+    height: 18px;
+    background: var(--line-soft);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .bench-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), rgba(47, 111, 94, 0.7));
+    border-radius: 6px;
+    transition: width 1s ease;
+  }
+  .bench-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .wrap { padding: 32px 20px; }
+    h1 { font-size: 28px; }
+    .flow { grid-template-columns: 1fr; }
+    .flow .step::after {
+      content: "↓";
+      right: 50%;
+      top: auto;
+      bottom: -22px;
+      transform: translateX(50%);
+    }
+    .kv-grid { grid-template-columns: 1fr; }
+    .bench-row {
+      grid-template-columns: 100px 1fr 60px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="eyebrow">Architecture · v2.0 · Real Integration</span>
+    <h1>Interview Agent 架构图<em>·九服务</em></h1>
+    <p class="lede">
+      基于 DeepAgents + Mem0（云端）+ Milvus 的多 Agent 面试系统。所有第三方组件真实接入，无 Mock。
+      简历项目优先讲亮点（SubAgent 编排 / 三层记忆 / 4 级水位线），商用化留给后续。
+    </p>
+  </header>
+
+  <!-- 1. 全局架构图 -->
+  <section>
+    <h2><span class="num">01</span> 全局架构</h2>
+    <p class="sub">5 个分层：客户端 / API / 基础设施 / 数据 / 可观测。颜色 = 层次区分。</p>
+
+    <div class="arch">
+      <div class="arch-grid">
+
+        <div class="layer-label client">Layer 1 · Client</div>
+        <div class="box wide primary">
+          <div class="title"><span class="dot accent"></span> React + Vite + Tailwind</div>
+          <div class="desc">豆包风格 UI · SSE 客户端 · useInterviewStream Hook</div>
+          <div class="port">:5173</div>
+        </div>
+        <div class="box wide">
+          <div class="title"><span class="dot accent"></span> nginx 反向代理</div>
+          <div class="desc">SSE 长连接 · gzip · 静态资源缓存</div>
+          <div class="port">:80</div>
+        </div>
+
+        <div class="layer-label api">Layer 2 · NestJS API（核心）</div>
+        <div class="box">
+          <div class="title"><span class="dot"></span> LLM Gateway</div>
+          <div class="desc">Qwen + DeepSeek 双模型路由 · 故障降级 · Token 计量</div>
+        </div>
+        <div class="box">
+          <div class="title"><span class="dot"></span> DeepAgents</div>
+          <div class="desc">SubAgent 编排 · 中间件 · Checkpoint</div>
+        </div>
+        <div class="box">
+          <div class="title"><span class="dot"></span> Memory 协调</div>
+          <div class="desc">三层记忆召回 · buildContext() 一次调用</div>
+        </div>
+        <div class="box">
+          <div class="title"><span class="dot"></span> Interview Controller</div>
+          <div class="desc">SSE 流式 · 业务编排 · Langfuse Span</div>
+        </div>
+
+        <div class="layer-label infra">Layer 3 · 基础设施（Docker）</div>
+        <div class="box wide primary">
+          <div class="title"><span class="dot"></span> Mem0 Cloud (SaaS)</div>
+          <div class="desc">FastAPI · pgvector 后端 · 自动去重 / 冲突合并 · LLM 提取候选人画像</div>
+          <div class="port">:8888 (REST + /docs)</div>
+        </div>
+        <div class="box wide">
+          <div class="title"><span class="dot"></span> Milvus Stack</div>
+          <div class="desc">etcd (元数据) + minio (对象存储) + milvus (向量) · 双 collection</div>
+          <div class="port">:19530 (gRPC) · :9091 (UI)</div>
+        </div>
+        <div class="box">
+          <div class="title"><span class="dot"></span> Redis</div>
+          <div class="desc">短期记忆 · 会话上下文 · 限流</div>
+          <div class="port">:6379</div>
+        </div>
+        <div class="box">
+          <div class="title"><span class="dot"></span> Postgres + pgvector</div>
+          <div class="desc">业务主库（Mem0 向量走云端）</div>
+          <div class="port">:5432</div>
+        </div>
+
+        <div class="layer-label obs">Layer 4 · 可观测</div>
+        <div class="box full">
+          <div class="title"><span class="dot accent"></span> Langfuse Cloud</div>
+          <div class="desc">Trace / Span / Generation 三层埋点 · 成本核算 · Prompt 仓 · 失败定位</div>
+          <div class="port">Trace ID 贯穿 LLM / Memory / Tool / Controller 全链路</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. 数据流 -->
+  <section>
+    <h2><span class="num">02</span> 一轮对话的数据流</h2>
+    <p class="sub">从用户输入到流式输出的完整链路，5 步可观察。</p>
+
+    <div class="flow">
+      <div class="step">
+        <div class="step-num">01 · INPUT</div>
+        <div class="step-name">用户发消息</div>
+        <div class="step-detail">SSE POST /message · userId + sessionId + text</div>
+      </div>
+      <div class="step">
+        <div class="step-num">02 · RECALL</div>
+        <div class="step-name">三层记忆召回</div>
+        <div class="step-detail">Redis 拉短期 · Mem0 语义搜长期 · Milvus 拉简历 RAG</div>
+      </div>
+      <div class="step">
+        <div class="step-num">03 · COMPRESS</div>
+        <div class="step-name">4 级水位线</div>
+        <div class="step-detail">Token 估算 → Snip → Prune → 增量摘要 · 保 Prompt Cache</div>
+      </div>
+      <div class="step">
+        <div class="step-num">04 · GENERATE</div>
+        <div class="step-name">DeepAgents 流式</div>
+        <div class="step-detail">SubAgent 决策 · 工具调用 · LLM Gateway 路由 · chunked SSE</div>
+      </div>
+      <div class="step">
+        <div class="step-num">05 · PERSIST</div>
+        <div class="step-name">异步记忆入库</div>
+        <div class="step-detail">Redis 推入 · Mem0 提取事实 · Langfuse Span 上报</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 三层记忆体系 -->
+  <section>
+    <h2><span class="num">03</span> 三层记忆体系</h2>
+    <p class="sub">不同生命周期 + 不同查询模式，各司其职。</p>
+
+    <div class="kv-grid">
+      <div class="kv-card">
+        <h3>Redis 短期</h3>
+        <div class="why">WHY · 实时会话上下文</div>
+        <dl>
+          <dt>存什么</dt><dd>最近 50 条消息</dd>
+          <dt>生命周期</dt><dd>TTL 1 小时</dd>
+          <dt>查询模式</dt><dd>LRU / 范围扫描</dd>
+          <dt>失败影响</dt><dd>丢失上下文（可接受）</dd>
+          <dt>端口</dt><dd>:6379</dd>
+        </dl>
+      </div>
+
+      <div class="kv-card">
+        <h3>Mem0 长期</h3>
+        <div class="why">WHY · 跨会话候选人画像</div>
+        <dl>
+          <dt>存什么</dt><dd>"擅长 X / 弱项 Y"</dd>
+          <dt>生命周期</dt><dd>永久</dd>
+          <dt>查询模式</dt><dd>语义搜索 topK</dd>
+          <dt>特色</dt><dd>LLM 去重 · 自动合并冲突</dd>
+          <dt>后端</dt><dd>pgvector (Postgres)</dd>
+        </dl>
+      </div>
+
+      <div class="kv-card">
+        <h3>Milvus 简历 RAG</h3>
+        <div class="why">WHY · 历史简历检索</div>
+        <dl>
+          <dt>存什么</dt><dd>简历 summary + skill 向量</dd>
+          <dt>生命周期</dt><dd>永久</dd>
+          <dt>查询模式</dt><dd>cosine 相似度 topK=5</dd>
+          <dt>特色</dt><dd>独立 collection · 元数据过滤</dd>
+          <dt>端口</dt><dd>:19530 (etcd+minio 依赖)</dd>
+        </dl>
+      </div>
+
+      <div class="kv-card">
+        <h3>Postgres 业务</h3>
+        <div class="why">WHY · 用户/面试主数据</div>
+        <dl>
+          <dt>存什么</dt><dd>User · Interview · Message</dd>
+          <dt>生命周期</dt><dd>永久</dd>
+          <dt>查询模式</dt><dd>Prisma ORM</dd>
+          <dt>特色</dt><dd>纯业务库，Mem0 向量走云端</dd>
+          <dt>端口</dt><dd>:5432</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. 简历亮点 vs 工程量 -->
+  <section>
+    <h2><span class="num">04</span> 五大简历亮点 · 面试深挖点</h2>
+    <p class="sub">每个亮点都有可深挖的设计决策，不是"用了 XX"这种空话。</p>
+
+    <div style="background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 8px 24px;">
+
+      <div class="bench-row">
+        <span class="bench-label">DeepAgents 集成</span>
+        <div class="bench-track"><div class="bench-fill" style="width: 95%;"></div></div>
+        <span class="bench-val">SubAgent · 中间件 · Checkpoint</span>
+      </div>
+      <div class="bench-row">
+        <span class="bench-label">三层记忆体系</span>
+        <div class="bench-track"><div class="bench-fill" style="width: 88%;"></div></div>
+        <span class="bench-val">Redis + Mem0 Cloud + Milvus 真实接入</span>
+      </div>
+      <div class="bench-row">
+        <span class="bench-label">ContextManager</span>
+        <div class="bench-track"><div class="bench-fill" style="width: 90%;"></div></div>
+        <span class="bench-val">4 级水位线 · 保 Prompt Cache</span>
+      </div>
+      <div class="bench-row">
+        <span class="bench-label">LLM Gateway</span>
+        <div class="bench-track"><div class="bench-fill" style="width: 75%;"></div></div>
+        <span class="bench-val">双模型路由 + 降级</span>
+      </div>
+      <div class="bench-row">
+        <span class="bench-label">Docker 真实集成</span>
+        <div class="bench-track"><div class="bench-fill" style="width: 85%;"></div></div>
+        <span class="bench-val">9 服务 · 无 Mock</span>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 5. 深挖示例 -->
+  <section>
+    <h2><span class="num">05</span> 面试深挖示例</h2>
+    <p class="sub">真实会被问的问题 + 我的标准回答方向。</p>
+
+    <div class="kv-grid">
+      <div class="kv-card">
+        <h3>DeepAgents vs LangGraph？</h3>
+        <div class="why">FOLLOW-UP</div>
+        <p style="font-size: 13px; line-height: 1.6;">
+          DeepAgents 内置 SubAgent + Plan-and-Execute，开箱即用；
+          LangGraph 更底层，要自己画状态机。我选 DeepAgents 是因为 SubAgent 抽象正好对应"面试官 / 评估官 / 总结官"分工，不需要从零画图。
+        </p>
+      </div>
+
+      <div class="kv-card">
+        <h3>为什么需要 3 层记忆？</h3>
+        <div class="why">FOLLOW-UP</div>
+        <p style="font-size: 13px; line-height: 1.6;">
+          单一存储不划算：Redis 实时但丢；Mem0 语义但慢；Milvus 简历 RAG 维度不一样（候选人画像 vs 简历原文）。三层分别优化，互不污染。
+        </p>
+      </div>
+
+      <div class="kv-card">
+        <h3>stub 滑窗为什么是 Cache 杀手？</h3>
+        <div class="why">DEEP</div>
+        <p style="font-size: 13px; line-height: 1.6;">
+          Prompt Cache 按 prefix 字节匹配，stub 决策一旦来回滑，全段 prefix 字节变 → 缓存全失效。必须单调推进才能保住 Cache 命中。
+        </p>
+      </div>
+
+      <div class="kv-card">
+        <h3>Mem0 Cloud vs 自托管？</h3>
+        <div class="why">OPS</div>
+        <p style="font-size: 13px; line-height: 1.6;">
+          Cloud 走 SaaS（Token 鉴权即用，0 部署成本）；OSS 自托管需要 Postgres + pgvector + Python 服务 = 2 个容器。简历项目用 Cloud 更聚焦业务逻辑，商用切 OSS 拿数据主权。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>interview-agent · architecture v2.0</span>
+    <span>DeepAgents + Mem0 Cloud + Milvus</span>
+  </footer>
+
+</div>
+</body>
+</html>
