@@ -1,0 +1,361 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { LlmGatewayService } from '../llm/llm.gateway.service';
+import { MemoryService } from '../memory/memory.service';
+import { LangfuseService } from '../../infra/langfuse/langfuse.service';
+import { BochaSearchTool } from './tools/bocha-search.tool';
+import { ContextManager } from './services/context-manager.service';
+import { DeepAgentsAgentService } from './deepagents-agent.service';
+import { PrismaService } from '../../infra/prisma/prisma.service';
+import { McpRegistry } from '../interview/services/mcp-registry';
+import { ChatMessage, StreamChunk } from '../llm/providers/types';
+import { extractFirstJsonObject, safeJsonParse } from '../../common/json-extract';
+import {
+  matchBank,
+  pickQuestions,
+  buildScoringRubric,
+  type BankKey,
+  type Question,
+} from '../interview/knowledge-banks';
+
+export interface AgentEvent {
+  type: 'token' | 'tool_call' | 'tool_result' | 'done' | 'error' | 'question';
+  content?: string;
+  toolName?: string;
+  toolResult?: any;
+  error?: string;
+  question?: Question;
+}
+
+export interface AgentContext {
+  userId: string;
+  sessionId: string;
+  position: string;
+  level: string;
+}
+
+@Injectable()
+export class InterviewAgentService {
+  private readonly logger = new Logger(InterviewAgentService.name);
+
+  constructor(
+    private llm: LlmGatewayService,
+    private memory: MemoryService,
+    private langfuse: LangfuseService,
+    private bocha: BochaSearchTool,
+    private contextMgr: ContextManager,
+    private deepAgents: DeepAgentsAgentService,
+    private prisma: PrismaService,
+  ) { }
+
+  /**
+   * 处理候选人消息 - 核心流式入口
+   */
+  async *processMessage(
+    ctx: AgentContext,
+    userInput: string,
+  ): AsyncGenerator<AgentEvent, void, void> {
+    // P0: 启动会话级成本追踪（幂等）
+    try {
+      await this.llm.startSession(ctx.sessionId, ctx.userId);
+    } catch (e) {
+      this.logger.debug(`startSession cost failed (non-fatal): ${e.message}`);
+    }
+
+    const trace = this.langfuse.startTrace({
+      name: 'interview.process_message',
+      userId: ctx.userId,
+      sessionId: ctx.sessionId,
+      metadata: { position: ctx.position, level: ctx.level },
+    });
+    const traceId = trace?.id;
+
+    try {
+      await this.memory.appendMessage(ctx.sessionId, {
+        role: 'user',
+        content: userInput,
+      });
+
+      const context = await this.memory.buildContext(
+        ctx.sessionId,
+        ctx.userId,
+        userInput,
+      );
+      this.langfuse.logSpan({
+        traceId,
+        name: 'memory.recall',
+        output: {
+          longTermCount: context.recalledMemories.length,
+          shortTermCount: context.shortTermMessages.length,
+        },
+      });
+
+      // 知识库驱动：根据岗位匹配 + 选题
+      const bank: BankKey = matchBank(ctx.position);
+      const questions = pickQuestions(bank, 5);
+      const currentQuestion = this.findCurrentQuestion(context.shortTermMessages, questions);
+
+      // 如果有当前题目，把题目和评分要点塞进 system prompt
+      const questionContext = currentQuestion
+        ? `\n\n【当前正在提问的题目】\n${currentQuestion.question}\n` +
+        `【考察点（评分依据）】\n${currentQuestion.keyPoints.join('\n- ')}\n` +
+        `【参考答案】\n${currentQuestion.referenceAnswer}\n` +
+        `（请基于以上要点评估候选人的回答，必要时追问或过渡到下一题）`
+        : `\n\n【题目已问完，进入收尾阶段】可以总结候选人表现并询问他有什么想问你的。`;
+
+      const systemPrompt =
+        `你是一位专业的 AI 面试官小面，正在面试【${ctx.position}】岗位（${ctx.level}）的候选人。\n\n` +
+        `【出题范围】${bank === 'agent' ? 'AI Agent / LLM 工程' : '前端开发'}方向，从知识库出题。\n` +
+        `【对话原则】每次只问一个题，候选人回答后先简要认可或追问，再进入下一题。\n` +
+        `【风格】专业、友好、像真人面试官，不要用 Markdown 标题。\n` +
+        `【候选人历史】\n${context.longTermContext || '暂无'}` +
+        questionContext;
+
+      // ===== 按用户偏好过滤工具 =====
+      const userPrefs = await this.prisma.userToolPreference.findMany({
+        where: { userId: ctx.userId },
+      });
+      const userPrefMap = new Map<string, boolean>(userPrefs.map((p) => [p.toolName, p.enabled]));
+      const availableTools = await McpRegistry.getAvailableTools(ctx.userId, userPrefMap);
+
+      // 构建 LLM tools 定义：只包含系统+用户都启用的工具
+      const tools: any[] = [];
+      const toolNames = new Set(availableTools.map((t) => t.name));
+      if (toolNames.has('bocha_search')) {
+        tools.push(BochaSearchTool.definition);
+      }
+
+      this.langfuse.logSpan({
+        traceId,
+        name: 'tools.filtered',
+        output: {
+          total: McpRegistry.count(),
+          available: availableTools.length,
+          toolNames: availableTools.map((t) => t.name),
+        },
+      });
+
+      let fullResponse = '';
+      const messages: ChatMessage[] = [
+        { role: 'system', content: systemPrompt },
+        ...context.shortTermMessages,
+        { role: 'user', content: userInput },
+      ];
+
+      // ===== 上下文压缩（MUR AI 4 级水位线）=====
+      const beforeTokens = this.estimateMessagesTokens(messages);
+      const MAX_TOKENS = 32000; // 千问 plus 上限（保守值）
+      const compaction = this.contextMgr.compact(messages, beforeTokens, MAX_TOKENS);
+
+      // Langfuse 埋点：可观测压缩行为
+      this.langfuse.logSpan({
+        traceId,
+        name: 'context.compact',
+        output: {
+          tier: compaction.tier,
+          beforeTokens,
+          afterTokens: compaction.afterTokens,
+          savedTokens: compaction.savedTokens,
+          stubCount: compaction.stubCount,
+          protectedCount: compaction.protectedCount,
+        },
+      });
+
+      let finalMessages = compaction.messages;
+      if (compaction.summarizeNeeded) {
+        // Tier 3: 调 LLM 做增量摘要
+        const { summary } = await this.contextMgr.summarize(
+          compaction.messages,
+          '', // 简化：暂不持久化 previousSummary
+          async (prompt) => {
+            const res = await this.llm.chat({
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.3,
+              traceId,
+            });
+            return res.content;
+          },
+        );
+        finalMessages = [
+          { role: 'system', content: systemPrompt },
+          { role: 'system', content: `【之前对话摘要】\n${summary}` },
+          { role: 'user', content: userInput },
+        ];
+        this.langfuse.logSpan({
+          traceId,
+          name: 'context.summarize',
+          output: { summaryLength: summary.length },
+        });
+      }
+
+      // ===== 写真实 deepagents 调用 =====
+      const useDeepAgents = this.deepAgents.isReady();
+      this.langfuse.logSpan({
+        traceId,
+        name: 'agent.engine',
+        output: { engine: useDeepAgents ? 'deepagents' : 'fallback-handwritten' },
+      });
+
+      if (useDeepAgents) {
+        // deepagents 接管（流式）
+        const llmMessages = finalMessages.map((m) => ({
+          role: m.role as 'system' | 'user' | 'assistant',
+          content: m.content,
+        }));
+
+        for await (const chunk of this.deepAgents.stream(systemPrompt, llmMessages)) {
+          fullResponse += chunk;
+          yield { type: 'token', content: chunk };
+        }
+      } else {
+        // 兜底：手写循环 - P0 接入：传 interviewId / userId / semanticCacheType
+        for await (const chunk of this.llm.streamChat({
+          messages: finalMessages,
+          tools,
+          temperature: 0.7,
+          traceId,
+          interviewId: ctx.sessionId,
+          userId: ctx.userId,
+          semanticCacheType: 'interview_question', // P0-2: 面试题启用白名单
+        })) {
+          if (chunk.content) {
+            fullResponse += chunk.content;
+            yield { type: 'token', content: chunk.content };
+          }
+        }
+      }
+
+      const needsSearch = toolNames.has('bocha_search') && this.detectSearchIntent(userInput, fullResponse);
+      if (needsSearch) {
+        yield { type: 'tool_call', toolName: 'bocha_search' };
+        const searchResult = await this.bocha.execute({ query: userInput });
+        yield { type: 'tool_result', toolName: 'bocha_search', toolResult: searchResult };
+      }
+
+      await this.memory.appendMessage(ctx.sessionId, {
+        role: 'assistant',
+        content: fullResponse,
+      });
+
+      // 提取最后一个 chunk 的 usage（粗暴但能用）
+      // 不用 setImmediate 异步了——直接 await，确保记忆写入
+      try {
+        await this.memory.memorize(ctx.userId, [
+          ...context.shortTermMessages.slice(-4),
+          { role: 'user', content: userInput },
+          { role: 'assistant', content: fullResponse },
+        ]);
+        this.logger.debug(`Memorized for user ${ctx.userId}`);
+      } catch (err) {
+        this.logger.error(`memorize failed: ${err.message}`);
+      }
+
+      yield { type: 'done' };
+    } catch (err) {
+      this.logger.error(`Agent process failed: ${err.message}`, err.stack);
+      yield { type: 'error', error: err.message };
+    } finally {
+      setImmediate(() => this.langfuse.flush().catch(() => { }));
+    }
+  }
+
+  /**
+   * 从短期记忆中推断当前在问哪道题
+   * 简化：用 assistant 最后一次完整回复匹配题目前缀
+   */
+  private findCurrentQuestion(
+    _shortTerm: ChatMessage[],
+    questions: Question[],
+  ): Question | null {
+    // 简化：返回第一道未完成的题（实际生产可以追踪已问过的）
+    // 这里取第一题——MVP 阶段够用
+    return questions[0] || null;
+  }
+
+  /**
+   * 生成面试报告 - 基于知识库评分
+   */
+  async generateReport(
+    ctx: AgentContext,
+    conversation: ChatMessage[],
+  ): Promise<{
+    overallScore: number;
+    scores: Record<string, number>;
+    strengths: string[];
+    weaknesses: string[];
+    suggestions: string[];
+  }> {
+    const bank: BankKey = matchBank(ctx.position);
+    const questions = pickQuestions(bank, 5);
+    const rubric = buildScoringRubric(bank, questions);
+
+    const prompt =
+      `你是一位严格的面试评估 AI。请基于以下评分细则评估候选人表现。\n\n` +
+      `【岗位】${ctx.position}（${ctx.level}）\n\n` +
+      `【评分细则（每道题的考察点和参考答案）】\n${rubric}\n\n` +
+      `【候选人对话】\n${conversation.map((m) => `${m.role}: ${m.content}`).join('\n')}\n\n` +
+      `【评估维度】（每项 0-100）\n` +
+      `1. technical（技术深度）：候选人回答命中了多少 keyPoints\n` +
+      `2. communication（沟通表达）：思路是否清晰\n` +
+      `3. logic（逻辑思维）：分析问题是否有条理\n` +
+      `4. learning（学习能力）：面对陌生问题的反应\n\n` +
+      `【输出格式】严格 JSON,只用 double quotes,无注释,无尾逗号：\n` +
+      `\`\`\`json\n` +
+      `{\n` +
+      `  "overallScore": <总分 0-100>,\n` +
+      `  "scores": { "technical": <0-100>, "communication": <0-100>, "logic": <0-100>, "learning": <0-100> },\n` +
+      `  "strengths": ["优点1", "优点2", "优点3"],\n` +
+      `  "weaknesses": ["不足1", "不足2"],\n` +
+      `  "suggestions": ["建议1", "建议2", "建议3"]\n` +
+      `}\n` +
+      `\`\`\`\n\n` +
+      `【重要】只输出一个 JSON object,不要其他解释文字。`;
+
+    const response = await this.llm.chat({
+      messages: [
+        { role: 'system', content: '你是一个严格的面试评估 AI。' },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.3,
+    });
+
+    // 调试：记录 LLM 原始输出（出问题排查用）
+    if (process.env.DEBUG_LLM_RESPONSE === 'true') {
+      this.logger.debug(`LLM report response: ${response.content.slice(0, 500)}...`);
+    }
+
+    const parsed = safeJsonParse<{
+      overallScore: number;
+      scores: Record<string, number>;
+      strengths: string[];
+      weaknesses: string[];
+      suggestions: string[];
+    }>(response.content);
+
+    if (!parsed.ok) {
+      const errMsg = (parsed as { ok: false; error: string }).error;
+      this.logger.error(`generateReport JSON parse failed: ${errMsg}`);
+      this.logger.error(`LLM raw response (first 1000 chars): ${response.content.slice(0, 1000)}`);
+      throw new Error(`Failed to parse scoring result: ${errMsg}`);
+    }
+    const result = (parsed as { ok: true; value: any }).value;
+    return {
+      ...result,
+      usage: response.usage, // 把 token 透出给 controller
+    } as any;
+  }
+
+  private detectSearchIntent(userInput: string, aiResponse: string): boolean {
+    const keywords = /最新|现在|2024|2025|趋势|动态|进展|recent|latest/i;
+    return keywords.test(userInput) || keywords.test(aiResponse);
+  }
+
+  private estimateMessagesTokens(messages: ChatMessage[]): number {
+    let total = 0;
+    for (const m of messages) {
+      const text = m.content || '';
+      const en = (text.match(/[a-zA-Z\s]/g) || []).length;
+      total += Math.ceil(en / 4 + (text.length - en) / 1.5);
+    }
+    return total;
+  }
+}
