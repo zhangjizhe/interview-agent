@@ -41,3 +41,21 @@ coverage/
 postgres_data/
 redis_data/
 qdrant_data/
+
+# 敏感 / 私人文件（不入公开库）
+SESSION-CONTEXT.md
+HOMECOMPUTER-SETUP.md
+package-project.sh
+.joycode/
+.mavis/
+
+# 个人简历与面试问答（不入公开库）
+docs/RESUME.md
+
+# 第三方抓取的电子书（版权风险，生成产物不入库）
+scripts/ai-interview-ebook.html
+scripts/fetch-ebook*.py
+scripts/clean-ebook.py
+
+# 第三方 vendor 源码（不随仓库分发，改用 image 拉取）
+docker/mem0/
