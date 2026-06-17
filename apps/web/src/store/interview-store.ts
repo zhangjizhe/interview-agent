@@ -16,6 +16,10 @@ interface Resume {
 }
 
 interface InterviewState {
+  // ========== 渲染触发器（解决 React batching 问题）==========
+  _renderCount: number;
+  forceRender: () => void;
+
   // ========== 消息流（流式核心） ==========
   messages: ChatMessage[];
   /** 追加一条完整消息（用户或 assistant 占位） */
@@ -62,11 +66,20 @@ interface InterviewState {
   confirming: boolean;
   setConfirming: (confirming: boolean) => void;
 
+  // ========== 流式状态（Transient） ==========
+  streaming: boolean;
+  setStreaming: (v: boolean) => void;
+  reconnecting: boolean;
+  setReconnecting: (v: boolean) => void;
+  error: string | null;
+  setError: (e: string | null) => void;
+
   // ========== 重置 ==========
   reset: () => void;
 }
 
 const initialState = {
+  _renderCount: 0,
   messages: [] as ChatMessage[],
   agentEvents: [] as AgentEvent[],
   input: '',
@@ -80,10 +93,15 @@ const initialState = {
   uploading: false,
   uploadedName: null,
   confirming: false,
+  streaming: false,
+  reconnecting: false,
+  error: null,
 };
 
 export const useInterviewStore = create<InterviewState>((set, get) => ({
   ...initialState,
+
+  forceRender: () => set((s) => ({ _renderCount: s._renderCount + 1 })),
 
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 
@@ -137,6 +155,13 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   setUploadedName: (uploadedName) => set({ uploadedName }),
 
   setConfirming: (confirming) => set({ confirming }),
+
+  streaming: false,
+  setStreaming: (streaming) => set({ streaming }),
+  reconnecting: false,
+  setReconnecting: (reconnecting) => set({ reconnecting }),
+  error: null,
+  setError: (error) => set({ error }),
 
   reset: () => set(initialState),
 }));
