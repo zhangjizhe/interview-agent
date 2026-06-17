@@ -44,6 +44,8 @@ export function InterviewPage() {
   const uploadedName = useInterviewStore((s) => s.uploadedName);
   const confirming = useInterviewStore((s) => s.confirming);
   const input = useInterviewStore((s) => s.input);
+  const streaming = useInterviewStore((s) => s.streaming);
+  const reconnecting = useInterviewStore((s) => s.reconnecting);
   const agentEvents = useInterviewStore((s) => s.agentEvents);
 
   const setInput = useInterviewStore((s) => s.setInput);
@@ -59,7 +61,7 @@ export function InterviewPage() {
   const setConfirming = useInterviewStore((s) => s.setConfirming);
   const addTokens = useInterviewStore((s) => s.addTokens);
 
-  const { streaming, reconnecting, send } = useInterviewStream();
+  const { send } = useInterviewStream();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

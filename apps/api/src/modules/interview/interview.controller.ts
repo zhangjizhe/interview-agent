@@ -548,6 +548,7 @@ export class InterviewController {
     });
     if (!interview) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: 'Interview not found' })}\n\n`);
+      (res as any).flush?.();
       res.end();
       return;
     }
@@ -563,55 +564,26 @@ export class InterviewController {
       level: interview.level,
     };
 
+    const writeEvent = (event: object) => {
+      const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
+      (res as any).flush?.();
+      if (!ok) return new Promise<void>((r) => res.once('drain', r));
+      return Promise.resolve();
+    };
+
     let fullResponse = '';
+
+    // 始终走单 Agent 流式路径（processMessage 是 AsyncGenerator，逐 token yield）
+    // Multi-Agent 需要改造才能真正流式，暂时禁用走这条路
     try {
-      // 优先走 Multi-Agent（Supervisor + Planner + Executor + Replanner + Reviewer）
-      // 失败/未初始化则降级到老的 InterviewAgentService
-      if (this.multiAgent.isEnabled()) {
-        try {
-          this.logger.log(`[multi-agent] user=${ctx.userId} msg="${dto.content.slice(0, 50)}..."`);
-          const result = await this.multiAgent.run(dto.content, interviewId);
-          fullResponse = result.response;
-          // 把意图/plan 写在 meta 事件里，前端调试可见
-          res.write(
-            `data: ${JSON.stringify({
-              type: 'meta',
-              engine: 'multi-agent',
-              intent: result.intent,
-              steps: result.steps,
-              plan: (result.plan || []).map((s: any) => s.description || s.id),
-            })}\n\n`,
-          );
-          // 按 8 字符一块 yield，模拟流式（每个 chunk 之间 flush + 短暂延迟，前端能看到打字机效果）
-          const chunkSize = 8;
-          for (let i = 0; i < fullResponse.length; i += chunkSize) {
-            const token = fullResponse.slice(i, i + chunkSize);
-            const ok = res.write(`data: ${JSON.stringify({ type: 'token', content: token })}\n\n`);
-            if (!ok) await new Promise<void>((r) => res.once('drain', r));
-            // 8ms 让事件循环 flush socket buffer，前端能逐字看到
-            await new Promise((r) => setTimeout(r, 8));
-          }
-        } catch (mErr: any) {
-          this.logger.warn(`MultiAgent failed, fallback to single: ${mErr.message}`);
-          for await (const event of this.agent.processMessage(ctx, dto.content)) {
-            if (event.type === 'token' && event.content) {
-              fullResponse += event.content;
-            }
-            const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
-            if (!ok) await new Promise<void>((r) => res.once('drain', r));
-          }
+      for await (const event of this.agent.processMessage(ctx, dto.content)) {
+        if (event.type === 'token' && event.content) {
+          fullResponse += event.content;
         }
-      } else {
-        for await (const event of this.agent.processMessage(ctx, dto.content)) {
-          if (event.type === 'token' && event.content) {
-            fullResponse += event.content;
-          }
-          const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
-          if (!ok) await new Promise<void>((r) => res.once('drain', r));
-        }
+        await writeEvent(event);
       }
 
-      const totalPrompt = Math.ceil((dto.content.length + (fullResponse.length * 0.3)) / 2);
+      const totalPrompt = Math.ceil((dto.content.length + fullResponse.length * 0.3) / 2);
       const totalCompletion = Math.ceil(fullResponse.length / 2);
 
       if (fullResponse) {
@@ -624,20 +596,20 @@ export class InterviewController {
             completionTokens: totalCompletion,
           },
         });
-        res.write(
-          `data: ${JSON.stringify({
-            type: 'token_usage',
-            promptTokens: totalPrompt,
-            completionTokens: totalCompletion,
-            total: totalPrompt + totalCompletion,
-          })}\n\n`,
-        );
+        await writeEvent({
+          type: 'token_usage',
+          promptTokens: totalPrompt,
+          completionTokens: totalCompletion,
+          total: totalPrompt + totalCompletion,
+        });
       }
 
       res.write('data: [DONE]\n\n');
+      (res as any).flush?.();
       res.end();
     } catch (err) {
-      res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'error', error: (err as Error).message })}\n\n`);
+      (res as any).flush?.();
       res.end();
     }
   }
