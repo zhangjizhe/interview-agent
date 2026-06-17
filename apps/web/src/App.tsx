@@ -1,12 +1,32 @@
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, lazy, Suspense, useEffect } from 'react';
 import { Cpu, Database } from 'lucide-react';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { HomePage } from './pages/HomePage';
-import { InterviewPage } from './pages/InterviewPage';
-import { QuestionBankPage } from './pages/QuestionBankPage';
-import { ToolsPage } from './pages/ToolsPage';
-import { AdminMcpPage } from './pages/AdminMcpPage';
+import { initWebVitals } from './utils/web-vitals';
+
+// 路由级懒加载 — 首屏不加载 InterviewPage / QuestionBankPage / ToolsPage / AdminMcpPage
+const InterviewPage = lazy(() =>
+  import('./pages/InterviewPage').then((m) => ({ default: m.InterviewPage })),
+);
+const QuestionBankPage = lazy(() =>
+  import('./pages/QuestionBankPage').then((m) => ({ default: m.QuestionBankPage })),
+);
+const ToolsPage = lazy(() =>
+  import('./pages/ToolsPage').then((m) => ({ default: m.ToolsPage })),
+);
+const AdminMcpPage = lazy(() =>
+  import('./pages/AdminMcpPage').then((m) => ({ default: m.AdminMcpPage })),
+);
+
+function PageSpinner() {
+  return (
+    <div className="flex items-center justify-center h-[60vh]">
+      <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function WallEIcon({ className = 'w-8 h-8' }: { className?: string }) {
   return (
@@ -158,17 +178,24 @@ function ToolsIndicator() {
 }
 
 export default function App() {
+  // 初始化 Web Vitals 性能监控
+  useEffect(() => { initWebVitals(); }, []);
+
   return (
     <div className="min-h-screen">
       <TopBar />
       <main>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/interview/:id" element={<InterviewPage />} />
-          <Route path="/question-bank" element={<QuestionBankPage />} />
-          <Route path="/tools" element={<ToolsPage />} />
-          <Route path="/admin/mcp" element={<AdminMcpPage />} />
-        </Routes>
+        <ErrorBoundary>
+          <Suspense fallback={<PageSpinner />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/interview/:id" element={<InterviewPage />} />
+              <Route path="/question-bank" element={<QuestionBankPage />} />
+              <Route path="/tools" element={<ToolsPage />} />
+              <Route path="/admin/mcp" element={<AdminMcpPage />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   );
