@@ -14,6 +14,10 @@ export interface ResumeAnalysis {
   seniority: 'junior' | 'mid' | 'senior' | 'architect';
 }
 
+export interface ParsedResume extends ResumeAnalysis {
+  rawText: string;
+}
+
 @Injectable()
 export class ResumeParserService {
   private readonly logger = new Logger(ResumeParserService.name);
@@ -27,7 +31,21 @@ export class ResumeParserService {
     '项目管理', '团队管理', '架构设计',
   ]);
 
-  async parse(rawText: string, userPosition?: string): Promise<ResumeAnalysis> {
+  async parse(fileOrText: any, userPosition?: string): Promise<ParsedResume> {
+    // 判断是文件对象还是字符串
+    let rawText: string;
+    if (typeof fileOrText === 'string') {
+      rawText = fileOrText;
+    } else if (fileOrText?.buffer) {
+      // Multer 文件对象
+      rawText = fileOrText.buffer.toString('utf-8');
+    } else if (fileOrText?.originalname) {
+      // 其他文件对象，尝试读取 buffer
+      rawText = fileOrText.buffer?.toString('utf-8') || '';
+    } else {
+      throw new Error('Unsupported input type for parse');
+    }
+
     const text = rawText.trim().toLowerCase();
     const sentences = rawText.split(/[\n。！？]/).map((s) => s.trim()).filter((s) => s);
 
@@ -54,6 +72,7 @@ export class ResumeParserService {
       keywords,
       summary,
       seniority,
+      rawText,
     };
   }
 
