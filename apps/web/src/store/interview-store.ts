@@ -16,6 +16,10 @@ interface InterviewState {
   updateLastMessage: (content: string, streaming?: boolean) => void;
   setMessages: (messages: InterviewState['messages']) => void;
 
+  // 输入
+  input: string;
+  setInput: (input: string) => void;
+
   // 报告
   report: Report | null;
   setReport: (report: Report | null) => void;
@@ -25,6 +29,8 @@ interface InterviewState {
   setResume: (resume: Resume | null) => void;
   resumeConfirmed: boolean;
   setResumeConfirmed: (confirmed: boolean) => void;
+  resumePanelOpen: boolean;
+  setResumePanelOpen: (open: boolean) => void;
 
   // UI 状态
   ending: boolean;
@@ -46,9 +52,11 @@ interface InterviewState {
 
 const initialState = {
   messages: [],
+  input: '',
   report: null,
   resume: null,
   resumeConfirmed: true,
+  resumePanelOpen: false,
   ending: false,
   drawerOpen: false,
   sessionTokens: 0,
@@ -76,11 +84,15 @@ export const useInterviewStore = create<InterviewState>((set) => ({
 
   setMessages: (messages) => set({ messages }),
 
+  setInput: (input) => set({ input }),
+
   setReport: (report) => set({ report }),
 
   setResume: (resume) => set({ resume }),
 
   setResumeConfirmed: (resumeConfirmed) => set({ resumeConfirmed }),
+
+  setResumePanelOpen: (resumePanelOpen) => set({ resumePanelOpen }),
 
   setEnding: (ending) => set({ ending }),
 
