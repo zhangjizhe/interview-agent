@@ -4,18 +4,30 @@ import { MilvusLongTermMemory } from './long-term/milvus-memory.store';
 import { Mem0CloudMemory } from './long-term/mem0.store';
 import { ChatMessage, Memory } from './interfaces/memory-store.interface';
 
-/**
- * 记忆服务 - 写真实 Milvus + Mem0 双引擎
- *
- * - 短期：Redis List（会话上下文，TTL）
- * - 长期：Milvus（自建向量库，写真实） + Mem0（云服务，自动去重）
- *
- * Mem0 启用时：memorize 同时写两边（Milvus 作本地索引，Mem0 作云端去重）
- * Mem0 失败时：自动降级到只写 Milvus
- */
+interface AuditEntry {
+  action: 'create' | 'update' | 'recall' | 'delete' | 'expire';
+  timestamp: number;
+  userId: string;
+  sessionId?: string;
+  memoryId?: string;
+  reason?: string;
+}
+
+interface MemoryMetadata {
+  createdAt: number;
+  lastAccessedAt: number;
+  accessCount: number;
+  validated: boolean;
+  audit: AuditEntry[];
+}
+
 @Injectable()
 export class MemoryService {
   private readonly logger = new Logger(MemoryService.name);
+  private memoryMetadata = new Map<string, MemoryMetadata>();
+  private readonly TTL_SHORT_TERM = 24 * 60 * 60 * 1000;
+  private readonly TTL_LONG_TERM = 30 * 24 * 60 * 60 * 1000;
+  private readonly MAX_ACCESS_AGE = 7 * 24 * 60 * 60 * 1000;
 
   constructor(
     private shortTerm: RedisShortTermMemory,
@@ -23,9 +35,60 @@ export class MemoryService {
     private mem0: Mem0CloudMemory,
   ) {}
 
-  // ===== 短期 =====
+  private getMemoryKey(userId: string, content: string): string {
+    return `${userId}-${content.slice(0, 50).hashCode()}`;
+  }
+
+  private validateMemoryContent(content: string): boolean {
+    if (!content || content.trim().length === 0) return false;
+    if (content.length > 10000) return false;
+    const suspiciousPatterns = [
+      /(最新消息|内部消息|机密)/i,
+      /(投资|理财|股票|加密货币)/i,
+      /(点击这里|立即购买|扫码)/i,
+    ];
+    return !suspiciousPatterns.some((pattern) => pattern.test(content));
+  }
+
+  private recordAudit(memoryKey: string, entry: Omit<AuditEntry, 'timestamp'>): void {
+    const metadata = this.memoryMetadata.get(memoryKey) || {
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now(),
+      accessCount: 0,
+      validated: false,
+      audit: [],
+    };
+    metadata.audit.push({ ...entry, timestamp: Date.now() });
+    this.memoryMetadata.set(memoryKey, metadata);
+  }
+
+  private async cleanupExpiredMemories(userId: string): Promise<void> {
+    const now = Date.now();
+    const expiredKeys: string[] = [];
+    
+    this.memoryMetadata.forEach((metadata, key) => {
+      if (key.startsWith(userId) && now - metadata.lastAccessedAt > this.MAX_ACCESS_AGE) {
+        expiredKeys.push(key);
+        this.recordAudit(key, { action: 'expire', userId, reason: '长期未访问' });
+      }
+    });
+
+    expiredKeys.forEach((key) => {
+      this.memoryMetadata.delete(key);
+    });
+
+    if (expiredKeys.length > 0) {
+      this.logger.debug(`[Memory] Cleaned up ${expiredKeys.length} expired memories for ${userId}`);
+    }
+  }
+
   async appendMessage(sessionId: string, msg: ChatMessage): Promise<void> {
-    return this.shortTerm.appendMessage(sessionId, msg);
+    const isValid = this.validateMemoryContent(msg.content);
+    if (!isValid) {
+      this.logger.warn(`[Memory] Invalid content rejected for session ${sessionId}`);
+      return;
+    }
+    await this.shortTerm.appendMessage(sessionId, msg);
   }
 
   async getRecentMessages(sessionId: string, limit = 20): Promise<ChatMessage[]> {
@@ -33,15 +96,22 @@ export class MemoryService {
   }
 
   async clearSession(sessionId: string): Promise<void> {
+    this.recordAudit(sessionId, { action: 'delete', userId: 'unknown', reason: 'session cleared' });
     return this.shortTerm.clearSession(sessionId);
   }
 
-  // ===== 长期 - 双写策略 =====
   async memorize(userId: string, messages: ChatMessage[]): Promise<void> {
-    // 写真实：双写 Milvus + Mem0
+    const validMessages = messages.filter((m) => this.validateMemoryContent(m.content));
+    if (validMessages.length !== messages.length) {
+      this.logger.warn(`[Memory] Filtered ${messages.length - validMessages.length} invalid messages`);
+    }
+
+    const memoryKey = this.getMemoryKey(userId, validMessages.map((m) => m.content).join('|'));
+    this.recordAudit(memoryKey, { action: 'create', userId, reason: 'memorize' });
+
     const results = await Promise.allSettled([
-      this.milvus.memorize(userId, messages, 'conversation'),
-      this.mem0.memorize(userId, messages),
+      this.milvus.memorize(userId, validMessages, 'conversation'),
+      this.mem0.memorize(userId, validMessages),
     ]);
 
     results.forEach((r, i) => {
@@ -52,10 +122,16 @@ export class MemoryService {
         this.logger.debug(`${target} memorize ok`);
       }
     });
+
+    await this.cleanupExpiredMemories(userId);
   }
 
   async recall(userId: string, query: string, limit = 5): Promise<Memory[]> {
-    // 写真实：优先 Milvus（更快），Mem0 作补充
+    if (!this.validateMemoryContent(query)) {
+      this.logger.warn(`[Memory] Invalid query rejected for user ${userId}`);
+      return [];
+    }
+
     const results = await Promise.allSettled([
       this.milvus.recall(userId, query, limit),
       this.mem0.recall(userId, query, limit),
@@ -64,7 +140,6 @@ export class MemoryService {
     const milvusMemories = results[0].status === 'fulfilled' ? results[0].value : [];
     const mem0Memories = results[1].status === 'fulfilled' ? results[1].value : [];
 
-    // 合并去重（按内容前 50 字符）
     const seen = new Set<string>();
     const merged: Memory[] = [];
     for (const m of [...milvusMemories, ...mem0Memories]) {
@@ -72,6 +147,15 @@ export class MemoryService {
       if (!seen.has(key)) {
         seen.add(key);
         merged.push(m);
+        
+        const memoryKey = this.getMemoryKey(userId, m.content);
+        const metadata = this.memoryMetadata.get(memoryKey);
+        if (metadata) {
+          metadata.lastAccessedAt = Date.now();
+          metadata.accessCount++;
+          this.memoryMetadata.set(memoryKey, metadata);
+        }
+        this.recordAudit(memoryKey, { action: 'recall', userId, reason: 'query' });
       }
     }
 
@@ -84,19 +168,53 @@ export class MemoryService {
     return [...milvus, ...mem0];
   }
 
-  /**
-   * 构建上下文 - 短期 + 长期召回
-   */
   async buildContext(sessionId: string, userId: string, query: string) {
     const [recent, recalled] = await Promise.all([
       this.shortTerm.getRecentMessages(sessionId, 10),
       this.recall(userId, query, 5),
     ]);
 
+    const freshRecalled = recalled.filter((m) => {
+      const age = Date.now() - (m.timestamp || 0);
+      return age < this.TTL_LONG_TERM;
+    });
+
     return {
-      longTermContext: recalled.map((m) => m.content).join('\n'),
+      longTermContext: freshRecalled.map((m) => m.content).join('\n'),
       shortTermMessages: recent,
-      recalledMemories: recalled,
+      recalledMemories: freshRecalled,
     };
   }
+
+  async getAuditLog(userId: string): Promise<AuditEntry[]> {
+    const logs: AuditEntry[] = [];
+    this.memoryMetadata.forEach((metadata, key) => {
+      if (key.startsWith(userId)) {
+        logs.push(...metadata.audit);
+      }
+    });
+    return logs.sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  async invalidateMemory(userId: string, content: string): Promise<void> {
+    const memoryKey = this.getMemoryKey(userId, content);
+    this.recordAudit(memoryKey, { action: 'delete', userId, reason: 'invalidated' });
+    this.memoryMetadata.delete(memoryKey);
+  }
 }
+
+declare global {
+  interface String {
+    hashCode(): number;
+  }
+}
+
+String.prototype.hashCode = function (): number {
+  let hash = 0;
+  for (let i = 0; i < this.length; i++) {
+    const char = this.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash;
+  }
+  return hash;
+};
