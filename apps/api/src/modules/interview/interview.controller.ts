@@ -760,7 +760,10 @@ export class InterviewController {
       };
     }
 
-    const report = await this.scoring.generateReport(evaluations);
+    // 从 generateQuestions 接口可获知总题目数，此处用回答数代替
+    const totalQuestions = evaluations.length;
+
+    const report = await this.scoring.generateReport(evaluations, totalQuestions);
 
     // 保存报告到 DB
     const savedReport = await this.prisma.report.upsert({
