@@ -1,5 +1,11 @@
 import { create } from 'zustand';
-import type { Report } from '@interview-agent/shared-types';
+import type { Report, AgentEvent } from '@interview-agent/shared-types';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  streaming?: boolean;
+}
 
 interface Resume {
   name: string | null;
@@ -10,21 +16,31 @@ interface Resume {
 }
 
 interface InterviewState {
-  // 消息
-  messages: { role: 'user' | 'assistant'; content: string; streaming?: boolean }[];
-  addMessage: (msg: { role: 'user' | 'assistant'; content: string; streaming?: boolean }) => void;
-  updateLastMessage: (content: string, streaming?: boolean) => void;
-  setMessages: (messages: InterviewState['messages']) => void;
+  // ========== 消息流（流式核心） ==========
+  messages: ChatMessage[];
+  /** 追加一条完整消息（用户或 assistant 占位） */
+  addMessage: (msg: ChatMessage) => void;
+  /** 追加 token 到最后一条 streaming=true 的 assistant 消息 */
+  appendToLastMessage: (delta: string) => void;
+  /** 把最后一条 streaming 消息的 streaming 标记置 false */
+  finalizeLastMessage: () => void;
+  /** 整体替换 messages（刷新历史用） */
+  setMessages: (messages: ChatMessage[]) => void;
 
-  // 输入
+  // ========== Agent / 工具调用事件流（CoT 面板用） ==========
+  agentEvents: AgentEvent[];
+  appendAgentEvent: (event: AgentEvent) => void;
+  clearAgentEvents: () => void;
+
+  // ========== 输入框（避免 prop drilling） ==========
   input: string;
   setInput: (input: string) => void;
 
-  // 报告
+  // ========== 报告 ==========
   report: Report | null;
   setReport: (report: Report | null) => void;
 
-  // 简历
+  // ========== 简历 ==========
   resume: Resume | null;
   setResume: (resume: Resume | null) => void;
   resumeConfirmed: boolean;
@@ -32,7 +48,7 @@ interface InterviewState {
   resumePanelOpen: boolean;
   setResumePanelOpen: (open: boolean) => void;
 
-  // UI 状态
+  // ========== UI 状态 ==========
   ending: boolean;
   setEnding: (ending: boolean) => void;
   drawerOpen: boolean;
@@ -46,12 +62,13 @@ interface InterviewState {
   confirming: boolean;
   setConfirming: (confirming: boolean) => void;
 
-  // 重置
+  // ========== 重置 ==========
   reset: () => void;
 }
 
 const initialState = {
-  messages: [],
+  messages: [] as ChatMessage[],
+  agentEvents: [] as AgentEvent[],
   input: '',
   report: null,
   resume: null,
@@ -65,24 +82,38 @@ const initialState = {
   confirming: false,
 };
 
-export const useInterviewStore = create<InterviewState>((set) => ({
+export const useInterviewStore = create<InterviewState>((set, get) => ({
   ...initialState,
 
-  addMessage: (msg) =>
-    set((s) => ({ messages: [...s.messages, msg] })),
+  addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 
-  updateLastMessage: (content, streaming) =>
+  appendToLastMessage: (delta) =>
     set((s) => {
+      if (s.messages.length === 0) return s;
       const last = s.messages[s.messages.length - 1];
-      if (last?.role === 'assistant' && last.streaming) {
-        return {
-          messages: [...s.messages.slice(0, -1), { ...last, content, streaming }],
-        };
-      }
-      return s;
+      if (last.role !== 'assistant' || !last.streaming) return s;
+      const newLast = { ...last, content: last.content + delta };
+      return {
+        messages: [...s.messages.slice(0, -1), newLast],
+      };
+    }),
+
+  finalizeLastMessage: () =>
+    set((s) => {
+      if (s.messages.length === 0) return s;
+      const last = s.messages[s.messages.length - 1];
+      if (last.role !== 'assistant') return s;
+      return {
+        messages: [...s.messages.slice(0, -1), { ...last, streaming: false }],
+      };
     }),
 
   setMessages: (messages) => set({ messages }),
+
+  appendAgentEvent: (event) =>
+    set((s) => ({ agentEvents: [...s.agentEvents, event] })),
+
+  clearAgentEvents: () => set({ agentEvents: [] }),
 
   setInput: (input) => set({ input }),
 

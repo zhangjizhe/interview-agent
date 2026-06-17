@@ -18,12 +18,31 @@ import {
 } from '../interview/knowledge-banks';
 
 export interface AgentEvent {
-  type: 'token' | 'tool_call' | 'tool_result' | 'done' | 'error' | 'question';
+  type:
+    | 'token'
+    | 'tool_call'
+    | 'tool_result'
+    | 'done'
+    | 'error'
+    | 'token_usage'
+    | 'meta'
+    | 'thinking'
+    | 'searching'
+    | 'recalling';
   content?: string;
   toolName?: string;
   toolResult?: any;
   error?: string;
   question?: Question;
+  // meta/thinking/searching/recalling 扩展
+  engine?: string;
+  intent?: string;
+  steps?: string[];
+  plan?: string[];
+  detail?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  total?: number;
 }
 
 export interface AgentContext {
@@ -141,6 +160,13 @@ export class InterviewAgentService {
         { role: 'user', content: userInput },
       ];
 
+      // ===== 给前端的"思考中"指示 =====
+      yield { type: 'thinking', content: '正在召回长期记忆并构建上下文...' };
+      yield {
+        type: 'recalling',
+        detail: `召回 ${context.recalledMemories.length} 条长期记忆 / ${context.shortTermMessages.length} 条短期消息`,
+      };
+
       // ===== 上下文压缩（MUR AI 4 级水位线）=====
       const beforeTokens = this.estimateMessagesTokens(messages);
       const MAX_TOKENS = 32000; // 千问 plus 上限（保守值）
@@ -163,6 +189,7 @@ export class InterviewAgentService {
       let finalMessages = compaction.messages;
       if (compaction.summarizeNeeded) {
         // Tier 3: 调 LLM 做增量摘要
+        yield { type: 'thinking', content: '上下文较长，正在增量摘要历史对话...' };
         const { summary } = await this.contextMgr.summarize(
           compaction.messages,
           '', // 简化：暂不持久化 previousSummary
@@ -195,6 +222,15 @@ export class InterviewAgentService {
         output: { engine: useDeepAgents ? 'deepagents' : 'fallback-handwritten' },
       });
 
+      yield {
+        type: 'meta',
+        engine: useDeepAgents ? 'deepagents' : 'llm-direct',
+        intent: '评估候选人回答 / 追问 / 进入下一题',
+        plan: [`知识库: ${bank}`, `当前候选: ${currentQuestion?.question?.slice(0, 30) || '（首问）'}...`],
+      };
+
+      yield { type: 'thinking', content: '正在调用 LLM 生成面试官回复...' };
+
       if (useDeepAgents) {
         // deepagents 接管（流式）
         const llmMessages = finalMessages.map((m) => ({
@@ -226,6 +262,7 @@ export class InterviewAgentService {
 
       const needsSearch = toolNames.has('bocha_search') && this.detectSearchIntent(userInput, fullResponse);
       if (needsSearch) {
+        yield { type: 'searching', detail: '正在调用 bocha_search 获取行业最新信息...' };
         yield { type: 'tool_call', toolName: 'bocha_search' };
         const searchResult = await this.bocha.execute({ query: userInput });
         yield { type: 'tool_result', toolName: 'bocha_search', toolResult: searchResult };

@@ -47,7 +47,17 @@ export interface Report {
 }
 
 export interface AgentEvent {
-  type: 'token' | 'tool_call' | 'tool_result' | 'done' | 'error' | 'token_usage';
+  type:
+    | 'token'
+    | 'tool_call'
+    | 'tool_result'
+    | 'done'
+    | 'error'
+    | 'token_usage'
+    | 'meta'
+    | 'thinking'
+    | 'searching'
+    | 'recalling';
   content?: string;
   toolName?: string;
   toolResult?: any;
@@ -55,6 +65,13 @@ export interface AgentEvent {
   promptTokens?: number;
   completionTokens?: number;
   total?: number;
+  // meta 扩展
+  engine?: string;
+  intent?: string;
+  steps?: string[];
+  plan?: string[];
+  // searching / recalling 指示当前子步骤
+  detail?: string;
 }
 
 export interface McpToolMeta {
