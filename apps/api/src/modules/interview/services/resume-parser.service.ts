@@ -27,13 +27,14 @@ export class ResumeParserService {
     '项目管理', '团队管理', '架构设计',
   ]);
 
-  async parse(rawText: string): Promise<ResumeAnalysis> {
+  async parse(rawText: string, userPosition?: string): Promise<ResumeAnalysis> {
     const text = rawText.trim().toLowerCase();
     const sentences = rawText.split(/[\n。！？]/).map((s) => s.trim()).filter((s) => s);
 
     const skills = this.extractSkills(text);
     const yearsExp = this.extractYearsOfExperience(text);
-    const position = this.detectPosition(skills);
+    // 用户指定岗位优先，否则从技能推断
+    const position = userPosition || this.detectPosition(skills);
     const name = this.extractName(rawText);
     const email = this.extractEmail(rawText);
     const projects = this.extractProjects(sentences);
