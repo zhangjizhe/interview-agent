@@ -11,6 +11,7 @@ import { AgentModule } from './modules/agent/agent.module';
 import { InterviewModule } from './modules/interview/interview.module';
 import { UserModule } from './modules/user/user.module';
 import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.mod
     KnowledgeBaseModule,
     InterviewModule,
     UserModule,
+    MetricsModule,
   ],
 })
 export class AppModule {}
