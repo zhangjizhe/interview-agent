@@ -132,8 +132,8 @@ React batching 导致流式渲染不自然：
 
 **SSE 优化**:
 - 每条事件后立即 `flush()`
-- 禁用阻塞式 Multi-Agent
-- 直接走单 Agent 流式路径
+- Multi-Agent 模式通过 `LlmGatewayChatModel` adapter 也经过 LlmGateway，享受 P0 缓存层
+- `graph.stream()` → `processMessage()` → SSE 逐 token 推送
 
 ### 实现位置
 - `apps/api/src/modules/interview/interview.controller.ts`
@@ -151,9 +151,13 @@ React batching 导致流式渲染不自然：
 - LLM Gateway 双模型路由 + P0 缓存工程
 
 ### 下一阶段 (v3.0)
-- 完整 DeLM 分布式架构（多 Agent 并行执行 + 共识机制）
-- HITL 中断框架接入前端
-- 分布式缓存（Redis Cluster）
+
+> v3.0 演进路线（与 README 演进路线表对齐）：
+
+1. **Multi-Agent Handoffs**：基于当前 `respond_directly` 节点扩展，使用 LangGraph Command 原语实现 Planner → Specialist Agent 路由
+2. **HITL 中断框架**：interrupt 接入前端，HR 可在多轮面试中实时审批 / 否决
+3. **Redis Cluster 分布式缓存**：主从复制 + 故障自动切换，多实例部署更稳
+4. **per-tenant namespace**：Mem0 / Milvus 按租户隔离，为多企业场景准备
 
 ### 长期目标 (v4.0)
 - 完全去中心化
@@ -204,7 +208,7 @@ const useMultiAgent = agentMode === 'multi' && this.multiAgent.isEnabled();
 ```
 session:{sessionId}:state {
   currentQuestion: string,
-  questionIndex: number,
+  questionIndex: number,        # ← 与 Prisma InterviewTask.completedCount 同步（P0-2 修复）
   coveredSkills: JSON string,
   scoreHistory: JSON string,
   followUpDepth: number,
