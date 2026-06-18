@@ -131,3 +131,24 @@ model UserToolPreference {
   @@index([userId])
   @@map("user_tool_preferences")
 }
+
+/// 动态任务队列 — 面试题目持久化（取代内存 Map）
+model TaskAnswer {
+  id          String   @id @default(cuid())
+  interviewId String   // 与 Interview.id 对应
+  taskId      String   // 任务唯一标识，如 interviewId-0 / interviewId-followup-123
+  taskType    String   // 'question' | 'follow-up' | 'summary' | 'evaluation'
+  question    String   @db.Text
+  answer      String?  @db.Text
+  category    String   // frontend / backend / algorithm / testing / agent
+  difficulty  String   // easy / medium / hard
+  priority    Int      @default(0)
+  /// LLM 评分结果（JSON，避免新增列）
+  quality     Json?    // { score, completeness, correctness, depth, feedback }
+  createdAt   DateTime @default(now())
+  answeredAt  DateTime?
+
+  @@unique([interviewId, taskId])
+  @@index([interviewId])
+  @@map("task_answers")
+}
