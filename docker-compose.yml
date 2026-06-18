@@ -65,6 +65,7 @@ services:
 
   milvus:
     image: milvusdb/milvus:v2.4.17
+    command: ["milvus", "run", "standalone"]
     container_name: interview-milvus
     ports:
       - '19530:19530'
