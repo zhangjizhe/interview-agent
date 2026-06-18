@@ -1,171 +1,166 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { LlmGatewayService } from '../../llm/llm.gateway.service';
-import 'multer';
 
-export interface ResumeExperience {
-  company?: string;
-  title?: string;
-  duration?: string;
-  description?: string;
-}
-
-export interface ResumeProject {
+export interface ResumeAnalysis {
   name: string;
-  description?: string;
-  techStack?: string[];
+  email: string;
+  position: string;
+  yearsOfExperience: number;
+  skills: string[];
+  education: string[];
+  experience: string[];
+  projects: string[];
+  keywords: string[];
+  summary: string;
+  seniority: 'junior' | 'mid' | 'senior' | 'architect';
 }
 
-export interface ParsedResume {
-  name?: string;
-  email?: string;
-  phone?: string;
-  skills: string[];
-  experience: ResumeExperience[];
-  projects: ResumeProject[];
-  education?: string;
+export interface ParsedResume extends ResumeAnalysis {
   rawText: string;
 }
 
-/**
- * 简历解析服务
- * 支持：.txt / .md（纯文本）+ .pdf（pdfjs-dist）
- * 暂不支持：.doc / .docx（MVP 阶段不引入 mammoth，提示用户先另存为 PDF）
- */
 @Injectable()
 export class ResumeParserService {
   private readonly logger = new Logger(ResumeParserService.name);
+  private readonly skillKeywords = new Set([
+    'react', 'vue', 'angular', 'javascript', 'typescript', 'node',
+    'python', 'java', 'go', 'golang', 'rust', 'c++', 'c#',
+    'docker', 'kubernetes', 'k8s', 'aws', 'gcp', 'azure',
+    '微服务', '分布式', '高并发', '数据库', 'mysql', 'postgresql', 'redis', 'mongodb',
+    'graphql', 'rest', 'grpc', '消息队列', 'kafka', 'rabbitmq',
+    '前端', '后端', '全栈', '算法', '大数据', '机器学习', '深度学习',
+    '项目管理', '团队管理', '架构设计',
+  ]);
 
-  constructor(private llm: LlmGatewayService) { }
-
-  async parse(file: any): Promise<ParsedResume> {
-    const text = await this.extractText(file);
-    if (!text || text.length < 10) {
-      throw new Error('简历内容为空或过短，请确认文件内容');
+  async parse(fileOrText: any, userPosition?: string): Promise<ParsedResume> {
+    let rawText: string;
+    if (typeof fileOrText === 'string') {
+      rawText = fileOrText;
+    } else if (fileOrText?.buffer) {
+      rawText = fileOrText.buffer.toString();
+    } else {
+      throw new Error('Invalid input: expected a string or a file object with buffer');
     }
-    return this.parseWithLLM(text);
+
+    const text = rawText.trim().toLowerCase();
+    const sentences = rawText.split(/[\n。！？]/).map((s) => s.trim()).filter((s) => s);
+
+    const skills = this.extractSkills(text);
+    const yearsExp = this.extractYearsOfExperience(text);
+    const position = userPosition || this.detectPosition(skills);
+    const name = this.extractName(rawText);
+    const email = this.extractEmail(rawText);
+    const education = this.extractEducation(sentences);
+    const experience = this.extractExperience(sentences);
+    const projects = this.extractProjects(sentences);
+    const keywords = this.extractKeywords(text);
+    const summary = this.generateSummary({ skills, yearsExp, position });
+    const seniority = this.determineSeniority(yearsExp, skills.length);
+
+    return {
+      name,
+      email,
+      position,
+      yearsOfExperience: yearsExp,
+      skills,
+      education,
+      experience,
+      projects,
+      keywords,
+      summary,
+      seniority,
+      rawText,
+    };
   }
 
-  /**
-   * 从文件提取文本
-   * - .pdf：pdfjs-dist
-   * - .doc/.docx：暂不支持，提示用户转 PDF
-   * - 其他：按 utf-8 读取
-   */
-  private async extractText(file: any): Promise<string> {
-    const filename = (file.originalname || '').toLowerCase();
-    const buffer: Buffer = file.buffer;
-
-    if (filename.endsWith('.pdf')) {
-      return this.extractFromPdf(buffer);
-    }
-
-    if (filename.endsWith('.doc') || filename.endsWith('.docx')) {
-      throw new Error('暂不支持 .doc / .docx 格式，请先在 Word/WPS 里"另存为 PDF"再上传');
-    }
-
-    return buffer.toString('utf-8').trim();
-  }
-
-  /**
-   * 用 pdfjs-dist 提取 PDF 文本
-   * pdfjs-dist v4 在 Node 用法：
-   *   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-   *   关闭 worker（用主线程或 disableWorker）
-   */
-  private async extractFromPdf(buffer: Buffer): Promise<string> {
-    try {
-      // 动态 import 避免启动时阻塞
-      const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
-
-      // 关闭 worker（Node 端没有 WorkerGlobalScope）
-      if (pdfjs.GlobalWorkerOptions) {
-        pdfjs.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+  private extractSkills(text: string): string[] {
+    const found: string[] = [];
+    for (const keyword of this.skillKeywords) {
+      if (text.includes(keyword)) {
+        found.push(keyword);
       }
-
-      const data = new Uint8Array(buffer);
-      const loadingTask = pdfjs.getDocument({
-        data,
-        useSystemFonts: true,
-        disableFontFace: true,
-        verbosity: 0,
+    }
+    // 按原文提取
+    const explicitMatches = text.match(/[【\[\(（][^\]】\)）]+/g);
+    if (explicitMatches) {
+      explicitMatches.forEach((m) => {
+        const cleaned = m.replace(/[【\[\(（\]】\)）]/g, '').trim();
+        if (cleaned.length > 0 && cleaned.length < 20) {
+          found.push(cleaned);
+        }
       });
-      const doc = await loadingTask.promise;
-      const pages: string[] = [];
-      for (let i = 1; i <= doc.numPages; i++) {
-        const page = await doc.getPage(i);
-        const content = await page.getTextContent();
-        const text = content.items
-          .map((it: any) => (typeof it.str === 'string' ? it.str : ''))
-          .filter(Boolean)
-          .join(' ');
-        pages.push(text);
-        page.cleanup();
-      }
-      await doc.destroy();
-      const full = pages.join('\n\n').trim();
-      if (!full) {
-        throw new Error('PDF 未提取到文字（可能是扫描件/图片），请用文字版 PDF 或上传 .md/.txt');
-      }
-      this.logger.log(`✅ PDF parsed: ${doc.numPages} pages, ${full.length} chars`);
-      return full;
-    } catch (err: any) {
-      this.logger.error(`PDF parse failed: ${err.message}`);
-      throw new Error(`PDF 解析失败：${err.message}`);
     }
+    return [...new Set(found)].slice(0, 20);
   }
 
-  /**
-   * 用 LLM 提取结构化字段
-   */
-  private async parseWithLLM(text: string): Promise<ParsedResume> {
-    const prompt = `你是一位专业的简历解析助手。请从以下简历文本中提取结构化信息。
-
-【简历文本】
-${text.slice(0, 4000)}
-
-【输出格式】严格 JSON：
-\`\`\`json
-{
-  "name": "候选人姓名（如未提及填空字符串）",
-  "email": "邮箱（如有）",
-  "phone": "电话（如有）",
-  "skills": ["技能1", "技能2", "技能3"],
-  "experience": [
-    { "company": "公司", "title": "职位", "duration": "时间段", "description": "简述" }
-  ],
-  "projects": [
-    { "name": "项目名", "description": "简述", "techStack": ["技术1", "技术2"] }
-  ],
-  "education": "最高学历 + 学校"
-}
-\`\`\``;
-
-    try {
-      const res = await this.llm.chat({
-        messages: [
-          { role: 'system', content: '你是一个专业的简历解析 AI。' },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.2,
-      });
-
-      const match = res.content.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('LLM 解析失败');
-
-      const parsed = JSON.parse(match[0]);
-      return {
-        ...parsed,
-        rawText: text.slice(0, 2000), // 保留前 2k 字
-      };
-    } catch (err) {
-      this.logger.error(`Resume parse failed: ${err.message}`);
-      // 兜底：返回原始文本
-      return {
-        skills: [],
-        experience: [],
-        projects: [],
-        rawText: text,
-      };
+  private extractYearsOfExperience(text: string): number {
+    const yearMatch = text.match(/(\d+)年.*年|(\d+)\+?\s*年|(\d+)\s*years?/i);
+    if (yearMatch) {
+      return Math.min(parseInt(yearMatch[1] || yearMatch[2] || yearMatch[3] || '3', 10), 20);
     }
+    return 3; // 默认3年
+  }
+
+  private extractName(text: string): string {
+    const lines = text.split('\n').map((l) => l.trim()).filter((l) => l);
+    // 简历开头的短句子通常是姓名
+    for (let i = 0; i < Math.min(5, lines.length); i++) {
+      if (lines[i].length < 10 && !lines[i].includes('@') && lines[i].length > 0) {
+        return lines[i];
+      }
+    }
+    return '候选人';
+  }
+
+  private extractEmail(text: string): string {
+    const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    return emailMatch ? emailMatch[0] : '';
+  }
+
+  private detectPosition(skills: string[]): string {
+    const frontendCount = skills.filter((s) => ['react', 'vue', 'angular', '前端', 'javascript', 'typescript', 'html', 'css'].some((p) => s.includes(p))).length;
+    const backendCount = skills.filter((s) => ['后端', 'node', 'java', 'python', 'go', 'java', '数据库', 'mysql', '微服务'].some((p) => s.includes(p))).length;
+    const algorithmCount = skills.filter((s) => ['算法', '机器学习', '深度学习', '大数据', 'ai'].some((p) => s.includes(p))).length;
+
+    if (frontendCount > Math.max(backendCount, algorithmCount)) return '前端开发工程师';
+    if (algorithmCount > backendCount) return '算法工程师';
+    if (backendCount >= frontendCount) return '后端开发工程师';
+    return '全栈开发工程师';
+  }
+
+  private extractKeywords(text: string): string[] {
+    const all = [...this.skillKeywords].filter((k) => text.includes(k));
+    return [...new Set(all)].slice(0, 15);
+  }
+
+  private extractEducation(sentences: string[]): string[] {
+    return sentences.filter((s) => s.includes('学') || s.includes('学院') || s.includes('教育') || s.includes('学历'))
+      .slice(0, 3);
+  }
+
+  private extractExperience(sentences: string[]): string[] {
+    return sentences.filter((s) => (s.includes('公司') || s.includes('工作') || s.includes('负责') || s.includes('参与')))
+      .slice(0, 5);
+  }
+
+  private extractProjects(sentences: string[]): string[] {
+    return sentences.filter((s) => s.includes('项目') || s.includes('负责') || s.includes('开发'))
+      .slice(0, 5);
+  }
+
+  private generateSummary(data: { skills: string[]; yearsExp: number; position: string }): string {
+    return `简历包含以下信息：\n- 职位：${data.position}\n- 年限：${data.yearsExp}年\n- 技能：${data.skills.slice(0, 10).join('、')}`;
+  }
+
+  private determineSeniority(years: number, skillsCount: number): 'junior' | 'mid' | 'senior' | 'architect' {
+    if (years >= 10 || skillsCount >= 15) return 'architect';
+    if (years >= 5) return 'senior';
+    if (years >= 2) return 'mid';
+    return 'junior';
+  }
+
+  async categorizeBySkill(skills: string[]): string[] {
+    return skills.map((s) => s.toLowerCase());
   }
 }
+
+// Helper: Helper 技能到知识点映射

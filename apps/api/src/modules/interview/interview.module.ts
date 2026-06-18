@@ -8,11 +8,27 @@ import { LlmModule } from '../llm/llm.module';
 import { ResumeParserService } from './services/resume-parser.service';
 import { ResumeRAGService } from './services/resume-rag.service';
 import { QuestionBankService } from './services/question-bank.service';
+import { QuestionGeneratorService } from './services/question-generator.service';
+import { ScoringService } from './services/scoring.service';
+import { RagService } from './services/rag.service';
 
 @Module({
   imports: [AgentModule, MemoryModule, LlmModule],
   controllers: [InterviewController, ToolsController, AdminMcpController],
-  providers: [ResumeParserService, ResumeRAGService, QuestionBankService],
-  exports: [ResumeParserService, ResumeRAGService, QuestionBankService],
+  providers: [
+    ResumeParserService,
+    ResumeRAGService,
+    QuestionBankService,
+    QuestionGeneratorService,
+    ScoringService,
+    RagService,
+  ],
+  exports: [
+    ResumeParserService,
+    ResumeRAGService,
+    QuestionBankService,
+    QuestionGeneratorService,
+    ScoringService,
+  ],
 })
 export class InterviewModule {}
