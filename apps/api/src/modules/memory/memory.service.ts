@@ -1,17 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisShortTermMemory } from './short-term/redis-memory.store';
+import { RedisShortTermMemory, type WorkingState } from './short-term/redis-memory.store';
 import { MilvusLongTermMemory } from './long-term/milvus-memory.store';
 import { Mem0CloudMemory } from './long-term/mem0.store';
 import { ChatMessage, Memory } from './interfaces/memory-store.interface';
 
+export type { WorkingState };
+
 /**
- * 记忆服务 - 写真实 Milvus + Mem0 双引擎
+ * 记忆服务 - 四层记忆架构
  *
- * - 短期：Redis List（会话上下文，TTL）
- * - 长期：Milvus（自建向量库，写真实） + Mem0（云服务，自动去重）
+ * - 工作记忆：Redis Hash（面试流程状态，跨实例安全）
+ * - 会话记忆：Redis List（会话上下文，TTL）
+ * - 长期记忆：Milvus（向量检索）+ Mem0（语义去重）
+ * - 用户画像：Prisma 结构化（面试结果归档）
  *
- * Mem0 启用时：memorize 同时写两边（Milvus 作本地索引，Mem0 作云端去重）
- * Mem0 失败时：自动降级到只写 Milvus
+ * 写入策略：每轮对话 → 工作记忆更新；面试结束 → 结构化归档到长期
  */
 @Injectable()
 export class MemoryService {
@@ -23,7 +26,7 @@ export class MemoryService {
     private mem0: Mem0CloudMemory,
   ) {}
 
-  // ===== 短期 =====
+  // ===== 短期（会话记忆）=====
   async appendMessage(sessionId: string, msg: ChatMessage): Promise<void> {
     return this.shortTerm.appendMessage(sessionId, msg);
   }
@@ -34,6 +37,36 @@ export class MemoryService {
 
   async clearSession(sessionId: string): Promise<void> {
     return this.shortTerm.clearSession(sessionId);
+  }
+
+  // ===== 工作记忆（Redis Hash）=====
+  async getWorkingState(sessionId: string): Promise<WorkingState> {
+    return this.shortTerm.getWorkingState(sessionId);
+  }
+
+  async setWorkingState(sessionId: string, state: WorkingState): Promise<void> {
+    return this.shortTerm.setWorkingState(sessionId, state);
+  }
+
+  async updateWorkingState(sessionId: string, partialState: Partial<WorkingState>): Promise<void> {
+    return this.shortTerm.updateWorkingState(sessionId, partialState);
+  }
+
+  async clearWorkingState(sessionId: string): Promise<void> {
+    return this.shortTerm.clearWorkingState(sessionId);
+  }
+
+  // ===== 会话摘要（Redis String）=====
+  async getSessionSummary(sessionId: string): Promise<string | null> {
+    return this.shortTerm.getSessionSummary(sessionId);
+  }
+
+  async setSessionSummary(sessionId: string, summary: string): Promise<void> {
+    return this.shortTerm.setSessionSummary(sessionId, summary);
+  }
+
+  async clearSessionSummary(sessionId: string): Promise<void> {
+    return this.shortTerm.clearSessionSummary(sessionId);
   }
 
   // ===== 长期 - 双写策略 =====

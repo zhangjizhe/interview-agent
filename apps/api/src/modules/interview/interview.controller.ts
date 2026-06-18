@@ -698,6 +698,49 @@ export class InterviewController {
       },
     });
 
+    // ===== 结构化归档：工作记忆 + 会话摘要写入长期记忆 =====
+    const workingState = await this.memory.getWorkingState(interviewId);
+    await this.memory.getSessionSummary(interviewId); // 读取会话摘要（如有）
+
+    // 构建候选人画像（结构化数据）
+    const user = await this.prisma.user.findUnique({ where: { id: interview.userId } });
+    const demoUserId = user?.email?.replace(/@demo\.local$/, '') || '';
+    const resumes = await this.resumeRag.searchByUser(demoUserId, 1).catch(() => []);
+    const resume = resumes[0] || null;
+    const endedAt = new Date();
+    const durationMs = endedAt.getTime() - interview.startedAt.getTime();
+    const durationMin = Math.max(1, Math.round(durationMs / 60000));
+    const messageCount = interview.messages.length;
+
+    // 候选人画像 - 用于写入长期记忆
+    const candidateProfile = {
+      userId: interview.userId,
+      name: resume?.name || user?.name || '匿名',
+      position: interview.position,
+      level: interview.level,
+      skills: [...(workingState.coveredSkills || []), ...(resume?.skills || [])],
+      scoreHistory: workingState.scoreHistory || [],
+      overallScore: report.overallScore,
+      strengths: report.strengths,
+      weaknesses: report.weaknesses,
+      durationMin,
+      messageCount,
+      startedAt: interview.startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+    };
+
+    // 将画像写入长期记忆（语义化存储）
+    try {
+      const profileContent = JSON.stringify(candidateProfile, null, 2);
+      await this.memory.memorize(interview.userId, [
+        { role: 'system', content: `【候选人画像】\n${profileContent}` },
+        ...conversation.slice(-10),
+      ]);
+      this.logger.log(`Archived candidate profile for ${interview.userId}`);
+    } catch (err) {
+      this.logger.error(`Failed to archive candidate profile: ${err.message}`);
+    }
+
     // 面试者信息（姓名 + 简历摘要 + 时长）—— 必须先 update interview.endedAt
     await this.prisma.interview.update({
       where: { id: interviewId },
