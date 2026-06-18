@@ -15,11 +15,39 @@ import { ChatOpenAI } from '@langchain/openai';
 import { z } from 'zod';
 import type { InterviewAgentStateType, PlanStep } from '../state';
 import { PlanStepSchema } from '../state';
+import { McpRegistry, type McpToolMetadata } from '../../../modules/interview/services/mcp-registry';
+
+export interface PlannerConfig {
+    userId?: string;
+    userPrefMap?: Map<string, boolean>;
+}
+
+/**
+ * 生成工具描述字符串（用于 prompt）
+ */
+function formatToolsForPrompt(tools: McpToolMetadata[]): string {
+    if (tools.length === 0) {
+        return '- ask_llm: 让 LLM 生成内容（无需 tool，description 描述生成要求）';
+    }
+
+    const toolDescriptions = tools.map((tool) => {
+        const actionName = tool.name.replace('_', ' ');
+        return `- ${actionName}: ${tool.description}（tool: ${tool.name}）`;
+    });
+
+    return [
+        ...toolDescriptions,
+        '- ask_llm: 让 LLM 生成内容（无需 tool，description 描述生成要求）',
+    ].join('\n');
+}
 
 /**
  * Planner 节点函数
+ * 
+ * @param model - ChatOpenAI 实例
+ * @param config - 可选配置，包含 userId 和用户偏好映射
  */
-export function createPlannerNode(model: ChatOpenAI) {
+export function createPlannerNode(model: ChatOpenAI, config?: PlannerConfig) {
     return async function plannerNode(
         state: InterviewAgentStateType,
     ): Promise<Partial<InterviewAgentStateType>> {
@@ -38,6 +66,13 @@ export function createPlannerNode(model: ChatOpenAI) {
             resume_review: '简历评估：解析简历、评估技能匹配度、给出改进建议',
         };
 
+        const availableTools = await McpRegistry.getAvailableTools(
+            config?.userId || 'system',
+            config?.userPrefMap || new Map(),
+        );
+
+        const toolsPrompt = formatToolsForPrompt(availableTools);
+
         const response = await model.withStructuredOutput(
             z.object({
                 steps: z.array(PlanStepSchema).min(1).max(8),
@@ -51,12 +86,8 @@ export function createPlannerNode(model: ChatOpenAI) {
 【用户意图】${state.user_intent}
 【意图目标】${intentPrompt[state.user_intent] || '通用处理'}
 
-【可用动作】
-- search: 调用博查搜索（tool: bocha_search, args: {query: string, count?: number}）
-- recall_memory: 召回候选人长期记忆（tool: memory_recall, args: {userId: string, query: string}）
-- query_knowledge_bank: 查询面试题库（tool: knowledge_bank, args: {position: string, count?: number}）
-- ask_llm: 让 LLM 生成内容（无需 tool，description 描述生成要求）
-- generate_question: 生成面试题（tool: knowledge_bank, args: {position: string, level?: string, count?: number}）
+【可用工具】
+${toolsPrompt}
 
 【已完成的步骤】
 ${pastStepsSummary}
@@ -69,7 +100,8 @@ ${lastMessage}
 2. 每步只做一件事
 3. 步骤数 2-6 步，不要过度拆分
 4. 如果需要搜索/记忆召回，放在前面（信息收集优先）
-5. 面试场景最后一通常是 ask_llm（生成回复或下一道题）`,
+5. 面试场景最后一步通常是 ask_llm（生成回复或下一道题）
+6. 选择工具时考虑用户偏好设置`,
             },
         ]);
 

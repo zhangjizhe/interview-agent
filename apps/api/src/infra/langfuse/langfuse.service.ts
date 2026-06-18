@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Langfuse } from 'langfuse';
+import { Langfuse, Generation } from 'langfuse';
 
 /**
  * Langfuse 可观测服务
@@ -51,7 +51,49 @@ export class LangfuseService implements OnModuleInit {
   }
 
   /**
-   * 记录 LLM 调用
+   * 创建一个 generation 记录（返回对象用于后续更新）
+   */
+  createGeneration(params: {
+    traceId: string;
+    name: string;
+    model: string;
+    input: any;
+    metadata?: Record<string, any>;
+  }): Generation | null {
+    if (!this.client) return null;
+    return this.client.generation({
+      traceId: params.traceId,
+      name: params.name,
+      model: params.model,
+      input: params.input,
+      metadata: params.metadata,
+    });
+  }
+
+  /**
+   * 更新 generation 的 usage（Token 计量）
+   */
+  updateGenerationUsage(generation: Generation, usage: { promptTokens: number; completionTokens: number }): void {
+    if (!this.client || !generation) return;
+    generation.update({
+      usage: {
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.promptTokens + usage.completionTokens,
+      },
+    });
+  }
+
+  /**
+   * 更新 generation 的 output
+   */
+  updateGenerationOutput(generation: Generation, output: any): void {
+    if (!this.client || !generation) return;
+    generation.update({ output });
+  }
+
+  /**
+   * 记录 LLM 调用（一次性完成）
    */
   logGeneration(params: {
     traceId: string;
@@ -95,10 +137,41 @@ export class LangfuseService implements OnModuleInit {
   }
 
   /**
+   * 记录工具调用
+   */
+  logToolCall(params: {
+    traceId: string;
+    name: string;
+    input?: any;
+    output?: any;
+    metadata?: Record<string, any>;
+    error?: string;
+  }) {
+    if (!this.client) return;
+    this.client.span({
+      traceId: params.traceId,
+      name: `tool.${params.name}`,
+      input: params.input,
+      output: params.error ? { error: params.error } : params.output,
+      metadata: {
+        ...params.metadata,
+        error: !!params.error,
+      },
+    });
+  }
+
+  /**
    * 异步上报（关键：进程退出前必须调）
    */
   async flush() {
     if (!this.client) return;
     await this.client.flushAsync();
+  }
+
+  /**
+   * 检查 Langfuse 是否启用
+   */
+  isEnabled(): boolean {
+    return !!this.client;
   }
 }

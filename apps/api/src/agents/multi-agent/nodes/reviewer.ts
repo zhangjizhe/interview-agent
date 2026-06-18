@@ -16,6 +16,18 @@ import { AIMessage } from 'langchain';
 import type { InterviewAgentStateType } from '../state';
 import { ReviewVerdictSchema } from '../state';
 
+export const ReviewResultSchema = z.object({
+    verdict: ReviewVerdictSchema,
+    score: z.number().min(0).max(1).describe('质量评分（0-1）'),
+    issues: z.array(z.string()).describe('存在的问题列表'),
+    suggestion: z.string().describe('修改建议'),
+    confidence: z.number().min(0).max(1).describe('审核置信度'),
+});
+
+export type ReviewResult = z.infer<typeof ReviewResultSchema>;
+
+const MAX_RETRY_COUNT = 2;
+
 /**
  * Reviewer 节点函数
  *
@@ -57,41 +69,45 @@ ${pastStepsSummary}
 
         const finalResponse = synthesisResponse.content as string;
 
-        // 第二阶段：审阅质量
-        const reviewResponse = await model.withStructuredOutput(
-            z.object({
-                verdict: ReviewVerdictSchema,
-                issues: z
-                    .array(z.string())
-                    .optional()
-                    .describe('存在的问题（仅当 verdict=revise 时）'),
-                suggestion: z.string().optional().describe('修改建议'),
-            }),
-        ).invoke([
+        // 第二阶段：审阅质量（结构化输出）
+        const reviewResponse = await model.withStructuredOutput(ReviewResultSchema).invoke([
             {
                 role: 'system',
-                content: `你是一个质量审核员。审阅以下面试官回复是否合格。
+                content: `你是一个严格的质量审核员。审阅以下面试官回复是否合格。
 
 【用户意图】${state.user_intent}
 【面试官回复】
 ${finalResponse}
 
 【审核标准】
-1. 是否回答了用户的问题
-2. 是否基于事实（而非编造）
-3. 语气是否专业友好
-4. 是否有明显的逻辑错误
-5. 回复是否完整（不是半截话）
+1. 相关性：是否直接回答了用户的问题
+2. 事实准确性：是否基于提供的信息（而非编造）
+3. 完整性：是否覆盖了核心要点
+4. 逻辑性：是否有清晰的逻辑结构
+5. 语气：是否专业友好
+6. 格式：是否符合要求（口语化、无 Markdown）
 
-approved = 合格，revise = 需要修改`,
+【输出要求】
+- score: 综合质量评分（0-1）
+- issues: 问题列表（每项简洁描述）
+- suggestion: 具体修改建议
+- confidence: 你的审核置信度（0-1）
+
+approved = 合格可输出，revise = 需要修改`,
             },
         ]);
 
-        // 通过或重试超限 → 直接输出
-        if (reviewResponse.verdict === 'approved' || state.retry_count >= 2) {
+        // 防死循环：重试次数超限强制通过
+        const isRetryExhausted = (state.retry_count || 0) >= MAX_RETRY_COUNT;
+        const shouldApprove = reviewResponse.verdict === 'approved' || isRetryExhausted;
+
+        if (shouldApprove) {
             return {
                 messages: [new AIMessage(finalResponse)],
                 final_response: finalResponse,
+                review_score: reviewResponse.score,
+                review_issues: reviewResponse.issues,
+                review_suggestion: reviewResponse.suggestion,
             };
         }
 
@@ -99,7 +115,10 @@ approved = 合格，revise = 需要修改`,
         // past_steps 不清——下一轮 Planner 可以参考之前的执行结果
         return {
             final_response: '',
-            retry_count: state.retry_count + 1,
+            retry_count: (state.retry_count || 0) + 1,
+            review_score: reviewResponse.score,
+            review_issues: reviewResponse.issues,
+            review_suggestion: reviewResponse.suggestion,
         };
     };
 }

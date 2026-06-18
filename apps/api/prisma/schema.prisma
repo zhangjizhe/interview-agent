@@ -32,9 +32,11 @@ model Interview {
   summary         String? // 面试总结（AI 生成）
   resumeConfirmed Boolean         @default(false) // 用户是否确认过简历（false = 仍显示确认面板）
 
-  messages Message[]
-  report   Report?
-  cost     SessionCost?
+  messages       Message[]
+  report         Report?
+  cost           SessionCost?
+  tasks          InterviewTask[]
+  answerHistories AnswerHistory[]
 
   @@index([userId, startedAt])
   @@map("interviews")
@@ -130,4 +132,55 @@ model UserToolPreference {
   @@unique([userId, toolName])
   @@index([userId])
   @@map("user_tool_preferences")
+}
+
+// 动态任务队列 - 面试过程中生成的问题队列
+model InterviewTask {
+  id        String    @id @default(cuid())
+  interviewId String
+  interview  Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  type      TaskType  // question | follow-up | summary | evaluation
+  question  String    @db.Text
+  category  String
+  difficulty String   // easy | medium | hard
+  priority  Int       @default(0)
+  context   Json?     // 额外上下文信息
+  status    TaskStatus @default(PENDING)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([interviewId, status, priority])
+  @@map("interview_tasks")
+}
+
+// 答案历史 - 记录面试中的问答及评分
+model AnswerHistory {
+  id            String    @id @default(cuid())
+  interviewId   String
+  interview     Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  question      String    @db.Text
+  answer        String    @db.Text
+  score         Float     @default(0)      // 0-1
+  completeness  Float     @default(0)     // 完整性 0-1
+  correctness   Float     @default(0)     // 正确性 0-1
+  depth         Float     @default(0)     // 深度 0-1
+  feedback      String?   @db.Text        // 反馈建议
+  llmEvaluated  Boolean   @default(false) // 是否由 LLM 评分
+  createdAt     DateTime  @default(now())
+
+  @@index([interviewId])
+  @@map("answer_histories")
+}
+
+enum TaskType {
+  QUESTION
+  FOLLOW_UP
+  SUMMARY
+  EVALUATION
+}
+
+enum TaskStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
 }

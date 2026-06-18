@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AgentEvent } from '@interview-agent/shared-types';
+import { RedisService } from '../../infra/redis/redis.service';
 
-interface ContextEntry {
+export interface ContextEntry {
   id: string;
   gist: string;
   details: string;
@@ -11,7 +11,7 @@ interface ContextEntry {
   audit: AuditRecord[];
 }
 
-interface AuditRecord {
+export interface AuditRecord {
   action: 'create' | 'update' | 'validate' | 'access';
   timestamp: number;
   agentId: string;
@@ -21,16 +21,26 @@ interface AuditRecord {
 @Injectable()
 export class SharedContextService {
   private readonly logger = new Logger(SharedContextService.name);
-  private context: Map<string, ContextEntry> = new Map();
-  private maxEntries = 100;
-  private ttlMs = 30 * 60 * 1000;
+  private readonly ttlSeconds = 30 * 60;
+  private readonly maxEntries = 100;
+
+  constructor(private redis: RedisService) {}
+
+  private getSessionKey(sessionId: string): string {
+    return `shared-ctx:${sessionId}`;
+  }
+
+  private getAllEntriesKey(): string {
+    return 'shared-ctx:all-entries';
+  }
 
   async write(
+    sessionId: string,
     agentId: string,
     content: string,
     source: 'thinking' | 'tool_result' | 'summary',
   ): Promise<string> {
-    const id = `${agentId}-${Date.now()}`;
+    const id = `${sessionId}-${Date.now()}`;
     
     const gist = this.extractGist(content);
     const entry: ContextEntry = {
@@ -43,26 +53,54 @@ export class SharedContextService {
       audit: [{ action: 'create', timestamp: Date.now(), agentId, reason: source }],
     };
 
-    this.context.set(id, entry);
-    this.cleanup();
-    this.logger.debug(`[SharedContext] Written entry ${id} from ${agentId}`);
+    const client = this.redis.getClient();
+    const sessionKey = this.getSessionKey(sessionId);
+    
+    await client.hset(sessionKey, id, JSON.stringify(entry));
+    await client.expire(sessionKey, this.ttlSeconds);
+    
+    await client.lpush(this.getAllEntriesKey(), id);
+    await client.ltrim(this.getAllEntriesKey(), 0, this.maxEntries - 1);
+
+    this.logger.debug(`[SharedContext] Written entry ${id} from ${agentId} for session ${sessionId}`);
     return id;
   }
 
-  async read(id: string): Promise<ContextEntry | undefined> {
-    const entry = this.context.get(id);
-    if (entry) {
+  async read(sessionId: string, id: string): Promise<ContextEntry | undefined> {
+    const client = this.redis.getClient();
+    const sessionKey = this.getSessionKey(sessionId);
+    const entryStr = await client.hget(sessionKey, id);
+    
+    if (!entryStr) return undefined;
+    
+    try {
+      const entry: ContextEntry = JSON.parse(entryStr);
       entry.audit.push({ action: 'access', timestamp: Date.now(), agentId: 'reader' });
+      await client.hset(sessionKey, id, JSON.stringify(entry));
+      await client.expire(sessionKey, this.ttlSeconds);
+      return entry;
+    } catch {
+      return undefined;
     }
-    return entry;
   }
 
-  listGists(): { id: string; gist: string; timestamp: number }[] {
-    return Array.from(this.context.values()).map((e) => ({
-      id: e.id,
-      gist: e.gist,
-      timestamp: e.timestamp,
-    }));
+  async listGists(sessionId: string): Promise<{ id: string; gist: string; timestamp: number }[]> {
+    const client = this.redis.getClient();
+    const sessionKey = this.getSessionKey(sessionId);
+    const entries = await client.hgetall(sessionKey);
+    
+    if (!entries) return [];
+    
+    return Object.values(entries)
+      .map((entryStr) => {
+        try {
+          const entry: ContextEntry = JSON.parse(entryStr);
+          return { id: entry.id, gist: entry.gist, timestamp: entry.timestamp };
+        } catch {
+          return null;
+        }
+      })
+      .filter((item): item is { id: string; gist: string; timestamp: number } => item !== null);
   }
 
   async validateContent(content: string): Promise<boolean> {
@@ -83,30 +121,44 @@ export class SharedContextService {
     return firstFew.length > 150 ? firstFew.slice(0, 150) + '...' : firstFew;
   }
 
-  private cleanup() {
-    const now = Date.now();
-    this.context.forEach((entry, id) => {
-      if (now - entry.timestamp > this.ttlMs) {
-        this.context.delete(id);
-        this.logger.debug(`[SharedContext] Expired entry ${id}`);
-      }
-    });
+  async getAuditLog(sessionId: string, id: string): Promise<AuditRecord[] | undefined> {
+    const entry = await this.read(sessionId, id);
+    return entry?.audit;
+  }
 
-    while (this.context.size > this.maxEntries) {
-      const oldest = Array.from(this.context.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
-      this.context.delete(oldest[0]);
+  async clear(sessionId?: string): Promise<void> {
+    const client = this.redis.getClient();
+    if (sessionId) {
+      await client.del(this.getSessionKey(sessionId));
+      this.logger.debug(`[SharedContext] Cleared context for session ${sessionId}`);
+    } else {
+      const keys = await client.keys('shared-ctx:*');
+      if (keys.length > 0) {
+        await client.del(...keys);
+      }
+      this.logger.debug('[SharedContext] Cleared all contexts');
     }
   }
 
-  getAuditLog(id: string): AuditRecord[] | undefined {
-    return this.context.get(id)?.audit;
+  async size(sessionId?: string): Promise<number> {
+    const client = this.redis.getClient();
+    if (sessionId) {
+      const count = await client.hlen(this.getSessionKey(sessionId));
+      return count;
+    }
+    const keys = await client.keys('shared-ctx:*');
+    return keys.length;
   }
 
-  clear(): void {
-    this.context.clear();
-  }
-
-  size(): number {
-    return this.context.size;
+  async cleanupExpired(): Promise<void> {
+    const client = this.redis.getClient();
+    const keys = await client.keys('shared-ctx:*');
+    for (const key of keys) {
+      const ttl = await client.ttl(key);
+      if (ttl === -2) {
+        await client.del(key);
+        this.logger.debug(`[SharedContext] Cleaned up expired key ${key}`);
+      }
+    }
   }
 }
