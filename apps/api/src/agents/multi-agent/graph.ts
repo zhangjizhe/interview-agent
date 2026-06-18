@@ -35,8 +35,15 @@ import { createExecutorNode } from './nodes/executor';
 import { createReplannerNode, replannerRouter } from './nodes/replanner';
 import { createReviewerNode, reviewerRouter } from './nodes/reviewer';
 import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage, AIMessage } from 'langchain';
+import { HumanMessage, AIMessage, BaseMessage } from 'langchain';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
+export interface StreamChunk {
+  type: 'token' | 'step' | 'final_response' | 'error';
+  content?: string;
+  step?: string;
+  node?: string;
+  error?: string;
+}
 
 /**
  * 构建面试多 Agent 图

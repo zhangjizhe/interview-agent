@@ -160,20 +160,51 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
 
     const stream = await this.graph.stream(
       { messages: [new HumanMessage(userMessage)] } as any,
+      { ...config, streamMode: 'messages' as const },
+    );
+
+    let fullResponse = '';
+
+    for await (const [msg, metadata] of stream) {
+      if (msg && typeof msg.content === 'string') {
+        fullResponse += msg.content;
+        yield {
+          type: 'token',
+          content: msg.content,
+          node: metadata?.node || undefined,
+        };
+      }
+    }
+
+    if (fullResponse) {
+      yield { type: 'final_response', content: fullResponse };
+    }
+  }
+
+  async *streamWithSteps(userMessage: string, threadId: string): AsyncGenerator<any, void, unknown> {
+    if (!this.graph) throw new Error('MultiAgent not initialized');
+    const config: RunnableConfig = { configurable: { thread_id: threadId } };
+
+    const stream = await this.graph.stream(
+      { messages: [new HumanMessage(userMessage)] } as any,
       { ...config, streamMode: 'values' as const },
     );
 
     for await (const chunk of stream) {
-      const messages = (chunk as any).messages || [];
-      const last = messages[messages.length - 1];
-      if (last && last.content) {
+      const state = chunk as InterviewAgentStateType;
+
+      if (state.past_steps && state.past_steps.length > 0) {
+        const lastStep = state.past_steps[state.past_steps.length - 1];
         yield {
-          type: 'token',
-          content: typeof last.content === 'string' ? last.content : JSON.stringify(last.content),
+          type: 'step',
+          step: lastStep.step.description,
+          result: typeof lastStep.result === 'string' ? lastStep.result : JSON.stringify(lastStep.result),
+          success: lastStep.success,
         };
       }
-      if ((chunk as any).final_response) {
-        yield { type: 'final_response', content: (chunk as any).final_response };
+
+      if (state.final_response) {
+        yield { type: 'final_response', content: state.final_response };
       }
     }
   }
