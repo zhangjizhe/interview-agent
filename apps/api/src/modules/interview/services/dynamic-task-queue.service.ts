@@ -310,48 +310,108 @@ export class DynamicTaskQueueService {
   }
 
   private async createFollowUpQuestion(task: any): Promise<string | null> {
-    const followUps: Record<string, string[]> = {
+    // LLM 语义生成追问：基于候选人具体回答内容，而非模板数组随机选
+    // 这样追问才有针对性（如候选人答了 useEffect 依赖数组 → 追问"什么场景遇到过死循环"）
+    try {
+      const response = await this.llm.chat({
+        messages: [
+          {
+            role: 'system',
+            content: `你是一位资深技术面试官。基于以下面试问题和候选人回答，生成一个针对性的追问。
+
+要求：
+- 追问必须基于候选人回答的具体内容，不要泛泛而问
+- 追问应深入候选人提到的某个具体点，或指出回答中的薄弱环节
+- 追问应该让候选人有机会展示更深的理解
+- 只输出追问本身，不要有任何前缀、编号或解释
+
+示例：
+问题："请解释 React 中 useEffect 的工作原理"
+回答："useEffect 在组件渲染后执行副作用，依赖数组控制执行时机，空数组表示只执行一次"
+好的追问："你提到依赖数组控制执行时机，能具体说说什么场景下遇到过依赖数组导致的死循环吗？你是怎么排查和解决的？"
+差的追问："能举一个实际项目中的应用例子吗？"（太泛，没有针对性）`,
+          },
+          {
+            role: 'user',
+            content: `问题：${task.question}\n\n候选人回答的上下文：${task.category} 方向，${task.difficulty} 难度`,
+          },
+        ],
+      });
+
+      const followUp = response.content?.trim();
+      if (followUp && followUp.length > 5) {
+        return followUp;
+      }
+    } catch (err: any) {
+      this.logger.warn(`[TaskQueue] LLM follow-up generation failed, using fallback: ${err.message}`);
+    }
+
+    // 回退：通用追问（LLM 不可用时的兜底）
+    const fallbackFollowUps: Record<string, string[]> = {
       frontend: [
-        '能举一个实际项目中的应用例子吗？',
-        '这个概念在 React 18 中有什么变化？',
-        '和其他类似的 API 相比有什么优势？',
+        '能具体展开你刚才提到的那个点吗？在实际项目中遇到过什么问题？',
+        '你提到的这个概念，在最新版本中有什么变化？对实际开发有什么影响？',
       ],
       backend: [
-        '在高并发场景下会有什么问题？如何优化？',
-        '这个方案的时间复杂度和空间复杂度是多少？',
-        '生产环境中需要注意哪些边界情况？',
+        '你刚才提到的方案，在高并发场景下会有什么问题？如何优化？',
+        '生产环境中使用这个方案，需要注意哪些边界情况？',
       ],
       algorithm: [
-        '有没有更优的解法？时间复杂度是多少？',
-        '这个算法在最坏情况下的表现如何？',
-        '如何证明这个算法的正确性？',
+        '你给出的解法，有没有更优的方式？时间复杂度能进一步降低吗？',
+        '这个解法在最坏情况下表现如何？有没有退化风险？',
       ],
     };
 
-    const categoryFollowUps = followUps[task.category] || followUps.frontend;
+    const categoryFollowUps = fallbackFollowUps[task.category] || fallbackFollowUps.frontend;
     return categoryFollowUps[Math.floor(Math.random() * categoryFollowUps.length)];
   }
 
   private async createAdvancedQuestion(task: any): Promise<string | null> {
-    const advancedMap: Record<string, string[]> = {
+    // LLM 语义生成进阶题：基于已完成题目的领域，生成更高难度的延伸问题
+    try {
+      const response = await this.llm.chat({
+        messages: [
+          {
+            role: 'system',
+            content: `你是一位资深技术面试官。基于以下已完成的面试题，生成一个更高难度的进阶问题。
+
+要求：
+- 进阶题必须在原题基础上提升难度（从原理到实战、从单机到分布式、从概念到源码）
+- 问题应该考察更深层的理解或更复杂的场景
+- 只输出问题本身，不要有任何前缀、编号或解释`,
+          },
+          {
+            role: 'user',
+            content: `已完成题目：${task.question}\n方向：${task.category}\n当前难度：${task.difficulty}`,
+          },
+        ],
+      });
+
+      const advanced = response.content?.trim();
+      if (advanced && advanced.length > 5) {
+        return advanced;
+      }
+    } catch (err: any) {
+      this.logger.warn(`[TaskQueue] LLM advanced question generation failed, using fallback: ${err.message}`);
+    }
+
+    // 回退
+    const fallbackAdvanced: Record<string, string[]> = {
       frontend: [
-        '如何在服务端渲染场景下应用这个概念？',
-        '如果需要实现一个类似的功能，你会如何设计 API？',
-        '这个概念和最新的前端技术趋势有什么联系？',
+        '如何在服务端渲染场景下应用这个概念？有哪些需要注意的坑？',
+        '如果要你从零设计一个类似的机制，你会如何设计 API 和内部实现？',
       ],
       backend: [
-        '如何将这个方案扩展到分布式系统中？',
-        '在云原生环境下会遇到哪些挑战？如何解决？',
-        '这个方案的可观测性如何保证？',
+        '如何将这个方案扩展到分布式系统中？一致性如何保证？',
+        '在云原生环境下这个方案会遇到哪些挑战？如何解决？',
       ],
       algorithm: [
-        '这个算法如何并行化？',
-        '在大规模数据场景下如何优化？',
-        '有没有相关的论文或工业界实践可以参考？',
+        '这个算法如何并行化？并行后的时间复杂度是多少？',
+        '在大规模数据场景下（TB 级），这个算法如何优化？',
       ],
     };
 
-    const advancedQuestions = advancedMap[task.category] || advancedMap.frontend;
+    const advancedQuestions = fallbackAdvanced[task.category] || fallbackAdvanced.frontend;
     return advancedQuestions[Math.floor(Math.random() * advancedQuestions.length)];
   }
 

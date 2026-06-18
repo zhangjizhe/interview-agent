@@ -40,7 +40,7 @@ describe('jest smoke - prompt-cache 纯函数', () => {
       { role: 'user', content: 'few-shot-1' },
       { role: 'user', content: 'real-q' },
     ];
-    const r = classifyMessages3(msgs, 2); // 前 2 条为静态
+    const r = classifyMessages3(msgs, 2);
     const kinds = r.segments.map((s) => s.kind);
     expect(kinds).toContain('SYSTEM');
     expect(kinds).toContain('SEMI_STATIC');
