@@ -3,6 +3,9 @@
 # 启动后：
 #   - 前端: http://localhost:5173
 #   - 后端: http://localhost:3001
+#
+# 容器清单（7 容器）：
+#   postgres / redis / qdrant / milvus / milvus-etcd / api / web
 
 services:
   postgres:
@@ -42,6 +45,45 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  # Milvus 2.x 依赖 etcd 做元数据存储
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: interview-milvus-etcd
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: '1000'
+      ETCD_QUOTA_BACKEND_BYTES: '4294967296'
+      ETCD_SNAPSHOT_COUNT: '50000'
+    volumes:
+      - milvus_etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ['CMD', 'etcdctl', 'endpoint', 'health']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  milvus:
+    image: milvusdb/milvus:v2.4.17
+    container_name: interview-milvus
+    ports:
+      - '19530:19530'
+      - '9091:9091'
+    environment:
+      ETCD_ENDPOINTS: milvus-etcd:2379
+      COMMON_STORAGETYPE: local
+    volumes:
+      - milvus_data:/var/lib/milvus
+    depends_on:
+      milvus-etcd:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9091/healthz']
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 30s
+
   api:
     build:
       context: .
@@ -54,6 +96,7 @@ services:
       DATABASE_URL: postgresql://dev:dev123@postgres:5432/interview
       REDIS_URL: redis://redis:6379
       QDRANT_URL: http://qdrant:6333
+      MILVUS_URL: http://milvus:19530
       NODE_ENV: production
       PORT: 3001
     env_file:
@@ -80,3 +123,5 @@ volumes:
   postgres_data:
   redis_data:
   qdrant_data:
+  milvus_etcd_data:
+  milvus_data:

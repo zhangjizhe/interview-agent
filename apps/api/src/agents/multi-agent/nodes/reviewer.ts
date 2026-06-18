@@ -1,14 +1,21 @@
 /**
- * Reviewer 节点 — 审阅最终回复质量
+ * Reviewer 节点 — 审阅最终回复质量 + HITL 中断
  *
  * 职责：
  * 1. 基于 past_steps 汇总生成 final_response
  * 2. 审阅 final_response 是否合理、完整
  * 3. 通过 → 结束；不通过 → 打回重做（retry_count++）
+ * 4. 评分争议（score < HITL_THRESHOLD）→ 设置 hitl_pending=true 触发 interrupt
  *
  * 失败策略：
  * - Reviewer 不通过：retry_count++，清空 final_response，回到 Planner 重新规划
  * - retry_count >= 2：强制输出（宁可输出不完美的回复也不死循环）
+ *
+ * HITL 流程：
+ * - Reviewer 评分 < 0.5 且 retry_count < MAX_RETRY_COUNT → hitl_pending=true
+ * - graph.ts 中 reviewer 条件边检测 hitl_pending → 路由到 hitl_review 节点
+ * - hitl_review 节点调用 interrupt() 暂停，等待 HR 审批
+ * - HR 审批后通过 Command(resume) 恢复执行
  */
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { z } from 'zod';
@@ -27,6 +34,7 @@ export const ReviewResultSchema = z.object({
 export type ReviewResult = z.infer<typeof ReviewResultSchema>;
 
 const MAX_RETRY_COUNT = 2;
+const HITL_SCORE_THRESHOLD = 0.5;
 
 /**
  * Reviewer 节点函数
@@ -101,6 +109,9 @@ approved = 合格可输出，revise = 需要修改`,
         const isRetryExhausted = (state.retry_count || 0) >= MAX_RETRY_COUNT;
         const shouldApprove = reviewResponse.verdict === 'approved' || isRetryExhausted;
 
+        // HITL 触发：评分争议且未超重试上限 → 暂停等待 HR 审批
+        const needsHitl = !shouldApprove && reviewResponse.score < HITL_SCORE_THRESHOLD && !isRetryExhausted;
+
         if (shouldApprove) {
             return {
                 messages: [new AIMessage(finalResponse)],
@@ -108,6 +119,19 @@ approved = 合格可输出，revise = 需要修改`,
                 review_score: reviewResponse.score,
                 review_issues: reviewResponse.issues,
                 review_suggestion: reviewResponse.suggestion,
+                hitl_pending: false,
+            };
+        }
+
+        // HITL 中断：评分争议，暂停等待 HR
+        if (needsHitl) {
+            return {
+                final_response: finalResponse, // 保留草稿，HR 审批后可使用
+                retry_count: (state.retry_count || 0) + 1,
+                review_score: reviewResponse.score,
+                review_issues: reviewResponse.issues,
+                review_suggestion: reviewResponse.suggestion,
+                hitl_pending: true,
             };
         }
 
@@ -119,6 +143,7 @@ approved = 合格可输出，revise = 需要修改`,
             review_score: reviewResponse.score,
             review_issues: reviewResponse.issues,
             review_suggestion: reviewResponse.suggestion,
+            hitl_pending: false,
         };
     };
 }
@@ -126,12 +151,18 @@ approved = 合格可输出，revise = 需要修改`,
 /**
  * Reviewer 条件路由函数
  *
- * - 有 final_response → 结束
+ * - hitl_pending=true → 路由到 hitl_review 节点（interrupt 等待 HR 审批）
+ * - 有 final_response 且非 HITL → 结束
  * - 没有 final_response（被打回）→ 回到 Planner 重新规划
  */
 export function reviewerRouter(
     state: InterviewAgentStateType,
-): 'end' | 'planner' {
+): 'end' | 'planner' | 'hitl_review' {
+    // HITL 中断优先：评分争议，需要 HR 审批
+    if (state.hitl_pending) {
+        return 'hitl_review';
+    }
+
     if (state.final_response) {
         return 'end';
     }

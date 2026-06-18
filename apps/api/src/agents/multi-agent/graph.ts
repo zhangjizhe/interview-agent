@@ -20,12 +20,16 @@
  *                                              reviewer → END
  *                                              (approved)
  *
+ *   reviewer ──→ hitl_review ──→ END (HR approved)
+ *                (interrupt)
+ *
  * 条件边：
  * 1. supervisor → planner | respond_directly   （按意图路由）
  * 2. replanner → executor | reviewer           （按执行状态路由）
- * 3. reviewer → END | planner                （通过则结束，打回则重规划）
+ * 3. reviewer → END | planner | hitl_review    （通过/打回/HITL中断）
+ * 4. hitl_review → END                         （interrupt 暂停，HR 审批后 Command(resume) 恢复）
  */
-import { StateGraph, END, START } from '@langchain/langgraph';
+import { StateGraph, END, START, interrupt, Command } from '@langchain/langgraph';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { InterviewAgentState, type InterviewAgentStateType } from './state';
 export type { InterviewAgentStateType } from './state';
@@ -38,11 +42,12 @@ import { LlmGatewayChatModel } from './llm-gateway-chat-model';
 import { HumanMessage, AIMessage, BaseMessage } from 'langchain';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 export interface StreamChunk {
-  type: 'token' | 'step' | 'final_response' | 'error';
+  type: 'token' | 'step' | 'final_response' | 'error' | 'hitl_pending';
   content?: string;
   step?: string;
   node?: string;
   error?: string;
+  hitlData?: { interviewId: string; score: number; issues: string[] };
 }
 
 /**
@@ -101,6 +106,45 @@ export function buildInterviewGraph(
         };
     };
 
+    // hitl_review 节点：评分争议时 interrupt 暂停，等待 HR 审批
+    // HR 审批后通过 Command(resume) 恢复，resume value = 'approved' | 'rejected'
+    const hitlReviewNode = async (
+        state: InterviewAgentStateType,
+    ): Promise<Partial<InterviewAgentStateType>> => {
+        // 调用 interrupt() 暂停图执行，等待外部输入
+        // resume value 由 HR 审批端点传入：'approved' 或 'rejected'
+        const verdict = interrupt<{ verdict: 'approved' | 'rejected' }>(
+            'HITL: 评分争议，等待 HR 审批',
+        ) as unknown as 'approved' | 'rejected';
+
+        if (verdict === 'approved') {
+            // HR 批准：使用 reviewer 的草稿 final_response
+            return {
+                messages: [new AIMessage(state.final_response)],
+                hitl_pending: false,
+                hitl_verdict: 'approved',
+                // final_response 保持不变（reviewer 已设置）
+            };
+        }
+
+        // HR 拒绝：打回重做
+        return {
+            final_response: '',
+            hitl_pending: false,
+            hitl_verdict: 'rejected',
+        };
+    };
+
+    // hitl_review 条件路由：approved → END，rejected → planner
+    const hitlReviewRouter = (
+        state: InterviewAgentStateType,
+    ): 'end' | 'planner' => {
+        if (state.hitl_verdict === 'approved' && state.final_response) {
+            return 'end';
+        }
+        return 'planner';
+    };
+
     // 构建 StateGraph
     const graph = new StateGraph(InterviewAgentState)
         // ── 注册节点 ──
@@ -110,6 +154,7 @@ export function buildInterviewGraph(
         .addNode('replanner', replannerNode)
         .addNode('reviewer', reviewerNode)
         .addNode('respond_directly', respondDirectlyNode)
+        .addNode('hitl_review', hitlReviewNode)
 
         // ── 定义边 ──
 
@@ -134,8 +179,15 @@ export function buildInterviewGraph(
             reviewer: 'reviewer',
         })
 
-        // reviewer 条件路由
+        // reviewer 条件路由（含 HITL 中断）
         .addConditionalEdges('reviewer', reviewerRouter, {
+            end: END,
+            planner: 'planner',
+            hitl_review: 'hitl_review',
+        })
+
+        // hitl_review 条件路由（HR 审批后恢复）
+        .addConditionalEdges('hitl_review', hitlReviewRouter, {
             end: END,
             planner: 'planner',
         })

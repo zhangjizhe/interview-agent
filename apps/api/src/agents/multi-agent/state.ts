@@ -107,6 +107,19 @@ export const InterviewAgentState = Annotation.Root({
      * >= 3 时强制进入 Reviewer（不死循环兜底）。
      */
     retry_count: Annotation<number>(),
+
+    /**
+     * HITL 中断标记。
+     * Reviewer 审阅时如果评分争议（score < 0.5），设置此字段触发 interrupt。
+     * HR 审批后通过 Command(resume) 恢复执行。
+     */
+    hitl_pending: Annotation<boolean>(),
+
+    /**
+     * HITL 审批结果。
+     * 'approved' / 'rejected' / undefined（未审批）
+     */
+    hitl_verdict: Annotation<'approved' | 'rejected'>(),
 });
 
 export type InterviewAgentStateType = typeof InterviewAgentState.State;
