@@ -32,18 +32,13 @@ export class ResumeParserService {
   ]);
 
   async parse(fileOrText: any, userPosition?: string): Promise<ParsedResume> {
-    // 判断是文件对象还是字符串
     let rawText: string;
     if (typeof fileOrText === 'string') {
       rawText = fileOrText;
     } else if (fileOrText?.buffer) {
-      // Multer 文件对象
-      rawText = fileOrText.buffer.toString('utf-8');
-    } else if (fileOrText?.originalname) {
-      // 其他文件对象，尝试读取 buffer
-      rawText = fileOrText.buffer?.toString('utf-8') || '';
+      rawText = fileOrText.buffer.toString();
     } else {
-      throw new Error('Unsupported input type for parse');
+      throw new Error('Invalid input: expected a string or a file object with buffer');
     }
 
     const text = rawText.trim().toLowerCase();
@@ -51,10 +46,11 @@ export class ResumeParserService {
 
     const skills = this.extractSkills(text);
     const yearsExp = this.extractYearsOfExperience(text);
-    // 用户指定岗位优先，否则从技能推断
     const position = userPosition || this.detectPosition(skills);
     const name = this.extractName(rawText);
     const email = this.extractEmail(rawText);
+    const education = this.extractEducation(sentences);
+    const experience = this.extractExperience(sentences);
     const projects = this.extractProjects(sentences);
     const keywords = this.extractKeywords(text);
     const summary = this.generateSummary({ skills, yearsExp, position });
@@ -66,8 +62,8 @@ export class ResumeParserService {
       position,
       yearsOfExperience: yearsExp,
       skills,
-      education: this.extractEducation(sentences),
-      experience: this.extractExperience(sentences),
+      education,
+      experience,
       projects,
       keywords,
       summary,
@@ -99,16 +95,16 @@ export class ResumeParserService {
   private extractYearsOfExperience(text: string): number {
     const yearMatch = text.match(/(\d+)年.*年|(\d+)\+?\s*年|(\d+)\s*years?/i);
     if (yearMatch) {
-      return Math.min(parseInt(yearMatch[1] || yearMatch[2] || yearMatch[3] || '3', 20);
+      return Math.min(parseInt(yearMatch[1] || yearMatch[2] || yearMatch[3] || '3', 10), 20);
     }
     return 3; // 默认3年
   }
 
   private extractName(text: string): string {
-    const lines = text.split('\n').map((l) => l.trim()).filter((l) => l));
+    const lines = text.split('\n').map((l) => l.trim()).filter((l) => l);
     // 简历开头的短句子通常是姓名
     for (let i = 0; i < Math.min(5, lines.length); i++) {
-      if (lines[i].length < 10 && !lines[i].includes('@') && !lines[i].length > 0) {
+      if (lines[i].length < 10 && !lines[i].includes('@') && lines[i].length > 0) {
         return lines[i];
       }
     }

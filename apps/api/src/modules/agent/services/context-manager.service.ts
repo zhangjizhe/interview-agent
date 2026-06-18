@@ -27,6 +27,8 @@ export class ContextManager {
   private readonly TIER_PRUNE = 0.8;
   private readonly TIER_SUMMARIZE = 0.95;
   private readonly PROTECT_WINDOW_TOKENS = 4000;
+  private readonly MAX_CACHE_SIZE = 1000; // LRU 上限，防止内存泄漏
+  // 用内容前 100 字符的 hash 做 key，避免切片下标错位问题
   private decisionCache: Map<string, StubCacheEntry> = new Map();
 
   compact(messages: ChatMessage[], currentTokens: number, maxTokens: number): CompactionResult {
@@ -61,9 +63,8 @@ export class ContextManager {
   private snip(compactable: ChatMessage[], protectedMsgs: ChatMessage[], beforeTokens: number): CompactionResult {
     const out: ChatMessage[] = [];
     let stubCount = 0;
-    for (let i = 0; i < compactable.length; i++) {
-      const msg = compactable[i];
-      const id = `m-${i}`;
+    for (const msg of compactable) {
+      const id = this.cacheKey(msg);
       const cached = this.decisionCache.get(id);
       if (cached) { if (cached.isStub) stubCount++; out.push({ ...msg, content: cached.content }); continue; }
       let content = msg.content;
@@ -76,7 +77,7 @@ export class ContextManager {
       } else if (msg.role === 'tool' && msg.content.length > 500) {
         content = msg.content.slice(0, 200) + `\n...[省略 ${msg.content.length - 200}]...`; isStub = true;
       }
-      this.decisionCache.set(id, { content, isStub });
+      this.setCache(id, { content, isStub });
       if (isStub) stubCount++;
       out.push({ ...msg, content });
     }
@@ -87,9 +88,8 @@ export class ContextManager {
   private prune(compactable: ChatMessage[], protectedMsgs: ChatMessage[], beforeTokens: number): CompactionResult {
     const out: ChatMessage[] = [];
     let stubCount = 0;
-    for (let i = 0; i < compactable.length; i++) {
-      const msg = compactable[i];
-      const id = `m-${i}`;
+    for (const msg of compactable) {
+      const id = this.cacheKey(msg);
       const cached = this.decisionCache.get(id);
       if (cached) { if (cached.isStub) stubCount++; out.push({ ...msg, content: cached.content }); continue; }
       let content = msg.content;
@@ -100,7 +100,7 @@ export class ContextManager {
       } else if (msg.role === 'assistant' || msg.role === 'tool') {
         content = '[已压缩]'; isStub = true;
       }
-      this.decisionCache.set(id, { content, isStub });
+      this.setCache(id, { content, isStub });
       if (isStub) stubCount++;
       out.push({ ...msg, content });
     }
@@ -126,5 +126,31 @@ export class ContextManager {
 
   private estMsgs(messages: ChatMessage[]): number {
     return messages.reduce((s, m) => s + this.est(m.content), 0);
+  }
+
+  /** 用内容前 100 字符的 hash 作为缓存 key，避免切片下标错位 */
+  private cacheKey(msg: ChatMessage): string {
+    const anchor = msg.content.slice(0, 100);
+    let hash = 0;
+    for (let i = 0; i < anchor.length; i++) {
+      const char = anchor.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return `${msg.role}-${hash}`;
+  }
+
+  /** 带 LRU 上限的缓存写入 */
+  private setCache(key: string, entry: StubCacheEntry): void {
+    if (this.decisionCache.size >= this.MAX_CACHE_SIZE) {
+      // 简单策略：清除最早的 10% 条目
+      const keys = this.decisionCache.keys();
+      let count = Math.floor(this.MAX_CACHE_SIZE * 0.1);
+      for (const k of keys) {
+        if (count-- <= 0) break;
+        this.decisionCache.delete(k);
+      }
+    }
+    this.decisionCache.set(key, entry);
   }
 }

@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
-import { MemoryService } from '../memory/memory.service';
+import { MemoryService, type WorkingState } from '../memory/memory.service';
 import { LangfuseService } from '../../infra/langfuse/langfuse.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
 import { ContextManager } from './services/context-manager.service';
 import { DeepAgentsAgentService } from './deepagents-agent.service';
+import { MultiAgentService } from './multi-agent.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { McpRegistry } from '../interview/services/mcp-registry';
 import { ChatMessage, StreamChunk } from '../llm/providers/types';
@@ -63,8 +65,10 @@ export class InterviewAgentService {
     private bocha: BochaSearchTool,
     private contextMgr: ContextManager,
     private deepAgents: DeepAgentsAgentService,
+    private multiAgent: MultiAgentService,
+    private config: ConfigService,
     private prisma: PrismaService,
-  ) { }
+  ) {}
 
   /**
    * 处理候选人消息 - 核心流式入口
@@ -108,10 +112,14 @@ export class InterviewAgentService {
         },
       });
 
+      // 读取工作记忆状态（面试流程状态）
+      const workingState = await this.memory.getWorkingState(ctx.sessionId);
+
       // 知识库驱动：根据岗位匹配 + 选题
       const bank: BankKey = matchBank(ctx.position);
       const questions = pickQuestions(bank, 5);
-      const currentQuestion = this.findCurrentQuestion(context.shortTermMessages, questions);
+      const questionIndex = workingState.questionIndex ?? 0;
+      const currentQuestion = questions[questionIndex] || this.findCurrentQuestion(context.shortTermMessages, questions);
 
       // 如果有当前题目，把题目和评分要点塞进 system prompt
       const questionContext = currentQuestion
@@ -215,23 +223,39 @@ export class InterviewAgentService {
       }
 
       // ===== 写真实 deepagents 调用 =====
-      const useDeepAgents = this.deepAgents.isReady();
+      // agent_mode 开关：multi | deepagents | llm-direct（默认 multi）
+      const agentMode = this.config.get<string>('agent.engine') || 'multi';
+      const useDeepAgents = agentMode === 'deepagents' && this.deepAgents.isReady();
+      const useMultiAgent = agentMode === 'multi' && this.multiAgent.isEnabled();
+
       this.langfuse.logSpan({
         traceId,
         name: 'agent.engine',
-        output: { engine: useDeepAgents ? 'deepagents' : 'fallback-handwritten' },
+        output: {
+          engine: useMultiAgent ? 'multi-agent' : useDeepAgents ? 'deepagents' : 'llm-direct',
+          agentMode,
+        },
       });
 
       yield {
         type: 'meta',
-        engine: useDeepAgents ? 'deepagents' : 'llm-direct',
+        engine: useMultiAgent ? 'multi-agent' : useDeepAgents ? 'deepagents' : 'llm-direct',
         intent: '评估候选人回答 / 追问 / 进入下一题',
         plan: [`知识库: ${bank}`, `当前候选: ${currentQuestion?.question?.slice(0, 30) || '（首问）'}...`],
       };
 
       yield { type: 'thinking', content: '正在调用 LLM 生成面试官回复...' };
 
-      if (useDeepAgents) {
+      if (useMultiAgent) {
+        // 多 Agent（LangGraph Supervisor 拓扑）：planner → executor → replanner → reviewer
+        // 注意：history 由 MultiAgentService 通过 PostgresSaver checkpointer 自动维护（thread_id = sessionId）
+        for await (const chunk of this.multiAgent.stream(userInput, ctx.sessionId)) {
+          if (chunk.type === 'token' && chunk.content) {
+            fullResponse += chunk.content;
+            yield { type: 'token', content: chunk.content };
+          }
+        }
+      } else if (useDeepAgents) {
         // deepagents 接管（流式）
         const llmMessages = finalMessages.map((m) => ({
           role: m.role as 'system' | 'user' | 'assistant',
@@ -271,6 +295,15 @@ export class InterviewAgentService {
       await this.memory.appendMessage(ctx.sessionId, {
         role: 'assistant',
         content: fullResponse,
+      });
+
+      // 更新工作记忆状态：题目索引 + 已覆盖技能
+      const nextQuestionIndex = questionIndex + 1;
+      const newCoveredSkills = [...(workingState.coveredSkills || []), bank];
+      await this.memory.updateWorkingState(ctx.sessionId, {
+        currentQuestion: currentQuestion?.question,
+        questionIndex: nextQuestionIndex,
+        coveredSkills: [...new Set(newCoveredSkills)], // 去重
       });
 
       // 提取最后一个 chunk 的 usage（粗暴但能用）

@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisShortTermMemory } from './short-term/redis-memory.store';
+import { RedisShortTermMemory, type WorkingState } from './short-term/redis-memory.store';
 import { MilvusLongTermMemory } from './long-term/milvus-memory.store';
 import { Mem0CloudMemory } from './long-term/mem0.store';
 import { ChatMessage, Memory } from './interfaces/memory-store.interface';
+
+export type { WorkingState };
 
 interface AuditEntry {
   action: 'create' | 'update' | 'recall' | 'delete' | 'expire';
@@ -21,6 +23,16 @@ interface MemoryMetadata {
   audit: AuditEntry[];
 }
 
+/**
+ * 记忆服务 - 四层记忆架构
+ *
+ * - 工作记忆：Redis Hash（面试流程状态，跨实例安全）
+ * - 会话记忆：Redis List（会话上下文，TTL）
+ * - 长期记忆：Milvus（向量检索）+ Mem0（语义去重）
+ * - 用户画像：Prisma 结构化（面试结果归档）
+ *
+ * 写入策略：每轮对话 → 工作记忆更新；面试结束 → 结构化归档到长期
+ */
 @Injectable()
 export class MemoryService {
   private readonly logger = new Logger(MemoryService.name);
@@ -65,7 +77,7 @@ export class MemoryService {
   private async cleanupExpiredMemories(userId: string): Promise<void> {
     const now = Date.now();
     const expiredKeys: string[] = [];
-    
+
     this.memoryMetadata.forEach((metadata, key) => {
       if (key.startsWith(userId) && now - metadata.lastAccessedAt > this.MAX_ACCESS_AGE) {
         expiredKeys.push(key);
@@ -82,6 +94,7 @@ export class MemoryService {
     }
   }
 
+  // ===== 短期（会话记忆）=====
   async appendMessage(sessionId: string, msg: ChatMessage): Promise<void> {
     const isValid = this.validateMemoryContent(msg.content);
     if (!isValid) {
@@ -100,6 +113,37 @@ export class MemoryService {
     return this.shortTerm.clearSession(sessionId);
   }
 
+  // ===== 工作记忆（Redis Hash）=====
+  async getWorkingState(sessionId: string): Promise<WorkingState> {
+    return this.shortTerm.getWorkingState(sessionId);
+  }
+
+  async setWorkingState(sessionId: string, state: WorkingState): Promise<void> {
+    return this.shortTerm.setWorkingState(sessionId, state);
+  }
+
+  async updateWorkingState(sessionId: string, partialState: Partial<WorkingState>): Promise<void> {
+    return this.shortTerm.updateWorkingState(sessionId, partialState);
+  }
+
+  async clearWorkingState(sessionId: string): Promise<void> {
+    return this.shortTerm.clearWorkingState(sessionId);
+  }
+
+  // ===== 会话摘要（Redis String）=====
+  async getSessionSummary(sessionId: string): Promise<string | null> {
+    return this.shortTerm.getSessionSummary(sessionId);
+  }
+
+  async setSessionSummary(sessionId: string, summary: string): Promise<void> {
+    return this.shortTerm.setSessionSummary(sessionId, summary);
+  }
+
+  async clearSessionSummary(sessionId: string): Promise<void> {
+    return this.shortTerm.clearSessionSummary(sessionId);
+  }
+
+  // ===== 长期 - 双写策略 =====
   async memorize(userId: string, messages: ChatMessage[]): Promise<void> {
     const validMessages = messages.filter((m) => this.validateMemoryContent(m.content));
     if (validMessages.length !== messages.length) {
@@ -147,7 +191,7 @@ export class MemoryService {
       if (!seen.has(key)) {
         seen.add(key);
         merged.push(m);
-        
+
         const memoryKey = this.getMemoryKey(userId, m.content);
         const metadata = this.memoryMetadata.get(memoryKey);
         if (metadata) {
