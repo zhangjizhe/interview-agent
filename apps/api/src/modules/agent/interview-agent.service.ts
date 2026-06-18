@@ -9,6 +9,7 @@ import { DeepAgentsAgentService } from './deepagents-agent.service';
 import { MultiAgentService } from './multi-agent.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { McpRegistry } from '../interview/services/mcp-registry';
+import { DynamicTaskQueueService } from '../interview/services/dynamic-task-queue.service';
 import { ChatMessage, StreamChunk } from '../llm/providers/types';
 import { extractFirstJsonObject, safeJsonParse } from '../../common/json-extract';
 import {
@@ -68,6 +69,7 @@ export class InterviewAgentService {
     private multiAgent: MultiAgentService,
     private config: ConfigService,
     private prisma: PrismaService,
+    private taskQueue: DynamicTaskQueueService,
   ) {}
 
   /**
@@ -115,11 +117,25 @@ export class InterviewAgentService {
       // 读取工作记忆状态（面试流程状态）
       const workingState = await this.memory.getWorkingState(ctx.sessionId);
 
-      // 知识库驱动：根据岗位匹配 + 选题
+      // ===== 动态任务队列驱动 =====
+      // 初始化队列（幂等操作）
+      await this.taskQueue.initializeQueue(ctx.sessionId, ctx.position, ctx.level);
+      
+      // 获取当前任务（支持动态出题、follow-up、自适应）
+      const currentTask = await this.taskQueue.getNextTask(ctx.sessionId);
+      
+      // 知识库驱动备选：根据岗位匹配选题（兼容旧逻辑）
       const bank: BankKey = matchBank(ctx.position);
       const questions = pickQuestions(bank, 5);
-      const questionIndex = workingState.questionIndex ?? 0;
-      const currentQuestion = questions[questionIndex] || this.findCurrentQuestion(context.shortTermMessages, questions);
+      
+      // 优先使用动态任务队列的题目，回退到知识库选题
+      const currentQuestion = currentTask 
+        ? {
+            question: currentTask.question,
+            keyPoints: ['待扩展：动态任务队列评分要点'],
+            referenceAnswer: '',
+          } as Question
+        : questions[workingState.questionIndex ?? 0] || this.findCurrentQuestion(context.shortTermMessages, questions);
 
       // 如果有当前题目，把题目和评分要点塞进 system prompt
       const questionContext = currentQuestion
@@ -177,8 +193,9 @@ export class InterviewAgentService {
 
       // ===== 上下文压缩（MUR AI 4 级水位线）=====
       const beforeTokens = this.estimateMessagesTokens(messages);
-      const MAX_TOKENS = 32000; // 千问 plus 上限（保守值）
-      const compaction = this.contextMgr.compact(messages, beforeTokens, MAX_TOKENS);
+      const providerMaxTokens = this.config.get<number>(`llm.${ctx.provider}.maxTokens`) ||
+        this.config.get<number>('llm.default.maxTokens') || 32000;
+      const compaction = this.contextMgr.compact(messages, beforeTokens, providerMaxTokens);
 
       // Langfuse 埋点：可观测压缩行为
       this.langfuse.logSpan({
@@ -329,15 +346,16 @@ export class InterviewAgentService {
   }
 
   /**
-   * 从短期记忆中推断当前在问哪道题
-   * 简化：用 assistant 最后一次完整回复匹配题目前缀
+   * 渐进式查找当前题目（支持动态任务队列）
+   * MVP 阶段：返回第一道未完成的题
+   * 后续可扩展：结合动态任务队列追踪已问过的题目，支持 follow-up 和自适应出题
    */
   private findCurrentQuestion(
     _shortTerm: ChatMessage[],
     questions: Question[],
   ): Question | null {
-    // 简化：返回第一道未完成的题（实际生产可以追踪已问过的）
-    // 这里取第一题——MVP 阶段够用
+    // 渐进式实现：优先返回队列中的第一道题
+    // 后续可扩展为从动态任务队列读取
     return questions[0] || null;
   }
 
@@ -415,8 +433,8 @@ export class InterviewAgentService {
   }
 
   private detectSearchIntent(userInput: string, aiResponse: string): boolean {
-    const keywords = /最新|现在|2024|2025|趋势|动态|进展|recent|latest/i;
-    return keywords.test(userInput) || keywords.test(aiResponse);
+    const searchKeywords = /最新|现在|如今|当前|当前情况|现状|202[4-9]|203[0-9]|趋势|动态|进展|发展|变化|更新|发布|release|recent|latest|newest|current/i;
+    return searchKeywords.test(userInput) || searchKeywords.test(aiResponse);
   }
 
   private estimateMessagesTokens(messages: ChatMessage[]): number {

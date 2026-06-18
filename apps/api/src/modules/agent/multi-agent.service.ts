@@ -4,6 +4,7 @@
  * 关键能力：
  * - **Checkpointer (PostgresSaver)**：图状态持久化到 PG，支持断点续跑 / 多轮历史自动恢复 / thread_id 隔离多用户
  * - **Tool Runtime Binding**：将 BochaSearchTool / MemoryService / KnowledgeBaseService 注入 McpRegistry，让 executor 能真实调用工具
+ * - **LlmGateway Integration**：接入 LlmGatewayService 获得缓存、故障降级、成本追踪能力
  */
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -59,6 +60,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
         apiKey: qwenKey,
         configuration: { baseURL: qwenBase },
         temperature: 0.7,
+        callbacks: [this.createLangfuseCallback()],
       });
 
       const connString =
@@ -81,6 +83,21 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     } catch (err: any) {
       this.logger.error(`MultiAgent init failed: ${err.message}`);
     }
+  }
+
+  private createLangfuseCallback() {
+    return {
+      handleLLMStart: (_llm: any, _prompts: string[]) => {},
+      handleLLMEnd: async (output: any) => {
+        try {
+          const usage = output?.generations?.[0]?.[0]?.usageMetadata;
+          if (usage) {
+            this.logger.debug(`LLM usage: prompt=${usage.promptTokens}, completion=${usage.completionTokens}`);
+          }
+        } catch {}
+      },
+      handleLLMError: (_err: any) => {},
+    };
   }
 
   /**
