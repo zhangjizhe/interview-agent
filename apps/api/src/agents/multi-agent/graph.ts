@@ -34,7 +34,7 @@ import { createPlannerNode } from './nodes/planner';
 import { createExecutorNode } from './nodes/executor';
 import { createReplannerNode, replannerRouter } from './nodes/replanner';
 import { createReviewerNode, reviewerRouter } from './nodes/reviewer';
-import { ChatOpenAI } from '@langchain/openai';
+import { LlmGatewayChatModel } from './llm-gateway-chat-model';
 import { HumanMessage, AIMessage, BaseMessage } from 'langchain';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 export interface StreamChunk {
@@ -68,7 +68,7 @@ export interface StreamChunk {
  * ```
  */
 export function buildInterviewGraph(
-  model: ChatOpenAI,
+  model: LlmGatewayChatModel,
   checkpointer?: BaseCheckpointSaver,
 ) {
     // 创建节点函数

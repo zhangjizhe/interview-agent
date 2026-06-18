@@ -53,6 +53,7 @@ export interface AgentContext {
   sessionId: string;
   position: string;
   level: string;
+  provider?: string; // P0-3 修复：按 provider 取 maxTokens 配置
 }
 
 @Injectable()
@@ -117,7 +118,7 @@ export class InterviewAgentService {
       // 读取工作记忆状态（面试流程状态）
       const workingState = await this.memory.getWorkingState(ctx.sessionId);
 
-      // ===== 动态任务队列驱动 =====
+      // ===== 动态任务队列驱动（统一题号追踪）=====
       // 初始化队列（幂等操作）
       await this.taskQueue.initializeQueue(ctx.sessionId, ctx.position, ctx.level);
       
@@ -128,6 +129,10 @@ export class InterviewAgentService {
       const bank: BankKey = matchBank(ctx.position);
       const questions = pickQuestions(bank, 5);
       
+      // P0-2 修复：题号统一从 taskQueue 统计，不依赖 workingState.questionIndex
+      const queueStatus = await this.taskQueue.getQueueStatus(ctx.sessionId);
+      const questionIndex = queueStatus.completedCount;
+      
       // 优先使用动态任务队列的题目，回退到知识库选题
       const currentQuestion = currentTask 
         ? {
@@ -135,7 +140,7 @@ export class InterviewAgentService {
             keyPoints: ['待扩展：动态任务队列评分要点'],
             referenceAnswer: '',
           } as Question
-        : questions[workingState.questionIndex ?? 0] || this.findCurrentQuestion(context.shortTermMessages, questions);
+        : questions[questionIndex] || this.findCurrentQuestion(context.shortTermMessages, questions);
 
       // 如果有当前题目，把题目和评分要点塞进 system prompt
       const questionContext = currentQuestion
@@ -193,8 +198,11 @@ export class InterviewAgentService {
 
       // ===== 上下文压缩（MUR AI 4 级水位线）=====
       const beforeTokens = this.estimateMessagesTokens(messages);
-      const providerMaxTokens = this.config.get<number>(`llm.${ctx.provider}.maxTokens`) ||
-        this.config.get<number>('llm.default.maxTokens') || 32000;
+      // P0-3 修复：按 ctx.provider 取配置项，三级 fallback
+      const provider = ctx.provider || 'qwen';
+      const providerMaxTokens = this.config.get<number>(`llm.${provider}.maxTokens`)
+        ?? this.config.get<number>('llm.default.maxTokens')
+        ?? 32000;
       const compaction = this.contextMgr.compact(messages, beforeTokens, providerMaxTokens);
 
       // Langfuse 埋点：可观测压缩行为
@@ -315,7 +323,9 @@ export class InterviewAgentService {
       });
 
       // 更新工作记忆状态：题目索引 + 已覆盖技能
-      const nextQuestionIndex = questionIndex + 1;
+      // P0-2 修复：题号从 taskQueue.getQueueStatus 取值（已完成的题数）
+      // 旧代码 nextQuestionIndex = questionIndex + 1，与动态队列脱钩
+      const nextQuestionIndex = queueStatus.completedCount + 1;
       const newCoveredSkills = [...(workingState.coveredSkills || []), bank];
       await this.memory.updateWorkingState(ctx.sessionId, {
         currentQuestion: currentQuestion?.question,

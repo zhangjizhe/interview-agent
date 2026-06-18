@@ -936,6 +936,8 @@ export class InterviewController {
       sessionId: interviewId,
       position: interview.position,
       level: interview.level,
+      // P0-3 修复：传 provider，让 maxTokens 走对应 provider 配置
+      provider: (dto as any).provider || 'qwen',
     };
 
     const writeEvent = (event: object) => {

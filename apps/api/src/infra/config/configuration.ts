@@ -55,6 +55,12 @@ export interface AppConfig {
     enabled: boolean;
     jsonPath: string;
   };
+  // P0-3 修复：按 provider 配置的 maxTokens
+  llm: {
+    qwen: { maxTokens: number };
+    deepseek: { maxTokens: number };
+    default: { maxTokens: number };
+  };
 }
 
 export const configuration = (): AppConfig => ({
@@ -114,5 +120,17 @@ export const configuration = (): AppConfig => ({
   knowledgeBase: {
     enabled: process.env.KNOWLEDGE_BASE_ENABLED !== 'false', // 默认开
     jsonPath: process.env.KNOWLEDGE_BASE_JSON || '', // 空则用默认路径
+  },
+  // P0-3 修复：按 provider 配置 maxTokens，区分模型能力
+  llm: {
+    qwen: {
+      maxTokens: parseInt(process.env.QWEN_MAX_TOKENS, 10) || 128000,
+    },
+    deepseek: {
+      maxTokens: parseInt(process.env.DEEPSEEK_MAX_TOKENS, 10) || 64000,
+    },
+    default: {
+      maxTokens: parseInt(process.env.LLM_DEFAULT_MAX_TOKENS, 10) || 32000,
+    },
   },
 });

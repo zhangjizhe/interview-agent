@@ -12,7 +12,7 @@
  * - 不可观测：不知道 LLM 为什么选了这条路
  * - 显式意图分类让路由可预测、可调试、可针对优化
  */
-import { ChatOpenAI } from '@langchain/openai';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { z } from 'zod';
 import type { InterviewAgentStateType } from '../state';
 import { UserIntentSchema, type UserIntent } from '../state';
@@ -20,7 +20,7 @@ import { UserIntentSchema, type UserIntent } from '../state';
 /**
  * Supervisor 节点函数
  */
-export function createSupervisorNode(model: ChatOpenAI) {
+export function createSupervisorNode(model: BaseChatModel) {
     return async function supervisorNode(
         state: InterviewAgentStateType,
     ): Promise<Partial<InterviewAgentStateType>> {

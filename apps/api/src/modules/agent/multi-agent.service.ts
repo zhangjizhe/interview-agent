@@ -4,11 +4,10 @@
  * 关键能力：
  * - **Checkpointer (PostgresSaver)**：图状态持久化到 PG，支持断点续跑 / 多轮历史自动恢复 / thread_id 隔离多用户
  * - **Tool Runtime Binding**：将 BochaSearchTool / MemoryService / KnowledgeBaseService 注入 McpRegistry，让 executor 能真实调用工具
- * - **LlmGateway Integration**：接入 LlmGatewayService 获得缓存、故障降级、成本追踪能力
+ * - **LlmGateway Integration**：通过 LlmGatewayChatModel 包装器接入 LlmGatewayService，享受缓存、故障降级、成本追踪能力
  */
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage, type BaseMessageLike } from '@langchain/core/messages';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
@@ -17,6 +16,7 @@ import {
   buildInterviewGraph,
   type InterviewAgentStateType,
 } from '../../agents/multi-agent/graph';
+import { LlmGatewayChatModel } from '../../agents/multi-agent/llm-gateway-chat-model';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
 import { MemoryService } from '../memory/memory.service';
@@ -51,16 +51,14 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      const qwenKey = this.config.get<string>('qwen.apiKey');
-      const qwenBase = this.config.get<string>('qwen.baseUrl');
-      const modelName = this.config.get<string>('qwen.model') || 'qwen-plus';
-
-      const model = new ChatOpenAI({
-        modelName,
-        apiKey: qwenKey,
-        configuration: { baseURL: qwenBase },
-        temperature: 0.7,
-        callbacks: [this.createLangfuseCallback()],
+      // P0-1 修复：不再直接 new ChatOpenAI，而是用 LlmGatewayChatModel 包装
+      // 这样 LangGraph 节点的 model.invoke() 实际走 LlmGateway → 享受 P0 缓存工程
+      const providerName = (this.config.get<string>('qwen.model') || 'qwen-plus') as 'qwen' | 'deepseek';
+      const model = new LlmGatewayChatModel({
+        llmGateway: this.llm,
+        provider: providerName,
+        interviewId: 'multi-agent-engine',
+        userId: 'system',
       });
 
       const connString =
@@ -79,25 +77,10 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
 
       this.graph = buildInterviewGraph(model, this.checkpointer || undefined);
       this.enabled = true;
-      this.logger.log(`✅ MultiAgent graph compiled (model=${modelName}, checkpoint=${this.checkpointer ? 'postgres' : 'none'})`);
+      this.logger.log(`✅ MultiAgent graph compiled (provider=${providerName}, llmGateway=ON, checkpoint=${this.checkpointer ? 'postgres' : 'none'})`);
     } catch (err: any) {
       this.logger.error(`MultiAgent init failed: ${err.message}`);
     }
-  }
-
-  private createLangfuseCallback() {
-    return {
-      handleLLMStart: (_llm: any, _prompts: string[]) => {},
-      handleLLMEnd: async (output: any) => {
-        try {
-          const usage = output?.generations?.[0]?.[0]?.usageMetadata;
-          if (usage) {
-            this.logger.debug(`LLM usage: prompt=${usage.promptTokens}, completion=${usage.completionTokens}`);
-          }
-        } catch {}
-      },
-      handleLLMError: (_err: any) => {},
-    };
   }
 
   /**

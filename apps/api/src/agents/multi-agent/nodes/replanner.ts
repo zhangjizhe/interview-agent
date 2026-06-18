@@ -12,7 +12,7 @@
  * - 两者 prompt 不同、职责不同
  * - 分离后可独立测试"失败恢复"逻辑
  */
-import { ChatOpenAI } from '@langchain/openai';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { z } from 'zod';
 import type { InterviewAgentStateType, PlanStep } from '../state';
 import { PlanStepSchema, ReplanDecisionSchema } from '../state';
@@ -20,7 +20,7 @@ import { PlanStepSchema, ReplanDecisionSchema } from '../state';
 /**
  * Replanner 节点函数
  */
-export function createReplannerNode(model: ChatOpenAI) {
+export function createReplannerNode(model: BaseChatModel) {
     return async function replannerNode(
         state: InterviewAgentStateType,
     ): Promise<Partial<InterviewAgentStateType>> {

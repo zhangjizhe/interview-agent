@@ -61,6 +61,9 @@ export interface InterviewAgentConfig {
  *
  * 内部封装 ChatOpenAI + buildInterviewGraph，返回编译好的图。
  * 同一个 config 可以创建多个 agent 实例（无状态，每次 invoke 独立）。
+ *
+ * 注意：multi-agent.service.ts 的生产路径已经走 LlmGatewayChatModel；
+ * 这个工厂函数保留 ChatOpenAI 是给 standalone 用例（不接入 LlmGateway）
  */
 export function createInterviewAgent(config: InterviewAgentConfig) {
     const model = new ChatOpenAI({
@@ -70,7 +73,7 @@ export function createInterviewAgent(config: InterviewAgentConfig) {
         temperature: config.temperature ?? 0.7,
     });
 
-    return buildInterviewGraph(model);
+    return buildInterviewGraph(model as any);
 }
 
 /**

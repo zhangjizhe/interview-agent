@@ -10,7 +10,7 @@
  * - Reviewer 不通过：retry_count++，清空 final_response，回到 Planner 重新规划
  * - retry_count >= 2：强制输出（宁可输出不完美的回复也不死循环）
  */
-import { ChatOpenAI } from '@langchain/openai';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { z } from 'zod';
 import { AIMessage } from 'langchain';
 import type { InterviewAgentStateType } from '../state';
@@ -35,7 +35,7 @@ const MAX_RETRY_COUNT = 2;
  * 1. 汇总生成 final_response（基于 past_steps）
  * 2. 审阅质量，通过则结束，不通过则打回
  */
-export function createReviewerNode(model: ChatOpenAI) {
+export function createReviewerNode(model: BaseChatModel) {
     return async function reviewerNode(
         state: InterviewAgentStateType,
     ): Promise<Partial<InterviewAgentStateType>> {

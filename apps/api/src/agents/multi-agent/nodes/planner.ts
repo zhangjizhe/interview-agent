@@ -11,7 +11,7 @@
  * - Planner 需要深入理解任务才能拆解，两者 prompt 不同
  * - 分离后可独立测试和调优
  */
-import { ChatOpenAI } from '@langchain/openai';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { z } from 'zod';
 import type { InterviewAgentStateType, PlanStep } from '../state';
 import { PlanStepSchema } from '../state';
@@ -47,7 +47,7 @@ function formatToolsForPrompt(tools: McpToolMetadata[]): string {
  * @param model - ChatOpenAI 实例
  * @param config - 可选配置，包含 userId 和用户偏好映射
  */
-export function createPlannerNode(model: ChatOpenAI, config?: PlannerConfig) {
+export function createPlannerNode(model: BaseChatModel, config?: PlannerConfig) {
     return async function plannerNode(
         state: InterviewAgentStateType,
     ): Promise<Partial<InterviewAgentStateType>> {

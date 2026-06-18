@@ -14,14 +14,14 @@
  * - Plan-and-Execute 模式：先规划再执行，每步有明确目标
  * - 执行结果可校验，跑偏了 Replanner 能纠正而非从头来
  */
-import { ChatOpenAI } from '@langchain/openai';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { InterviewAgentStateType, PastStep } from '../state';
 import { McpRegistry } from '../../../modules/interview/services/mcp-registry';
 
 /**
  * Executor 节点函数
  */
-export function createExecutorNode(model: ChatOpenAI) {
+export function createExecutorNode(model: BaseChatModel) {
     return async function executorNode(
         state: InterviewAgentStateType,
     ): Promise<Partial<InterviewAgentStateType>> {
