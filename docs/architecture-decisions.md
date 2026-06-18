@@ -77,15 +77,29 @@ Agent Memory 存在以下技术债：
 
 ### 设计方案
 
-**质量评估维度**:
-1. **完整性** - 回答长度 + 关键词匹配
-2. **正确性** - 内容正确性指标
-3. **深度** - 技术深度指标
+**Agent 决策模式**（v2.1 重构，Workflow → Agent）:
 
-**自适应策略**:
-- `score < 0.5`: 生成跟进问题深入追问
-- `score > 0.8`: 生成进阶问题提升难度
-- `0.5 <= score <= 0.8`: 正常流程
+> 旧 Workflow: LLM 评分 → `score < 0.5` 规则触发追问 → LLM 生成追问内容（3 步，规则驱动）
+> 新 Agent: `agentDecide()` 一次 LLM 调用同时完成评分 + 是否追问 + 追问内容 + 是否进阶 + 进阶内容（1 步，语义驱动）
+
+**AgentDecision Schema**:
+- 评分维度：score / completeness / correctness / depth / feedback / keyPoints / missingPoints
+- 决策维度：shouldFollowUp + followUpQuestion + followUpReason / shouldAdvance + advancedQuestion
+- `shouldFollowUp` 由 LLM 基于回答语义自主判断，不是 `score < 0.5` 硬阈值
+- LLM 可在 score=0.6 时决定追问（回答有误导性内容需澄清），也可在 score=0.3 时决定不追问（太离谱不值得追问）
+
+**质量评估维度**:
+1. **完整性** - 回答是否覆盖核心要点
+2. **正确性** - 内容是否准确
+3. **深度** - 是否有细节和原理
+
+**降级策略**:
+- LLM 不可用时 → `heuristicDecide()` 启发式回退（此时才用阈值，明确标注为降级逻辑）
+- Milvus 不可用时 → 本地题库 `LOCAL_QUESTIONS` 兜底
+
+**题库来源**:
+- 主路径：`QuestionBankService`（Milvus 混合检索：Dense + BM25 + RRF + Rerank）
+- 回退：本地硬编码题库（frontend / backend / algorithm 各 5 题）
 
 ### 实现位置
 `apps/api/src/modules/interview/services/dynamic-task-queue.service.ts`
