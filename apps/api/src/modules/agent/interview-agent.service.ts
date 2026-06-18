@@ -219,8 +219,8 @@ export class InterviewAgentService {
       }
 
       // ===== 写真实 deepagents 调用 =====
-      // agent_mode 开关：multi | deepagents | llm-direct（默认）
-      const agentMode = this.config.get<string>('agent.engine') || 'llm-direct';
+      // agent_mode 开关：multi | deepagents | llm-direct（默认 multi）
+      const agentMode = this.config.get<string>('agent.engine') || 'multi';
       const useDeepAgents = agentMode === 'deepagents' && this.deepAgents.isReady();
       const useMultiAgent = agentMode === 'multi' && this.multiAgent.isEnabled();
 
@@ -244,10 +244,7 @@ export class InterviewAgentService {
 
       if (useMultiAgent) {
         // 多 Agent（LangGraph Supervisor 拓扑）：planner → executor → replanner → reviewer
-        const historyMessages = finalMessages
-          .filter((m) => m.role !== 'system')
-          .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-
+        // 注意：history 由 MultiAgentService 通过 PostgresSaver checkpointer 自动维护（thread_id = sessionId）
         for await (const chunk of this.multiAgent.stream(userInput, ctx.sessionId)) {
           if (chunk.type === 'token' && chunk.content) {
             fullResponse += chunk.content;
