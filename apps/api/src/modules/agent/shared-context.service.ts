@@ -71,7 +71,7 @@ export class SharedContextService {
       if (!trimmed) return false;
       if (trimmed.length > 10000) return false;
       const hasEvidence = trimmed.includes('根据') || trimmed.includes('基于') || trimmed.includes('参考');
-      return hasEvidence || true;
+      return hasEvidence;
     } catch {
       return false;
     }
