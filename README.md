@@ -352,15 +352,14 @@ interview-agent/
 
 ## 测试与基准
 
-### 单元测试（22 个，全过）
+### 单元测试（34 个，全过）
 
 ```bash
 cd apps/api
-TS_NODE_TRANSPILE_ONLY=true npx ts-node \
-  --transpile-only \
-  --compiler-options '{"module":"commonjs","esModuleInterop":true}' \
-  tests/cache.spec.ts
-# 22 passed, 0 failed
+npm test
+# jest  12 passed（Prompt Cache + json-extract 烟囱测试）
+# node:test  22 passed（Prompt Cache 策略 + JSON 容错解析）
+# 合计  34/34
 ```
 
 ### RAG 召回基准（P@5 = 1.0）
@@ -381,15 +380,19 @@ cd apps/api && npx ts-node scripts/bench-p0.ts
 
 ---
 
-## 已知局限
+## 演进路线
 
-| 类别 | 问题 | 计划 |
-|------|------|------|
-| 安全 | API 无认证（demo 阶段 userId 直传） | 接入 JWT |
-| 测试 | 前端 0 测试，后端覆盖率 < 30% | 补 Vitest + Playwright e2e |
-| 扩展性 | Mem0 单 namespace，多租户需隔离 | per-tenant namespace |
-| 可观测 | Langfuse 100% 采样，无 APM | 接入采样 + Sentry |
-| 并发 | SSE 单连接无复用 | WebSocket 升级方案 |
+> 下表是"**当前状态 → 下一阶段**"的演进图，与 commit 历史对齐。标注 ✅ 的部分已在当前版本实现。
+
+| 维度 | 当前状态 | 下一阶段 | 相关文件 |
+|------|---------|---------|---------|
+| **安全** | ✅ JWT 认证（`/auth/login` + `Authorization: Bearer`）+ Rate Limiting（60/min/IP，demo 模式自动 mock userId） | 完整 OAuth2 + 角色权限（面试官/管理员/候选人） | [auth.service.ts](apps/api/src/modules/auth/auth.service.ts), [auth.controller.ts](apps/api/src/modules/auth/auth.controller.ts) |
+| **测试** | ✅ 34/34 全过（jest 12 + node:test 22），覆盖 Prompt Cache 三段识别 / JSON 容错解析 / fnv1a 稳定哈希 | 补前端 Vitest（`apps/web`）+ Playwright e2e（SSE 流、评分报告） | [smoke.spec.ts](apps/api/src/__tests__/smoke.spec.ts), [cache.spec.ts](apps/api/tests/cache.spec.ts) |
+| **可观测** | ✅ Langfuse 三级采样：trace 10% / span 50% / generation 100%（成本数据必须完整）。自建成本面板 < 100ms | 接入 Sentry 异常告警。trace 采样率上线后根据流量回调 | [langfuse.service.ts](apps/api/src/infra/langfuse/langfuse.service.ts), [session-cost.tracker.ts](apps/api/src/modules/llm/cost/session-cost.tracker.ts) |
+| **Agent 引擎** | ✅ LangGraph 5 节点 Supervisor（Supervisor→Planner→Executor→Replanner→Reviewer） | v3.0：基于当前 `respond_directly` 节点扩展 Multi-Agent Handoffs（Planner 决策路由到 Specialist Agent） | [multi-agent.service.ts](apps/api/src/modules/agent/multi-agent.service.ts), [graph.ts](apps/api/src/agents/multi-agent/graph.ts) |
+| **流式** | ✅ SSE（`graph.stream()` → `processMessage()`）。LlmGatewayChatModel adapter 使 multi 模式也经过 P0 缓存层 | 双通道：SSE 主对话 + WebSocket 推送业务事件（系统状态、MCP 工具响应） | [interview.controller.ts](apps/api/src/modules/interview/interview.controller.ts), [llm-gateway-chat-model.ts](apps/api/src/agents/multi-agent/llm-gateway-chat-model.ts) |
+| **MCP 协议** | ✅ 标准 MCP stdio Server（`@modelcontextprotocol/sdk`）。bocha_search / memory_recall / knowledge_bank 三个工具已接入 McpRegistry + McpAdapter | 外部 MCP Server（GitHub/GitLab/文件系统）spawn 集成 + 健康检查 | [mcp-adapter.service.ts](apps/api/src/modules/mcp/mcp-adapter.service.ts), [mcp-registry.ts](apps/api/src/modules/interview/services/mcp-registry.ts) |
+| **扩展性** | Mem0 单 namespace。Redis 已天然按 key 前缀隔离（`shared-ctx:{sessionId}`） | per-tenant namespace。Prisma 表加 `tenantId` 字段 | |
 
 ---
 

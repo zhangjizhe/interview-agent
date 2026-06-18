@@ -949,8 +949,10 @@ export class InterviewController {
 
     let fullResponse = '';
 
-    // 始终走单 Agent 流式路径（processMessage 是 AsyncGenerator，逐 token yield）
-    // Multi-Agent 需要改造才能真正流式，暂时禁用走这条路
+    // 默认走 multi 模式（LangGraph Supervisor 拓扑），SSE 流式逐 token 推送
+    // 路径：processMessage → MultiAgentService.stream → graph.stream(streamMode='messages')
+    // LlmGatewayChatModel adapter 确保 multi 模式也经过 LlmGateway（P0 缓存层）
+    // llm-direct 模式走 LlmGatewayService.streamChat（纯 LLM，无 Agent 拓扑）
     try {
       for await (const event of this.agent.processMessage(ctx, dto.content)) {
         if (event.type === 'token' && event.content) {
