@@ -20,9 +20,11 @@ import { InterviewAgentService, AgentContext } from '../agent/interview-agent.se
 import { MultiAgentService } from '../agent/multi-agent.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { MemoryService } from '../memory/memory.service';
-import { ResumeParserService, ParsedResume } from './services/resume-parser.service';
+import { ResumeParserService, ParsedResume, type ResumeAnalysis } from './services/resume-parser.service';
 import { ResumeRAGService } from './services/resume-rag.service';
 import { QuestionBankService } from './services/question-bank.service';
+import { QuestionGeneratorService, type InterviewQuestion } from './services/question-generator.service';
+import { ScoringService, type AnswerEvaluation, type InterviewReport } from './services/scoring.service';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { ChatMessage } from '../llm/providers/types';
 import { pickQuestions, matchBank, type BankKey } from './knowledge-banks';
@@ -68,6 +70,8 @@ export class InterviewController {
     private resumeParser: ResumeParserService,
     private resumeRag: ResumeRAGService,
     private questionBank: QuestionBankService,
+    private questionGenerator: QuestionGeneratorService,
+    private scoring: ScoringService,
     private llm: LlmGatewayService,
   ) { }
 
@@ -151,7 +155,7 @@ export class InterviewController {
     if (!position) throw new BadRequestException('position is required');
 
     // 1. 解析简历（支持 PDF/DOC/DOCX/TXT/MD）
-    const parsed: ParsedResume = await this.resumeParser.parse(file);
+    const parsed: ParsedResume = await this.resumeParser.parse(file, position);
 
     // 2. 写入 Milvus（简历 RAG）
     if (userId) {
@@ -530,6 +534,376 @@ export class InterviewController {
     return { success: true };
   }
 
+  // ========== 简历解析 + 动态出题 + 评分（核心）==========
+
+  /**
+   * POST /interview/parse-resume
+   * 解析简历文本，提取技能、岗位、经验等信息
+   */
+  @Post('parse-resume')
+  async parseResumeText(@Body() dto: { text: string; position?: string }) {
+    if (!dto.text || dto.text.trim().length < 20) {
+      throw new BadRequestException('简历内容过短，请提供更完整的文本');
+    }
+    const analysis = await this.resumeParser.parse(dto.text, dto.position);
+    return {
+      name: analysis.name,
+      email: analysis.email,
+      position: analysis.position,
+      yearsOfExperience: analysis.yearsOfExperience,
+      skills: analysis.skills,
+      education: analysis.education,
+      experience: analysis.experience,
+      projects: analysis.projects,
+      keywords: analysis.keywords,
+      seniority: analysis.seniority,
+      summary: analysis.summary,
+    };
+  }
+
+  /**
+   * POST /interview/generate-questions
+   * 基于简历分析动态生成个性化面试题
+   */
+  @Post('generate-questions')
+  async generateInterviewQuestions(
+    @Body() dto: { text: string; position?: string; count?: number },
+  ) {
+    if (!dto.text || dto.text.trim().length < 20) {
+      throw new BadRequestException('简历内容过短');
+    }
+
+    // 1. 解析简历
+    const analysis = await this.resumeParser.parse(dto.text, dto.position);
+
+    // 2. 如果提供了岗位则覆盖，否则用解析器推断
+    if (dto.position) {
+      (analysis as any).position = dto.position;
+    }
+
+    // 3. 动态生成题目
+    const questions = await this.questionGenerator.generateQuestions(
+      analysis,
+      dto.count || 8,
+    );
+
+    return {
+      analysis: {
+        name: analysis.name,
+        position: analysis.position,
+        seniority: analysis.seniority,
+        skills: analysis.skills,
+        yearsOfExperience: analysis.yearsOfExperience,
+      },
+      questions: questions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        category: q.category,
+        difficulty: q.difficulty,
+        expectedPoints: q.expectedPoints,
+      })),
+      totalQuestions: questions.length,
+      difficultyDistribution: {
+        easy: questions.filter((q) => q.difficulty === 'easy').length,
+        medium: questions.filter((q) => q.difficulty === 'medium').length,
+        hard: questions.filter((q) => q.difficulty === 'hard').length,
+      },
+    };
+  }
+
+  /**
+   * POST /interview/:interviewId/generate-dynamic-questions
+   * 面试过程中根据简历生成个性化题目（存入 interview 的题目池）
+   */
+  @Post(':interviewId/generate-dynamic-questions')
+  async generateDynamicQuestions(
+    @Param('interviewId') interviewId: string,
+    @Body() dto: { resumeText: string; count?: number },
+  ) {
+    const interview = await this.prisma.interview.findUnique({ where: { id: interviewId } });
+    if (!interview) throw new BadRequestException('Interview not found');
+
+    const analysis = await this.resumeParser.parse(dto.resumeText, interview.position);
+    const questions = await this.questionGenerator.generateQuestions(
+      analysis,
+      dto.count || 8,
+    );
+
+    return {
+      success: true,
+      interviewId,
+      analysis: {
+        position: analysis.position,
+        skills: analysis.skills,
+        seniority: analysis.seniority,
+      },
+      questions: questions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        category: q.category,
+        difficulty: q.difficulty,
+        followUpHints: q.followUpHints,
+      })),
+    };
+  }
+
+  /**
+   * POST /interview/evaluate-answer
+   * 评分单道题目回答
+   */
+  @Post('evaluate-answer')
+  async evaluateAnswer(@Body() dto: { question: string; answer: string; category?: string }) {
+    if (!dto.question || !dto.answer) {
+      throw new BadRequestException('question and answer are required');
+    }
+
+    const question: InterviewQuestion = {
+      id: `eval-${Date.now()}`,
+      category: dto.category || 'general',
+      difficulty: 'medium',
+      question: dto.question,
+      expectedPoints: this.extractKeywordsFromQuestion(dto.question),
+      followUpHints: [],
+    };
+
+    const evaluation = await this.scoring.evaluateAnswer(question, dto.answer);
+    return evaluation;
+  }
+
+  /**
+   * POST /interview/:interviewId/evaluate-answer
+   * 面试过程中评分并保存
+   */
+  @Post(':interviewId/evaluate-answer')
+  async evaluateAnswerInInterview(
+    @Param('interviewId') interviewId: string,
+    @Body() dto: { question: string; answer: string; category?: string },
+  ) {
+    const interview = await this.prisma.interview.findUnique({ where: { id: interviewId } });
+    if (!interview) throw new BadRequestException('Interview not found');
+
+    const question: InterviewQuestion = {
+      id: `eval-${Date.now()}`,
+      category: dto.category || 'general',
+      difficulty: 'medium',
+      question: dto.question,
+      expectedPoints: this.extractKeywordsFromQuestion(dto.question),
+      followUpHints: [],
+    };
+
+    const evaluation = await this.scoring.evaluateAnswer(question, dto.answer);
+
+    // 保存评估结果
+    const saved = await this.prisma.answer.create({
+      data: {
+        interviewId,
+        questionId: question.id,
+        question: dto.question,
+        answer: dto.answer,
+        score: evaluation.score,
+        feedback: evaluation.feedback,
+        category: question.category,
+      },
+    });
+
+    return { ...evaluation, savedId: saved.id };
+  }
+
+  /**
+   * POST /interview/:interviewId/generate-report
+   * 生成完整面试报告（综合评分）
+   */
+  @Post(':interviewId/generate-report')
+  async generateInterviewReport(@Param('interviewId') interviewId: string) {
+    const interview = await this.prisma.interview.findUnique({
+      where: { id: interviewId },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+    if (!interview) throw new BadRequestException('Interview not found');
+
+    // 从问答对生成评估（假设 user 消息是问题、assistant 消息是回答；或用 evaluate 记录）
+    const evaluations: AnswerEvaluation[] = [];
+
+    // 成对提取 user 消息和 assistant 消息
+    const questionAnswerPairs: Array<{ q: string; a: string }> = [];
+    for (let i = 0; i < interview.messages.length - 1; i++) {
+      if (interview.messages[i].role === 'user') {
+        const nextMsg = interview.messages[i + 1];
+        if (nextMsg && nextMsg.role === 'assistant') {
+          questionAnswerPairs.push({
+            q: interview.messages[i].content,
+            a: nextMsg.content,
+          });
+        }
+      }
+    }
+
+    for (const pair of questionAnswerPairs) {
+      if (!pair.a || pair.a.trim().length < 5) continue;
+      const question: InterviewQuestion = {
+        id: `q-${Date.now()}-${Math.random()}`,
+        category: 'general',
+        difficulty: 'medium',
+        question: pair.q,
+        expectedPoints: this.extractKeywordsFromQuestion(pair.q),
+        followUpHints: [],
+      };
+      const evalItem = await this.scoring.evaluateAnswer(question, pair.a);
+      evaluations.push(evalItem);
+    }
+
+    if (evaluations.length === 0) {
+      return {
+        success: false,
+        reason: 'no_valid_answers',
+        message: '暂无足够的答题记录生成报告',
+      };
+    }
+
+    const report = await this.scoring.generateReport(evaluations);
+
+    // 保存报告到 DB
+    const savedReport = await this.prisma.report.upsert({
+      where: { interviewId },
+      create: {
+        interviewId,
+        overallScore: report.overallScore,
+        scores: report as any,
+        strengths: report.strengthAreas.join('\n'),
+        weaknesses: report.improvementAreas.join('\n'),
+        suggestions: report.summary,
+      },
+      update: {
+        overallScore: report.overallScore,
+        scores: report as any,
+        strengths: report.strengthAreas.join('\n'),
+        weaknesses: report.improvementAreas.join('\n'),
+        suggestions: report.summary,
+      },
+    });
+
+    return {
+      success: true,
+      report: {
+        overallScore: report.overallScore,
+        recommendation: report.finalRecommendation,
+        summary: report.summary,
+        strengths: report.strengthAreas,
+        improvements: report.improvementAreas,
+        skillBreakdown: report.skillBreakdown,
+      },
+      evaluations: evaluations.map((e) => ({
+        question: e.question,
+        score: e.score,
+        feedback: e.feedback,
+      })),
+      savedReportId: savedReport.id,
+    };
+  }
+
+  /**
+   * POST /interview/:interviewId/next-question
+   * 根据之前的表现动态决定下一题
+   * - 如果上次回答质量高 → 提高难度
+   * - 如果上次回答质量低 → 追问或降低难度
+   */
+  @Post(':interviewId/next-question')
+  async getNextQuestion(
+    @Param('interviewId') interviewId: string,
+    @Body() dto: { lastQuestion?: string; lastAnswer?: string; resumeText?: string },
+  ) {
+    const interview = await this.prisma.interview.findUnique({ where: { id: interviewId } });
+    if (!interview) throw new BadRequestException('Interview not found');
+
+    // 如果有简历，基于简历动态出题
+    if (dto.resumeText && dto.resumeText.trim().length > 50) {
+      const analysis = await this.resumeParser.parse(dto.resumeText, interview.position);
+
+      // 基于上次回答的质量决定难度
+      let targetCount = 3;
+      if (dto.lastAnswer) {
+        const lastQuestion: InterviewQuestion = {
+          id: 'last',
+          category: 'general',
+          difficulty: 'medium',
+          question: dto.lastQuestion || '',
+          expectedPoints: this.extractKeywordsFromQuestion(dto.lastQuestion || ''),
+          followUpHints: [],
+        };
+        const evalItem = await this.scoring.evaluateAnswer(lastQuestion, dto.lastAnswer);
+
+        // 质量低 → 先追问
+        if (evalItem.score < 50) {
+          const followUp = await this.questionGenerator.generateFollowUp(
+            dto.lastQuestion || '',
+            dto.lastAnswer,
+            evalItem.score,
+          );
+          if (followUp) {
+            return {
+              type: 'follow-up',
+              question: followUp,
+              reason: `上一题得分 ${evalItem.score}，需要深入追问`,
+              lastEvaluation: { score: evalItem.score, feedback: evalItem.feedback },
+            };
+          }
+        }
+      }
+
+      // 正常出题
+      const questions = await this.questionGenerator.generateQuestions(
+        analysis,
+        targetCount,
+      );
+      return {
+        type: 'question',
+        question: questions[0]?.question || '',
+        category: questions[0]?.category || 'general',
+        allQuestions: questions.map((q) => ({
+          id: q.id,
+          question: q.question,
+          category: q.category,
+          difficulty: q.difficulty,
+        })),
+        analysis: {
+          position: analysis.position,
+          skills: analysis.skills.slice(0, 5),
+          seniority: analysis.seniority,
+        },
+      };
+    }
+
+    // 没有简历 → 走简单模式（返回通用面试题）
+    const questions = await this.questionGenerator.generateQuestions(
+      {
+        name: '候选人',
+        email: '',
+        position: interview.position,
+        yearsOfExperience: 3,
+        skills: [interview.position],
+        education: [],
+        experience: [],
+        projects: [],
+        keywords: [],
+        summary: '',
+        seniority: 'mid',
+      } as ResumeAnalysis,
+      3,
+    );
+
+    return {
+      type: 'question',
+      question: questions[0]?.question || '',
+      category: questions[0]?.category || 'general',
+      allQuestions: questions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        category: q.category,
+        difficulty: q.difficulty,
+      })),
+    };
+  }
+
   @Post(':interviewId/message')
   async streamMessage(
     @Param('interviewId') interviewId: string,
@@ -548,6 +922,7 @@ export class InterviewController {
     });
     if (!interview) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: 'Interview not found' })}\n\n`);
+      (res as any).flush?.();
       res.end();
       return;
     }
@@ -563,55 +938,26 @@ export class InterviewController {
       level: interview.level,
     };
 
+    const writeEvent = (event: object) => {
+      const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
+      (res as any).flush?.();
+      if (!ok) return new Promise<void>((r) => res.once('drain', r));
+      return Promise.resolve();
+    };
+
     let fullResponse = '';
+
+    // 始终走单 Agent 流式路径（processMessage 是 AsyncGenerator，逐 token yield）
+    // Multi-Agent 需要改造才能真正流式，暂时禁用走这条路
     try {
-      // 优先走 Multi-Agent（Supervisor + Planner + Executor + Replanner + Reviewer）
-      // 失败/未初始化则降级到老的 InterviewAgentService
-      if (this.multiAgent.isEnabled()) {
-        try {
-          this.logger.log(`[multi-agent] user=${ctx.userId} msg="${dto.content.slice(0, 50)}..."`);
-          const result = await this.multiAgent.run(dto.content, interviewId);
-          fullResponse = result.response;
-          // 把意图/plan 写在 meta 事件里，前端调试可见
-          res.write(
-            `data: ${JSON.stringify({
-              type: 'meta',
-              engine: 'multi-agent',
-              intent: result.intent,
-              steps: result.steps,
-              plan: (result.plan || []).map((s: any) => s.description || s.id),
-            })}\n\n`,
-          );
-          // 按 8 字符一块 yield，模拟流式（每个 chunk 之间 flush + 短暂延迟，前端能看到打字机效果）
-          const chunkSize = 8;
-          for (let i = 0; i < fullResponse.length; i += chunkSize) {
-            const token = fullResponse.slice(i, i + chunkSize);
-            const ok = res.write(`data: ${JSON.stringify({ type: 'token', content: token })}\n\n`);
-            if (!ok) await new Promise<void>((r) => res.once('drain', r));
-            // 8ms 让事件循环 flush socket buffer，前端能逐字看到
-            await new Promise((r) => setTimeout(r, 8));
-          }
-        } catch (mErr: any) {
-          this.logger.warn(`MultiAgent failed, fallback to single: ${mErr.message}`);
-          for await (const event of this.agent.processMessage(ctx, dto.content)) {
-            if (event.type === 'token' && event.content) {
-              fullResponse += event.content;
-            }
-            const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
-            if (!ok) await new Promise<void>((r) => res.once('drain', r));
-          }
+      for await (const event of this.agent.processMessage(ctx, dto.content)) {
+        if (event.type === 'token' && event.content) {
+          fullResponse += event.content;
         }
-      } else {
-        for await (const event of this.agent.processMessage(ctx, dto.content)) {
-          if (event.type === 'token' && event.content) {
-            fullResponse += event.content;
-          }
-          const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
-          if (!ok) await new Promise<void>((r) => res.once('drain', r));
-        }
+        await writeEvent(event);
       }
 
-      const totalPrompt = Math.ceil((dto.content.length + (fullResponse.length * 0.3)) / 2);
+      const totalPrompt = Math.ceil((dto.content.length + fullResponse.length * 0.3) / 2);
       const totalCompletion = Math.ceil(fullResponse.length / 2);
 
       if (fullResponse) {
@@ -624,20 +970,20 @@ export class InterviewController {
             completionTokens: totalCompletion,
           },
         });
-        res.write(
-          `data: ${JSON.stringify({
-            type: 'token_usage',
-            promptTokens: totalPrompt,
-            completionTokens: totalCompletion,
-            total: totalPrompt + totalCompletion,
-          })}\n\n`,
-        );
+        await writeEvent({
+          type: 'token_usage',
+          promptTokens: totalPrompt,
+          completionTokens: totalCompletion,
+          total: totalPrompt + totalCompletion,
+        });
       }
 
       res.write('data: [DONE]\n\n');
+      (res as any).flush?.();
       res.end();
     } catch (err) {
-      res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'error', error: (err as Error).message })}\n\n`);
+      (res as any).flush?.();
       res.end();
     }
   }
@@ -700,7 +1046,6 @@ export class InterviewController {
 
     // ===== 结构化归档：工作记忆 + 会话摘要写入长期记忆 =====
     const workingState = await this.memory.getWorkingState(interviewId);
-    await this.memory.getSessionSummary(interviewId); // 读取会话摘要（如有）
 
     // 构建候选人画像（结构化数据）
     const user = await this.prisma.user.findUnique({ where: { id: interview.userId } });
@@ -734,33 +1079,30 @@ export class InterviewController {
       const profileContent = JSON.stringify(candidateProfile, null, 2);
       await this.memory.memorize(interview.userId, [
         { role: 'system', content: `【候选人画像】\n${profileContent}` },
-        ...conversation.slice(-10),
+        ...conversation.slice(-10), // 最后 10 条对话作为上下文
       ]);
       this.logger.log(`Archived candidate profile for ${interview.userId}`);
     } catch (err) {
       this.logger.error(`Failed to archive candidate profile: ${err.message}`);
     }
 
-    // 面试者信息（姓名 + 简历摘要 + 时长）—— 必须先 update interview.endedAt
+    // 更新面试状态
     await this.prisma.interview.update({
       where: { id: interviewId },
-      data: { status: 'COMPLETED', endedAt: new Date(), summary: `总 token: ${totalTokens}` },
+      data: {
+        status: 'COMPLETED',
+        endedAt: endedAt,
+        summary: `总 token: ${totalTokens}, 得分: ${report.overallScore}`,
+      },
     });
 
-    const user = await this.prisma.user.findUnique({ where: { id: interview.userId } });
-    const demoUserId = user?.email?.replace(/@demo\.local$/, '') || '';
-    const resumes = await this.resumeRag.searchByUser(demoUserId, 1).catch(() => []);
-    const resume = resumes[0] || null;
-    const endedAt = new Date();
-    const durationMs = endedAt.getTime() - interview.startedAt.getTime();
-    const durationMin = Math.max(1, Math.round(durationMs / 60000));
-    const messageCount = interview.messages.length;
+    // 清空短期记忆（可选：也可以保留一段时间供用户回看）
+    // await this.memory.clearSession(interviewId);
 
     return {
       report: saved,
       ...report,
       totalTokens,
-      // 面试者信息
       candidate: {
         userId: demoUserId,
         name: resume?.name || user?.name || '匿名',
@@ -772,11 +1114,28 @@ export class InterviewController {
         messageCount,
         resumeName: resume?.name || null,
         resumeSkills: resume?.skills || null,
+        coveredSkills: workingState.coveredSkills || [],
+        questionIndex: workingState.questionIndex || 0,
       },
     };
   }
 
   // ===== 私有方法 =====
+
+  private extractKeywordsFromQuestion(question: string): string[] {
+    const techKeywords = [
+      'react', 'vue', 'angular', 'javascript', 'typescript', 'node', 'python',
+      'java', 'go', 'rust', 'docker', 'kubernetes', 'k8s', 'redis', 'mysql',
+      'postgresql', 'mongodb', 'kafka', '微服务', '分布式', '算法', '数据库',
+      '缓存', '性能', '并发', '异步', '同步', 'rest', 'graphql', 'grpc',
+      'http', 'https', 'tcp', 'udp', 'websocket', '前端', '后端', '全栈',
+      'css', 'html', 'redux', 'zustand', 'hook', 'virtual dom', '状态管理',
+      '机器学习', '深度学习', 'transformer', 'llm', '大模型', '向量', 'embedding',
+      '工程化', '架构', '设计模式', '依赖注入', '控制反转', 'mvc', 'mvp', 'mvvm',
+    ];
+    const lowerQ = question.toLowerCase();
+    return techKeywords.filter((k) => lowerQ.includes(k)).slice(0, 5);
+  }
 
   private async generateQuestionsFromResume(
     parsed: ParsedResume,

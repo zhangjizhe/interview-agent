@@ -85,13 +85,17 @@ export class DeepAgentsAgentService implements OnModuleInit {
 
   /**
    * 调用 Agent（流式输出）
+   * 
+   * 注意：deepagents 的 stream() 内部是 invoke + 分块模拟，
+   * 无法逐 token 流式。这里改为直接调用 ChatOpenAI.stream()，
+   * 实现真正的 token-by-token 流式输出。
    */
   async *stream(
     systemContext: string,
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
   ): AsyncGenerator<string, void, void> {
-    if (!this.agent) {
-      throw new Error('Agent not initialized');
+    if (!this.model) {
+      throw new Error('Model not initialized');
     }
 
     // 注入上下文：候选人历史 + 当前岗位 + 题库
@@ -100,30 +104,21 @@ export class DeepAgentsAgentService implements OnModuleInit {
       ...messages.map((m) => ({ role: m.role as any, content: m.content })),
     ];
 
-    // deepagents 的 stream() 在内部跑 tool 编排，
-    // 直接拿不到逐 token。改为 chunk-by-chunk 模拟流式：
-    // 1. 调用 invoke 拿完整结果
-    // 2. 按字符分块 yield（让前端看起来像流式）
-    let full = '';
+    // 直接调用 ChatOpenAI 的 stream() —— 真正的逐 token 流式
     try {
-      const result = await this.agent.invoke({
-        messages: fullMessages,
-      });
-      full = this.extractContent(result) || '';
+      const stream = await this.model.stream(fullMessages);
+      for await (const chunk of stream) {
+        // chunk 是 AIMessageChunk，content 可能是 string 或 ContentChunk[]
+        const text = typeof chunk.content === 'string'
+          ? chunk.content
+          : Array.isArray(chunk.content)
+            ? chunk.content.map((c: any) => c.text || '').join('')
+            : '';
+        if (text) yield text;
+      }
     } catch (err: any) {
-      this.logger.error(`DeepAgents invoke failed: ${err.message}`);
+      this.logger.error(`DeepAgents stream failed: ${err.message}`);
       throw err;
-    }
-
-    if (!full) {
-      this.logger.warn('DeepAgents returned empty content');
-      return;
-    }
-
-    // 模拟流式输出：按 8 字符一块 yield
-    const chunkSize = 8;
-    for (let i = 0; i < full.length; i += chunkSize) {
-      yield full.slice(i, i + chunkSize);
     }
   }
 
