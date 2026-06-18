@@ -3,13 +3,13 @@
 > **目的**：本 wiki 为其他 AI 模型（GPT-4 / Claude 3.7 等）评估本项目工程能力而写。
 > **建议评分维度**：架构合理性 / 工程化程度 / 代码质量 / 可观测性 / 性能优化 / 测试覆盖 / 文档完整度 / 商用化潜力
 >
-> **最后更新**：2026-06-16（v13 + P0 缓存工程 + KnowledgeBase + 混合检索 Rerank）
+> **最后更新**：2026-06-18（四层记忆架构落地 + Multi-Agent 默认启用 + decisionCache 修复）
 
 ---
 
 ## 一、项目摘要（一句话版）
 
-**Interview Agent** 是一个基于 LLM 的多轮结构化面试系统：候选人上传简历 → AI 面试官出题 → 流式追问 → 自动生成评分报告。**技术栈核心**：NestJS + DeepAgents (LangChain 1.x) + 三层记忆（Redis/Mem0/Milvus）+ Qwen/DeepSeek 双模型 + Langfuse + **P0 缓存工程**（Prompt Cache + 语义缓存 + 成本面板）+ 混合检索 Rerank。
+**Interview Agent** 是一个基于 LLM 的多轮结构化面试系统：候选人上传简历 → AI 面试官出题 → 流式追问 → 自动生成评分报告。**技术栈核心**：NestJS + LangGraph Multi-Agent（默认启用）+ 四层记忆（Redis Hash 工作记忆 / Redis List 会话 / Milvus+Mem0 长期 / Prisma 画像）+ Qwen/DeepSeek 双模型 + Langfuse + **P0 缓存工程**（Prompt Cache + 语义缓存 + 成本面板）+ 混合检索 Rerank。
 
 **项目作者**：1 年+ LLM Agent 工程师，求职目标 P6→P7 过渡岗。
 
@@ -223,9 +223,10 @@ DYNAMIC      → 对话历史（永远不进）
 ### 6.5 Multi-Agent + PostgresSaver Checkpoint（**生产级状态管理**）
 
 - 5 节点 LangGraph：planner → supervisor → executor → replanner → reviewer
-- **PostgresSaver checkpoint**（v13 重点补全项）
+- **PostgresSaver checkpoint**（断点续跑）
 - 条件边 + retry 兜底防死循环
-- HITL interrupt 框架已具备（**业务侧未启用**）
+- **agent.engine 配置开关**：`multi`（默认）| `deepagents` | `llm-direct`，通过 `ConfigService` 读取环境变量
+- **processMessage 主路径已接入**：multi 模式下 `InterviewAgentService.processMessage` 优先走 `MultiAgentService.stream()`
 
 ### 6.6 RAG 双引擎（**业界主流双路召回**）
 
@@ -289,7 +290,7 @@ v13 原 `\{[\s\S]*\}` 贪婪匹配在 LLM 输出 markdown ```json + 嵌套 array
 
 ### 7.6 简历项目角度（针对求职）
 - **商用化深度不足**：没有真实用户量、压测数据、SLA
-- **Multi-Agent 实际启用与否存疑**：multi-agent.service.ts 有，但 processMessage 路径**可能仍走单 Agent**
+- **Multi-Agent 已接入主路径**：通过 `agent.engine=multi` 配置（默认），`processMessage` 优先走 LangGraph Supervisor
 - **HITL 没接**：LangGraph interrupt 框架具备，但前端无中断入口
 - **RAG 真假混合**：knowledge-banks 是写死的题库（不是真 RAG），question-bank.service.ts 才是真 RAG（Milvus 混合检索）
 
@@ -442,6 +443,10 @@ curl -s "http://localhost:3001/api/knowledge-base/recall?q=LangGraph%20checkpoin
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-18 | **P0 四层记忆架构落地**：Redis Hash 工作记忆（questionIndex/coveredSkills/scoreHistory，跨实例安全）|
+| 2026-06-18 | **Multi-Agent 引擎默认启用**：`agent.engine=multi`，processMessage 主路径已接入 LangGraph Supervisor |
+| 2026-06-18 | **ContextManager decisionCache bug 修复**：内容前 100 字符 hash 做 key + LRU 1000 条上限，防止缓存错位和内存泄漏 |
+| 2026-06-18 | README 叙事重构：去掉 DeLM 空壳叙事，P0 缓存工程提到第一行亮点 |
 | 2026-06-16 | P0-1 Prompt Cache + P0-2 语义缓存 + 会话级成本面板接入 |
 | 2026-06-16 | Qdrant 1.18 容器化 + Mem0 双层降级 + Milvus 修补 |
 | 2026-06-16 | KnowledgeBase 题库 RAG（142 题 / Qdrant / Qwen embedding / 启动导入） |
