@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
-import { MemoryService } from '../memory/memory.service';
+import { MemoryService, type WorkingState } from '../memory/memory.service';
 import { LangfuseService } from '../../infra/langfuse/langfuse.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
 import { ContextManager } from './services/context-manager.service';
@@ -108,10 +108,14 @@ export class InterviewAgentService {
         },
       });
 
+      // 读取工作记忆状态（面试流程状态）
+      const workingState = await this.memory.getWorkingState(ctx.sessionId);
+
       // 知识库驱动：根据岗位匹配 + 选题
       const bank: BankKey = matchBank(ctx.position);
       const questions = pickQuestions(bank, 5);
-      const currentQuestion = this.findCurrentQuestion(context.shortTermMessages, questions);
+      const questionIndex = workingState.questionIndex ?? 0;
+      const currentQuestion = questions[questionIndex] || this.findCurrentQuestion(context.shortTermMessages, questions);
 
       // 如果有当前题目，把题目和评分要点塞进 system prompt
       const questionContext = currentQuestion
@@ -271,6 +275,15 @@ export class InterviewAgentService {
       await this.memory.appendMessage(ctx.sessionId, {
         role: 'assistant',
         content: fullResponse,
+      });
+
+      // 更新工作记忆状态：题目索引 + 已覆盖技能
+      const nextQuestionIndex = questionIndex + 1;
+      const newCoveredSkills = [...(workingState.coveredSkills || []), bank];
+      await this.memory.updateWorkingState(ctx.sessionId, {
+        currentQuestion: currentQuestion?.question,
+        questionIndex: nextQuestionIndex,
+        coveredSkills: [...new Set(newCoveredSkills)], // 去重
       });
 
       // 提取最后一个 chunk 的 usage（粗暴但能用）
