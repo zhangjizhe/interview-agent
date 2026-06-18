@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisShortTermMemory } from './short-term/redis-memory.store';
+import { RedisShortTermMemory, type WorkingState } from './short-term/redis-memory.store';
 import { MilvusLongTermMemory } from './long-term/milvus-memory.store';
 import { Mem0CloudMemory } from './long-term/mem0.store';
 import { ChatMessage, Memory } from './interfaces/memory-store.interface';
+
+export type { WorkingState };
 
 interface AuditEntry {
   action: 'create' | 'update' | 'recall' | 'delete' | 'expire';
@@ -200,6 +202,38 @@ export class MemoryService {
     const memoryKey = this.getMemoryKey(userId, content);
     this.recordAudit(memoryKey, { action: 'delete', userId, reason: 'invalidated' });
     this.memoryMetadata.delete(memoryKey);
+  }
+
+  // ========== 工作记忆方法 ==========
+
+  async getWorkingState(sessionId: string): Promise<WorkingState> {
+    return this.shortTerm.getWorkingState(sessionId);
+  }
+
+  async setWorkingState(sessionId: string, state: WorkingState): Promise<void> {
+    return this.shortTerm.setWorkingState(sessionId, state);
+  }
+
+  async updateWorkingState(sessionId: string, partialState: Partial<WorkingState>): Promise<void> {
+    return this.shortTerm.updateWorkingState(sessionId, partialState);
+  }
+
+  async clearWorkingState(sessionId: string): Promise<void> {
+    return this.shortTerm.clearWorkingState(sessionId);
+  }
+
+  // ========== 会话摘要方法 ==========
+
+  async getSessionSummary(sessionId: string): Promise<string | null> {
+    return this.shortTerm.getSessionSummary(sessionId);
+  }
+
+  async setSessionSummary(sessionId: string, summary: string): Promise<void> {
+    return this.shortTerm.setSessionSummary(sessionId, summary);
+  }
+
+  async clearSessionSummary(sessionId: string): Promise<void> {
+    return this.shortTerm.clearSessionSummary(sessionId);
   }
 }
 
