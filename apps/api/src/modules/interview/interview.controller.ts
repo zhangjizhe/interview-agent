@@ -305,7 +305,7 @@ export class InterviewController {
   ) {
     if (!file) throw new BadRequestException('No file uploaded');
     if (!position) throw new BadRequestException('position is required');
-    const text = await this.resumeParser.parse(file, position); // 复用简历解析器
+    const text = await this.resumeParser.parse(file); // 复用简历解析器
     const result = await this.questionBank.importQuestions({
       text: text.rawText,
       position,
@@ -760,10 +760,7 @@ export class InterviewController {
       };
     }
 
-    // 从 generateQuestions 接口可获知总题目数，此处用回答数代替
-    const totalQuestions = evaluations.length;
-
-    const report = await this.scoring.generateReport(evaluations, totalQuestions);
+    const report = await this.scoring.generateReport(evaluations);
 
     // 保存报告到 DB
     const savedReport = await this.prisma.report.upsert({
@@ -1047,12 +1044,10 @@ export class InterviewController {
       },
     });
 
-    // 面试者信息（姓名 + 简历摘要 + 时长）—— 必须先 update interview.endedAt
-    await this.prisma.interview.update({
-      where: { id: interviewId },
-      data: { status: 'COMPLETED', endedAt: new Date(), summary: `总 token: ${totalTokens}` },
-    });
+    // ===== 结构化归档：工作记忆 + 会话摘要写入长期记忆 =====
+    const workingState = await this.memory.getWorkingState(interviewId);
 
+    // 构建候选人画像（结构化数据）
     const user = await this.prisma.user.findUnique({ where: { id: interview.userId } });
     const demoUserId = user?.email?.replace(/@demo\.local$/, '') || '';
     const resumes = await this.resumeRag.searchByUser(demoUserId, 1).catch(() => []);
@@ -1062,11 +1057,52 @@ export class InterviewController {
     const durationMin = Math.max(1, Math.round(durationMs / 60000));
     const messageCount = interview.messages.length;
 
+    // 候选人画像 - 用于写入长期记忆
+    const candidateProfile = {
+      userId: interview.userId,
+      name: resume?.name || user?.name || '匿名',
+      position: interview.position,
+      level: interview.level,
+      skills: [...(workingState.coveredSkills || []), ...(resume?.skills || [])],
+      scoreHistory: workingState.scoreHistory || [],
+      overallScore: report.overallScore,
+      strengths: report.strengths,
+      weaknesses: report.weaknesses,
+      durationMin,
+      messageCount,
+      startedAt: interview.startedAt.toISOString(),
+      endedAt: endedAt.toISOString(),
+    };
+
+    // 将画像写入长期记忆（语义化存储）
+    try {
+      const profileContent = JSON.stringify(candidateProfile, null, 2);
+      await this.memory.memorize(interview.userId, [
+        { role: 'system', content: `【候选人画像】\n${profileContent}` },
+        ...conversation.slice(-10), // 最后 10 条对话作为上下文
+      ]);
+      this.logger.log(`Archived candidate profile for ${interview.userId}`);
+    } catch (err) {
+      this.logger.error(`Failed to archive candidate profile: ${err.message}`);
+    }
+
+    // 更新面试状态
+    await this.prisma.interview.update({
+      where: { id: interviewId },
+      data: {
+        status: 'COMPLETED',
+        endedAt: endedAt,
+        summary: `总 token: ${totalTokens}, 得分: ${report.overallScore}`,
+      },
+    });
+
+    // 清空短期记忆（可选：也可以保留一段时间供用户回看）
+    // await this.memory.clearSession(interviewId);
+
     return {
       report: saved,
       ...report,
       totalTokens,
-      // 面试者信息
       candidate: {
         userId: demoUserId,
         name: resume?.name || user?.name || '匿名',
@@ -1078,6 +1114,8 @@ export class InterviewController {
         messageCount,
         resumeName: resume?.name || null,
         resumeSkills: resume?.skills || null,
+        coveredSkills: workingState.coveredSkills || [],
+        questionIndex: workingState.questionIndex || 0,
       },
     };
   }
