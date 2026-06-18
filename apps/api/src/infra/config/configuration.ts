@@ -31,6 +31,11 @@ export interface AppConfig {
     publicKey: string;
     secretKey: string;
     baseUrl: string;
+    sampleRate: {
+      trace: number;
+      span: number;
+      generation: number;
+    };
   };
   mem0: {
     apiKey?: string;
@@ -60,6 +65,15 @@ export interface AppConfig {
     qwen: { maxTokens: number };
     deepseek: { maxTokens: number };
     default: { maxTokens: number };
+  };
+  // P0-1 修复：JWT + Rate Limiting
+  auth: {
+    jwtSecret: string;
+    jwtExpiresIn: string;
+  };
+  throttler: {
+    ttl: number;
+    limit: number;
   };
 }
 
@@ -96,6 +110,11 @@ export const configuration = (): AppConfig => ({
     publicKey: process.env.LANGFUSE_PUBLIC_KEY || '',
     secretKey: process.env.LANGFUSE_SECRET_KEY || '',
     baseUrl: process.env.LANGFUSE_BASE_URL || 'https://us.cloud.langfuse.com',
+    sampleRate: {
+      trace: parseFloat(process.env.LANGFUSE_SAMPLE_RATE_TRACE || '0.1'),
+      span: parseFloat(process.env.LANGFUSE_SAMPLE_RATE_SPAN || '0.5'),
+      generation: parseFloat(process.env.LANGFUSE_SAMPLE_RATE_GENERATION || '1.0'),
+    },
   },
   mem0: {
     apiKey: process.env.MEM0_API_KEY,
@@ -132,5 +151,14 @@ export const configuration = (): AppConfig => ({
     default: {
       maxTokens: parseInt(process.env.LLM_DEFAULT_MAX_TOKENS, 10) || 32000,
     },
+  },
+  // P0-1 修复：JWT + Rate Limiting
+  auth: {
+    jwtSecret: process.env.JWT_SECRET || 'interview-agent-dev-secret-change-in-production',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  },
+  throttler: {
+    ttl: parseInt(process.env.THROTTLER_TTL || '60', 10),
+    limit: parseInt(process.env.THROTTLER_LIMIT || '60', 10),
   },
 });

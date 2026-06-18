@@ -12,6 +12,8 @@ import { InterviewModule } from './modules/interview/interview.module';
 import { UserModule } from './modules/user/user.module';
 import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { McpModule } from './modules/mcp/mcp.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { MetricsModule } from './modules/metrics/metrics.module';
     InterviewModule,
     UserModule,
     MetricsModule,
+    AuthModule, // P0-1 修复：JWT + Rate Limiting
+    McpModule, // P1-4 修复：MCP 协议接入
   ],
 })
 export class AppModule {}

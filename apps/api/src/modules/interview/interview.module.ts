@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { InterviewController } from './interview.controller';
 import { ToolsController } from './tools.controller';
 import { AdminMcpController } from './admin-mcp.controller';
+import { HitlController } from './controllers/hitl.controller';
 import { AgentModule } from '../agent/agent.module';
 import { MemoryModule } from '../memory/memory.module';
 import { LlmModule } from '../llm/llm.module';
@@ -11,10 +12,11 @@ import { QuestionBankService } from './services/question-bank.service';
 import { QuestionGeneratorService } from './services/question-generator.service';
 import { ScoringService } from './services/scoring.service';
 import { RagService } from './services/rag.service';
+import { HitlService } from './services/hitl.service';
 
 @Module({
   imports: [AgentModule, MemoryModule, LlmModule],
-  controllers: [InterviewController, ToolsController, AdminMcpController],
+  controllers: [InterviewController, ToolsController, AdminMcpController, HitlController],
   providers: [
     ResumeParserService,
     ResumeRAGService,
@@ -22,6 +24,7 @@ import { RagService } from './services/rag.service';
     QuestionGeneratorService,
     ScoringService,
     RagService,
+    HitlService,
   ],
   exports: [
     ResumeParserService,
@@ -29,6 +32,7 @@ import { RagService } from './services/rag.service';
     QuestionBankService,
     QuestionGeneratorService,
     ScoringService,
+    HitlService,
   ],
 })
 export class InterviewModule {}
