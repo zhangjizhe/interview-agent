@@ -3,12 +3,12 @@
  *
  * 关键能力：
  * - **Checkpointer (PostgresSaver)**：图状态持久化到 PG，支持断点续跑 / 多轮历史自动恢复 / thread_id 隔离多用户
- * - **thread_id**：以 interviewId 为 key，每个面试一个独立的对话线程
+ * - **Tool Runtime Binding**：将 BochaSearchTool / MemoryService / KnowledgeBaseService 注入 McpRegistry，让 executor 能真实调用工具
  */
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatOpenAI } from '@langchain/openai';
-import { HumanMessage, type BaseMessage, type BaseMessageLike } from '@langchain/core/messages';
+import { HumanMessage, type BaseMessageLike } from '@langchain/core/messages';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import type { RunnableConfig } from '@langchain/core/runnables';
@@ -17,6 +17,10 @@ import {
   type InterviewAgentStateType,
 } from '../../agents/multi-agent/graph';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
+import { BochaSearchTool } from './tools/bocha-search.tool';
+import { MemoryService } from '../memory/memory.service';
+import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
+import { McpRegistry } from '../interview/services/mcp-registry';
 
 @Injectable()
 export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
@@ -29,15 +33,22 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private config: ConfigService,
     private llm: LlmGatewayService,
+    private bocha: BochaSearchTool,
+    private memory: MemoryService,
+    private kb: KnowledgeBaseService,
   ) {}
 
   async onModuleInit() {
-    // 开关：默认开启 multi-agent
-    const flag = this.config.get<string>('multiAgent.enabled');
-    if (flag === 'false') {
-      this.logger.warn('MultiAgent disabled by env');
+    // ===== Step 1: 把真实工具执行函数绑定到 McpRegistry（让 executor 能调用真实工具） =====
+    this.bindTools();
+
+    // ===== Step 2: 构建 LangGraph =====
+    const agentMode = this.config.get<string>('agent.engine') || 'multi';
+    if (agentMode !== 'multi') {
+      this.logger.warn(`MultiAgent disabled by config (agent.engine=${agentMode})`);
       return;
     }
+
     try {
       const qwenKey = this.config.get<string>('qwen.apiKey');
       const qwenBase = this.config.get<string>('qwen.baseUrl');
@@ -50,39 +61,69 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
         temperature: 0.7,
       });
 
-      // Checkpointer: PostgresSaver 持久化到 PG（thread_id 隔离）
-      // 复用现有 Prisma DATABASE_URL（pgvector 容器同源）
       const connString =
         this.config.get<string>('database.url') ||
         'postgresql://dev:dev123@postgres:5432/interview';
 
       try {
-        this.checkpointer = PostgresSaver.fromConnString(connString, {
-          schema: 'public',
-        });
-        // 第一次使用要 setup() 创建 checkpoint 表
+        this.checkpointer = PostgresSaver.fromConnString(connString, { schema: 'public' });
         await (this.checkpointer as any).setup();
         this.checkpointerSetupDone = true;
         this.logger.log(`✅ PostgresSaver ready (${connString.replace(/:[^:@]+@/, ':***@')})`);
       } catch (cpErr: any) {
-        this.logger.error(
-          `PostgresSaver init failed, falling back to no-checkpoint: ${cpErr.message}`,
-        );
+        this.logger.error(`PostgresSaver init failed, falling back to no-checkpoint: ${cpErr.message}`);
         this.checkpointer = null;
       }
 
       this.graph = buildInterviewGraph(model, this.checkpointer || undefined);
       this.enabled = true;
-      this.logger.log(
-        `✅ MultiAgent graph compiled (model=${modelName}, checkpoint=${this.checkpointer ? 'postgres' : 'none'})`,
-      );
+      this.logger.log(`✅ MultiAgent graph compiled (model=${modelName}, checkpoint=${this.checkpointer ? 'postgres' : 'none'})`);
     } catch (err: any) {
       this.logger.error(`MultiAgent init failed: ${err.message}`);
     }
   }
 
+  /**
+   * 把 NestJS 注入的真实服务通过 bindExecute 挂到 McpRegistry
+   * executor 节点通过 McpRegistry.get(name).execute 调用这些工具
+   */
+  private bindTools() {
+    // bocha_search — 联网搜索
+    const bound1 = McpRegistry.bindExecute(
+      'bocha_search',
+      async (args: any) => this.bocha.execute(args),
+    );
+
+    // memory_recall — 长期记忆检索
+    const bound2 = McpRegistry.bindExecute(
+      'memory_recall',
+      async (args: any) => {
+        const hits = await this.memory.recall(args.userId || 'unknown', args.query || '', args.limit || 5);
+        return { hits: hits.map((m) => ({ content: m.content, timestamp: m.timestamp })) };
+      },
+    );
+
+    // knowledge_bank — 面试题库 RAG
+    const bound3 = McpRegistry.bindExecute(
+      'knowledge_bank',
+      async (args: any) => {
+        const hits = await this.kb.recall(args.query || '', { limit: args.limit || 5 });
+        return {
+          items: hits.map((h: any) => ({
+            title: h.item?.title || '',
+            body: h.item?.body || '',
+            score: h.score || 0,
+          })),
+        };
+      },
+    );
+
+    this.logger.debug(
+      `[ToolBinding] bound ${[bound1, bound2, bound3].filter(Boolean).length}/3 tools via McpRegistry`,
+    );
+  }
+
   async onModuleDestroy() {
-    // PostgresSaver 在 langgraph 1.4 里有 close() 方法
     try {
       await (this.checkpointer as any)?.close?.();
     } catch {}
@@ -92,26 +133,14 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     return this.enabled;
   }
 
-  /**
-   * 同步调用 - 用 thread_id 隔离多用户/多面试
-   * 第二次调用相同 thread 会自动从 checkpoint 恢复 state.messages
-   */
-  async run(
-    userMessage: string,
-    threadId: string,
-    history: BaseMessageLike[] = [],
-  ) {
+  async run(userMessage: string, threadId: string, history: BaseMessageLike[] = []) {
     if (!this.graph) throw new Error('MultiAgent not initialized');
-    const config: RunnableConfig = {
-      configurable: { thread_id: threadId },
-    };
+    const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
-    // 只有第一次传 messages，后续会自动从 checkpoint 恢复
-    // 但保险起见，如果 thread_id 是新的（first turn），仍传 messages
     const isFirstTurn = history.length === 0;
     const input: Partial<InterviewAgentStateType> = isFirstTurn
       ? { messages: [new HumanMessage(userMessage)] }
-      : { messages: [new HumanMessage(userMessage)] }; // 简化：始终传新 message，langgraph 会 append
+      : { messages: [new HumanMessage(userMessage)] };
 
     const result = await this.graph.invoke(input as any, config);
 
@@ -125,17 +154,9 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  /**
-   * 流式调用 - 用于 SSE
-   */
-  async *stream(
-    userMessage: string,
-    threadId: string,
-  ): AsyncGenerator<any, void, unknown> {
+  async *stream(userMessage: string, threadId: string): AsyncGenerator<any, void, unknown> {
     if (!this.graph) throw new Error('MultiAgent not initialized');
-    const config: RunnableConfig = {
-      configurable: { thread_id: threadId },
-    };
+    const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
     const stream = await this.graph.stream(
       { messages: [new HumanMessage(userMessage)] } as any,
@@ -157,9 +178,6 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * 取 thread 状态（用于断点续跑/历史回放）
-   */
   async getState(threadId: string) {
     if (!this.graph) return null;
     try {
@@ -171,18 +189,13 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * 列出所有 thread 的 checkpoint 历史
-   */
   async listCheckpoints(threadId: string) {
     if (!this.checkpointer) return [];
     try {
       const listFn = (this.checkpointer as any).list;
       if (!listFn) return [];
       const items: any[] = [];
-      for await (const cp of listFn.call(this.checkpointer, {
-        configurable: { thread_id: threadId },
-      })) {
+      for await (const cp of listFn.call(this.checkpointer, { configurable: { thread_id: threadId } })) {
         items.push(cp);
       }
       return items;

@@ -31,7 +31,6 @@ export function createExecutorNode(model: ChatOpenAI) {
         if (!step) {
             return {
                 past_steps: [
-                    ...state.past_steps,
                     {
                         step: {
                             id: 'noop',
@@ -111,8 +110,9 @@ ${contextFromPastSteps || '（无）'}
 
         const pastStep: PastStep = { step, result, success };
 
+        // 只返回增量（由 state reducer 合并到 past_steps），避免全量展开导致并发覆盖 + N² 内存
         return {
-            past_steps: [...state.past_steps, pastStep],
+            past_steps: [pastStep],
             current_step_idx: state.current_step_idx + 1,
             // 失败时增加 retry_count
             retry_count: success ? state.retry_count : state.retry_count + 1,

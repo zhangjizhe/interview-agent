@@ -77,9 +77,12 @@ export const InterviewAgentState = Annotation.Root({
 
     /**
      * 已执行的步骤 + 结果。
-     * 每次 Executor 执行成功后追加。
+     * 每次 Executor 执行后增量追加（reducer 合并，防止并发覆盖 + N² 全量展开）。
      */
-    past_steps: Annotation<PastStep[]>(),
+    past_steps: Annotation<PastStep[]>({
+        reducer: (prev: PastStep[], next: PastStep[]) => [...(prev ?? []), ...(next ?? [])],
+        default: () => [],
+    }),
 
     /**
      * 意图分类结果（Supervisor 节点写入）。

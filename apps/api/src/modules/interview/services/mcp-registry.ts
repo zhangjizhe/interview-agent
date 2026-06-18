@@ -39,20 +39,18 @@ export interface McpTool extends McpToolMetadata {
 interface RegistryEntry {
   meta: McpToolMetadata;
   transport: 'builtin' | 'stdio' | 'streamable-http';
-  builtin: boolean;            // builtin = API 内置（BochaSearchTool 等），不需 spawn
-  command?: string;            // stdio
+  builtin: boolean;
+  command?: string;
   args?: string[];
-  url?: string;                // streamable-http
+  url?: string;
   env?: Record<string, string>;
-  pid?: number;                // stdio 子进程 PID
+  pid?: number;
   status: 'running' | 'stopped' | 'error' | 'builtin';
   lastHealthCheck?: Date;
   errorMessage?: string;
-  /**
-   * 持久化层：管理员 toggle 后写这里
-   * 重启时从 config 重新加载时使用 config.enabled 覆盖
-   */
   systemOverride?: boolean;
+  /** 真实执行函数（由 NestJS 模块初始化时 bindExecute 注入） */
+  execute?: (args: any) => Promise<any>;
 }
 
 /**
@@ -71,7 +69,19 @@ class McpRegistryClass {
       transport: 'builtin',
       builtin: true,
       status: 'builtin',
+      execute,
     });
+  }
+
+  /**
+   * NestJS 模块初始化时调用：为已注册的工具绑定真实执行函数
+   * 例如 BochaSearchTool.execute 需要 ConfigService，只能在 DI 容器中注入
+   */
+  bindExecute(name: string, fn: (args: any) => Promise<any>): boolean {
+    const e = this.entries.get(name);
+    if (!e) return false;
+    e.execute = fn;
+    return true;
   }
 
   // ============ 新 API：配置驱动加载 ============
@@ -176,7 +186,9 @@ class McpRegistryClass {
 
   get(name: string): McpTool | undefined {
     const e = this.entries.get(name);
-    return e ? { ...e.meta, execute: undefined as any } : undefined;
+    if (!e) return undefined;
+    // 返回真实 execute（若已 bindExecute 注入，则有真实函数，否则为 undefined）
+    return { ...e.meta, execute: e.execute };
   }
 
   count(): number {
