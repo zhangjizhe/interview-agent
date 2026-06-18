@@ -155,7 +155,7 @@ export class InterviewController {
     if (!position) throw new BadRequestException('position is required');
 
     // 1. 解析简历（支持 PDF/DOC/DOCX/TXT/MD）
-    const parsed: ParsedResume = await this.resumeParser.parse(file);
+    const parsed: ParsedResume = await this.resumeParser.parse(file, position);
 
     // 2. 写入 Milvus（简历 RAG）
     if (userId) {
@@ -545,7 +545,7 @@ export class InterviewController {
     if (!dto.text || dto.text.trim().length < 20) {
       throw new BadRequestException('简历内容过短，请提供更完整的文本');
     }
-    const analysis = await this.resumeParser.parse(dto.text);
+    const analysis = await this.resumeParser.parse(dto.text, dto.position);
     return {
       name: analysis.name,
       email: analysis.email,
@@ -574,7 +574,7 @@ export class InterviewController {
     }
 
     // 1. 解析简历
-    const analysis = await this.resumeParser.parse(dto.text);
+    const analysis = await this.resumeParser.parse(dto.text, dto.position);
 
     // 2. 如果提供了岗位则覆盖，否则用解析器推断
     if (dto.position) {
@@ -623,7 +623,7 @@ export class InterviewController {
     const interview = await this.prisma.interview.findUnique({ where: { id: interviewId } });
     if (!interview) throw new BadRequestException('Interview not found');
 
-    const analysis = await this.resumeParser.parse(dto.resumeText);
+    const analysis = await this.resumeParser.parse(dto.resumeText, interview.position);
     const questions = await this.questionGenerator.generateQuestions(
       analysis,
       dto.count || 8,
@@ -817,7 +817,7 @@ export class InterviewController {
 
     // 如果有简历，基于简历动态出题
     if (dto.resumeText && dto.resumeText.trim().length > 50) {
-      const analysis = await this.resumeParser.parse(dto.resumeText);
+      const analysis = await this.resumeParser.parse(dto.resumeText, interview.position);
 
       // 基于上次回答的质量决定难度
       let targetCount = 3;
