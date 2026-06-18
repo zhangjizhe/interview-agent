@@ -12,6 +12,7 @@ import { HumanMessage, type BaseMessageLike } from '@langchain/core/messages';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import type { RunnableConfig } from '@langchain/core/runnables';
+import { Command } from '@langchain/langgraph';
 import {
   buildInterviewGraph,
   type InterviewAgentStateType,
@@ -233,6 +234,80 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     } catch (err: any) {
       this.logger.warn(`listCheckpoints failed: ${err.message}`);
       return [];
+    }
+  }
+
+  /**
+   * 检查某个 thread 是否处于 HITL 中断状态
+   * 返回 pending 状态和相关信息
+   */
+  async checkHitlStatus(threadId: string): Promise<{
+    isHitlPending: boolean;
+    score?: number;
+    issues?: string[];
+    suggestion?: string;
+    finalResponse?: string;
+  }> {
+    if (!this.graph) return { isHitlPending: false };
+
+    try {
+      const state = await this.graph.getState({
+        configurable: { thread_id: threadId },
+      });
+
+      const values = (state as any).values as InterviewAgentStateType;
+      const nextNodes = (state as any).next as string[];
+
+      // 如果下一个要执行的节点是 hitl_review，说明处于 HITL 中断状态
+      const isHitlPending = values?.hitl_pending === true || nextNodes?.includes('hitl_review');
+
+      if (!isHitlPending) {
+        return { isHitlPending: false };
+      }
+
+      return {
+        isHitlPending: true,
+        score: (values as any).review_score,
+        issues: (values as any).review_issues,
+        suggestion: (values as any).review_suggestion,
+        finalResponse: values?.final_response,
+      };
+    } catch (err: any) {
+      this.logger.warn(`checkHitlStatus failed: ${err.message}`);
+      return { isHitlPending: false };
+    }
+  }
+
+  /**
+   * HR 审批后恢复图执行
+   * 通过 Command(resume) 传入审批结果
+   */
+  async resumeAfterHitl(
+    threadId: string,
+    verdict: 'approved' | 'rejected',
+  ): Promise<{ success: boolean; response?: string }> {
+    if (!this.graph) {
+      return { success: false };
+    }
+
+    try {
+      const config: RunnableConfig = {
+        configurable: { thread_id: threadId },
+      };
+
+      // 使用 Command(resume) 恢复 interrupt，传入 HR 审批结果
+      const result = await this.graph.invoke(
+        new Command({ resume: verdict }),
+        config,
+      );
+
+      const response = (result as any).final_response || '';
+      this.logger.log(`[HITL] Resumed with verdict=${verdict}, response length=${response.length}`);
+
+      return { success: true, response };
+    } catch (err: any) {
+      this.logger.error(`resumeAfterHitl failed: ${err.message}`);
+      return { success: false };
     }
   }
 }

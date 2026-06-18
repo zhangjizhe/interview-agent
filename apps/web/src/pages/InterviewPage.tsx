@@ -15,6 +15,9 @@ import {
   ChevronUp,
   Check,
   Zap,
+  ShieldAlert,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { useInterviewStream } from '../hooks/useInterviewStream';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
@@ -47,6 +50,13 @@ export function InterviewPage() {
   const streaming = useInterviewStore((s) => s.streaming);
   const reconnecting = useInterviewStore((s) => s.reconnecting);
   const agentEvents = useInterviewStore((s) => s.agentEvents);
+  const hitlPending = useInterviewStore((s) => s.hitlPending);
+  const hitlScore = useInterviewStore((s) => s.hitlScore);
+  const hitlIssues = useInterviewStore((s) => s.hitlIssues);
+  const hitlSuggestion = useInterviewStore((s) => s.hitlSuggestion);
+  const hitlResuming = useInterviewStore((s) => s.hitlResuming);
+  const setHitlPending = useInterviewStore((s) => s.setHitlPending);
+  const setHitlResuming = useInterviewStore((s) => s.setHitlResuming);
 
   const setInput = useInterviewStore((s) => s.setInput);
   const setMessages = useInterviewStore((s) => s.setMessages);
@@ -216,6 +226,55 @@ export function InterviewPage() {
       console.error('确认失败:', err);
     } finally {
       setConfirming(false);
+    }
+  };
+
+  // HITL 审批：轮询图状态
+  useEffect(() => {
+    if (!interviewId || !resumeConfirmed) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/hitl/graph-status/${interviewId}`);
+        const data = await res.json();
+        if (data.isHitlPending) {
+          setHitlPending(true, {
+            score: data.score,
+            issues: data.issues,
+            suggestion: data.suggestion,
+          });
+        } else if (hitlPending) {
+          setHitlPending(false);
+        }
+      } catch {}
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [interviewId, resumeConfirmed, hitlPending, setHitlPending]);
+
+  // HITL 审批：通过/拒绝
+  const handleHitlVerdict = async (verdict: 'approved' | 'rejected') => {
+    if (!interviewId || hitlResuming) return;
+    setHitlResuming(true);
+    try {
+      const res = await fetch(`/api/hitl/graph-resume/${interviewId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verdict }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setHitlPending(false);
+        // 如果 approved，把 response 加到消息列表
+        if (verdict === 'approved' && data.response) {
+          setMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: data.response, streaming: false },
+          ]);
+        }
+      }
+    } catch (err) {
+      console.error('HITL resume failed:', err);
+    } finally {
+      setHitlResuming(false);
     }
   };
 
@@ -673,6 +732,44 @@ export function InterviewPage() {
                 ))}
                 {/* CoT 思维链面板 */}
                 <CotPanel events={agentEvents} />
+                {/* HITL 审批面板 */}
+                {hitlPending && (
+                  <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="w-5 h-5 text-amber-600" />
+                      <span className="font-semibold text-amber-800">评分争议，等待 HR 审批</span>
+                    </div>
+                    <div className="text-sm text-amber-700 space-y-1">
+                      {hitlScore != null && (
+                        <div>AI 评分：<span className="font-mono font-bold">{(hitlScore * 100).toFixed(0)}</span>/100</div>
+                      )}
+                      {hitlIssues.length > 0 && (
+                        <div>问题：{hitlIssues.join('；')}</div>
+                      )}
+                      {hitlSuggestion && (
+                        <div>建议：{hitlSuggestion}</div>
+                      )}
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleHitlVerdict('approved')}
+                        disabled={hitlResuming}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 transition"
+                      >
+                        {hitlResuming ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
+                        批准通过
+                      </button>
+                      <button
+                        onClick={() => handleHitlVerdict('rejected')}
+                        disabled={hitlResuming}
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 transition"
+                      >
+                        {hitlResuming ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsDown className="w-4 h-4" />}
+                        打回重做
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* 重连提示 */}
                 {reconnecting && (
                   <div className="text-center text-xs text-amber-600 py-2">

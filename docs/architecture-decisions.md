@@ -168,10 +168,49 @@ React batching 导致流式渲染不自然：
 
 > v3.0 演进路线（与 README 演进路线表对齐）：
 
-1. **Multi-Agent Handoffs**：基于当前 `respond_directly` 节点扩展，使用 LangGraph Command 原语实现 Planner → Specialist Agent 路由
-2. **HITL 中断框架**：interrupt 接入前端，HR 可在多轮面试中实时审批 / 否决
+1. ~~**Multi-Agent Handoffs**：基于当前 `respond_directly` 节点扩展，使用 LangGraph Command 原语实现 Planner → Specialist Agent 路由~~ ✅ **已实现（v15）**
+2. ~~**HITL 中断框架**：interrupt 接入前端，HR 可在多轮面试中实时审批 / 否决~~ ✅ **已实现（v15）**
 3. **Redis Cluster 分布式缓存**：主从复制 + 故障自动切换，多实例部署更稳
 4. **per-tenant namespace**：Mem0 / Milvus 按租户隔离，为多企业场景准备
+
+### 当前状态 (v3.0)
+
+> v15 新增的两个核心特性：
+
+#### HITL 中断审批（ADR #10）
+
+**设计决策**：Reviewer 评分争议（score < 0.5）时，图执行暂停等待 HR 审批。
+
+**实现路径**：
+1. Reviewer 节点检测 `score < HITL_SCORE_THRESHOLD` → 设置 `hitl_pending=true`
+2. reviewer 条件路由检测 `hitl_pending` → 路由到 `hitl_review` 节点
+3. `hitl_review` 节点调用 `interrupt()` 暂停图执行
+4. 前端轮询 `/hitl/graph-status` 检测中断状态，显示审批面板
+5. HR 点击"批准/拒绝" → `POST /hitl/graph-resume` → `Command(resume=verdict)` 恢复
+6. approved → END（使用 Reviewer 草稿），rejected → Planner（打回重做）
+
+**关键设计**：
+- `interrupt()` 是 LangGraph 原生 API，不需要外部消息队列
+- `Command(resume)` 是 LangGraph v0.2 提供的恢复原语
+- Redis HITL 状态与 LangGraph checkpoint 双写，保证一致性
+
+#### Specialist Handoffs（ADR #11）
+
+**设计决策**：Planner 在规划时指定 `step.specialist`，Executor 按类型路由到不同 system prompt。
+
+**实现路径**：
+1. `PlanStepSchema` 新增 `specialist` 字段（interviewer/evaluator/searcher/general）
+2. Planner prompt 加入 Specialist 说明，LLM 规划时自动选择
+3. Executor 的 `ask_llm` 分支根据 `step.specialist` 选择 `SPECIALIST_PROMPTS[specialist]`
+4. `current_specialist` 写入 state，供前端 CoT 面板展示
+
+**Specialist 类型**：
+| Specialist | 职责 | system prompt |
+|-----------|------|-------------|
+| interviewer | 出题、追问、评估 | 面试官角色 |
+| evaluator | 评分、反馈、报告 | 评估专家角色 |
+| searcher | 搜索、检索 | 信息检索专家 |
+| general | 通用处理 | 默认面试官小面 |
 
 ### 长期目标 (v4.0)
 - 完全去中心化

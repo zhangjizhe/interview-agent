@@ -85,10 +85,15 @@ export class DeepAgentsAgentService implements OnModuleInit {
 
   /**
    * 调用 Agent（流式输出）
-   * 
-   * 注意：deepagents 的 stream() 内部是 invoke + 分块模拟，
-   * 无法逐 token 流式。这里改为直接调用 ChatOpenAI.stream()，
-   * 实现真正的 token-by-token 流式输出。
+   *
+   * ⚠️ 架构说明：
+   * deepagents 的 stream() 内部是 invoke + 分块模拟，无法逐 token 流式。
+   * 因此 stream 模式绕回 ChatOpenAI.stream() 实现真正的 token-by-token 流式输出。
+   * deepagents 图（createDeepAgent）仅在 invoke() 非流式调用时使用。
+   *
+   * 简历话术注意：
+   * ✅ 能写："deepagents 引擎支持 invoke 非流式调用 + ChatOpenAI 真流式输出"
+   * ❌ 不能写："deepagents 完整跑多 Agent 流式"（stream 不是走 deepagents 图）
    */
   async *stream(
     systemContext: string,

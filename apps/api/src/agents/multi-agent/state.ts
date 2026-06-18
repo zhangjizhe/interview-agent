@@ -15,6 +15,10 @@ import { z } from 'zod';
 // Zod Schema（用于 LLM 结构化输出校验）
 // ============================================================
 
+/** Specialist Agent 类型（Handoffs 路由目标） */
+export const SpecialistTypeSchema = z.enum(['interviewer', 'evaluator', 'searcher', 'general']);
+export type SpecialistType = z.infer<typeof SpecialistTypeSchema>;
+
 /** 单个执行步骤 */
 export const PlanStepSchema = z.object({
     id: z.string().describe('步骤唯一标识，如 step-1'),
@@ -24,6 +28,7 @@ export const PlanStepSchema = z.object({
     tool: z.string().optional().describe('MCP 工具名（如 bocha_search）'),
     args: z.record(z.any()).optional().describe('工具参数'),
     description: z.string().describe('步骤描述（人可读）'),
+    specialist: SpecialistTypeSchema.optional().describe('Handoffs: 路由到 Specialist Agent（interviewer/evaluator/searcher/general）'),
 });
 export type PlanStep = z.infer<typeof PlanStepSchema>;
 
@@ -120,6 +125,13 @@ export const InterviewAgentState = Annotation.Root({
      * 'approved' / 'rejected' / undefined（未审批）
      */
     hitl_verdict: Annotation<'approved' | 'rejected'>(),
+
+    /**
+     * Handoffs: 当前步骤路由到的 Specialist Agent。
+     * 由 Planner 在 PlanStep.specialist 中指定，Executor 执行时读取。
+     * 用于 Command 原语路由。
+     */
+    current_specialist: Annotation<SpecialistType>(),
 });
 
 export type InterviewAgentStateType = typeof InterviewAgentState.State;

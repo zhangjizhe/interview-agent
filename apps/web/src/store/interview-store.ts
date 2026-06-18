@@ -74,6 +74,15 @@ interface InterviewState {
   error: string | null;
   setError: (e: string | null) => void;
 
+  // ========== HITL 审批状态 ==========
+  hitlPending: boolean;
+  hitlScore: number | null;
+  hitlIssues: string[];
+  hitlSuggestion: string | null;
+  hitlResuming: boolean;
+  setHitlPending: (pending: boolean, data?: { score?: number; issues?: string[]; suggestion?: string }) => void;
+  setHitlResuming: (resuming: boolean) => void;
+
   // ========== 重置 ==========
   reset: () => void;
 }
@@ -96,6 +105,11 @@ const initialState = {
   streaming: false,
   reconnecting: false,
   error: null,
+  hitlPending: false,
+  hitlScore: null as number | null,
+  hitlIssues: [] as string[],
+  hitlSuggestion: null as string | null,
+  hitlResuming: false,
 };
 
 export const useInterviewStore = create<InterviewState>((set, get) => ({
@@ -162,6 +176,16 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   setReconnecting: (reconnecting) => set({ reconnecting }),
   error: null,
   setError: (error) => set({ error }),
+
+  setHitlPending: (pending, data) =>
+    set({
+      hitlPending: pending,
+      hitlScore: data?.score ?? null,
+      hitlIssues: data?.issues ?? [],
+      hitlSuggestion: data?.suggestion ?? null,
+    }),
+
+  setHitlResuming: (hitlResuming) => set({ hitlResuming }),
 
   reset: () => set(initialState),
 }));

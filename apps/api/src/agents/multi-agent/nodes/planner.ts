@@ -14,7 +14,7 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { z } from 'zod';
 import type { InterviewAgentStateType, PlanStep } from '../state';
-import { PlanStepSchema } from '../state';
+import { PlanStepSchema, SpecialistTypeSchema } from '../state';
 import { McpRegistry, type McpToolMetadata } from '../../../modules/interview/services/mcp-registry';
 
 export interface PlannerConfig {
@@ -89,6 +89,12 @@ export function createPlannerNode(model: BaseChatModel, config?: PlannerConfig) 
 【可用工具】
 ${toolsPrompt}
 
+【可用 Specialist Agent（Handoffs 路由）】
+- interviewer: 面试官 Agent，擅长出题、追问、评估回答质量
+- evaluator: 评估 Agent，擅长评分、写反馈、生成报告
+- searcher: 搜索 Agent，擅长联网搜索、信息检索
+- general: 通用 Agent，处理其他任务
+
 【已完成的步骤】
 ${pastStepsSummary}
 
@@ -101,7 +107,12 @@ ${lastMessage}
 3. 步骤数 2-6 步，不要过度拆分
 4. 如果需要搜索/记忆召回，放在前面（信息收集优先）
 5. 面试场景最后一步通常是 ask_llm（生成回复或下一道题）
-6. 选择工具时考虑用户偏好设置`,
+6. 选择工具时考虑用户偏好设置
+7. **Handoffs**: 如果某个步骤需要特定专业能力，指定 specialist 字段路由到对应 Agent
+   - 出题/追问 → specialist: interviewer
+   - 评分/反馈 → specialist: evaluator
+   - 搜索/检索 → specialist: searcher
+   - 其他 → specialist: general（或不指定）`,
             },
         ]);
 

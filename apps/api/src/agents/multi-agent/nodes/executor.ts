@@ -1,5 +1,5 @@
 /**
- * Executor 节点 — 执行 plan 中的当前步骤
+ * Executor 节点 — 执行 plan 中的当前步骤（含 Handoffs Specialist 路由）
  *
  * 职责：
  * 1. 取 state.plan[state.current_step_idx]
@@ -8,15 +8,44 @@
  * 4. current_step_idx++
  * 5. 执行失败时 retry_count++
  *
- * 为什么不用 ReAct？
- * - ReAct 每步都重新决策下一步做什么，长链路容易跑偏
- * - ReAct 每步都要过 LLM 决策，token 浪费大
- * - Plan-and-Execute 模式：先规划再执行，每步有明确目标
- * - 执行结果可校验，跑偏了 Replanner 能纠正而非从头来
+ * Handoffs 扩展：
+ * - 如果 step.specialist 指定了 Specialist Agent，使用对应的 system prompt
+ * - interviewer: 面试官角色（出题、追问、评估）
+ * - evaluator: 评估角色（评分、反馈、报告）
+ * - searcher: 搜索角色（联网搜索、信息检索）
+ * - general: 通用角色
  */
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { InterviewAgentStateType, PastStep } from '../state';
+import type { InterviewAgentStateType, PastStep, SpecialistType } from '../state';
 import { McpRegistry } from '../../../modules/interview/services/mcp-registry';
+
+/**
+ * Specialist Agent 的 system prompt 映射
+ */
+const SPECIALIST_PROMPTS: Record<SpecialistType, string> = {
+    interviewer: `你是一位资深 AI 面试官。你的职责是：
+1. 根据候选人回答的质量，决定追问还是进入下一题
+2. 追问要针对回答中的薄弱点，不是简单重复
+3. 每次只问一个问题
+4. 保持专业、友好、自然口语化
+5. 不要用 Markdown 标题或列表`,
+
+    evaluator: `你是一位严格的面试评估专家。你的职责是：
+1. 基于评分细则对候选人回答进行评分
+2. 评分要客观公正，指出优点和不足
+3. 给出具体的改进建议
+4. 评估维度：完整性、正确性、深度
+5. 输出结构化评分结果`,
+
+    searcher: `你是一位信息检索专家。你的职责是：
+1. 根据用户需求搜索相关信息
+2. 对搜索结果进行筛选和整理
+3. 提取关键信息，去除噪音
+4. 确保信息的时效性和准确性
+5. 汇总搜索结果供后续使用`,
+
+    general: `你是一位专业的 AI 面试官小面。请基于已收集的信息，完成指定任务。`,
+};
 
 /**
  * Executor 节点函数
@@ -71,6 +100,7 @@ export function createExecutorNode(model: BaseChatModel) {
 
                 case 'ask_llm': {
                     // 直接调 LLM 生成内容
+                    // Handoffs: 根据 step.specialist 选择对应的 Specialist prompt
                     const lastMessage =
                         state.messages[state.messages.length - 1]?.content ?? '';
                     const contextFromPastSteps = state.past_steps
@@ -80,10 +110,13 @@ export function createExecutorNode(model: BaseChatModel) {
                         )
                         .join('\n');
 
+                    const specialistType: SpecialistType = step.specialist || 'general';
+                    const specialistPrompt = SPECIALIST_PROMPTS[specialistType];
+
                     const llmResponse = await model.invoke([
                         {
                             role: 'system',
-                            content: `你是一位专业的 AI 面试官小面。基于以下已收集的信息，完成指定任务。
+                            content: `${specialistPrompt}
 
 【已收集信息】
 ${contextFromPastSteps || '（无）'}
@@ -116,6 +149,8 @@ ${contextFromPastSteps || '（无）'}
             current_step_idx: state.current_step_idx + 1,
             // 失败时增加 retry_count
             retry_count: success ? state.retry_count : state.retry_count + 1,
+            // Handoffs: 记录当前步骤的 specialist（供前端 CoT 面板展示）
+            current_specialist: step.specialist || 'general',
         };
     };
 }
