@@ -1,9 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Question, QuestionDocument } from '../schemas/question.schema';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { LlmGatewayService } from '../../llm/llm.gateway.service';
+import { QuestionBankService } from './question-bank.service';
 import { z } from 'zod';
 
 export interface InterviewTask {
@@ -25,7 +23,14 @@ export interface AnswerQuality {
   feedback: string;
 }
 
-const AnswerEvaluationSchema = z.object({
+/**
+ * Agent 决策结果：LLM 一次调用同时完成评分 + 追问决策
+ *
+ * 旧 Workflow: LLM 评分 → 规则看 score → 决定追问 → LLM 生成追问
+ * 新 Agent:    LLM 看完回答 → 自己判断该不该追问 / 追什么 / 是否进阶
+ */
+const AgentDecisionSchema = z.object({
+  // ── 评分维度 ──
   score: z.number().min(0).max(1).describe('综合评分'),
   completeness: z.number().min(0).max(1).describe('回答完整性'),
   correctness: z.number().min(0).max(1).describe('回答正确性'),
@@ -33,18 +38,49 @@ const AnswerEvaluationSchema = z.object({
   feedback: z.string().describe('改进建议'),
   keyPoints: z.array(z.string()).describe('回答中涉及的关键点'),
   missingPoints: z.array(z.string()).describe('缺失的关键点'),
+  // ── Agent 决策维度 ──
+  shouldFollowUp: z.boolean().describe('是否需要追问（Agent 自主判断，不是规则阈值）'),
+  followUpQuestion: z.string().nullable().describe('追问问题（基于候选人回答语义生成，null 则不追问）'),
+  followUpReason: z.string().nullable().describe('追问理由（为什么追问这个点）'),
+  shouldAdvance: z.boolean().describe('是否需要进阶题'),
+  advancedQuestion: z.string().nullable().describe('进阶问题（null 则不进阶）'),
 });
 
-type AnswerEvaluation = z.infer<typeof AnswerEvaluationSchema>;
+type AgentDecision = z.infer<typeof AgentDecisionSchema>;
+
+/** 本地回退题库（Milvus / LLM 不可用时使用） */
+const LOCAL_QUESTIONS: Record<string, { question: string; difficulty: 'easy' | 'medium' | 'hard' }[]> = {
+  frontend: [
+    { question: '请解释 React 中 useEffect 的工作原理和常见陷阱', difficulty: 'easy' },
+    { question: 'useState 和 useReducer 的使用场景有什么区别？', difficulty: 'easy' },
+    { question: 'React 18 的并发特性对现有代码有什么影响？', difficulty: 'medium' },
+    { question: '如何设计一个高性能的虚拟列表组件？', difficulty: 'medium' },
+    { question: '从源码层面解释 React Fiber 架构的调度机制', difficulty: 'hard' },
+  ],
+  backend: [
+    { question: '请解释 Node.js 的事件循环机制', difficulty: 'easy' },
+    { question: 'RESTful API 和 GraphQL 各自的优缺点是什么？', difficulty: 'easy' },
+    { question: '如何设计一个高可用的分布式缓存方案？', difficulty: 'medium' },
+    { question: '数据库连接池的工作原理和调优策略', difficulty: 'medium' },
+    { question: 'CAP 定理在实际系统设计中的取舍', difficulty: 'hard' },
+  ],
+  algorithm: [
+    { question: '请解释时间复杂度和空间复杂度的概念', difficulty: 'easy' },
+    { question: '常见的排序算法有哪些？各自的复杂度？', difficulty: 'easy' },
+    { question: '动态规划的核心思想是什么？如何识别 DP 问题？', difficulty: 'medium' },
+    { question: '图的最短路径算法有哪些？适用场景？', difficulty: 'medium' },
+    { question: '如何设计一个支持大规模数据的近似最近邻搜索系统？', difficulty: 'hard' },
+  ],
+};
 
 @Injectable()
 export class DynamicTaskQueueService {
   private readonly logger = new Logger(DynamicTaskQueueService.name);
 
   constructor(
-    @InjectModel(Question.name) private questionModel: Model<QuestionDocument>,
     private prisma: PrismaService,
     private llm: LlmGatewayService,
+    @Optional() private questionBank?: QuestionBankService,
   ) {}
 
   async initializeQueue(interviewId: string, position: string, level: string): Promise<void> {
@@ -62,30 +98,56 @@ export class DynamicTaskQueueService {
       category: q.category,
       difficulty: q.difficulty,
       priority: index + 1,
-      context: JSON.stringify({ position, level, questionId: q._id }),
+      context: JSON.stringify({ position, level, questionId: q.questionId }),
     }));
 
     await this.prisma.interviewTask.createMany({ data: tasksData });
     this.logger.debug(`[TaskQueue] Initialized queue for ${interviewId} with ${tasksData.length} tasks`);
   }
 
-  async generateInitialQuestions(position: string, level: string): Promise<Question[]> {
-    const difficultyMap: Record<string, 'easy' | 'medium' | 'hard'> = {
-      'P1': 'easy',
-      'P2': 'easy',
-      'P3': 'medium',
-      'P4': 'medium',
-      'P5': 'hard',
-      'P6': 'hard',
+  async generateInitialQuestions(position: string, level: string): Promise<{
+    questionId: string; question: string; category: string; difficulty: string;
+  }[]> {
+    const difficultyMap: Record<string, string> = {
+      'P1': 'easy', 'P2': 'easy', 'P3': 'medium', 'P4': 'medium', 'P5': 'hard', 'P6': 'hard',
     };
-
     const targetDifficulty = difficultyMap[level] || 'medium';
     const category = this.getCategoryByPosition(position);
 
-    return this.questionModel
-      .find({ category, difficulty: targetDifficulty })
-      .limit(5)
-      .exec();
+    // 优先从 Milvus 知识库检索
+    if (this.questionBank) {
+      try {
+        const results = await this.questionBank.search(category, {
+          position,
+          level,
+          category,
+          limit: 5,
+          rerank: true,
+        });
+        if (results.length > 0) {
+          return results.map((r) => ({
+            questionId: r.questionId,
+            question: r.question,
+            category: r.category || category,
+            difficulty: r.difficulty || targetDifficulty,
+          }));
+        }
+      } catch (err: any) {
+        this.logger.warn(`[TaskQueue] Milvus search failed, using local fallback: ${err.message}`);
+      }
+    }
+
+    // 回退：本地题库
+    const localQs = LOCAL_QUESTIONS[category] || LOCAL_QUESTIONS.frontend;
+    return localQs
+      .filter((q) => q.difficulty === targetDifficulty)
+      .slice(0, 5)
+      .map((q, i) => ({
+        questionId: `local-${category}-${i}`,
+        question: q.question,
+        category,
+        difficulty: q.difficulty,
+      }));
   }
 
   private getCategoryByPosition(position: string): string {
@@ -126,32 +188,35 @@ export class DynamicTaskQueueService {
     }
   }
 
-  private mapTaskTypeReverse(type: 'question' | 'follow-up' | 'summary' | 'evaluation'): string {
-    switch (type) {
-      case 'question': return 'QUESTION';
-      case 'follow-up': return 'FOLLOW_UP';
-      case 'summary': return 'SUMMARY';
-      case 'evaluation': return 'EVALUATION';
-      default: return 'QUESTION';
-    }
-  }
-
+  /**
+   * 完成 + Agent 决策：一次 LLM 调用完成评分 + 追问/进阶决策
+   *
+   * 旧 Workflow:
+   *   LLM 评分 → score < 0.5 → 规则触发追问 → LLM 生成追问内容
+   *   LLM 评分 → score > 0.8 → 规则触发进阶 → LLM 生成进阶题
+   *
+   * 新 Agent 决策:
+   *   LLM 看完候选人回答 → 自己判断该不该追问 / 追什么 / 是否进阶
+   *   不再用硬编码阈值，而是让 LLM 基于语义理解做决策
+   */
   async completeTask(interviewId: string, taskId: string, answer: string): Promise<void> {
     const task = await this.prisma.interviewTask.findUnique({ where: { id: taskId } });
     if (!task) return;
 
-    const quality = await this.evaluateAnswer(task.question, answer);
+    // Agent 一次决策：评分 + 是否追问 + 追问内容 + 是否进阶 + 进阶内容
+    const decision = await this.agentDecide(task.question, answer, task.category, task.difficulty);
 
+    // 写入评分记录
     await this.prisma.answerHistory.create({
       data: {
         interviewId,
         question: task.question,
         answer,
-        score: quality.score,
-        completeness: quality.completeness,
-        correctness: quality.correctness,
-        depth: quality.depth,
-        feedback: quality.feedback,
+        score: decision.score,
+        completeness: decision.completeness,
+        correctness: decision.correctness,
+        depth: decision.depth,
+        feedback: decision.feedback,
         llmEvaluated: true,
       },
     });
@@ -161,69 +226,195 @@ export class DynamicTaskQueueService {
       data: { status: 'COMPLETED' },
     });
 
-    await this.generateFollowUpTasks(interviewId, task, quality);
+    // 执行 Agent 决策结果（而非规则触发）
+    await this.executeAgentDecision(interviewId, task, decision);
   }
 
-  private async evaluateAnswer(question: string, answer: string): Promise<AnswerQuality> {
+  /**
+   * Agent 决策：LLM 一次调用完成评分 + 追问/进阶决策
+   *
+   * 关键区别：shouldFollowUp / shouldAdvance 由 LLM 自主判断，
+   * 不是 score < 0.5 这种硬编码阈值。
+   * LLM 可以在 score=0.6 时也决定追问（比如回答有误导性内容需要澄清），
+   * 也可以在 score=0.3 时决定不追问（比如回答太离谱不值得追问）。
+   */
+  private async agentDecide(
+    question: string,
+    answer: string,
+    category: string,
+    difficulty: string,
+  ): Promise<AgentDecision> {
     try {
       const response = await this.llm.chat({
         messages: [
           {
             role: 'system',
-            content: `你是一位专业的技术面试官评分助手。请基于以下面试问题和候选人回答，给出结构化的评分。
+            content: `你是一位资深技术面试官，需要同时完成两件事：
+
+1. **评估候选人回答**：给出结构化评分
+2. **自主决策下一步**：基于回答的语义内容（而非分数阈值），决定是否追问或出进阶题
 
 【评分标准】
-- score: 综合评分 (0-1)，考虑完整性、正确性和深度
-- completeness: 完整性 (0-1)，回答是否覆盖了问题的核心要点
-- correctness: 正确性 (0-1)，回答内容是否准确无误
-- depth: 深度 (0-1)，回答是否深入、有细节
-- feedback: 具体的改进建议
+- score: 综合评分 (0-1)
+- completeness: 完整性 (0-1)，是否覆盖核心要点
+- correctness: 正确性 (0-1)，内容是否准确
+- depth: 深度 (0-1)，是否有细节和原理
+- feedback: 改进建议
 - keyPoints: 回答中涉及的关键点
 - missingPoints: 缺失的关键点
+
+【Agent 决策规则】
+- shouldFollowUp: 你自己判断是否需要追问。不要用分数阈值，而是看回答内容：
+  - 回答提到了某个概念但理解有偏差 → 追问澄清
+  - 回答只说了表面，缺少深层理解 → 追问深入
+  - 回答已经很好很完整 → 不需要追问
+  - 回答完全跑题 → 不追问（追问也没意义）
+- followUpQuestion: 如果 shouldFollowUp=true，生成针对性追问（基于候选人说的具体内容）
+- followUpReason: 为什么决定追问这个点
+- shouldAdvance: 回答质量很高，可以出更难的题
+- advancedQuestion: 如果 shouldAdvance=true，生成进阶题
+
+【追问示例】
+问题："请解释 React 中 useEffect 的工作原理"
+回答："useEffect 在组件渲染后执行副作用，依赖数组控制执行时机，空数组表示只执行一次"
+→ shouldFollowUp=true, followUpQuestion="你提到依赖数组控制执行时机，能具体说说什么场景下遇到过依赖数组导致的死循环吗？你是怎么排查和解决的？", followUpReason="候选人理解了基本概念，但依赖数组是 useEffect 最容易出 bug 的地方，追问可以考察实战经验"
+
+回答："useEffect 就是组件加载时执行代码"
+→ shouldFollowUp=true, followUpQuestion="useEffect 的依赖数组具体是怎么工作的？如果依赖项是引用类型会怎样？", followUpReason="回答过于简略，缺少对依赖机制的理解"
+
+回答："useEffect 接收一个回调函数和一个依赖数组。组件挂载时执行回调；依赖数组变化时重新执行；返回函数作为清理逻辑。空数组 [] 表示只在挂载时执行一次。React 18 严格模式下会双重调用以检测副作用。常见陷阱包括闭包陈旧引用和无限循环。"
+→ shouldFollowUp=false, followUpQuestion=null, followUpReason="回答已经非常完整，覆盖了核心机制、清理逻辑、严格模式行为和常见陷阱"
 
 请用 JSON 格式输出，不要有其他文字。`,
           },
           {
             role: 'user',
-            content: `问题：${question}\n\n回答：${answer}`,
+            content: `问题：${question}\n\n候选人回答：${answer}\n\n方向：${category}，难度：${difficulty}`,
           },
         ],
       });
 
-      const evaluation: AnswerEvaluation = JSON.parse(response.content);
-      return {
-        score: evaluation.score,
-        completeness: evaluation.completeness,
-        correctness: evaluation.correctness,
-        depth: evaluation.depth,
-        feedback: evaluation.feedback,
-      };
-    } catch (error) {
-      this.logger.error(`LLM evaluation failed, falling back to heuristic: ${error.message}`);
-      return this.heuristicEvaluateAnswer(question, answer);
+      const parsed = JSON.parse(response.content);
+      const decision: AgentDecision = AgentDecisionSchema.parse(parsed);
+      return decision;
+    } catch (error: any) {
+      this.logger.warn(`[TaskQueue] Agent decision failed, falling back to heuristic: ${error.message}`);
+      return this.heuristicDecide(question, answer, category);
     }
   }
 
-  private heuristicEvaluateAnswer(question: string, answer: string): AnswerQuality {
+  /**
+   * 启发式回退：LLM 不可用时用规则兜底
+   * 这里的阈值是 fallback 逻辑，不是主路径——主路径由 LLM 自主决策
+   */
+  private heuristicDecide(question: string, answer: string, category: string): AgentDecision {
     const lengthScore = Math.min(answer.length / 200, 1);
-    
     const keywords = this.extractKeywords(question);
-    const keywordMatch = keywords.length > 0 
-      ? keywords.filter((k) => answer.includes(k)).length / keywords.length 
+    const keywordMatch = keywords.length > 0
+      ? keywords.filter((k) => answer.includes(k)).length / keywords.length
       : 0.5;
-    
+
     const completeness = 0.6 * lengthScore + 0.4 * keywordMatch;
     const correctness = this.estimateCorrectness(answer);
     const depth = this.estimateDepth(answer);
-    
     const score = (completeness + correctness + depth) / 3;
-    
+
     let feedback = '';
     if (score < 0.4) feedback = '回答较为简略，建议深入阐述';
     else if (score < 0.7) feedback = '回答基本覆盖要点，部分细节可补充';
     else feedback = '回答完整且深入';
 
-    return { score, completeness, correctness, depth, feedback };
+    // fallback 规则：LLM 不可用时才用阈值
+    const shouldFollowUp = score < 0.5 && score > 0.15; // 太差也不追问
+    const shouldAdvance = score > 0.8;
+
+    const fallbackFollowUps: Record<string, string[]> = {
+      frontend: [
+        '能具体展开你刚才提到的那个点吗？在实际项目中遇到过什么问题？',
+        '你提到的这个概念，在最新版本中有什么变化？对实际开发有什么影响？',
+      ],
+      backend: [
+        '你刚才提到的方案，在高并发场景下会有什么问题？如何优化？',
+        '生产环境中使用这个方案，需要注意哪些边界情况？',
+      ],
+      algorithm: [
+        '你给出的解法，有没有更优的方式？时间复杂度能进一步降低吗？',
+        '这个解法在最坏情况下表现如何？有没有退化风险？',
+      ],
+    };
+
+    const categoryFollowUps = fallbackFollowUps[category] || fallbackFollowUps.frontend;
+
+    return {
+      score,
+      completeness,
+      correctness,
+      depth,
+      feedback,
+      keyPoints: keywords,
+      missingPoints: [],
+      shouldFollowUp,
+      followUpQuestion: shouldFollowUp
+        ? categoryFollowUps[Math.floor(Math.random() * categoryFollowUps.length)]
+        : null,
+      followUpReason: shouldFollowUp ? 'fallback: 回答质量偏低，需要追问' : null,
+      shouldAdvance,
+      advancedQuestion: null, // fallback 不生成进阶题
+    };
+  }
+
+  /**
+   * 执行 Agent 决策结果
+   * 注意：追问/进阶的触发完全由 Agent 决策决定，不是规则阈值
+   */
+  private async executeAgentDecision(
+    interviewId: string,
+    completedTask: any,
+    decision: AgentDecision,
+  ): Promise<void> {
+    // Agent 决定追问
+    if (decision.shouldFollowUp && decision.followUpQuestion) {
+      await this.prisma.interviewTask.create({
+        data: {
+          interviewId,
+          type: 'FOLLOW_UP',
+          question: decision.followUpQuestion,
+          category: completedTask.category,
+          difficulty: completedTask.difficulty,
+          priority: 1,
+          context: JSON.stringify({
+            followUpFrom: completedTask.id,
+            followUpReason: decision.followUpReason,
+          }),
+        },
+      });
+      this.logger.debug(
+        `[TaskQueue] Agent decided follow-up for ${interviewId}: ${decision.followUpReason}`,
+      );
+    }
+
+    // Agent 决定进阶
+    if (decision.shouldAdvance && decision.advancedQuestion) {
+      const pendingCount = await this.prisma.interviewTask.count({
+        where: { interviewId, status: 'PENDING' },
+      });
+
+      if (pendingCount < 8) {
+        const difficultyMap: Record<string, string> = { easy: 'medium', medium: 'hard', hard: 'hard' };
+        await this.prisma.interviewTask.create({
+          data: {
+            interviewId,
+            type: 'QUESTION',
+            question: decision.advancedQuestion,
+            category: completedTask.category,
+            difficulty: difficultyMap[completedTask.difficulty] || 'hard',
+            priority: pendingCount + 1,
+            context: JSON.stringify({ advanced: true }),
+          },
+        });
+        this.logger.debug(`[TaskQueue] Agent decided advance for ${interviewId}`);
+      }
+    }
   }
 
   private extractKeywords(question: string): string[] {
@@ -244,7 +435,7 @@ export class DynamicTaskQueueService {
   private estimateCorrectness(answer: string): number {
     const correctIndicators = ['正确', '确实如此', '这个理解是对的', '是的', '没错'];
     const wrongIndicators = ['错误', '不对', '不是这样', '不正确'];
-    
+
     let score = 0.6;
     correctIndicators.forEach((indicator) => {
       if (answer.includes(indicator)) score += 0.1;
@@ -252,7 +443,7 @@ export class DynamicTaskQueueService {
     wrongIndicators.forEach((indicator) => {
       if (answer.includes(indicator)) score -= 0.2;
     });
-    
+
     return Math.max(0.2, Math.min(1, score));
   }
 
@@ -260,159 +451,6 @@ export class DynamicTaskQueueService {
     const depthIndicators = ['原理', '底层', '源码', '实现', '机制', '流程', '步骤'];
     const count = depthIndicators.filter((i) => answer.includes(i)).length;
     return Math.min(1, 0.3 + count * 0.15);
-  }
-
-  private async generateFollowUpTasks(
-    interviewId: string,
-    completedTask: any,
-    quality: AnswerQuality,
-  ): Promise<void> {
-    if (quality.score < 0.5) {
-      const followUp = await this.createFollowUpQuestion(completedTask);
-      if (followUp) {
-        await this.prisma.interviewTask.create({
-          data: {
-            interviewId,
-            type: 'FOLLOW_UP',
-            question: followUp,
-            category: completedTask.category,
-            difficulty: completedTask.difficulty,
-            priority: 1,
-            context: JSON.stringify({ followUpFrom: completedTask.id }),
-          },
-        });
-        this.logger.debug(`[TaskQueue] Added follow-up task for ${interviewId}`);
-      }
-    }
-
-    const pendingCount = await this.prisma.interviewTask.count({
-      where: { interviewId, status: 'PENDING' },
-    });
-
-    if (quality.score > 0.8 && pendingCount < 8) {
-      const advanced = await this.createAdvancedQuestion(completedTask);
-      if (advanced) {
-        const difficultyMap: Record<string, string> = { easy: 'medium', medium: 'hard', hard: 'hard' };
-        await this.prisma.interviewTask.create({
-          data: {
-            interviewId,
-            type: 'QUESTION',
-            question: advanced,
-            category: completedTask.category,
-            difficulty: difficultyMap[completedTask.difficulty] || 'hard',
-            priority: pendingCount + 1,
-            context: JSON.stringify({ advanced: true }),
-          },
-        });
-        this.logger.debug(`[TaskQueue] Added advanced task for ${interviewId}`);
-      }
-    }
-  }
-
-  private async createFollowUpQuestion(task: any): Promise<string | null> {
-    // LLM 语义生成追问：基于候选人具体回答内容，而非模板数组随机选
-    // 这样追问才有针对性（如候选人答了 useEffect 依赖数组 → 追问"什么场景遇到过死循环"）
-    try {
-      const response = await this.llm.chat({
-        messages: [
-          {
-            role: 'system',
-            content: `你是一位资深技术面试官。基于以下面试问题和候选人回答，生成一个针对性的追问。
-
-要求：
-- 追问必须基于候选人回答的具体内容，不要泛泛而问
-- 追问应深入候选人提到的某个具体点，或指出回答中的薄弱环节
-- 追问应该让候选人有机会展示更深的理解
-- 只输出追问本身，不要有任何前缀、编号或解释
-
-示例：
-问题："请解释 React 中 useEffect 的工作原理"
-回答："useEffect 在组件渲染后执行副作用，依赖数组控制执行时机，空数组表示只执行一次"
-好的追问："你提到依赖数组控制执行时机，能具体说说什么场景下遇到过依赖数组导致的死循环吗？你是怎么排查和解决的？"
-差的追问："能举一个实际项目中的应用例子吗？"（太泛，没有针对性）`,
-          },
-          {
-            role: 'user',
-            content: `问题：${task.question}\n\n候选人回答的上下文：${task.category} 方向，${task.difficulty} 难度`,
-          },
-        ],
-      });
-
-      const followUp = response.content?.trim();
-      if (followUp && followUp.length > 5) {
-        return followUp;
-      }
-    } catch (err: any) {
-      this.logger.warn(`[TaskQueue] LLM follow-up generation failed, using fallback: ${err.message}`);
-    }
-
-    // 回退：通用追问（LLM 不可用时的兜底）
-    const fallbackFollowUps: Record<string, string[]> = {
-      frontend: [
-        '能具体展开你刚才提到的那个点吗？在实际项目中遇到过什么问题？',
-        '你提到的这个概念，在最新版本中有什么变化？对实际开发有什么影响？',
-      ],
-      backend: [
-        '你刚才提到的方案，在高并发场景下会有什么问题？如何优化？',
-        '生产环境中使用这个方案，需要注意哪些边界情况？',
-      ],
-      algorithm: [
-        '你给出的解法，有没有更优的方式？时间复杂度能进一步降低吗？',
-        '这个解法在最坏情况下表现如何？有没有退化风险？',
-      ],
-    };
-
-    const categoryFollowUps = fallbackFollowUps[task.category] || fallbackFollowUps.frontend;
-    return categoryFollowUps[Math.floor(Math.random() * categoryFollowUps.length)];
-  }
-
-  private async createAdvancedQuestion(task: any): Promise<string | null> {
-    // LLM 语义生成进阶题：基于已完成题目的领域，生成更高难度的延伸问题
-    try {
-      const response = await this.llm.chat({
-        messages: [
-          {
-            role: 'system',
-            content: `你是一位资深技术面试官。基于以下已完成的面试题，生成一个更高难度的进阶问题。
-
-要求：
-- 进阶题必须在原题基础上提升难度（从原理到实战、从单机到分布式、从概念到源码）
-- 问题应该考察更深层的理解或更复杂的场景
-- 只输出问题本身，不要有任何前缀、编号或解释`,
-          },
-          {
-            role: 'user',
-            content: `已完成题目：${task.question}\n方向：${task.category}\n当前难度：${task.difficulty}`,
-          },
-        ],
-      });
-
-      const advanced = response.content?.trim();
-      if (advanced && advanced.length > 5) {
-        return advanced;
-      }
-    } catch (err: any) {
-      this.logger.warn(`[TaskQueue] LLM advanced question generation failed, using fallback: ${err.message}`);
-    }
-
-    // 回退
-    const fallbackAdvanced: Record<string, string[]> = {
-      frontend: [
-        '如何在服务端渲染场景下应用这个概念？有哪些需要注意的坑？',
-        '如果要你从零设计一个类似的机制，你会如何设计 API 和内部实现？',
-      ],
-      backend: [
-        '如何将这个方案扩展到分布式系统中？一致性如何保证？',
-        '在云原生环境下这个方案会遇到哪些挑战？如何解决？',
-      ],
-      algorithm: [
-        '这个算法如何并行化？并行后的时间复杂度是多少？',
-        '在大规模数据场景下（TB 级），这个算法如何优化？',
-      ],
-    };
-
-    const advancedQuestions = fallbackAdvanced[task.category] || fallbackAdvanced.frontend;
-    return advancedQuestions[Math.floor(Math.random() * advancedQuestions.length)];
   }
 
   async getQueueStatus(interviewId: string): Promise<{
@@ -429,7 +467,7 @@ export class DynamicTaskQueueService {
     });
 
     const history = await this.prisma.answerHistory.findMany({ where: { interviewId } });
-    
+
     const avgQuality = history.length > 0
       ? history.reduce((sum, h) => sum + h.score, 0) / history.length
       : 0;
@@ -449,7 +487,7 @@ export class DynamicTaskQueueService {
 
   async getAnswerHistory(interviewId: string): Promise<{ question: string; answer: string; quality: AnswerQuality }[]> {
     const history = await this.prisma.answerHistory.findMany({ where: { interviewId } });
-    
+
     return history.map((h) => ({
       question: h.question,
       answer: h.answer,
