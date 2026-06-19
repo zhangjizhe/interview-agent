@@ -56,12 +56,13 @@ services:
       ETCD_SNAPSHOT_COUNT: '50000'
     volumes:
       - milvus_etcd_data:/etcd
-    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    command: etcd -advertise-client-urls=http://milvus-etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
       test: ['CMD', 'etcdctl', 'endpoint', 'health']
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 20s
 
   milvus:
     image: milvusdb/milvus:v2.4.17
@@ -80,10 +81,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:9091/healthz']
-      interval: 30s
-      timeout: 20s
-      retries: 5
-      start_period: 30s
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
 
   api:
     build:
@@ -107,6 +108,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3001/interview/stats']
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   web:
@@ -117,7 +124,8 @@ services:
     ports:
       - '5173:80'
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

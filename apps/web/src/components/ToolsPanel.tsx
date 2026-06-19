@@ -3,6 +3,24 @@ import { useEffect, useState } from 'react';
 import { Cpu, Zap, Sparkles } from 'lucide-react';
 import type { McpToolMeta } from '@interview-agent/shared-types';
 
+// 安全 JSON 解析
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!res.ok) {
+    try {
+      const data = JSON.parse(text);
+      return { _error: true, _status: res.status, ...data };
+    } catch {
+      return { _error: true, _status: res.status, message: `服务不可用 (HTTP ${res.status})` };
+    }
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
 interface ToolsPanelProps {
   activeToolNames?: string[]; // 当前正在调用的工具名（用于高亮）
 }
@@ -16,7 +34,7 @@ export function ToolsPanel({ activeToolNames = [] }: ToolsPanelProps) {
     queryKey: ['tools'],
     queryFn: async () => {
       const r = await fetch('/api/tools');
-      return r.json() as Promise<{ tools: McpToolMeta[]; count: number; enabledCount: number }>;
+      return safeJson(r) as Promise<{ tools: McpToolMeta[]; count: number; enabledCount: number }>;
     },
     refetchInterval: 10000,
   });

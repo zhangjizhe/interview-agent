@@ -3,6 +3,24 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Upload, Search, Trash2, Plus, Sparkles, Loader2, Database, BookOpen, Layers, X, Tag, FileText, Clock, Hash } from 'lucide-react';
 
 const POSITIONS = ['后端开发工程师', '前端开发工程师', 'AI Agent 工程师', '算法工程师', '产品经理'];
+
+// 安全 JSON 解析：API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!res.ok) {
+    try {
+      const data = JSON.parse(text);
+      return { _error: true, _status: res.status, ...data };
+    } catch {
+      return { _error: true, _status: res.status, message: `服务不可用 (HTTP ${res.status})` };
+    }
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
 const LEVELS = ['P4', 'P5', 'P6', 'P7'];
 
 // 标签颜色映射（按维度）
@@ -176,8 +194,8 @@ export function QuestionBankPage() {
         fetch('/api/knowledge-base/list'),
       ]);
       
-      const milvusData = await milvusRes.json();
-      const qdrantData = await qdrantRes.json();
+      const milvusData = await safeJson(milvusRes);
+      const qdrantData = await safeJson(qdrantRes);
 
       const milvusQuestions: Question[] = (milvusData.results || []).map((q: any) => ({
         ...q,
@@ -240,8 +258,8 @@ export function QuestionBankPage() {
           }),
         });
       }
-      const data = await r.json();
-      if (r.ok) {
+      const data = await safeJson(r);
+      if (!data._error) {
         alert('已添加');
         setForm({ ...form, question: '', answer: '', tags: '' });
         setView('list');
@@ -271,8 +289,8 @@ export function QuestionBankPage() {
         fetch(`/api/knowledge-base/recall?${params}`),
       ]);
 
-      const milvusData = await milvusRes.json();
-      const qdrantData = await qdrantRes.json();
+      const milvusData = await safeJson(milvusRes);
+      const qdrantData = await safeJson(qdrantRes);
 
       const milvusResults: Question[] = (milvusData.results || []).map((q: any) => ({
         ...q,
@@ -324,8 +342,8 @@ export function QuestionBankPage() {
         method: 'POST',
         body: fd,
       });
-      const data = await r.json();
-      if (!r.ok) {
+      const data = await safeJson(r);
+      if (data._error) {
         alert('导入失败：' + (data.message || JSON.stringify(data)));
       } else {
         setImportResult({
@@ -357,8 +375,8 @@ export function QuestionBankPage() {
           category: form.category,
         }),
       });
-      const data = await r.json();
-      if (!r.ok) {
+      const data = await safeJson(r);
+      if (data._error) {
         alert('抓取失败：' + (data.message || JSON.stringify(data)));
       } else {
         setImportResult({
