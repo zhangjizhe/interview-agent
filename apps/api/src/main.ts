@@ -34,6 +34,9 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // 全局路由前缀（所有路由统一 /api/ 前缀，nginx 直接透传不 rewrite）
+  app.setGlobalPrefix('api');
+
   // 启动时加载 MCP config（覆盖 in-code register）
   const configPath = path.resolve(__dirname, '../config/mcp-servers.json');
   const result = await McpRegistry.loadFromConfig(configPath);

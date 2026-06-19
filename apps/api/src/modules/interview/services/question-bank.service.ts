@@ -1,5 +1,7 @@
 /**
- * 面试题知识库（混合检索 + Rerank）
+ * 面试题知识库（混合检索 + Rerank，lazy init）
+ *
+ * Milvus collection 在首次使用时初始化，而非启动时。
  *
  * 检索流程：
  * 1. 用户上传面试题（题目 + 答案 + 岗位 + 难度 + 标签）
@@ -13,7 +15,7 @@
  *
  * 用例：面试复盘时，Agent 自动从知识库找同主题的真题做强化练习
  */
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import {
@@ -43,7 +45,7 @@ export interface RerankedQuestion extends QuestionItem {
 }
 
 @Injectable()
-export class QuestionBankService implements OnApplicationBootstrap {
+export class QuestionBankService {
   private readonly logger = new Logger(QuestionBankService.name);
   private client: MilvusClient;
   private embedder: OpenAI;
@@ -55,6 +57,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
   /** Rerank 开关（默认开启，API Key 缺失时自动关闭） */
   private rerankEnabled = false;
   private dashscopeApiKey = '';
+  private initialized = false;
 
   constructor(private config: ConfigService) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
@@ -71,24 +74,38 @@ export class QuestionBankService implements OnApplicationBootstrap {
     }
   }
 
-  async onApplicationBootstrap() {
-    await this.ensureCollection();
-  }
-
   // ===== Collection 初始化 =====
 
+  /**
+   * Lazy init：首次使用时连接 Milvus 并初始化 collection
+   */
   private async ensureCollection() {
-    try {
-      const has = await this.client.hasCollection({ collection_name: this.COLLECTION });
-      if (!has.value) {
-        await this.createV2Collection();
-      } else {
-        await this.client.loadCollection({ collection_name: this.COLLECTION });
-        this.logger.log(`✅ Question bank v2 collection loaded`);
+    if (this.initialized) return;
+    const maxRetries = 10;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const has = await this.client.hasCollection({ collection_name: this.COLLECTION });
+        if (!has.value) {
+          await this.createV2Collection();
+        } else {
+          await this.client.loadCollection({ collection_name: this.COLLECTION });
+          this.logger.log(`✅ Question bank v2 collection loaded`);
+        }
+        this.initialized = true;
+        this.logger.log(`✅ Question bank v2 collection ready`);
+        return;
+      } catch (err: any) {
+        this.logger.warn(
+          `Question bank init attempt ${attempt + 1}/${maxRetries} failed: ${err.message}`,
+        );
+        if (attempt < maxRetries - 1) {
+          await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+        }
       }
-    } catch (err) {
-      this.logger.error(`Question bank init failed: ${err.message}`);
     }
+    throw new Error(
+      `Question bank init failed after ${maxRetries} retries — Milvus unavailable`,
+    );
   }
 
   /**
@@ -162,10 +179,9 @@ export class QuestionBankService implements OnApplicationBootstrap {
       // 3. 加载
       await this.client.loadCollection({ collection_name: this.COLLECTION });
       this.logger.log(`✅ Question bank v2 collection created (dense + BM25 hybrid)`);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error(`createV2Collection failed: ${err.message}`);
-      // 降级：如果 v2 创建失败（Milvus 版本不支持），回退到 v1 纯向量
-      this.logger.warn(`Falling back to v1 pure vector search`);
+      throw err;
     }
   }
 
@@ -175,6 +191,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
    * 把题目存进知识库
    */
   async addQuestion(item: Omit<QuestionItem, 'id' | 'createdAt'>): Promise<{ questionId: string }> {
+    await this.ensureCollection();
     try {
       const text = `${item.question}\n\n${item.answer}\n\n${item.tags}`;
       const vector = await this.embedText(text);
@@ -209,6 +226,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
    */
   async addQuestions(items: Array<Omit<QuestionItem, 'id' | 'createdAt'>>): Promise<{ count: number }> {
     if (items.length === 0) return { count: 0 };
+    await this.ensureCollection();
     try {
       const texts = items.map((it) => `${it.question}\n\n${it.answer}\n\n${it.tags}`);
       const vectors = await Promise.all(texts.map((t) => this.embedText(t)));
@@ -254,6 +272,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
       rerank?: boolean; // 默认 true
     } = {},
   ): Promise<Array<RerankedQuestion>> {
+    await this.ensureCollection();
     try {
       const { position, level, category, limit = 5, rerank = true } = options;
 
@@ -271,80 +290,54 @@ export class QuestionBankService implements OnApplicationBootstrap {
         'question', 'answer', 'tags', 'createdAt',
       ];
 
-      let results: Array<RerankedQuestion>;
-
-      try {
-        // 混合检索：dense + BM25 → RRF
-        const hybridResult = await this.client.hybridSearch({
-          collection_name: this.COLLECTION,
-          data: [
-            // 语义路：dense vector
-            {
-              data: [vector],
-              anns_field: 'vector',
-              params: { nprobe: 10 },
-            },
-            // 关键词路：BM25（传原始文本，Milvus 自动转 sparse vector）
-            // 新 SDK VectorTypes 不含 string，用 as any 绕类型（运行时 OK）
-            {
-              data: [query] as any,
-              anns_field: 'sparse_bm25',
-            },
-          ],
-          rerank: {
-            strategy: 'rrf',
-            params: { k: 60 },
+      // 混合检索：dense + BM25 → RRF
+      const hybridResult = await this.client.hybridSearch({
+        collection_name: this.COLLECTION,
+        data: [
+          // 语义路：dense vector
+          {
+            data: [vector],
+            anns_field: 'vector',
+            params: { nprobe: 10 },
           },
-          limit,
-          filter,
-          output_fields: outputFields,
-        });
+          // 关键词路：BM25（传原始文本，Milvus 自动转 sparse vector）
+          // 新 SDK VectorTypes 不含 string，用 as any 绕类型（运行时 OK）
+          {
+            data: [query] as any,
+            anns_field: 'sparse_bm25',
+          },
+        ],
+        rerank: {
+          strategy: 'rrf',
+          params: { k: 60 },
+        },
+        limit,
+        filter,
+        output_fields: outputFields,
+      });
 
-        results = (hybridResult.results || []).map((r: any) => ({
-          id: String(r.id),
-          questionId: r.questionId,
-          position: r.position,
-          level: r.level,
-          category: r.category,
-          question: r.question,
-          answer: r.answer,
-          tags: r.tags,
-          createdAt: r.createdAt,
-          score: r.score,
-        }));
-      } catch (hybridErr: any) {
-        // 降级：混合检索失败 → 纯向量检索
-        this.logger.warn(`Hybrid search failed (${hybridErr.message}), fallback to pure vector`);
-        const fallbackResult = await this.client.search({
-          collection_name: this.COLLECTION,
-          vector,
-          limit,
-          filter,
-          output_fields: outputFields,
-        });
-        results = (fallbackResult.results || []).map((r: any) => ({
-          id: String(r.id),
-          questionId: r.questionId,
-          position: r.position,
-          level: r.level,
-          category: r.category,
-          question: r.question,
-          answer: r.answer,
-          tags: r.tags,
-          createdAt: r.createdAt,
-          score: r.score,
-        }));
-      }
+      const results: Array<RerankedQuestion> = (hybridResult.results || []).map((r: any) => ({
+        id: String(r.id),
+        questionId: r.questionId,
+        position: r.position,
+        level: r.level,
+        category: r.category,
+        question: r.question,
+        answer: r.answer,
+        tags: r.tags,
+        createdAt: r.createdAt,
+        score: r.score,
+      }));
 
       // Rerank 精排
       if (rerank && this.rerankEnabled && results.length > 0) {
-        results = await this.rerankResults(query, results);
+        return await this.rerankResults(query, results);
       }
 
       return results;
     } catch (err: any) {
       this.logger.error(`Question search failed: ${err.message}`);
-      return [];
+      throw err;
     }
   }
 
@@ -415,6 +408,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
    * 列出所有题目（按 position 过滤）
    */
   async list(position?: string, limit = 20): Promise<QuestionItem[]> {
+    await this.ensureCollection();
     try {
       const filter = position ? `position == "${position}"` : undefined;
       const result = await this.client.query({
@@ -436,7 +430,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
       }));
     } catch (err: any) {
       this.logger.error(`Question list failed: ${err.message}`);
-      return [];
+      throw err;
     }
   }
 
@@ -444,6 +438,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
    * 按 questionId 删除
    */
   async deleteQuestion(questionId: string): Promise<{ deleted: boolean }> {
+    await this.ensureCollection();
     try {
       await this.client.delete({
         collection_name: this.COLLECTION,
