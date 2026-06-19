@@ -78,17 +78,30 @@ export class QuestionBankService implements OnApplicationBootstrap {
   // ===== Collection 初始化 =====
 
   private async ensureCollection() {
-    try {
-      const has = await this.client.hasCollection({ collection_name: this.COLLECTION });
-      if (!has.value) {
-        await this.createV2Collection();
-      } else {
-        await this.client.loadCollection({ collection_name: this.COLLECTION });
-        this.logger.log(`✅ Question bank v2 collection loaded`);
+    const maxRetries = 10;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const has = await this.client.hasCollection({ collection_name: this.COLLECTION });
+        if (!has.value) {
+          await this.createV2Collection();
+        } else {
+          await this.client.loadCollection({ collection_name: this.COLLECTION });
+          this.logger.log(`✅ Question bank v2 collection loaded`);
+        }
+        this.logger.log(`✅ Question bank v2 collection ready`);
+        return;
+      } catch (err: any) {
+        this.logger.warn(
+          `Question bank init attempt ${attempt + 1}/${maxRetries} failed: ${err.message}`,
+        );
+        if (attempt < maxRetries - 1) {
+          await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+        }
       }
-    } catch (err) {
-      this.logger.error(`Question bank init failed: ${err.message}`);
     }
+    throw new Error(
+      `Question bank init failed after ${maxRetries} retries — Milvus unavailable`,
+    );
   }
 
   /**
@@ -162,10 +175,9 @@ export class QuestionBankService implements OnApplicationBootstrap {
       // 3. 加载
       await this.client.loadCollection({ collection_name: this.COLLECTION });
       this.logger.log(`✅ Question bank v2 collection created (dense + BM25 hybrid)`);
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error(`createV2Collection failed: ${err.message}`);
-      // 降级：如果 v2 创建失败（Milvus 版本不支持），回退到 v1 纯向量
-      this.logger.warn(`Falling back to v1 pure vector search`);
+      throw err;
     }
   }
 
@@ -271,80 +283,54 @@ export class QuestionBankService implements OnApplicationBootstrap {
         'question', 'answer', 'tags', 'createdAt',
       ];
 
-      let results: Array<RerankedQuestion>;
-
-      try {
-        // 混合检索：dense + BM25 → RRF
-        const hybridResult = await this.client.hybridSearch({
-          collection_name: this.COLLECTION,
-          data: [
-            // 语义路：dense vector
-            {
-              data: [vector],
-              anns_field: 'vector',
-              params: { nprobe: 10 },
-            },
-            // 关键词路：BM25（传原始文本，Milvus 自动转 sparse vector）
-            // 新 SDK VectorTypes 不含 string，用 as any 绕类型（运行时 OK）
-            {
-              data: [query] as any,
-              anns_field: 'sparse_bm25',
-            },
-          ],
-          rerank: {
-            strategy: 'rrf',
-            params: { k: 60 },
+      // 混合检索：dense + BM25 → RRF
+      const hybridResult = await this.client.hybridSearch({
+        collection_name: this.COLLECTION,
+        data: [
+          // 语义路：dense vector
+          {
+            data: [vector],
+            anns_field: 'vector',
+            params: { nprobe: 10 },
           },
-          limit,
-          filter,
-          output_fields: outputFields,
-        });
+          // 关键词路：BM25（传原始文本，Milvus 自动转 sparse vector）
+          // 新 SDK VectorTypes 不含 string，用 as any 绕类型（运行时 OK）
+          {
+            data: [query] as any,
+            anns_field: 'sparse_bm25',
+          },
+        ],
+        rerank: {
+          strategy: 'rrf',
+          params: { k: 60 },
+        },
+        limit,
+        filter,
+        output_fields: outputFields,
+      });
 
-        results = (hybridResult.results || []).map((r: any) => ({
-          id: String(r.id),
-          questionId: r.questionId,
-          position: r.position,
-          level: r.level,
-          category: r.category,
-          question: r.question,
-          answer: r.answer,
-          tags: r.tags,
-          createdAt: r.createdAt,
-          score: r.score,
-        }));
-      } catch (hybridErr: any) {
-        // 降级：混合检索失败 → 纯向量检索
-        this.logger.warn(`Hybrid search failed (${hybridErr.message}), fallback to pure vector`);
-        const fallbackResult = await this.client.search({
-          collection_name: this.COLLECTION,
-          vector,
-          limit,
-          filter,
-          output_fields: outputFields,
-        });
-        results = (fallbackResult.results || []).map((r: any) => ({
-          id: String(r.id),
-          questionId: r.questionId,
-          position: r.position,
-          level: r.level,
-          category: r.category,
-          question: r.question,
-          answer: r.answer,
-          tags: r.tags,
-          createdAt: r.createdAt,
-          score: r.score,
-        }));
-      }
+      const results: Array<RerankedQuestion> = (hybridResult.results || []).map((r: any) => ({
+        id: String(r.id),
+        questionId: r.questionId,
+        position: r.position,
+        level: r.level,
+        category: r.category,
+        question: r.question,
+        answer: r.answer,
+        tags: r.tags,
+        createdAt: r.createdAt,
+        score: r.score,
+      }));
 
       // Rerank 精排
       if (rerank && this.rerankEnabled && results.length > 0) {
-        results = await this.rerankResults(query, results);
+        return await this.rerankResults(query, results);
       }
 
       return results;
     } catch (err: any) {
       this.logger.error(`Question search failed: ${err.message}`);
-      return [];
+      throw err;
     }
   }
 
@@ -436,7 +422,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
       }));
     } catch (err: any) {
       this.logger.error(`Question list failed: ${err.message}`);
-      return [];
+      throw err;
     }
   }
 
