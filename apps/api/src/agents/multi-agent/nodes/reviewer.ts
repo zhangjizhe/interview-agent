@@ -120,7 +120,7 @@ approved = 合格可输出，revise = 需要修改`,
                 review_issues: reviewResponse.issues,
                 review_suggestion: reviewResponse.suggestion,
                 hitl_pending: false,
-            };
+            } as any;
         }
 
         // HITL 中断：评分争议，暂停等待 HR
@@ -132,7 +132,7 @@ approved = 合格可输出，revise = 需要修改`,
                 review_issues: reviewResponse.issues,
                 review_suggestion: reviewResponse.suggestion,
                 hitl_pending: true,
-            };
+            } as any;
         }
 
         // 不通过 → 打回重做：清空 final_response，增加 retry_count
@@ -144,7 +144,7 @@ approved = 合格可输出，revise = 需要修改`,
             review_issues: reviewResponse.issues,
             review_suggestion: reviewResponse.suggestion,
             hitl_pending: false,
-        };
+        } as any;
     };
 }
 

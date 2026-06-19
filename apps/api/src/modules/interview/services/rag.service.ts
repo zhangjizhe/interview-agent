@@ -1,6 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import * as similarity from 'compute-cosine-similarity';
+import { PrismaService } from '../../../infra/prisma/prisma.service';
+
+// 内联余弦相似度（避免引入 compute-cosine-similarity 包）
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (!a || !b || a.length !== b.length || a.length === 0) return 0;
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  const d = Math.sqrt(na) * Math.sqrt(nb);
+  return d === 0 ? 0 : dot / d;
+}
 
 interface SearchResult {
   id: string;
@@ -69,7 +81,7 @@ export class RagService {
     const results: SearchResult[] = [];
     for (const doc of documents) {
       const docEmbedding = await this.getEmbedding(doc.content);
-      const score = similarity(queryEmbedding, docEmbedding);
+      const score = cosineSimilarity(queryEmbedding, docEmbedding);
       
       if (score >= minScore) {
         results.push({
@@ -106,10 +118,10 @@ export class RagService {
     const allResults = await this.search(query, { limit: expandCount + 3 });
     
     const quickResults = allResults.slice(0, 3);
-    const expandedResults = await Promise.all(
+    const expandedResults: any = await Promise.all(
       allResults.slice(0, expandCount).map(async (r) => ({
         ...r,
-        details: await r.details(),
+        details: await (r as any).details(),
       })),
     );
 

@@ -17,7 +17,7 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { McpRegistry } from '../../interview/services/mcp-registry';
+import { McpRegistry } from '../interview/services/mcp-registry';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 /**

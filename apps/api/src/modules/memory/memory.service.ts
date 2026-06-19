@@ -219,7 +219,7 @@ export class MemoryService {
     ]);
 
     const freshRecalled = recalled.filter((m) => {
-      const age = Date.now() - (m.timestamp || 0);
+      const age = Date.now() - ((m as any).timestamp || 0);
       return age < this.TTL_LONG_TERM;
     });
 

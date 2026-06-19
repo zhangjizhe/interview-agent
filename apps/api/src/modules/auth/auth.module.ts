@@ -19,7 +19,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
     // JwtModule - 使用配置中的 secret 和 expiresIn
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (config: ConfigService) => ({
+      useFactory: async (config: ConfigService): Promise<any> => ({
         secret: config.get<string>('auth.jwtSecret'),
         signOptions: {
           expiresIn: config.get<string>('auth.jwtExpiresIn') || '7d',
@@ -48,6 +48,6 @@ import { JwtAuthGuard } from './jwt-auth.guard';
       useClass: ThrottlerGuard,
     },
   ],
-  exports: [AuthService, JwtAuthGuard],
+  exports: [AuthService, JwtAuthGuard, JwtModule],
 })
 export class AuthModule {}

@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Langfuse, Generation } from 'langfuse';
+import { Langfuse } from 'langfuse';
+type Generation = any;
 
 /**
  * Langfuse 可观测服务

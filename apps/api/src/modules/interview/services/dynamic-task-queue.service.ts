@@ -129,7 +129,7 @@ export class DynamicTaskQueueService {
             questionId: r.questionId,
             question: r.question,
             category: r.category || category,
-            difficulty: r.difficulty || targetDifficulty,
+            difficulty: (r as any).difficulty || targetDifficulty,
           }));
         }
       } catch (err: any) {
@@ -173,7 +173,7 @@ export class DynamicTaskQueueService {
       category: task.category,
       difficulty: task.difficulty as 'easy' | 'medium' | 'hard',
       priority: task.priority,
-      context: task.context ? JSON.parse(task.context) : {},
+      context: task.context ? (typeof task.context === 'string' ? JSON.parse(task.context) : task.context) : {},
       createdAt: task.createdAt.getTime(),
     };
   }

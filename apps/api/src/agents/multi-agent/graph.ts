@@ -113,9 +113,9 @@ export function buildInterviewGraph(
     ): Promise<Partial<InterviewAgentStateType>> => {
         // 调用 interrupt() 暂停图执行，等待外部输入
         // resume value 由 HR 审批端点传入：'approved' 或 'rejected'
-        const verdict = interrupt<{ verdict: 'approved' | 'rejected' }>(
+        const verdict = (interrupt as any)(
             'HITL: 评分争议，等待 HR 审批',
-        ) as unknown as 'approved' | 'rejected';
+        ) as 'approved' | 'rejected';
 
         if (verdict === 'approved') {
             // HR 批准：使用 reviewer 的草稿 final_response

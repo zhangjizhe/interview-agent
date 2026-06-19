@@ -10,6 +10,7 @@ export interface Memory {
   score?: number;
   metadata?: Record<string, any>;
   createdAt?: Date;
+  timestamp?: number;
 }
 
 export interface MemoryStore {

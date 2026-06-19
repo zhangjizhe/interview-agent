@@ -36,7 +36,19 @@ export class ResumeParserService {
     if (typeof fileOrText === 'string') {
       rawText = fileOrText;
     } else if (fileOrText?.buffer) {
-      rawText = fileOrText.buffer.toString();
+      // 根据文件类型选择解析方式：PDF 用 pdf-parse，二进制/文本直接读
+      const isPdf =
+        fileOrText.mimetype === 'application/pdf' ||
+        (fileOrText.originalname || '').toLowerCase().endsWith('.pdf');
+      if (isPdf) {
+        const pdfParse = (await import('pdf-parse')).default;
+        const data = await pdfParse(fileOrText.buffer);
+        rawText = data.text;
+        this.logger.log(`PDF 解析完成：${data.numpages} 页，${rawText.length} 字符`);
+      } else {
+        // .txt / .md / .docx(转纯文本) — UTF-8 解码
+        rawText = fileOrText.buffer.toString('utf-8');
+      }
     } else {
       throw new Error('Invalid input: expected a string or a file object with buffer');
     }
@@ -158,7 +170,7 @@ export class ResumeParserService {
     return 'junior';
   }
 
-  async categorizeBySkill(skills: string[]): string[] {
+  async categorizeBySkill(skills: string[]): Promise<string[]> {
     return skills.map((s) => s.toLowerCase());
   }
 }

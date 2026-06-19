@@ -8,7 +8,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisService } from '../../infra/redis/redis.service';
+import { RedisService } from '../../../infra/redis/redis.service';
 
 export interface HitlPending {
   interviewId: string;

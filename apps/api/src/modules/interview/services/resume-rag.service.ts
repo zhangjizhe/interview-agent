@@ -91,7 +91,7 @@ export class ResumeRAGService {
   async ingestResume(userId: string, position: string, parsed: ParsedResume): Promise<void> {
     await this.ensureCollection();
     try {
-      const summary = `岗位: ${position}\n技能: ${parsed.skills?.join('、') || '无'}\n经验: ${parsed.experience?.slice(0, 3).map((e) => `${e.title}@${e.company}`).join('; ')}\n项目: ${parsed.projects?.slice(0, 2).map((p) => p.name).join('、')}`;
+      const summary = `岗位: ${position}\n技能: ${parsed.skills?.join('、') || '无'}\n经验: ${(parsed.experience || []).slice(0, 3).join('; ')}\n项目: ${(parsed.projects || []).slice(0, 2).join('、')}`;
       const text = `${summary}\n\n${parsed.rawText?.slice(0, 1500) || ''}`;
       const vector = await this.embedText(text);
 

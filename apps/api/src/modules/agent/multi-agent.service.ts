@@ -167,12 +167,13 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     let fullResponse = '';
 
     for await (const [msg, metadata] of stream) {
-      if (msg && typeof msg.content === 'string') {
-        fullResponse += msg.content;
+      const m = msg as any;
+      if (m && typeof m.content === 'string') {
+        fullResponse += m.content;
         yield {
           type: 'token',
-          content: msg.content,
-          node: metadata?.node || undefined,
+          content: m.content,
+          node: (metadata as any)?.node || undefined,
         };
       }
     }
@@ -192,10 +193,10 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     );
 
     for await (const chunk of stream) {
-      const state = chunk as InterviewAgentStateType;
+      const state = chunk as any as InterviewAgentStateType;
 
       if (state.past_steps && state.past_steps.length > 0) {
-        const lastStep = state.past_steps[state.past_steps.length - 1];
+        const lastStep = state.past_steps[state.past_steps.length - 1] as any;
         yield {
           type: 'step',
           step: lastStep.step.description,

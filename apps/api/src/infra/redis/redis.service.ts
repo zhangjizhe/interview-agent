@@ -63,4 +63,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async expire(key: string, seconds: number): Promise<void> {
     await this.client.expire(key, seconds);
   }
+
+  // ===== Hash 操作（4 层记忆 L1 工作记忆用 Redis Hash）=====
+  async hgetall(key: string): Promise<Record<string, string>> {
+    return this.client.hgetall(key) as any;
+  }
+
+  async hget(key: string, field: string): Promise<string | null> {
+    return this.client.hget(key, field);
+  }
+
+  async hmset(key: string, data: Record<string, string>): Promise<void> {
+    await this.client.hmset(key, data);
+  }
+
+  async hdel(key: string, ...fields: string[]): Promise<void> {
+    await this.client.hdel(key, ...fields);
+  }
 }
