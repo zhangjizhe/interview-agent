@@ -5,6 +5,24 @@ import { useQuery } from '@tanstack/react-query';
 import { Clock, FileText, ChevronRight, Plus, BarChart3, X, Cpu, Sparkles, Upload, CheckCircle2, Loader2 } from 'lucide-react';
 import type { McpToolMeta } from '@interview-agent/shared-types';
 
+// 安全 JSON 解析：API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!res.ok) {
+    try {
+      const data = JSON.parse(text);
+      return { _error: true, _status: res.status, ...data };
+    } catch {
+      return { _error: true, _status: res.status, message: `服务不可用 (HTTP ${res.status})` };
+    }
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
 const POSITIONS = ['AI Agent 工程师', '前端开发工程师', '高级测试工程师', '后端开发工程师', '算法工程师', '产品经理'];
 const LEVELS = ['P4', 'P5', 'P6', 'P7'];
 
@@ -57,12 +75,12 @@ export function HomePage() {
       fd.append('position', position);
       fd.append('userId', userId);
       const res = await fetch('/api/interview/upload-resume', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (data?.ragIngested) {
-        setResumeUploaded(true);
-      } else {
-        alert('简历上传失败：' + JSON.stringify(data));
+      const data = await safeJson(res);
+      if (data?._error || !data?.ragIngested) {
+        alert('简历上传失败：' + (data?.message || JSON.stringify(data)));
+        return;
       }
+      setResumeUploaded(true);
     } catch (err: any) {
       alert('上传出错：' + err.message);
     } finally {
@@ -74,7 +92,7 @@ export function HomePage() {
     queryKey: ['interviews', userId],
     queryFn: async () => {
       const r = await fetch(`/api/interview/list?userId=${userId}`);
-      return r.json();
+      return safeJson(r);
     },
     refetchInterval: 3000,
   });
@@ -83,7 +101,7 @@ export function HomePage() {
     queryKey: ['token-stats', userId],
     queryFn: async () => {
       const r = await fetch(`/api/interview/stats?userId=${userId}`);
-      return r.json();
+      return safeJson(r);
     },
     refetchInterval: 5000,
   });
@@ -93,7 +111,7 @@ export function HomePage() {
     queryKey: ['tools'],
     queryFn: async () => {
       const r = await fetch('/api/tools');
-      return r.json() as Promise<{ tools: McpToolMeta[]; count: number; enabledCount: number }>;
+      return safeJson(r) as Promise<{ tools: McpToolMeta[]; count: number; enabledCount: number }>;
     },
     refetchInterval: 30000,
   });
@@ -104,7 +122,7 @@ export function HomePage() {
     queryKey: ['empty-rooms', userId],
     queryFn: async () => {
       const r = await fetch(`/api/interview/empty-rooms?userId=${userId}&idleMinutes=30`);
-      return r.json() as Promise<{ emptyRooms: EmptyRoom[]; count: number }>;
+      return safeJson(r) as Promise<{ emptyRooms: EmptyRoom[]; count: number }>;
     },
     refetchInterval: 60000, // 每分钟查一次
   });
@@ -168,8 +186,8 @@ export function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, position, level }),
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await safeJson(res);
+      if (data?._error) {
         alert('启动失败：' + (data.message || JSON.stringify(data)));
         return;
       }

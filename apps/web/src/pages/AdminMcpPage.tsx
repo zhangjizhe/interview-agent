@@ -53,6 +53,24 @@ const TRANSPORT_LABEL: Record<string, string> = {
   'streamable-http': 'HTTP',
 };
 
+// 安全 JSON 解析：API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!res.ok) {
+    try {
+      const data = JSON.parse(text);
+      return { _error: true, _status: res.status, ...data };
+    } catch {
+      return { _error: true, _status: res.status, message: `服务不可用 (HTTP ${res.status})` };
+    }
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
 export function AdminMcpPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -61,7 +79,7 @@ export function AdminMcpPage() {
     queryKey: ['admin-mcp-servers'],
     queryFn: async () => {
       const r = await fetch('/api/admin/mcp-servers');
-      return r.json() as Promise<ServersResponse>;
+      return safeJson(r) as Promise<ServersResponse>;
     },
     refetchInterval: 30000,
   });
@@ -73,7 +91,7 @@ export function AdminMcpPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ toolName, enabled }),
       });
-      return r.json();
+      return safeJson(r);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-mcp-servers'] });
@@ -83,7 +101,7 @@ export function AdminMcpPage() {
   const reloadMut = useMutation({
     mutationFn: async () => {
       const r = await fetch('/api/admin/mcp-servers/reload', { method: 'POST' });
-      return r.json();
+      return safeJson(r);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-mcp-servers'] });
@@ -93,7 +111,7 @@ export function AdminMcpPage() {
   const healthMut = useMutation({
     mutationFn: async (name: string) => {
       const r = await fetch(`/api/admin/mcp-servers/${name}/health`);
-      return r.json();
+      return safeJson(r);
     },
   });
 

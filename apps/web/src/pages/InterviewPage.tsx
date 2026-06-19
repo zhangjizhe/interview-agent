@@ -28,6 +28,24 @@ import { CotPanel } from '../components/CotPanel';
 import { useInterviewStore } from '../store/interview-store';
 import type { Report } from '@interview-agent/shared-types';
 
+// 安全 JSON 解析：API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!res.ok) {
+    try {
+      const data = JSON.parse(text);
+      return { _error: true, _status: res.status, ...data };
+    } catch {
+      return { _error: true, _status: res.status, message: `服务不可用 (HTTP ${res.status})` };
+    }
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
 export function InterviewPage() {
   const { id: interviewId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -81,7 +99,7 @@ export function InterviewPage() {
       if (!interviewId) return;
       try {
         const res = await fetch(`/api/interview/${interviewId}`);
-        const data = await res.json();
+        const data = await safeJson(res);
         if (data?.messages) {
           setMessages(
             data.messages.map((m: any) => ({
@@ -110,7 +128,7 @@ export function InterviewPage() {
     (async () => {
       try {
         const res = await fetch(`/api/interview/${interviewId}`);
-        const data = await res.json();
+        const data = await safeJson(res);
         if (data?.messages) {
           setMessages(
             data.messages.map((m: any) => ({
@@ -171,7 +189,7 @@ export function InterviewPage() {
     setDrawerOpen(false);
     try {
       const res = await fetch(`/api/interview/${interviewId}/end`, { method: 'POST' });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data?.deleted) {
         alert(data.reason === 'no_messages' ? '空面试已退出，不保存' : '已退出');
         navigate('/');
@@ -196,12 +214,11 @@ export function InterviewPage() {
       fd.append('position', searchParams.get('position') || '前端开发工程师');
       fd.append('userId', userId);
       const res = await fetch('/api/interview/upload-resume', { method: 'POST', body: fd });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data?.ragIngested) {
         setUploadedName(file.name);
-        // 重新拉面试详情拿到新简历
         const res2 = await fetch(`/api/interview/${interviewId}`);
-        const data2 = await res2.json();
+        const data2 = await safeJson(res2);
         if (data2?.resume) setResume(data2.resume);
         setResumePanelOpen(true);
       } else {
@@ -235,7 +252,7 @@ export function InterviewPage() {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/hitl/graph-status/${interviewId}`);
-        const data = await res.json();
+        const data = await safeJson(res);
         if (data.isHitlPending) {
           setHitlPending(true, {
             score: data.score,
@@ -260,13 +277,14 @@ export function InterviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ verdict }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data.success) {
         setHitlPending(false);
         // 如果 approved，把 response 加到消息列表
         if (verdict === 'approved' && data.response) {
-          setMessages((prev) => [
-            ...prev,
+          const store = useInterviewStore.getState();
+          store.setMessages([
+            ...store.messages,
             { role: 'assistant', content: data.response, streaming: false },
           ]);
         }

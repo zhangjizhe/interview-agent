@@ -6,6 +6,24 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { HomePage } from './pages/HomePage';
 import { initWebVitals } from './utils/web-vitals';
 
+// 安全 JSON 解析：当 API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!res.ok) {
+    try {
+      const data = JSON.parse(text);
+      return { _error: true, _status: res.status, ...data };
+    } catch {
+      return { _error: true, _status: res.status, message: `服务不可用 (HTTP ${res.status})` };
+    }
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
 // 路由级懒加载 — 首屏不加载 InterviewPage / QuestionBankPage / ToolsPage / AdminMcpPage
 const InterviewPage = lazy(() =>
   import('./pages/InterviewPage').then((m) => ({ default: m.InterviewPage })),
@@ -61,7 +79,7 @@ function TopBar() {
     queryKey: ['token-stats', userId],
     queryFn: async () => {
       const r = await fetch(`/api/interview/token-stats?userId=${userId}`);
-      return r.json();
+      return safeJson(r);
     },
     refetchInterval: 5000,
   });
@@ -159,7 +177,7 @@ function ToolsIndicator() {
     queryKey: ['tools-count'],
     queryFn: async () => {
       const r = await fetch('/api/tools');
-      return r.json() as Promise<{ count: number; enabledCount: number }>;
+      return safeJson(r) as Promise<{ count: number; enabledCount: number }>;
     },
     refetchInterval: 30000,
   });

@@ -19,6 +19,7 @@ export class ResumeRAGService implements OnApplicationBootstrap {
   private embedder: OpenAI;
   private readonly COLLECTION = 'resumes';
   private readonly VECTOR_DIM = 1024;
+  private milvusReady = false;
 
   constructor(private config: ConfigService) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
@@ -34,42 +35,59 @@ export class ResumeRAGService implements OnApplicationBootstrap {
   }
 
   private async ensureCollection() {
-    try {
-      const has = await this.client.hasCollection({ collection_name: this.COLLECTION });
-      if (!has.value) {
-        await this.client.createCollection({
-          collection_name: this.COLLECTION,
-          fields: [
-            { name: 'id', data_type: DataType.Int64, is_primary_key: true, autoID: true },
-            { name: 'vector', data_type: DataType.FloatVector, dim: this.VECTOR_DIM },
-            { name: 'userId', data_type: DataType.VarChar, max_length: 200 },
-            { name: 'name', data_type: DataType.VarChar, max_length: 100 },
-            { name: 'position', data_type: DataType.VarChar, max_length: 100 },
-            { name: 'summary', data_type: DataType.VarChar, max_length: 4000 },
-            { name: 'skills', data_type: DataType.VarChar, max_length: 2000 },
-            { name: 'createdAt', data_type: DataType.VarChar, max_length: 50 },
-          ],
-        });
-        await this.client.createIndex({
-          collection_name: this.COLLECTION,
-          field_name: 'vector',
-          index_type: IndexType.AUTOINDEX,
-          metric_type: MetricType.COSINE,
-        });
-        await this.client.loadCollection({ collection_name: this.COLLECTION });
-        this.logger.log(`✅ Resume collection created`);
-      } else {
-        await this.client.loadCollection({ collection_name: this.COLLECTION });
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const has = await this.client.hasCollection({ collection_name: this.COLLECTION });
+        if (!has.value) {
+          await this.client.createCollection({
+            collection_name: this.COLLECTION,
+            fields: [
+              { name: 'id', data_type: DataType.Int64, is_primary_key: true, autoID: true },
+              { name: 'vector', data_type: DataType.FloatVector, dim: this.VECTOR_DIM },
+              { name: 'userId', data_type: DataType.VarChar, max_length: 200 },
+              { name: 'name', data_type: DataType.VarChar, max_length: 100 },
+              { name: 'position', data_type: DataType.VarChar, max_length: 100 },
+              { name: 'summary', data_type: DataType.VarChar, max_length: 4000 },
+              { name: 'skills', data_type: DataType.VarChar, max_length: 2000 },
+              { name: 'createdAt', data_type: DataType.VarChar, max_length: 50 },
+            ],
+          });
+          await this.client.createIndex({
+            collection_name: this.COLLECTION,
+            field_name: 'vector',
+            index_type: IndexType.AUTOINDEX,
+            metric_type: MetricType.COSINE,
+          });
+          await this.client.loadCollection({ collection_name: this.COLLECTION });
+          this.logger.log(`✅ Resume collection created`);
+        } else {
+          await this.client.loadCollection({ collection_name: this.COLLECTION });
+        }
+        this.milvusReady = true;
+        return;
+      } catch (err) {
+        this.logger.warn(
+          `Resume collection init attempt ${attempt + 1}/${maxRetries} failed: ${err.message}`,
+        );
+        if (attempt < maxRetries - 1) {
+          await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+        }
       }
-    } catch (err) {
-      this.logger.error(`Resume collection init failed: ${err.message}`);
     }
+    this.logger.error(
+      `Resume collection init failed after ${maxRetries} retries — Milvus unavailable, ResumeRAG degraded`,
+    );
   }
 
   /**
    * 把解析后的简历存进 Milvus
    */
   async ingestResume(userId: string, position: string, parsed: ParsedResume): Promise<void> {
+    if (!this.milvusReady) {
+      this.logger.warn(`Resume ingest skipped — Milvus not available (degraded)`);
+      return;
+    }
     try {
       const summary = `岗位: ${position}\n技能: ${parsed.skills?.join('、') || '无'}\n经验: ${parsed.experience?.slice(0, 3).map((e) => `${e.title}@${e.company}`).join('; ')}\n项目: ${parsed.projects?.slice(0, 2).map((p) => p.name).join('、')}`;
       const text = `${summary}\n\n${parsed.rawText?.slice(0, 1500) || ''}`;
@@ -93,14 +111,17 @@ export class ResumeRAGService implements OnApplicationBootstrap {
       this.logger.log(`✅ Resume ingested for ${userId} (position=${position})`);
     } catch (err) {
       this.logger.error(`Resume ingest failed: ${err.message}`);
-      throw err;
     }
   }
 
-  /**
-   * 检索候选人的历史简历（按 userId 过滤）
-   */
-  async searchByUser(userId: string, limit = 3): Promise<Array<{ name?: string; position: string; summary: string; skills: string; createdAt: string; score?: number }>> {
+  async searchByUser(
+    userId: string,
+    limit = 3,
+  ): Promise<Array<{ name?: string; position: string; summary: string; skills: string; createdAt: string; score?: number }>> {
+    if (!this.milvusReady) {
+      this.logger.warn(`Resume search skipped — Milvus not available (degraded)`);
+      return [];
+    }
     try {
       const result = await this.client.query({
         collection_name: this.COLLECTION,
@@ -115,10 +136,15 @@ export class ResumeRAGService implements OnApplicationBootstrap {
     }
   }
 
-  /**
-   * 检索相似简历（按岗位 + 技能）
-   */
-  async searchSimilar(position: string, query: string, limit = 5): Promise<Array<{ userId: string; position: string; summary: string; skills: string; score: number }>> {
+  async searchSimilar(
+    position: string,
+    query: string,
+    limit = 5,
+  ): Promise<Array<{ userId: string; position: string; summary: string; skills: string; score: number }>> {
+    if (!this.milvusReady) {
+      this.logger.warn(`Resume similar search skipped — Milvus not available (degraded)`);
+      return [];
+    }
     try {
       const vector = await this.embedText(query);
       const result = await this.client.search({
