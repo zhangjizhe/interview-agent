@@ -46,6 +46,18 @@ async function bootstrap() {
 
   await app.listen(port);
   Logger.log(`🚀 API server running on http://localhost:${port}`, 'Bootstrap');
+
+  // Health endpoint（供 docker healthcheck 使用）
+  // 不依赖业务，purely 服务可用性检查
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/health', (_req: any, res: any) => {
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+    });
+  });
+  Logger.log('✅ Health endpoint ready at GET /health', 'Bootstrap');
 }
 
 bootstrap();

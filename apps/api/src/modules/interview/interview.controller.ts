@@ -694,15 +694,13 @@ export class InterviewController {
     const evaluation = await this.scoring.evaluateAnswer(question, dto.answer);
 
     // 保存评估结果
-    const saved = await this.prisma.answer.create({
+    const saved = await this.prisma.answerHistory.create({
       data: {
         interviewId,
-        questionId: question.id,
         question: dto.question,
         answer: dto.answer,
         score: evaluation.score,
         feedback: evaluation.feedback,
-        category: question.category,
       },
     });
 
@@ -1151,8 +1149,8 @@ export class InterviewController {
 【候选人简历摘要】
 - 姓名：${parsed.name || '未知'}
 - 技能：${(parsed.skills || []).slice(0, 10).join('、')}
-- 最近经历：${(parsed.experience || []).slice(0, 2).map((e) => `${e.title || ''}@${e.company || ''}`).join('；')}
-- 项目：${(parsed.projects || []).slice(0, 2).map((p) => p.name).join('、')}
+- 最近经历：${(parsed.experience || []).slice(0, 2).join('；')}
+- 项目：${(parsed.projects || []).slice(0, 2).join('、')}
 
 【要求】
 1. 题目必须**针对简历中提到的具体技术栈或项目**（不能是通用题）
