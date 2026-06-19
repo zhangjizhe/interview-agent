@@ -17,8 +17,7 @@ COPY apps ./apps
 COPY packages ./packages
 
 # Build web（tsc 类型检查 + vite 打包）
-# pnpm symlink 问题：vite 不在 apps/web/node_modules/.bin，需要从根 node_modules 调
-RUN cd apps/web && ../../node_modules/.bin/tsc --noEmit && ../../node_modules/.bin/vite build
+RUN pnpm --filter @interview-agent/web build
 
 # ===== 运行时：nginx =====
 FROM nginx:alpine
