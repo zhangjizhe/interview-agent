@@ -53,6 +53,7 @@ const SPECIALIST_PROMPTS: Record<SpecialistType, string> = {
 export function createExecutorNode(model: BaseChatModel) {
     return async function executorNode(
         state: InterviewAgentStateType,
+        config?: any,
     ): Promise<Partial<InterviewAgentStateType>> {
         const step = state.plan[state.current_step_idx];
 
@@ -124,7 +125,7 @@ ${contextFromPastSteps || '（无）'}
 【当前任务】${step.description}`,
                         },
                         { role: 'user', content: lastMessage },
-                    ]);
+                    ], config);
 
                     result = llmResponse.content as string;
                     success = true;

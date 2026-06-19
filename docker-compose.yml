@@ -109,6 +109,7 @@ services:
       MILVUS_URL: http://milvus:19530
       NODE_ENV: production
       PORT: 3001
+      PRISMA_LOG: '1'
     env_file:
       - .env
     depends_on:
@@ -122,7 +123,7 @@ services:
         condition: service_started
     healthcheck:
       # 用 node 内置 http 模块，不依赖 curl/wget（alpine 镜像里没装）
-      test: ['CMD-SHELL', 'node -e "require(\"http\").get(\"http://localhost:3001/interview/stats\",r=>process.exit(r.statusCode===200?0:1)).on(\"error\",()=>process.exit(1))"']
+      test: ['CMD-SHELL', 'node -e "require(\"http\").get(\"http://localhost:3001/api/health\",r=>process.exit(r.statusCode===200?0:1)).on(\"error\",()=>process.exit(1))"']
       interval: 15s
       timeout: 10s
       retries: 15

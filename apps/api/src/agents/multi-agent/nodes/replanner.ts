@@ -23,6 +23,7 @@ import { PlanStepSchema, ReplanDecisionSchema } from '../state';
 export function createReplannerNode(model: BaseChatModel) {
     return async function replannerNode(
         state: InterviewAgentStateType,
+        config?: any,
     ): Promise<Partial<InterviewAgentStateType>> {
         const lastPastStep = state.past_steps[state.past_steps.length - 1];
         const allStepsDone = state.current_step_idx >= state.plan.length;
@@ -83,7 +84,7 @@ ${pastStepsSummary}
 - 如果某步失败但有替代方案，选 replan
 - 如果失败超过 3 次，必须选 finish`,
             },
-        ]);
+        ], config);
 
         const updates: Partial<InterviewAgentStateType> = {};
 

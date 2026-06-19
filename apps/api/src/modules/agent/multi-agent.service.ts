@@ -17,7 +17,7 @@ import {
   buildInterviewGraph,
   type InterviewAgentStateType,
 } from '../../agents/multi-agent/graph';
-import { LlmGatewayChatModel } from '../../agents/multi-agent/llm-gateway-chat-model';
+import { LlmGatewayChatModel, threadIdStorage } from '../../agents/multi-agent/llm-gateway-chat-model';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
 import { MemoryService } from '../memory/memory.service';
@@ -58,7 +58,10 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
       const model = new LlmGatewayChatModel({
         llmGateway: this.llm,
         provider: providerName,
-        interviewId: 'multi-agent-engine',
+        // P0 修复：不在初始化时硬编码 interviewId
+        // LlmGatewayChatModel._generate 会从 LangGraph runtime config.configurable.thread_id 动态拿真实 sessionId
+        // 这里写 'unknown' 仅作为 fallback（如果将来出现脱离 thread_id 的调用）
+        interviewId: 'unknown',
         userId: 'system',
       });
 
@@ -143,7 +146,11 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
       ? { messages: [new HumanMessage(userMessage)] }
       : { messages: [new HumanMessage(userMessage)] };
 
-    const result = await this.graph.invoke(input as any, config);
+    // 用 AsyncLocalStorage 包装，让 _generate 拿到真实 threadId
+    // （LangChain v1.x _generate 拿到的 options.configurable 已被剥离）
+    const result = await threadIdStorage.run({ threadId }, async () =>
+      this.graph!.invoke(input as any, config),
+    );
 
     return {
       response: (result as any).final_response || '',
@@ -155,59 +162,113 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async *stream(userMessage: string, threadId: string): AsyncGenerator<any, void, unknown> {
+  async *stream(userMessage: string, threadId: string, userId?: string): AsyncGenerator<any, void, unknown> {
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
-    const stream = await this.graph.stream(
-      { messages: [new HumanMessage(userMessage)] } as any,
-      { ...config, streamMode: 'messages' as const },
-    );
-
-    let fullResponse = '';
-
-    for await (const [msg, metadata] of stream) {
-      const m = msg as any;
-      if (m && typeof m.content === 'string') {
-        fullResponse += m.content;
-        yield {
-          type: 'token',
-          content: m.content,
-          node: (metadata as any)?.node || undefined,
-        };
+    // AsyncLocalStorage 不能直接在 async generator 顶部用——generator 是 lazy 的，
+    // 第一次 yield 时 store 已经出栈。改用一个内部 async function + 队列转发。
+    // 真正在 ALS 上下文里跑的是 producer() 里的 graph.stream()。
+    const queue: any[] = [];
+    const done = { v: false };
+    const err: any[] = [];
+    const self = this;
+    const producer = (async () => {
+      try {
+        await threadIdStorage.run({ threadId, userId }, async () => {
+          const stream = await self.graph!.stream(
+            { messages: [new HumanMessage(userMessage)] } as any,
+            { ...config, streamMode: 'messages' as const },
+          );
+          for await (const [msg, metadata] of stream) {
+            queue.push({ kind: 'data', msg, metadata });
+          }
+        });
+        done.v = true;
+        queue.push({ kind: 'done' });
+      } catch (e: any) {
+        err.push(e);
+        queue.push({ kind: 'done' });
       }
-    }
+    })();
 
-    if (fullResponse) {
-      yield { type: 'final_response', content: fullResponse };
+    try {
+      while (true) {
+        if (queue.length > 0) {
+          const item = queue.shift();
+          if (item.kind === 'done') break;
+          const m = item.msg as any;
+          if (m && typeof m.content === 'string') {
+            yield {
+              type: 'token',
+              content: m.content,
+              node: (item.metadata as any)?.node || undefined,
+            };
+          }
+          continue;
+        }
+        if (err.length > 0) throw err[0];
+        if (done.v) break;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    } finally {
+      await producer;
     }
   }
 
-  async *streamWithSteps(userMessage: string, threadId: string): AsyncGenerator<any, void, unknown> {
+  async *streamWithSteps(userMessage: string, threadId: string, userId?: string): AsyncGenerator<any, void, unknown> {
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
-    const stream = await this.graph.stream(
-      { messages: [new HumanMessage(userMessage)] } as any,
-      { ...config, streamMode: 'values' as const },
-    );
-
-    for await (const chunk of stream) {
-      const state = chunk as any as InterviewAgentStateType;
-
-      if (state.past_steps && state.past_steps.length > 0) {
-        const lastStep = state.past_steps[state.past_steps.length - 1] as any;
-        yield {
-          type: 'step',
-          step: lastStep.step.description,
-          result: typeof lastStep.result === 'string' ? lastStep.result : JSON.stringify(lastStep.result),
-          success: lastStep.success,
-        };
+    const queue: any[] = [];
+    const done = { v: false };
+    const err: any[] = [];
+    const self = this;
+    const producer = (async () => {
+      try {
+        await threadIdStorage.run({ threadId, userId }, async () => {
+          const stream = await self.graph!.stream(
+            { messages: [new HumanMessage(userMessage)] } as any,
+            { ...config, streamMode: 'values' as const },
+          );
+          for await (const chunk of stream) {
+            queue.push({ kind: 'data', chunk });
+          }
+        });
+        done.v = true;
+        queue.push({ kind: 'done' });
+      } catch (e: any) {
+        err.push(e);
+        queue.push({ kind: 'done' });
       }
+    })();
 
-      if (state.final_response) {
-        yield { type: 'final_response', content: state.final_response };
+    try {
+      while (true) {
+        if (queue.length > 0) {
+          const item = queue.shift();
+          if (item.kind === 'done') break;
+          const state = item.chunk as any as InterviewAgentStateType;
+          if (state.past_steps && state.past_steps.length > 0) {
+            const lastStep = state.past_steps[state.past_steps.length - 1] as any;
+            yield {
+              type: 'step',
+              step: lastStep.step.description,
+              result: typeof lastStep.result === 'string' ? lastStep.result : JSON.stringify(lastStep.result),
+              success: lastStep.success,
+            };
+          }
+          if (state.final_response) {
+            yield { type: 'final_response', content: state.final_response };
+          }
+          continue;
+        }
+        if (err.length > 0) throw err[0];
+        if (done.v) break;
+        await new Promise((r) => setTimeout(r, 10));
       }
+    } finally {
+      await producer;
     }
   }
 

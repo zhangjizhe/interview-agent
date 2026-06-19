@@ -231,6 +231,8 @@ export class InterviewAgentService {
               messages: [{ role: 'user', content: prompt }],
               temperature: 0.3,
               traceId,
+              interviewId: ctx.sessionId,
+              userId: ctx.userId,
             });
             return res.content;
           },
@@ -274,7 +276,7 @@ export class InterviewAgentService {
       if (useMultiAgent) {
         // 多 Agent（LangGraph Supervisor 拓扑）：planner → executor → replanner → reviewer
         // 注意：history 由 MultiAgentService 通过 PostgresSaver checkpointer 自动维护（thread_id = sessionId）
-        for await (const chunk of this.multiAgent.stream(userInput, ctx.sessionId)) {
+        for await (const chunk of this.multiAgent.stream(userInput, ctx.sessionId, ctx.userId)) {
           if (chunk.type === 'token' && chunk.content) {
             fullResponse += chunk.content;
             yield { type: 'token', content: chunk.content };

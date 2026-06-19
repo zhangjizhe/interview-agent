@@ -112,6 +112,7 @@ export class SessionCostTracker implements OnModuleInit {
 
   /** 强刷：用于 GET endpoint 调用时拿到最新值 */
   async flushToDb(interviewId: string): Promise<void> {
+    this.logger.warn(`[FLUSH] start interviewId=${interviewId}`);
     const key = this.redisKey(interviewId);
     const raw = await this.redis.getClient().hgetall(key);
     if (!raw || Object.keys(raw).length === 0) return;
@@ -168,6 +169,11 @@ export class SessionCostTracker implements OnModuleInit {
         errors: Number(raw.errors || 0),
         estimatedCostCny: cost,
       },
+    }).then(() => {
+      this.logger.warn(`[FLUSH] OK interviewId=${interviewId}`);
+    }).catch((e) => {
+      this.logger.error(`[FLUSH] FAIL interviewId=${interviewId} err=${e.message} code=${e.code} meta=${JSON.stringify(e.meta)}`);
+      throw e;
     });
   }
 

@@ -23,6 +23,7 @@ import { UserIntentSchema, type UserIntent } from '../state';
 export function createSupervisorNode(model: BaseChatModel) {
     return async function supervisorNode(
         state: InterviewAgentStateType,
+        config?: any,
     ): Promise<Partial<InterviewAgentStateType>> {
         const lastMessage = state.messages[state.messages.length - 1]?.content ?? '';
         const history = state.messages
@@ -54,7 +55,7 @@ ${lastMessage}
 
 请输出意图分类和理由。`,
             },
-        ]);
+        ], config);
 
         return {
             user_intent: response.intent as UserIntent,

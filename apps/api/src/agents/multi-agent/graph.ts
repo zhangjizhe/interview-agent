@@ -86,6 +86,7 @@ export function buildInterviewGraph(
     // respond_directly 节点：general_qa 直接调 LLM 回复，不走规划
     const respondDirectlyNode = async (
         state: InterviewAgentStateType,
+        config?: any,
     ): Promise<Partial<InterviewAgentStateType>> => {
         const lastMessage =
             state.messages[state.messages.length - 1]?.content ?? '';
@@ -96,7 +97,7 @@ export function buildInterviewGraph(
                     '你是一位专业的 AI 面试官小面。请简洁友好地回答用户的问题，自然口语化，不要用 Markdown 标题或列表。',
             },
             { role: 'user', content: lastMessage },
-        ]);
+        ], config);
         const text = response.content as string;
         // 既要 push AIMessage 到 messages（让 state 完整 + checkpointer 持久化完整对话），
         // 也要 set final_response（向后兼容 controller 取值）

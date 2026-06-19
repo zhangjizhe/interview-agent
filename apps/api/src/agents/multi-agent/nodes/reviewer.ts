@@ -46,6 +46,7 @@ const HITL_SCORE_THRESHOLD = 0.5;
 export function createReviewerNode(model: BaseChatModel) {
     return async function reviewerNode(
         state: InterviewAgentStateType,
+        config?: any,
     ): Promise<Partial<InterviewAgentStateType>> {
         const lastMessage = state.messages[state.messages.length - 1]?.content ?? '';
         const pastStepsSummary = state.past_steps
@@ -73,7 +74,7 @@ ${pastStepsSummary}
 5. 回复要直接面向用户，不要说"根据我收集到的信息..."`,
             },
             { role: 'user', content: lastMessage },
-        ]);
+        ], config);
 
         const finalResponse = synthesisResponse.content as string;
 
@@ -103,7 +104,7 @@ ${finalResponse}
 
 approved = 合格可输出，revise = 需要修改`,
             },
-        ]);
+        ], config);
 
         // 防死循环：重试次数超限强制通过
         const isRetryExhausted = (state.retry_count || 0) >= MAX_RETRY_COUNT;

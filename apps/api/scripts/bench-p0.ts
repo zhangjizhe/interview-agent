@@ -17,7 +17,7 @@
 
 import { performance } from 'perf_hooks';
 
-const API_BASE = process.env.API_BASE || 'http://localhost:3001';
+const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
 const INTERVIEW_ID = process.env.INTERVIEW_ID || 'bench-' + Date.now();
 const USER_ID = process.env.USER_ID || 'bench-user';
 const POSITION = process.env.POSITION || '前端开发';

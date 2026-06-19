@@ -50,6 +50,7 @@ function formatToolsForPrompt(tools: McpToolMetadata[]): string {
 export function createPlannerNode(model: BaseChatModel, config?: PlannerConfig) {
     return async function plannerNode(
         state: InterviewAgentStateType,
+        config?: any,
     ): Promise<Partial<InterviewAgentStateType>> {
         const lastMessage = state.messages[state.messages.length - 1]?.content ?? '';
 
@@ -114,7 +115,7 @@ ${lastMessage}
    - 搜索/检索 → specialist: searcher
    - 其他 → specialist: general（或不指定）`,
             },
-        ]);
+        ], config);
 
         const plan: PlanStep[] = response.steps.map((step, i) => ({
             ...step,
