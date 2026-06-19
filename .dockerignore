@@ -1,0 +1,59 @@
+# ==========================================
+# Docker build 排除文件
+# 防止 host 的 node_modules 覆盖容器内 pnpm install 装的依赖
+# ==========================================
+
+# 依赖（关键！pnpm 装的依赖不能被 host 的覆盖）
+node_modules
+**/node_modules
+**/.pnpm
+
+# VCS
+.git
+.gitignore
+.github
+
+# 环境/密钥
+.env
+.env.local
+.env.*.local
+
+# 构建产物
+dist
+build
+coverage
+*.tsbuildinfo
+.vite
+
+# 日志
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# IDE / OS
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+
+# 测试报告（不进 image）
+playwright-report
+test-results
+coverage
+
+# 文档/无关
+docs/
+*.md
+!apps/api/**/*.md
+!apps/web/**/*.md
+!packages/**/*.md
+
+# Session/笔记/草稿
+SESSION-CONTEXT.md
+WIKI.md
+RESUME.md
+HOMECOMPUTER-SETUP.md
+scripts/
+!apps/api/scripts/

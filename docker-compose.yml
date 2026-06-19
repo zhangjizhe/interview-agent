@@ -44,12 +44,14 @@ services:
       - '6334:6334'
     volumes:
       - qdrant_data:/qdrant/storage
+    # qdrant 镜像里没装 curl/wget，且 Rust binary 不便外部 health probe
+    # 用 wget 在 aliyun/apt 镜像里也未必有，最稳妥是 TCP 端口探测
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:6333/']
+      test: ['CMD-SHELL', 'timeout 2 bash -c "</dev/tcp/localhost/6333" || exit 1']
       interval: 10s
       timeout: 5s
-      retries: 8
-      start_period: 15s
+      retries: 5
+      start_period: 20s
 
   # Milvus 2.x 依赖 etcd 做元数据存储
   milvus-etcd:
@@ -71,7 +73,7 @@ services:
       start_period: 20s
 
   milvus:
-    image: milvusdb/milvus:v2.4.17
+    image: milvusdb/milvus:v2.5.3
     command: ["milvus", "run", "standalone"]
     container_name: interview-milvus
     ports:
@@ -90,7 +92,7 @@ services:
       interval: 15s
       timeout: 10s
       retries: 8
-      start_period: 60s
+      start_period: 90s
 
   api:
     build:
@@ -117,13 +119,14 @@ services:
       milvus:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3001/api/health']
+      # 用 node 内置 http 模块，不依赖 curl/wget（alpine 镜像里没装）
+      test: ['CMD-SHELL', 'node -e "require(\"http\").get(\"http://localhost:3001/interview/stats\",r=>process.exit(r.statusCode===200?0:1)).on(\"error\",()=>process.exit(1))"']
       interval: 15s
       timeout: 10s
-      retries: 10
-      start_period: 30s
+      retries: 15
+      start_period: 90s
     restart: unless-stopped
 
   web:
