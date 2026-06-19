@@ -28,7 +28,7 @@ const LEVELS = ['P4', 'P5', 'P6', 'P7'];
 
 export function HomePage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const showNew = searchParams.get('new') === '1';
 
   const [userId, setUserId] = useState(() => {
@@ -153,17 +153,30 @@ export function HomePage() {
     dismissEmpty(id);
   };
 
+  // 用于 useEffect 闭包的稳定 ref
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
+
   useEffect(() => {
     if (showNew) setShowForm(true);
   }, [showNew]);
 
-  // 弹窗关闭时清空简历状态
+  // 弹窗关闭时清空简历状态 + 清除 URL 参数
   useEffect(() => {
     if (!showForm) {
       setResumeFile(null);
       setResumeUploaded(false);
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      // 关闭时清除 ?new=1，避免 URL 残留导致再次点击打不开
+      const sp = searchParamsRef.current;
+      if (sp.get('new') === '1') {
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('new');
+          return next;
+        }, { replace: true });
+      }
     }
   }, [showForm]);
 
@@ -332,7 +345,7 @@ export function HomePage() {
             面试记录
           </h2>
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => setSearchParams({ new: '1' }, { replace: true })}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
           >
             <Plus className="w-4 h-4" /> 新建
@@ -344,7 +357,7 @@ export function HomePage() {
             <div className="text-5xl mb-3">🤖</div>
             <p className="text-slate-600 mb-4">还没有面试记录，开始你的第一场吧</p>
             <button
-              onClick={() => setShowForm(true)}
+              onClick={() => setSearchParams({ new: '1' }, { replace: true })}
               className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-lg"
             >
               开始面试
