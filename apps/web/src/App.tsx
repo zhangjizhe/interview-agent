@@ -131,7 +131,7 @@ function TopBar() {
             {showStart && (
               <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-lg p-2 z-30">
                 <button
-                  onClick={() => { setShowStart(false); navigate('/?new=1'); }}
+                  onClick={() => { setShowStart(false); navigate('/?new=1&t=' + Date.now()); }}
                   className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
                 >
                   🚀 自定义岗位
@@ -139,7 +139,7 @@ function TopBar() {
                 <button
                   onClick={() => {
                     setShowStart(false);
-                    navigate('/?new=1&position=AI+Agent+工程师&level=P5');
+                    navigate('/?new=1&position=AI+Agent+工程师&level=P5&t=' + Date.now());
                   }}
                   className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
                 >
@@ -148,7 +148,7 @@ function TopBar() {
                 <button
                   onClick={() => {
                     setShowStart(false);
-                    navigate('/?new=1&position=前端开发工程师&level=P5');
+                    navigate('/?new=1&position=前端开发工程师&level=P5&t=' + Date.now());
                   }}
                   className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
                 >
@@ -157,7 +157,7 @@ function TopBar() {
                 <button
                   onClick={() => {
                     setShowStart(false);
-                    navigate('/?new=1&position=高级测试工程师&level=P6');
+                    navigate('/?new=1&position=高级测试工程师&level=P6&t=' + Date.now());
                   }}
                   className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
                 >

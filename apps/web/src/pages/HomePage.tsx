@@ -23,7 +23,9 @@ async function safeJson(res: Response): Promise<any> {
   }
 }
 
-const POSITIONS = ['AI Agent 工程师', '前端开发工程师', '高级测试工程师', '后端开发工程师', '算法工程师', '产品经理'];
+// 默认岗位改为「前端开发工程师」—— 更符合通用 demo 直觉
+// （之前默认是 AI Agent 工程师，会让用户误以为选了"前端"但实际是 agent）
+const POSITIONS = ['前端开发工程师', 'AI Agent 工程师', '高级测试工程师', '后端开发工程师', '算法工程师', '产品经理'];
 const LEVELS = ['P4', 'P5', 'P6', 'P7'];
 
 export function HomePage() {

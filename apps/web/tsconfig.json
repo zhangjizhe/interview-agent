@@ -20,5 +20,6 @@
       "@interview-agent/shared-types": ["../../packages/shared-types/src/index.ts"]
     }
   },
-  "include": ["src", "../../packages/shared-types/src/**/*"]
+  "include": ["src", "../../packages/shared-types/src/**/*"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "src/**/*.spec.ts"]
 }
