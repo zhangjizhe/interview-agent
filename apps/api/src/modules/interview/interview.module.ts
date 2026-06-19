@@ -4,6 +4,8 @@ import { ToolsController } from './tools.controller';
 import { AdminMcpController } from './admin-mcp.controller';
 import { HitlController } from './controllers/hitl.controller';
 import { AgentModule } from '../agent/agent.module';
+import { TaskQueueModule } from '../agent/task-queue.module';
+import { AuthModule } from '../auth/auth.module';
 import { MemoryModule } from '../memory/memory.module';
 import { LlmModule } from '../llm/llm.module';
 import { ResumeParserService } from './services/resume-parser.service';
@@ -15,7 +17,7 @@ import { RagService } from './services/rag.service';
 import { HitlService } from './services/hitl.service';
 
 @Module({
-  imports: [AgentModule, MemoryModule, LlmModule],
+  imports: [AgentModule, MemoryModule, LlmModule, TaskQueueModule, AuthModule],
   controllers: [InterviewController, ToolsController, AdminMcpController, HitlController],
   providers: [
     ResumeParserService,
