@@ -1,11 +1,14 @@
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { MilvusClient, DataType, MetricType, IndexType } from '@zilliz/milvus2-sdk-node';
 import { ConfigService } from '@nestjs/config';
 import { ParsedResume } from './resume-parser.service';
 
 /**
- * 简历 RAG 服务
+ * 简历 RAG 服务（lazy init）
+ *
+ * Milvus collection 在首次使用时初始化，而非启动时。
+ * 这样即使 Milvus 启动稍慢，也不会阻塞 API 启动。
  *
  * 流程：
  * 1. 简历解析 → 结构化字段
@@ -13,12 +16,13 @@ import { ParsedResume } from './resume-parser.service';
  * 3. 面试开始时 → 检索相似历史简历 → 作为 Agent 上下文
  */
 @Injectable()
-export class ResumeRAGService implements OnApplicationBootstrap {
+export class ResumeRAGService {
   private readonly logger = new Logger(ResumeRAGService.name);
   private client: MilvusClient;
   private embedder: OpenAI;
   private readonly COLLECTION = 'resumes';
   private readonly VECTOR_DIM = 1024;
+  private initialized = false;
 
   constructor(private config: ConfigService) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
@@ -29,11 +33,12 @@ export class ResumeRAGService implements OnApplicationBootstrap {
     this.embedder = new OpenAI({ apiKey: qwenKey, baseURL: qwenBase });
   }
 
-  async onApplicationBootstrap() {
-    await this.ensureCollection();
-  }
-
+  /**
+   * Lazy init：首次使用时连接 Milvus 并初始化 collection
+   * 失败时 throw，让调用方感知错误而非静默降级
+   */
   private async ensureCollection() {
+    if (this.initialized) return;
     const maxRetries = 10;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -63,6 +68,7 @@ export class ResumeRAGService implements OnApplicationBootstrap {
         } else {
           await this.client.loadCollection({ collection_name: this.COLLECTION });
         }
+        this.initialized = true;
         this.logger.log(`✅ Resume collection ready`);
         return;
       } catch (err) {
@@ -83,6 +89,7 @@ export class ResumeRAGService implements OnApplicationBootstrap {
    * 把解析后的简历存进 Milvus
    */
   async ingestResume(userId: string, position: string, parsed: ParsedResume): Promise<void> {
+    await this.ensureCollection();
     try {
       const summary = `岗位: ${position}\n技能: ${parsed.skills?.join('、') || '无'}\n经验: ${parsed.experience?.slice(0, 3).map((e) => `${e.title}@${e.company}`).join('; ')}\n项目: ${parsed.projects?.slice(0, 2).map((p) => p.name).join('、')}`;
       const text = `${summary}\n\n${parsed.rawText?.slice(0, 1500) || ''}`;
@@ -114,6 +121,7 @@ export class ResumeRAGService implements OnApplicationBootstrap {
     userId: string,
     limit = 3,
   ): Promise<Array<{ name?: string; position: string; summary: string; skills: string; createdAt: string; score?: number }>> {
+    await this.ensureCollection();
     try {
       const result = await this.client.query({
         collection_name: this.COLLECTION,
@@ -133,6 +141,7 @@ export class ResumeRAGService implements OnApplicationBootstrap {
     query: string,
     limit = 5,
   ): Promise<Array<{ userId: string; position: string; summary: string; skills: string; score: number }>> {
+    await this.ensureCollection();
     try {
       const vector = await this.embedText(query);
       const result = await this.client.search({

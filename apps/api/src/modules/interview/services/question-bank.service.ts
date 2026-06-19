@@ -1,5 +1,7 @@
 /**
- * 面试题知识库（混合检索 + Rerank）
+ * 面试题知识库（混合检索 + Rerank，lazy init）
+ *
+ * Milvus collection 在首次使用时初始化，而非启动时。
  *
  * 检索流程：
  * 1. 用户上传面试题（题目 + 答案 + 岗位 + 难度 + 标签）
@@ -13,7 +15,7 @@
  *
  * 用例：面试复盘时，Agent 自动从知识库找同主题的真题做强化练习
  */
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import {
@@ -43,7 +45,7 @@ export interface RerankedQuestion extends QuestionItem {
 }
 
 @Injectable()
-export class QuestionBankService implements OnApplicationBootstrap {
+export class QuestionBankService {
   private readonly logger = new Logger(QuestionBankService.name);
   private client: MilvusClient;
   private embedder: OpenAI;
@@ -55,6 +57,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
   /** Rerank 开关（默认开启，API Key 缺失时自动关闭） */
   private rerankEnabled = false;
   private dashscopeApiKey = '';
+  private initialized = false;
 
   constructor(private config: ConfigService) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
@@ -71,13 +74,13 @@ export class QuestionBankService implements OnApplicationBootstrap {
     }
   }
 
-  async onApplicationBootstrap() {
-    await this.ensureCollection();
-  }
-
   // ===== Collection 初始化 =====
 
+  /**
+   * Lazy init：首次使用时连接 Milvus 并初始化 collection
+   */
   private async ensureCollection() {
+    if (this.initialized) return;
     const maxRetries = 10;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -88,6 +91,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
           await this.client.loadCollection({ collection_name: this.COLLECTION });
           this.logger.log(`✅ Question bank v2 collection loaded`);
         }
+        this.initialized = true;
         this.logger.log(`✅ Question bank v2 collection ready`);
         return;
       } catch (err: any) {
@@ -187,6 +191,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
    * 把题目存进知识库
    */
   async addQuestion(item: Omit<QuestionItem, 'id' | 'createdAt'>): Promise<{ questionId: string }> {
+    await this.ensureCollection();
     try {
       const text = `${item.question}\n\n${item.answer}\n\n${item.tags}`;
       const vector = await this.embedText(text);
@@ -221,6 +226,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
    */
   async addQuestions(items: Array<Omit<QuestionItem, 'id' | 'createdAt'>>): Promise<{ count: number }> {
     if (items.length === 0) return { count: 0 };
+    await this.ensureCollection();
     try {
       const texts = items.map((it) => `${it.question}\n\n${it.answer}\n\n${it.tags}`);
       const vectors = await Promise.all(texts.map((t) => this.embedText(t)));
@@ -266,6 +272,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
       rerank?: boolean; // 默认 true
     } = {},
   ): Promise<Array<RerankedQuestion>> {
+    await this.ensureCollection();
     try {
       const { position, level, category, limit = 5, rerank = true } = options;
 
@@ -401,6 +408,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
    * 列出所有题目（按 position 过滤）
    */
   async list(position?: string, limit = 20): Promise<QuestionItem[]> {
+    await this.ensureCollection();
     try {
       const filter = position ? `position == "${position}"` : undefined;
       const result = await this.client.query({
@@ -430,6 +438,7 @@ export class QuestionBankService implements OnApplicationBootstrap {
    * 按 questionId 删除
    */
   async deleteQuestion(questionId: string): Promise<{ deleted: boolean }> {
+    await this.ensureCollection();
     try {
       await this.client.delete({
         collection_name: this.COLLECTION,
