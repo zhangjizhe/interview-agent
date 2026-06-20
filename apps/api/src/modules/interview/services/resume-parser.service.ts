@@ -36,15 +36,13 @@ export class ResumeParserService {
     if (typeof fileOrText === 'string') {
       rawText = fileOrText;
     } else if (fileOrText?.buffer) {
-      // 根据文件类型选择解析方式：PDF 用 pdf-parse，二进制/文本直接读
+      // 根据文件类型选择解析方式：PDF 用 pdfjs-dist@4 (鲁棒) + pdf-parse 兜底，二进制/文本直接读
       const isPdf =
         fileOrText.mimetype === 'application/pdf' ||
         (fileOrText.originalname || '').toLowerCase().endsWith('.pdf');
       if (isPdf) {
-        const pdfParse = (await import('pdf-parse')).default;
-        const data = await pdfParse(fileOrText.buffer);
-        rawText = data.text;
-        this.logger.log(`PDF 解析完成：${data.numpages} 页，${rawText.length} 字符`);
+        rawText = await this.extractPdfText(fileOrText.buffer);
+        this.logger.log(`PDF 解析完成：${rawText.length} 字符`);
       } else {
         // .txt / .md / .docx(转纯文本) — UTF-8 解码
         rawText = fileOrText.buffer.toString('utf-8');
@@ -52,6 +50,9 @@ export class ResumeParserService {
     } else {
       throw new Error('Invalid input: expected a string or a file object with buffer');
     }
+
+    // 清洗 PDF 内部结构噪音（兜底，对付 pdf-parse 偶发的元数据泄漏，如 %PDF-1.7 / /ICCBased）
+    rawText = this.scrubPdfStructureNoise(rawText);
 
     const text = rawText.trim().toLowerCase();
     const sentences = rawText.split(/[\n。！？]/).map((s) => s.trim()).filter((s) => s);
@@ -172,6 +173,119 @@ export class ResumeParserService {
 
   async categorizeBySkill(skills: string[]): Promise<string[]> {
     return skills.map((s) => s.toLowerCase());
+  }
+
+  /**
+   * PDF 文本提取 — 优先 pdfjs-dist@4（PDF.js 引擎，Node 端用 legacy build 无 worker），
+   * 失败回退到 pdf-parse。两种路径输出都经过 scrubPdfStructureNoise 清洗。
+   *
+   * 修复背景（2026-06-21）：pdf-parse@1.1.x 在复杂排版/自定义字体/部分在线简历工具导出 PDF
+   * 时会把 PDF 内部 PostScript 语法泄漏进 text 字段（%PDF-1.7、/ICCBased 11 0 R、/Type /Catalog
+   * 等），导致下游 LLM 把 %PDF-1.7 当姓名、/ICCBased 当技能。
+   */
+  private async extractPdfText(buffer: Buffer): Promise<string> {
+    try {
+      const text = await this.extractWithPdfJs(buffer);
+      if (text && text.trim().length > 0) return text;
+      this.logger.warn('pdfjs-dist 输出为空，回退到 pdf-parse');
+    } catch (e) {
+      this.logger.warn(
+        `pdfjs-dist 解析失败，回退到 pdf-parse: ${(e as Error)?.message || e}`,
+      );
+    }
+    const pdfParse = (await import('pdf-parse')).default;
+    const data = await pdfParse(buffer);
+    return data.text;
+  }
+
+  private async extractWithPdfJs(buffer: Buffer): Promise<string> {
+    // pdfjs-dist 4 是纯 ESM，必须 dynamic import
+    // legacy/build/pdf.mjs 是 Node 同步版本（无 worker、不需要 isEvalSupported）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(buffer),
+      useSystemFonts: false,
+      disableFontFace: true,
+      isEvalSupported: false,
+      verbosity: 0,
+    });
+    const pdf = await loadingTask.promise;
+    const lines: string[] = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      // 按 y 坐标分组重建排版（PDF 坐标系 y 从底部向上）
+      const yGroups = new Map<number, Array<{ x: number; str: string }>>();
+      for (const item of content.items as Array<{ str?: string; transform: number[]; hasEOL?: boolean }>) {
+        if (!item.str) continue;
+        const y = Math.round(item.transform[5]);
+        const x = item.transform[4];
+        if (!yGroups.has(y)) yGroups.set(y, []);
+        yGroups.get(y)!.push({ x, str: item.str });
+      }
+      const ys = [...yGroups.keys()].sort((a, b) => b - a);
+      for (const y of ys) {
+        const items = yGroups.get(y)!.sort((a, b) => a.x - b.x);
+        const line = items.map((it) => it.str).join(' ').replace(/\s+/g, ' ').trim();
+        if (line) lines.push(line);
+      }
+      lines.push('');
+    }
+    return lines.join('\n').trim();
+  }
+
+  /**
+   * 清洗 PDF 内部结构噪音（兜底，主要对付 pdf-parse 偶发的元数据泄漏）。
+   * 规则：行内含 PDF 内部 PostScript 语法 → 删整行。
+   * 设计：宁严勿松——"PDF 元数据混进简历正文"的概率远大于"简历里写 /Type /Catalog"。
+   */
+  private scrubPdfStructureNoise(text: string): string {
+    const lines = text.split('\n');
+    const cleaned: string[] = [];
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) {
+        cleaned.push('');
+        continue;
+      }
+      // 行内含 PDF 内部 PostScript 标识 → 删整行
+      // - 头尾标记: %PDF-1.7, %%EOF, startxref
+      // - 对象声明: "11 0 obj" / "endobj" / "beginobj"
+      // - 对象引用: "/Name 11 0 R"（间接对象语法 = 数字 数字 R）
+      // - stream 标记: "stream" / "endstream"
+      // - 字典/对象头: "<<", "/Length 1234", "/Type /Catalog", "/Subtype /...", "/Filter /..."
+      // - 颜色/字体引用: "/ICCBased ...", "/F1 12 Tf", "/Font <<"
+      // - 资源/MediaBox: "/MediaBox [0 0 612 792]", "/Resources <<"
+      if (
+        /%PDF-\d/.test(line) ||
+        /%%EOF/.test(line) ||
+        /\bstartxref\b/.test(line) ||
+        /\b\d+\s+\d+\s+obj\b/.test(line) ||
+        /\bendobj\b/.test(line) ||
+        /\bbeginobj\b/.test(line) ||
+        /^\s*<<\s*$/.test(line) ||
+        /^\s*>>\s*$/.test(line) ||
+        /^\s*stream\s*$/.test(line) ||
+        /^\s*endstream\s*$/.test(line) ||
+        /\/ICCBased\b/.test(line) ||
+        /\/MediaBox\b/.test(line) ||
+        /\/Resources\b/.test(line) ||
+        /\/Type\s+\/[\w-]+/.test(line) || // /Type /Catalog /Type /Pages /Type /Font 等
+        /\/Subtype\s+\/[\w-]+/.test(line) || // /Subtype /Type1 /Subtype /TrueType 等
+        /\/Filter\s+\/[\w-]+/.test(line) || // /Filter /FlateDecode 等
+        /\/Length\s+\d+/.test(line) || // /Length 1234
+        /^\/[\w.-]+\s+\d+\s+\d+\s+R\s*$/.test(line) || // 整行是对象引用 "/F1 12 0 R"
+        /^\/[\w.-]+\s+[-\d.]+\s+(Tf|Tm|Td|TD|T\*|Tj|TJ)\s*$/.test(line) || // 整行是字体/矩阵命令 "/F1 12 Tf"
+        /^\/[\w.-]+\s+<<\s*$/.test(line) // 整行是字典开始 "/Font <<"
+      ) {
+        continue;
+      }
+      // 移除控制字符（保留 \n \r \t）
+      const noCtrl = line.replace(/[\x00-\x08\x0B-\x1F\x7F]/g, '');
+      if (noCtrl) cleaned.push(noCtrl);
+    }
+    return cleaned.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 }
 
