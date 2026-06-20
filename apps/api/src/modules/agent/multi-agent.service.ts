@@ -166,24 +166,51 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
-    // AsyncLocalStorage 不能直接在 async generator 顶部用——generator 是 lazy 的，
-    // 第一次 yield 时 store 已经出栈。改用一个内部 async function + 队列转发。
-    // 真正在 ALS 上下文里跑的是 producer() 里的 graph.stream()。
+    // 流式输出策略：
+    //
+    // 1. 用 LangGraph **invoke**（非 stream）跑完整图，拿到 state.final_response
+    //    —— reviewer 节点用 model.invoke() 生成 final_response,invoke 完成时
+    //    state.final_response 是完整字符串
+    // 2. 在这里**手动切块流式输出**：每 30ms yield 3 个字符（处理 emoji 用 Array.from），
+    //    模拟真实 token 流速。前端就能感受到"逐字出现"的视觉效果。
+    //
+    // 为什么不直接用 LangGraph stream + streamMode:'messages'：
+    //   - 节点用 model.stream() 时，LangChain 1.x 的 streamEvents 只 emit start/end，
+    //     不传播内部 stream 的 chunk（已验证：on_chat_model_stream 计数 = 0）
+    //   - 用 model.invoke() 又只能拿到完整 AIMessage（不是 delta），前端整块出来
+    //
+    // 为什么不调 LlmGateway.streamChat 重新生成 final_response：
+    //   - 浪费一次 LLM 调用（reviewer 已经生成过 final_response）
+    //   - 重新生成可能与原 final_response 不一致
+    //
+    // 手动切块流式的优势：
+    //   - 不依赖 LangChain stream 内部机制，行为可预测
+    //   - 流速可控（30ms / 3 字符 ≈ 100 字符/秒，符合人类阅读速度）
+    //   - 最终内容 100% 等于 reviewer 的 final_response，不会有"重新生成偏差"
+    //
+    // AsyncLocalStorage 包装：必须用 producer/queue 模式，让 ALS 上下文覆盖 generator 的整个生命周期
     const queue: any[] = [];
     const done = { v: false };
     const err: any[] = [];
     const self = this;
     const producer = (async () => {
       try {
-        await threadIdStorage.run({ threadId, userId }, async () => {
-          const stream = await self.graph!.stream(
+        const state = await threadIdStorage.run({ threadId, userId }, async () =>
+          (await self.graph!.invoke(
             { messages: [new HumanMessage(userMessage)] } as any,
-            { ...config, streamMode: 'messages' as const },
-          );
-          for await (const [msg, metadata] of stream) {
-            queue.push({ kind: 'data', msg, metadata });
+            config,
+          )) as InterviewAgentStateType,
+        );
+
+        const finalResponse = state.final_response || '';
+        if (finalResponse) {
+          // 按字符切块（用 Array.from 正确处理中文/emoji surrogate pair）
+          const chars = Array.from(finalResponse);
+          const chunkSize = 3;
+          for (let i = 0; i < chars.length; i += chunkSize) {
+            queue.push({ kind: 'data', content: chars.slice(i, i + chunkSize).join('') });
           }
-        });
+        }
         done.v = true;
         queue.push({ kind: 'done' });
       } catch (e: any) {
@@ -197,14 +224,13 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
         if (queue.length > 0) {
           const item = queue.shift();
           if (item.kind === 'done') break;
-          const m = item.msg as any;
-          if (m && typeof m.content === 'string') {
-            yield {
-              type: 'token',
-              content: m.content,
-              node: (item.metadata as any)?.node || undefined,
-            };
-          }
+          yield {
+            type: 'token',
+            content: item.content,
+            node: 'reviewer',
+          };
+          // 30ms 间隔模拟 token 流速（约 100 字/秒，符合人类阅读速度）
+          await new Promise((r) => setTimeout(r, 30));
           continue;
         }
         if (err.length > 0) throw err[0];
