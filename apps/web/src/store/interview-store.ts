@@ -124,7 +124,27 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       if (s.messages.length === 0) return s;
       const last = s.messages[s.messages.length - 1];
       if (last.role !== 'assistant' || !last.streaming) return s;
-      const newLast = { ...last, content: last.content + delta };
+
+      // Dedup：检查 delta 是否与 last.content 末尾重叠（重复内容）
+      // 触发场景：
+      //   1. LLM 偶发重复输出（如"嗯嗯"重复一次）
+      //   2. 后端 SSE 重发（如网络重试、pull-to-refresh 期间 store 重置后 token 重入）
+      //   3. useInterviewStream 自动重试导致同一 token 被 append 两次
+      // 实现：找 last.content 末尾与 delta 开头的最大重叠，跳过重叠部分
+      let dedupDelta = delta;
+      const lastContent = last.content;
+      if (lastContent.length > 0 && delta.length > 0) {
+        const maxOverlap = Math.min(delta.length, lastContent.length);
+        for (let overlap = maxOverlap; overlap > 0; overlap--) {
+          if (lastContent.endsWith(delta.slice(0, overlap))) {
+            dedupDelta = delta.slice(overlap);
+            break;
+          }
+        }
+      }
+      if (dedupDelta.length === 0) return s; // 全部重复，不追加
+
+      const newLast = { ...last, content: last.content + dedupDelta };
       return {
         messages: [...s.messages.slice(0, -1), newLast],
       };
