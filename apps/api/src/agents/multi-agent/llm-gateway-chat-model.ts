@@ -20,6 +20,7 @@ import { AsyncLocalStorage } from 'async_hooks';
 import { BaseChatModel, type BaseChatModelParams } from '@langchain/core/language_models/chat_models';
 import {
   AIMessage,
+  AIMessageChunk,
   BaseMessage,
   ChatMessage,
   HumanMessage,
@@ -27,7 +28,7 @@ import {
   type MessageContent,
   type MessageContentText,
 } from '@langchain/core/messages';
-import { ChatResult } from '@langchain/core/outputs';
+import { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import type { LlmGatewayService } from '../../modules/llm/llm.gateway.service';
 
@@ -86,6 +87,99 @@ export class LlmGatewayChatModel extends BaseChatModel {
     options: this['ParsedCallOptions'],
     _runManager?: CallbackManagerForLLMRun,
   ): Promise<ChatResult> {
+    const { resolvedInterviewId, resolvedUserId, gatewayMessages } = this.buildGatewayPayload(messages, options);
+
+    const response = await this.llmGateway.chat(
+      {
+        messages: gatewayMessages,
+        interviewId: resolvedInterviewId,
+        userId: resolvedUserId,
+      },
+      this.provider,
+    );
+
+    const aiMessage = new AIMessage(response.content);
+    return {
+      generations: [
+        {
+          text: response.content,
+          message: aiMessage,
+        },
+      ],
+      llmOutput: {
+        tokenUsage: response.usage,
+        model_name: response.model,
+        finish_reason: response.finishReason,
+      },
+    };
+  }
+
+  /**
+   * LangChain v1.2 的 BaseChatModel.stream() 在 _streamResponseChunks 没被 override 时会
+   * fallback 到 `yield this.invoke(input, options)` —— 整块输出。
+   *
+   * 这里 override 后改走 LlmGateway.streamChat()，让 LangGraph 的 streamMode:'messages'
+   * 拿到真正的 token 级 ChatGenerationChunk，LLM 回复就能逐 token 流到前端。
+   *
+   * threadId / userId 解析与 _generate 完全一致（同一个 helper buildGatewayPayload），
+   * 成本埋点也由 LlmGatewayService.streamChat 内部统一处理。
+   */
+  async *_streamResponseChunks(
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+    _runManager?: CallbackManagerForLLMRun,
+  ): AsyncGenerator<ChatGenerationChunk> {
+    const { resolvedInterviewId, resolvedUserId, gatewayMessages } = this.buildGatewayPayload(messages, options);
+
+    for await (const chunk of this.llmGateway.streamChat(
+      {
+        messages: gatewayMessages,
+        interviewId: resolvedInterviewId,
+        userId: resolvedUserId,
+      },
+      this.provider,
+    )) {
+      // 文本 delta：每个 token 一块 ChatGenerationChunk（AIMessageChunk 用于 LangGraph messages stream 增量累加）
+      if (chunk.content) {
+        yield new ChatGenerationChunk({
+          message: new AIMessageChunk({ content: chunk.content }),
+          text: chunk.content,
+        });
+      }
+      // 终止原因：放在最后一块的 generationInfo 里
+      if (chunk.finishReason) {
+        yield new ChatGenerationChunk({
+          message: new AIMessageChunk({ content: '' }),
+          text: '',
+          generationInfo: { finish_reason: chunk.finishReason },
+        });
+      }
+      // 用量统计：最后一个 chunk 透传给 LangChain 用于 llmOutput.tokenUsage
+      if (chunk.usage) {
+        yield new ChatGenerationChunk({
+          message: new AIMessageChunk({ content: '' }),
+          text: '',
+          generationInfo: {
+            tokenUsage: chunk.usage,
+            finish_reason: chunk.finishReason || 'stop',
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * 共享 helper：解析 threadId / userId + 把 LangChain BaseMessage 转成 LlmGateway 期望的格式
+   * _generate 和 _streamResponseChunks 都走这里，保证两边行为一致
+   */
+  private buildGatewayPayload(
+    messages: BaseMessage[],
+    options: this['ParsedCallOptions'],
+  ): {
+    resolvedInterviewId: string;
+    resolvedUserId: string;
+    gatewayMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+  } {
     // 拿真实 sessionId：
     //   优先级 1: AsyncLocalStorage 上下文（MultiAgentService 入口设置的 threadId）
     //   优先级 2: LangChain options 里的字段（兜底，多数情况下已被剥离）
@@ -113,29 +207,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
       return { role: 'user' as const, content };
     });
 
-    const response = await this.llmGateway.chat(
-      {
-        messages: gatewayMessages,
-        interviewId: resolvedInterviewId,
-        userId: resolvedUserId,
-      },
-      this.provider,
-    );
-
-    const aiMessage = new AIMessage(response.content);
-    return {
-      generations: [
-        {
-          text: response.content,
-          message: aiMessage,
-        },
-      ],
-      llmOutput: {
-        tokenUsage: response.usage,
-        model_name: response.model,
-        finish_reason: response.finishReason,
-      },
-    };
+    return { resolvedInterviewId, resolvedUserId, gatewayMessages };
   }
 
   private extractText(content: MessageContent): string {
