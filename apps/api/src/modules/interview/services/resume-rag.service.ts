@@ -144,7 +144,7 @@ export class ResumeRAGService {
       const raw = (result.data as any) || [];
       // 读取侧清洗：旧数据（修复前上传）可能含 PDF 元数据，
       // 返回前再洗一次 name/skills/summary，确保前端不会展示 %PDF-1.7 / /ICCBased 等
-      return raw.map((r: any) => ({
+      const cleaned = raw.map((r: any) => ({
         ...r,
         name: isPdfStructureToken(r.name || '') ? undefined : r.name,
         position: r.position,
@@ -154,6 +154,9 @@ export class ResumeRAGService {
           .filter((s: string) => s && !isPdfStructureToken(s))
           .join('、'),
       }));
+      // 按 createdAt 倒序，取最新（Milvus query 默认不保证顺序）
+      cleaned.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      return cleaned;
     } catch (err) {
       this.logger.error(`Resume search failed: ${err.message}`);
       throw err;
