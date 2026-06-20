@@ -1,0 +1,977 @@
+{
+  "$schema": "./golden-dataset.schema.json",
+  "version": "1.0.0",
+  "description": "面试 Agent 评估集 v1 — 30 条 case,覆盖前端 15 条 + AI Agent 15 条。每题至少 2 档回答(excellent/poor 对比),用于回归测试与评分校准。",
+  "metadata": {
+    "createdAt": "2026-06-21",
+    "author": "Mavis + 哲哥",
+    "scoringRubric": {
+      "excellent": "80-100 分:核心要点全覆盖,有深度,有例子/对比/结构化表达",
+      "good": "60-79 分:覆盖主要要点,部分深度欠缺,缺少例子或对比",
+      "average": "40-59 分:覆盖部分要点,缺少深度或例子",
+      "poor": "0-39 分:答非所问/概念错误/过于简略/承认不知道"
+    }
+  },
+  "cases": [
+    {
+      "id": "case-001-fe-react-hooks",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "react",
+      "difficulty": "easy",
+      "question": "React Hooks 闭包陷阱是什么?实际项目里你怎么处理?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "闭包陷阱本质是 useEffect 或者事件回调里捕获了 render 时的旧 state。最常见场景是 setInterval 读不到最新值。解决方案:1) 用函数式 setState,基于前值更新;2) 用 useRef 保存最新值,回调里读 ref.current;3) 把依赖项加对,让 effect 重建。实际项目我做过一个倒计时组件,最初用 setInterval 读 state 一直停在初始值,改成 useRef 存 ref 之后才好。",
+          "expectedScore": 88,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.85,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["闭包", "useRef", "函数式 setState", "依赖项", "stale state"],
+          "reason": "讲清了本质(捕获旧 state)+3 种解法 + 真实项目例子,结构清晰。"
+        },
+        {
+          "level": "poor",
+          "answer": "闭包就是函数能访问外层变量。在 React 里要注意这个,具体怎么处理忘了,好像是 useEffect 依赖要写对吧?",
+          "expectedScore": 35,
+          "expectedCorrectness": 0.3,
+          "expectedDepth": 0.2,
+          "expectedCompleteness": 0.4,
+          "expectedFeedbackKeywords": ["闭包", "依赖"],
+          "reason": "只提到依赖项,没讲清陷阱本质(捕获旧 state),没具体方案,无项目例子。"
+        }
+      ],
+      "tags": ["react", "hooks", "闭包", "stale-state"],
+      "notes": "前端高频面试题,考察是否真正踩过坑。"
+    },
+    {
+      "id": "case-002-fe-react-perf",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "react",
+      "difficulty": "medium",
+      "question": "React 性能优化你做过哪些?React.memo / useMemo / useCallback 的差异和使用场景?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "实际项目里做过 4 类优化:1) 用 React.memo 包纯展示组件,避免父组件 rerender 牵连子组件无效渲染;2) useMemo 缓存复杂计算(比如大列表的 filter/sort);3) useCallback 缓存传给 memo 包裹子组件的回调,不然引用每次变,子组件 memo 失效;4) 用 react-window 做虚拟列表,长列表从 O(n) 降到 O(可见区域)。差异:React.memo 是组件级浅比较 props,useMemo 是值级缓存计算结果,useCallback 是 fn 级缓存引用。常见误区:把所有组件都包 memo,实际浅比较本身有开销,props 不稳定时反而负优化。",
+          "expectedScore": 92,
+          "expectedCorrectness": 0.95,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.95,
+          "expectedFeedbackKeywords": ["React.memo", "useMemo", "useCallback", "虚拟列表", "浅比较"],
+          "reason": "4 类优化实战 + 3 个 API 差异 + 误区警示,有深度。"
+        },
+        {
+          "level": "average",
+          "answer": "用过 React.memo 和 useMemo。React.memo 包组件避免重渲染,useMemo 缓存值,useCallback 缓存函数。具体什么场景用哪个看情况。",
+          "expectedScore": 55,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.5,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["React.memo", "useMemo", "useCallback"],
+          "reason": "提到了 3 个 API 但都是简单定义,无实际场景判断,无深度。"
+        }
+      ],
+      "tags": ["react", "performance", "memo"],
+      "notes": "考察 API 差异理解深度 + 实战场景判断。"
+    },
+    {
+      "id": "case-003-fe-microfrontend",
+      "position": "前端开发工程师",
+      "level": "P7",
+      "category": "architecture",
+      "difficulty": "medium",
+      "question": "微前端方案有哪些?对比 qiankun / micro-app / wujie / Module Federation 的差异?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "主流 4 个方案对比:1) qiankun 基于 single-spa,HTML entry 加载子应用,JS 沙箱用 Proxy 代理 window,sandbox:strict 模式有兼容问题;2) micro-app 是京东出的,基于 WebComponent,子应用改造成本最低,样式隔离用 Shadow DOM 但有兼容性坑;3) wujie 是腾讯的,基于 WebComponent + iframe,iframe 提供 JS 沙箱彻底解决变量冲突,性能比纯 Proxy 沙箱好;4) Module Federation 是 webpack 5 原生方案,运行时共享依赖,我之前项目用 module-federation 把公共组件库抽到 remote,主子应用共享。选型建议:团队小/子应用老项目用 micro-app 改造成本低;性能要求高用 wujie;深度共享依赖用 MF。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["qiankun", "micro-app", "wujie", "Module Federation", "沙箱", "Shadow DOM", "iframe"],
+          "reason": "4 个方案核心机制 + 选型建议,实战导向。"
+        },
+        {
+          "level": "poor",
+          "answer": "微前端就是多个小程序集成在一起。用 iframe 就能实现,主页面嵌几个 iframe 就是微前端。",
+          "expectedScore": 25,
+          "expectedCorrectness": 0.2,
+          "expectedDepth": 0.1,
+          "expectedCompleteness": 0.2,
+          "expectedFeedbackKeywords": ["iframe"],
+          "reason": "iframe 是最原始方案,不是真正意义的微前端;无任何现代方案认知。"
+        }
+      ],
+      "tags": ["architecture", "microfrontend", "qiankun", "micro-app", "wujie", "module-federation"],
+      "notes": "考察架构选型视野,中级及以上必考点。"
+    },
+    {
+      "id": "case-004-fe-virtual-list",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "performance",
+      "difficulty": "medium",
+      "question": "虚拟列表的实现原理是什么?动态高度怎么解决?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "原理:只渲染视窗可见区域 + 上下 buffer 区的列表项,通过滚动事件动态计算 offset 和可视区 items,把 DOM 数量从 N 降到 ~20-30 个。固定高度实现简单,top = index * itemHeight。动态高度有 3 个解法:1) 预估高度 + 渲染后再用 ResizeObserver 实测修正;2) 维护 offset 缓存 Map,每次测量后更新;3) 滚动时二分查找定位起始 index(因为 offset 是单调递增的)。注意:滚动态时不能 sync 计算 offset,要 raf 节流。我之前做 IM 消息列表(高度不一)用过 react-virtuoso,核心就是这套机制。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["视窗", "buffer", "ResizeObserver", "二分查找", "offset"],
+          "reason": "核心原理 + 动态高度 3 个解法 + raf 节流 + 实战库推荐。"
+        },
+        {
+          "level": "average",
+          "answer": "虚拟列表就是只渲染看得到的部分,减少 DOM 数量。动态高度需要测量每个元素的高度,具体怎么测量我说不上来。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["渲染", "DOM"],
+          "reason": "知道原理但无具体方案,深度不足。"
+        }
+      ],
+      "tags": ["performance", "virtual-list", "dom-optimization"],
+      "notes": "长列表性能高频题,动态高度是进阶点。"
+    },
+    {
+      "id": "case-005-fe-box-model",
+      "position": "前端开发工程师",
+      "level": "P5",
+      "category": "css",
+      "difficulty": "easy",
+      "question": "讲一下 CSS 盒模型和 BFC。",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "盒模型两种:content-box(W3C 标准,width = content 宽)和 border-box(IE 模式,width = content + padding + border)。实际项目一般全局设 *, *::before, *::after { box-sizing: border-box } 让布局更直观。BFC(块级格式化上下文)是独立的渲染区域,有 5 个特性:1) 内部 box 垂直排列;2) margin 不与外部折叠;3) 不会和浮动元素重叠;4) 计算高度时包含浮动子元素。触发条件:float 非 none、position 是 absolute/fixed、overflow 非 visible、display 是 flex/inline-block/table-cell、根元素。典型应用:清除浮动用 overflow: hidden 形成 BFC,避免 margin 折叠用 padding 替代或者让父元素形成 BFC。",
+          "expectedScore": 88,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.85,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["content-box", "border-box", "BFC", "margin", "浮动", "清除浮动"],
+          "reason": "盒模型两种 + BFC 4 个特性 + 触发条件 + 实际应用,完整体系。"
+        },
+        {
+          "level": "poor",
+          "answer": "盒模型就是 margin + padding + border + content。BFC 是个概念,具体怎么用记不清了。",
+          "expectedScore": 30,
+          "expectedCorrectness": 0.4,
+          "expectedDepth": 0.2,
+          "expectedCompleteness": 0.4,
+          "expectedFeedbackKeywords": ["margin", "padding"],
+          "reason": "只提到组成,无细节差异和应用。"
+        }
+      ],
+      "tags": ["css", "box-model", "bfc"],
+      "notes": "基础题,初级工程师也要答好。"
+    },
+    {
+      "id": "case-006-fe-event-loop",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "browser",
+      "difficulty": "medium",
+      "question": "浏览器事件循环机制是什么?macroTask 和 microTask 区别?Node 的事件循环和浏览器有什么不同?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "浏览器事件循环:执行栈空后从任务队列取任务执行。每个循环 tick:执行一个 macroTask → 清空所有 microTask → 渲染。macroTask:setTimeout/setInterval/I/O/UI 渲染、MessageChannel。microTask:Promise.then/catch/finally、queueMicrotask、MutationObserver。关键差异:microTask 在每个 macroTask 后立即清空,优先级比下一个 macroTask 高,所以 Promise.resolve().then 永远比 setTimeout 0 先执行。Node 事件循环分 6 个 phase(timers、pending callbacks、idle、poll、check、close),每个 phase 都有自己的队列,phase 之间才清空 microTask;Node 11 之后 process.nextTick 优先于 Promise,但 microTask 在每个 phase 后清空,行为已接近浏览器。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["macroTask", "microTask", "Promise", "setTimeout", "phase", "nextTick"],
+          "reason": "浏览器 + Node 双线对比,6 phase 细节到位。"
+        },
+        {
+          "level": "average",
+          "answer": "事件循环就是任务队列,JS 是单线程所以要排队。macroTask 是 setTimeout, microTask 是 Promise.then。先执行 microTask 再执行下一个 macroTask。",
+          "expectedScore": 55,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.5,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["microTask", "macroTask", "Promise"],
+          "reason": "基本概念对,无具体执行细节,无 Node 对比。"
+        }
+      ],
+      "tags": ["browser", "event-loop", "node"],
+      "notes": "高频基础进阶题,必考点。"
+    },
+    {
+      "id": "case-007-fe-http-evolution",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "network",
+      "difficulty": "medium",
+      "question": "HTTP/1.1、HTTP/2、HTTP/3 各自解决了什么问题?核心改进点?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "HTTP/1.1 痛点:1) 队头阻塞(一个连接上一个请求慢,后面都等);2) 头部重复(每次请求都带完整 header);3) 只能单向请求。HTTP/2 改进:1) 二进制分帧,把请求拆成帧,可以在一个连接上交错发送(多路复用,解决队头阻塞);2) HPACK 头部压缩(静态表 + 动态表);3) Server Push(已废弃);4) 流优先级。但 HTTP/2 还有 TCP 层队头阻塞(一个包丢后面都等)。HTTP/3 改用 QUIC 基于 UDP:1) 彻底解决队头阻塞(流独立);2) 0-RTT 握手(复用 TLS session ticket);3) 内置 TLS 1.3;4) 连接迁移(网络切换不重连,基于 Connection ID)。",
+          "expectedScore": 92,
+          "expectedCorrectness": 0.95,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.95,
+          "expectedFeedbackKeywords": ["队头阻塞", "多路复用", "HPACK", "QUIC", "0-RTT", "TLS"],
+          "reason": "三代对比清晰,每个版本痛点→解法对应,HTTP/3 进阶点到位。"
+        },
+        {
+          "level": "average",
+          "answer": "HTTP/2 用了多路复用所以快。HTTP/3 改用 UDP 更快。每个新版本都解决上一个的问题。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["多路复用", "UDP"],
+          "reason": "答到核心改进,但无具体技术细节,无痛点→解法对应。"
+        }
+      ],
+      "tags": ["network", "http2", "http3", "quic"],
+      "notes": "P6+ 必考,体现工程师对协议栈理解深度。"
+    },
+    {
+      "id": "case-008-fe-xss",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "security",
+      "difficulty": "medium",
+      "question": "XSS 攻击类型和防御方案?CSP 怎么配置?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "XSS 三类:1) 反射型 - URL 参数注入,诱导点击恶意链接;2) 存储型 - 提交内容存库后渲染时执行(论坛评论最常见);3) DOM 型 - 前端 innerHTML/document.write 不安全 API 使用。防御 4 层:1) 输出转义 - 用 textContent 不用 innerHTML,React 默认转义;2) 输入校验 - 限制长度、过滤 < > & \" ' 等;3) HttpOnly Cookie - JS 拿不到 session,即使 XSS 也无法盗号;4) CSP 内容安全策略 - Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-xxx'; style-src 'self' 'unsafe-inline',配合 nonce 替代 unsafe-inline。Trusted Types 是新一代防御,要求所有 DOM sink 必须传 TrustedHTML 对象,根治 DOM XSS。",
+          "expectedScore": 88,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.85,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["反射型", "存储型", "DOM型", "CSP", "nonce", "Trusted Types", "HttpOnly"],
+          "reason": "3 类攻击 + 4 层防御 + CSP 具体配置 + Trusted Types 前沿,体系完整。"
+        },
+        {
+          "level": "poor",
+          "answer": "XSS 是跨站脚本攻击,要转义用户输入,不要相信用户输入。",
+          "expectedScore": 30,
+          "expectedCorrectness": 0.4,
+          "expectedDepth": 0.2,
+          "expectedCompleteness": 0.3,
+          "expectedFeedbackKeywords": ["转义"],
+          "reason": "只一句话,无分类,无具体方案,无 CSP 配置。"
+        }
+      ],
+      "tags": ["security", "xss", "csp"],
+      "notes": "前端安全必考点。"
+    },
+    {
+      "id": "case-009-fe-jwt",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "security",
+      "difficulty": "medium",
+      "question": "JWT 的结构?签名的作用?Refresh Token 机制?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "JWT 三段:header(算法+类型).payload(claims).signature(header.payload 的 HMAC/RSA 签名),用 base64url 编码。签名作用:1) 完整性校验 - payload 被篡改签名就对不上;2) 身份认证 - 服务端用 secret 签,客户端不能伪造。注意 base64 不是加密,任何人都能解出来看内容,所以不能存敏感信息(密码、身份证)。Access Token 短(15min-2h),Refresh Token 长(7-30 天)。流程:Access 过期 → 用 Refresh 换新 Access → Refresh 旋转(每次用旧的换新的,旧的失效)。撤销机制:黑名单存 Redis 主动失效,或加 jti 唯一标识做去重。",
+          "expectedScore": 88,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.85,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["header", "payload", "signature", "Refresh", "Access Token", "黑名单"],
+          "reason": "三段 + 签名作用 + 旋转机制 + 黑名单撤销,完整体系。"
+        },
+        {
+          "level": "average",
+          "answer": "JWT 是 token,服务端签发给客户端,客户端每次请求带过来做身份验证。Refresh Token 是用来刷新 Access Token 的。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["token", "Refresh"],
+          "reason": "概念对,无结构细节,无签名/旋转/撤销机制。"
+        }
+      ],
+      "tags": ["security", "jwt", "auth"],
+      "notes": "鉴权高频题,签名的不可伪造性是核心考点。"
+    },
+    {
+      "id": "case-010-fe-shorturl",
+      "position": "前端开发工程师",
+      "level": "P7",
+      "category": "system-design",
+      "difficulty": "hard",
+      "question": "设计一个短链生成器(类似 t.cn),要求 QPS 10万+,长链转短链 + 短链跳转。",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "核心 4 个组件:1) 发号器 - Snowflake 改造,保证全局唯一 ID(64bit:41 时间戳 + 10 机器 + 12 序列),用 Redis 预生成批量号段减少 MySQL 压力;2) 转换 - ID → 62 进制字符串(Base62:0-9a-zA-Z),6 位支持 568 亿条,够用;3) 存储 - MySQL 主从,长链 hash 做唯一索引防重复(同长链返回同短链);4) 缓存 - Redis 存短→长映射,读多写少典型场景,读缓存命中率 99%+。跳转:301 永久重定向(SEO 友好但浏览器缓存)或 302 临时(统计点击但不缓存),生产一般用 302 便于统计。进阶:1) 限流 - 单 IP 每分钟最多生成 100 条,sentinel/redis + lua;2) 预热 - 大促前批量生成;3) 风控 - 短链内容审核。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["Snowflake", "Base62", "发号器", "301", "302", "缓存", "限流"],
+          "reason": "发号器 + Base62 + 缓存 + 跳转策略 + 限流/预热/风控,完整系统设计。"
+        },
+        {
+          "level": "average",
+          "answer": "用 MD5 或者随机字符串生成短码,存到数据库里,跳转时查数据库返回长链。",
+          "expectedScore": 45,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.3,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["数据库"],
+          "reason": "基本思路对,无 QPS 10万+ 的高可用设计,无缓存,无发号策略。"
+        }
+      ],
+      "tags": ["system-design", "high-concurrency", "short-url"],
+      "notes": "P7 必考系统设计题,考察高 QPS 思维。"
+    },
+    {
+      "id": "case-011-fe-ratelimit",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "system-design",
+      "difficulty": "medium",
+      "question": "限流算法有哪些?分布式限流怎么做?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "4 个算法对比:1) 固定窗口 - 1 秒 1000 个,简单但有临界突刺(0.9s 用完 1000 个,下一秒又用 1000 个,2 秒内 2000 个);2) 滑动窗口 - 滚动统计 1 秒内的请求,精确但存所有时间戳;3) 令牌桶 - 固定速率放令牌,请求拿令牌,允许突发(桶满就不放);4) 漏桶 - 固定速率处理,请求先进桶排队,绝对平滑但不能突发。选型:对外 API 限流用令牌桶(允许业务峰值);内部服务用漏桶(防雪崩)。分布式限流:Redis + Lua 原子操作(INCR + EXPIRE),用滑动窗口 + 集群粒度限流。Sentinel 是阿里开源方案,支持 QPS/线程数/系统负载多维度。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["令牌桶", "漏桶", "滑动窗口", "Redis + Lua", "Sentinel"],
+          "reason": "4 个算法对比 + 临界突刺问题 + 选型 + 分布式实现,完整。"
+        },
+        {
+          "level": "average",
+          "answer": "用过令牌桶。Redis 可以做分布式限流,具体用 INCR 加过期时间。",
+          "expectedScore": 55,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.5,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["令牌桶", "Redis"],
+          "reason": "提到核心,但无算法对比,无原子性说明。"
+        }
+      ],
+      "tags": ["system-design", "ratelimit", "redis"],
+      "notes": "高可用系统设计基础题。"
+    },
+    {
+      "id": "case-012-fe-cdn-cache",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "system-design",
+      "difficulty": "medium",
+      "question": "浏览器缓存机制?强缓存和协商缓存?CDN 回源怎么优化?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "浏览器缓存两层:1) 强缓存 - 不发请求,直接用本地。HTTP/1.1 用 Cache-Control: max-age=3600,s-maxage 是 CDN 专用。HTTP/1.0 用 Expires(绝对时间,有时钟不同步问题)。2) 协商缓存 - 强缓存失效后发请求问服务端。Last-Modified/If-Modified-Since(精度 s,文件改了但内容没变会误判)+ ETag/If-None-Match(内容 hash,精确)。命中 304 不返回 body,只返回 header。CDN 优化:1) 静态资源长 max-age + 文件名带 hash(webpack 出的 app.a3f4.js);2) 缓存预热 - 大促前 CDN 主动拉源站;3) 回源策略 - 1)miss→2)回源→3)缓存+返回;4) 分层缓存 - 边缘节点 + 区域中心,减少回源深度。",
+          "expectedScore": 88,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.85,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["强缓存", "协商缓存", "ETag", "Cache-Control", "回源", "预热"],
+          "reason": "两层缓存 + CDN 4 个优化点,实战导向。"
+        },
+        {
+          "level": "average",
+          "answer": "强缓存是 Cache-Control,协商缓存是 ETag。CDN 就是把资源放到离用户近的地方,减少回源。",
+          "expectedScore": 55,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.5,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["Cache-Control", "ETag", "回源"],
+          "reason": "概念对,无 Last-Modified 对比,无 CDN 具体优化策略。"
+        }
+      ],
+      "tags": ["system-design", "cache", "cdn", "http"],
+      "notes": "性能优化高频题,CDN 是大厂必问。"
+    },
+    {
+      "id": "case-013-fe-typescript",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "typescript",
+      "difficulty": "medium",
+      "question": "TypeScript 类型体操怎么写?用过哪些高级类型?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "常用 5 个高级类型:1) 泛型 + 约束 extends K extends keyof T;2) 条件类型 T extends U ? X : Y;3) infer 推断 - ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;4) 映射类型 {[K in keyof T]: T[K]},配合 readonly、?、+、- 修饰符;5) 模板字面量类型 API.Event.`${Resource}.${Action}`,防止字符串拼错。实战写过 deepReadonly<T> = { readonly [K in keyof T]: T[K] extends object ? deepReadonly<T[K]> : T[K] } 用于 Redux store 类型。Type challenges 里 PickByValue、PartialByValue 都练过,关键是先把目标值的形式写出来,再逆向推导。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["泛型", "条件类型", "infer", "映射类型", "模板字面量", "deepReadonly"],
+          "reason": "5 个高级类型 + ReturnType 展开 + 实战 deepReadonly,体现工程深度。"
+        },
+        {
+          "level": "poor",
+          "answer": "类型体操就是写复杂的类型。我一般用 any 解决,简单粗暴。",
+          "expectedScore": 25,
+          "expectedCorrectness": 0.2,
+          "expectedDepth": 0.1,
+          "expectedCompleteness": 0.2,
+          "expectedFeedbackKeywords": ["any"],
+          "reason": "用 any 表明对 TypeScript 类型系统理解不足。"
+        }
+      ],
+      "tags": ["typescript", "type-system"],
+      "notes": "P6+ 进阶题,any 党直接扣分。"
+    },
+    {
+      "id": "case-014-fe-webpack-vite",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "engineering",
+      "difficulty": "medium",
+      "question": "Webpack 和 Vite 的核心差异?为什么 Vite 开发更快?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "Webpack 是 bundle-based,启动时要全量打包所有模块成一个 bundle,模块越多启动越慢;改文件后增量重编,但 HMR 速度仍受打包影响。Vite 是 unbundle + esbuild 预构建:1) dev server 启动时用 esbuild(Go 写)预构建依赖到 ESM,速度比 webpack 快 10-100 倍;2) 业务代码走浏览器原生 ESM,按需编译(访问哪个模块才编译哪个),首屏只编译入口和当前路由;3) HMR 基于 ESM,改一个文件只重新请求该文件,毫秒级。生产环境 Vite 用 Rollup 打包(tree-shaking 更激进)。坑:1) Vite 依赖预构建对 CJS 不友好,需要 optimizeDeps.include;2) 生产环境某些 Rollup 插件生态不如 Webpack 完善。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["esbuild", "ESM", "按需编译", "HMR", "Rollup", "optimizeDeps"],
+          "reason": "bundle vs unbundle + esbuild + ESM + HMR + 实战坑,完整。"
+        },
+        {
+          "level": "average",
+          "answer": "Vite 用了 ES Module 所以启动快。Webpack 要打包所以慢。生产环境 Vite 用 Rollup 打包。",
+          "expectedScore": 55,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.5,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["ES Module", "Rollup"],
+          "reason": "答到核心,无 esbuild 细节,无 HMR 机制,无生产 vs 开发差异。"
+        }
+      ],
+      "tags": ["engineering", "bundler", "vite", "webpack"],
+      "notes": "前端工程化高频题。"
+    },
+    {
+      "id": "case-015-fe-monitoring",
+      "position": "前端开发工程师",
+      "level": "P6",
+      "category": "engineering",
+      "difficulty": "medium",
+      "question": "前端监控体系怎么设计?核心指标和上报策略?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "前端监控 3 大类:1) 性能监控 - Web Vitals(LCP 最大内容渲染 < 2.5s 良好 / FID 或新指标 INP / CLS 视觉稳定性 < 0.1 / FCP / TTFB),用 PerformanceObserver 监听;2) 异常监控 - window.onerror 捕获同步错、unhandledrejection 捕获 Promise 错、框架错误边界 React ErrorBoundary;3) 行为监控 - PV/UV、自定义埋点、点击流,PV 用 navigator.sendBeacon 保活离上报。上报策略:1) 采样 - 性能全量,异常全量,行为采样(10%);2) 合并 - 1s 内多条合并一条;3) 离线缓存 - localStorage 排队,下次启动补发;4) 防刷 - 单用户 1min 最多报 10 次异常,避免错误风暴打爆后端。监控平台自研可以接 Sentry 错误 + 自建性能 + 阿里云日志。",
+          "expectedScore": 88,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.85,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["Web Vitals", "LCP", "INP", "CLS", "sendBeacon", "PerformanceObserver", "ErrorBoundary"],
+          "reason": "3 大监控 + Web Vitals 核心指标 + 上报 4 策略,体系完整。"
+        },
+        {
+          "level": "average",
+          "answer": "前端监控要监听错误 window.onerror,性能可以用 Performance API,然后用 fetch 上报到服务端。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["window.onerror", "Performance"],
+          "reason": "提到 2 类,无 Web Vitals 指标,无上报策略,无离线/采样/防刷设计。"
+        }
+      ],
+      "tags": ["engineering", "monitoring", "web-vitals"],
+      "notes": "前端工程化进阶题。"
+    },
+    {
+      "id": "case-016-agent-react",
+      "position": "AI Agent 工程师",
+      "level": "P5",
+      "category": "agent",
+      "difficulty": "easy",
+      "question": "ReAct (Reasoning + Acting) 是什么?讲一下工作流程。",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "ReAct = Reasoning + Acting,核心是 Thought → Action → Observation 循环:LLM 先思考当前状态和下一步行动(Thought),再决定调哪个工具/做什么动作(Action),工具返回结果作为 Observation 反馈给 LLM,LLM 再基于 Observation 继续 Reasoning,直到得出最终答案。对比纯 CoT(只推理不行动)和纯 Tool Use(只调工具不显式思考),ReAct 优点是思考过程可解释(可以审计 LLM 为什么调这个工具),缺点是 token 消耗大(每步都把思考过程塞进 prompt)。适用场景:需要多步推理 + 调外部工具的任务(客服、搜索问答)。LangChain Agent / ReAct Agent 都是这套机制。",
+          "expectedScore": 88,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.85,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["Thought", "Action", "Observation", "CoT", "LangChain"],
+          "reason": "三段循环 + 对比 CoT/Tool Use + 优缺点 + 适用场景 + 框架,完整。"
+        },
+        {
+          "level": "poor",
+          "answer": "ReAct 是 agent 的一个框架,可以调外部工具。",
+          "expectedScore": 30,
+          "expectedCorrectness": 0.4,
+          "expectedDepth": 0.2,
+          "expectedCompleteness": 0.3,
+          "expectedFeedbackKeywords": ["框架"],
+          "reason": "一句话,无三段循环,无对比,无细节。"
+        }
+      ],
+      "tags": ["agent", "react", "prompt"],
+      "notes": "Agent 基础题,初级工程师也要答对。"
+    },
+    {
+      "id": "case-017-agent-cot-tot",
+      "position": "AI Agent 工程师",
+      "level": "P6",
+      "category": "agent",
+      "difficulty": "medium",
+      "question": "对比 CoT (Chain of Thought)、ToT (Tree of Thought)、Plan-and-Execute 三种推理范式。",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "三种范式对比:1) CoT - 链式思维,单路径逐步推理,适合中等复杂度数学/逻辑题,实现简单但容易中途走偏没有回头机制。2) ToT - 树搜索多路径评估,广度优先/深度优先展开多个思维分支,用 LLM 自己或投票/打分函数评估,选最佳路径,适合 24 点、汉诺塔这类多步搜索题,token 消耗是 CoT 的 5-10 倍。3) Plan-and-Execute - 一次性生成完整计划(ReAct 风格的 plan agent),再逐步执行(execute agent),适合任务可拆解的场景,优点是规划阶段全局视野好,缺点是计划刚性,执行中遇到意外难以调整。改进方向:Plan-and-Execute 加 replan 步骤(我项目 multi-agent 的 replanner 节点就是这个思路)。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["CoT", "ToT", "Plan-and-Execute", "replan", "评估函数"],
+          "reason": "3 种范式对比 + 各自场景 + token 消耗 + replan 改进,体系完整。"
+        },
+        {
+          "level": "average",
+          "answer": "CoT 是思维链让模型一步步想。ToT 是树搜索。Plan-and-Execute 是先规划再执行,适合复杂任务。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["CoT", "ToT"],
+          "reason": "概念对,无具体机制差异,无场景对比,无 token 消耗考量。"
+        }
+      ],
+      "tags": ["agent", "prompt", "reasoning"],
+      "notes": "推理范式必考点。"
+    },
+    {
+      "id": "case-018-agent-rag",
+      "position": "AI Agent 工程师",
+      "level": "P6",
+      "category": "rag",
+      "difficulty": "medium",
+      "question": "RAG 的工作流程?如何优化检索质量?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "RAG (Retrieval-Augmented Generation) 三阶段:1) Indexing - 文档切片(300-500 token overlap 50)→ Embedding → 存向量库;2) Retrieval - Query → Embedding → 向量相似度 topK → 候选 chunks;3) Generation - chunks + query 拼到 prompt → LLM 生成。优化 5 个方向:1) 切片 - 按语义切(Markdown header / 代码块 / 段落)而不是固定字符;2) Embedding 选型 - 中文 BGE-large-zh、英文 text-embedding-3,垂类用 BGE-medical;3) Rerank - 粗排 top100 → Cross-Encoder 精排 top5,准确率提升 20%+;4) Query Rewrite - LLM 先改写模糊问题;5) HyDE - 用假设性文档去检索,适合 query 短场景。进阶:Agentic RAG 让 LLM 决定要不要再查、查什么;CRAG 检索后评估质量,差就改策略;Self-RAG 模型自评引用。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["切片", "Embedding", "Rerank", "Query Rewrite", "HyDE", "Agentic RAG", "CRAG"],
+          "reason": "三阶段 + 5 个优化方向 + 3 个进阶范式,体系完整。"
+        },
+        {
+          "level": "average",
+          "answer": "RAG 就是把文档转成向量存起来,查询时找相似的塞给 LLM。可以加 rerank 提高准确率。",
+          "expectedScore": 55,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.5,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["向量", "rerank"],
+          "reason": "基本流程对,无切片策略,无 Embedding 选型,无 Agentic RAG 进阶。"
+        }
+      ],
+      "tags": ["agent", "rag", "embedding"],
+      "notes": "RAG 是 LLM 工程核心技能。"
+    },
+    {
+      "id": "case-019-agent-fc-mcp",
+      "position": "AI Agent 工程师",
+      "level": "P6",
+      "category": "agent",
+      "difficulty": "medium",
+      "question": "Function Calling 和 MCP (Model Context Protocol) 有什么区别?为什么要 MCP?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "Function Calling 是 LLM 厂商(OpenAI/Anthropic/Qwen)提供的工具调用能力,模型在响应中输出结构化 JSON 标识调哪个函数、传什么参数,应用层解析后执行。MCP 是 Anthropic 2024 年底提出的开放协议,标准化 AI 客户端(Claude Desktop / Cursor / 自研 Agent)和工具服务器之间的通信,基于 JSON-RPC 2.0,提供 Tools / Resources / Prompts 三类原语,stdio / SSE / Streamable HTTP 三种传输。核心区别:1) FC 是模型能力,各家 API 不兼容;MCP 是协议层标准,跨平台;2) FC 工具定义写在 prompt 里,改工具要改 prompt;MCP 工具由 server 动态声明,运行时发现;3) MCP 让工具可复用 - 写一个 server 任何支持 MCP 的客户端都能用,生态价值巨大,类似 USB-C 接口统一外设。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["Function Calling", "MCP", "JSON-RPC", "stdio", "SSE", "Streamable HTTP", "Tools"],
+          "reason": "FC vs MCP 三层对比 + MCP 协议细节 + 生态价值,完整。"
+        },
+        {
+          "level": "average",
+          "answer": "Function Calling 是模型调工具的能力。MCP 是 Anthropic 的协议,可以统一工具接口。具体实现细节不太清楚。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["MCP"],
+          "reason": "概念对,无协议细节,无生态价值分析。"
+        }
+      ],
+      "tags": ["agent", "mcp", "function-calling"],
+      "notes": "2025 必考点,体现对前沿协议理解。"
+    },
+    {
+      "id": "case-020-agent-langgraph",
+      "position": "AI Agent 工程师",
+      "level": "P6",
+      "category": "agent",
+      "difficulty": "medium",
+      "question": "LangGraph 的核心概念?为什么需要状态图?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "LangGraph 是 LangChain 出的有状态多 Agent 编排框架,核心概念:1) State - 共享状态,通常用 TypeScript 接口 + Annotation 描述(MessagesAnnotation 消息列表,Channel 不同字段有不同 reducer);2) Node - 处理函数,接收 state 返回 partial state;3) Edge - 普通边(直接连)和条件边(函数判断走哪);4) Checkpointer - 状态持久化(PostgresSaver / MemorySaver),支持断点续跑、时间旅行;5) interrupt - HITL 暂停等待人工。为什么要状态图:Agent 复杂后控制流不简单是链式(sequential),会有循环(ReAct retry)、分支(根据结果选路径)、并行(多 agent 协作)、暂停(等人审),状态图把这 4 种拓扑都原生支持。比 LCEL 链式更适合复杂 Agent。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["State", "Node", "Edge", "Checkpointer", "PostgresSaver", "interrupt", "Annotation"],
+          "reason": "5 个核心概念 + 为什么状态图(4 种拓扑)+ 对比 LCEL,完整。"
+        },
+        {
+          "level": "average",
+          "answer": "LangGraph 是用图的方式编排 Agent,节点是处理函数,边是连接。状态存在 state 里。",
+          "expectedScore": 55,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.5,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["节点", "状态"],
+          "reason": "基本概念对,无 Checkpointer / interrupt / Annotation 细节。"
+        }
+      ],
+      "tags": ["agent", "langgraph", "framework"],
+      "notes": "Agent 工程师必问框架。"
+    },
+    {
+      "id": "case-021-agent-multi",
+      "position": "AI Agent 工程师",
+      "level": "P7",
+      "category": "agent",
+      "difficulty": "hard",
+      "question": "Multi-Agent 架构如何设计?什么时候该用 / 不该用?有什么坑?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "Multi-Agent 3 种典型拓扑:1) Supervisor - 中央调度(planner 拆任务 → 派给 executor → reviewer 审),适合任务可拆解的复杂场景,我项目面试 Agent 就是这个模式,LangGraph 5 节点(supervisor/planner/executor/replanner/reviewer);2) Peer-to-Peer - 平等协作(AutoGen 风格),agent 之间对话达成共识,适合开放任务;3) Hierarchical - 多层 supervisor,适合大型系统。什么时候用:任务复杂需要职责分离(出题/评分/搜索分给不同 agent),不同 agent 需要不同 prompt / 工具 / 模型。什么时候不用:单一任务单 agent + 工具链已经能搞定,多 agent 通信开销大、状态追踪难、调试地狱(一个 agent 输出有幻觉,整个流程崩)。坑:1) 通信成本 - agent 之间传完整上下文 token 高;2) 一致性 - 不同 agent 风格/格式不统一;3) 调试难 - 需要 trace 全链路,我用 Langfuse 三层埋点(trace/span/generation)。代表框架:LangGraph、AutoGen、CrewAI。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["Supervisor", "planner", "executor", "reviewer", "AutoGen", "LangGraph", "调试地狱", "Langfuse"],
+          "reason": "3 种拓扑 + 用/不用判断 + 3 个坑 + 实战经验(自己项目 5 节点)+ 框架,完整。"
+        },
+        {
+          "level": "poor",
+          "answer": "Multi-Agent 就是多个 agent 一起工作,各自负责一部分。",
+          "expectedScore": 25,
+          "expectedCorrectness": 0.3,
+          "expectedDepth": 0.2,
+          "expectedCompleteness": 0.2,
+          "expectedFeedbackKeywords": ["agent"],
+          "reason": "一句话,无拓扑分类,无场景判断,无挑战分析。"
+        }
+      ],
+      "tags": ["agent", "multi-agent", "architecture"],
+      "notes": "P7 架构设计题,考察深度和实战经验。"
+    },
+    {
+      "id": "case-022-agent-token-opt",
+      "position": "AI Agent 工程师",
+      "level": "P6",
+      "category": "llm",
+      "difficulty": "medium",
+      "question": "LLM 应用里如何优化 token 成本?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "5 个层次优化:1) Prompt 层 - 短指令、Few-shot 用 1-2 个例子、结构化输出减少重复生成;2) 缓存层 - Prompt Cache(Anthropic 自动识别稳定前缀,跨请求复用,1 小时 1.9 倍便宜);Semantic Cache(类似 query 命中直接返回,我的项目用 Qwen Embedding 算余弦相似度);3) 上下文层 - 我项目自研 4 级水位线 ContextManager(Tier 0 不动 / Tier 1 截断 > 200 token / Tier 2 替换为 stub / Tier 3 调 LLM 增量摘要),保护系统 prompt + 最近 4 条消息不被裁;4) 模型路由 - 简单任务用小模型(Qwen-Turbo 0.003 元/1k),复杂任务用大模型(Qwen-Max);5) 流式 + 早停 - 流式返回,客户端断开就停。生成长文本前先评估 max_tokens,不要给到上限。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["Prompt Cache", "Semantic Cache", "4 级水位线", "Tier", "模型路由", "stub"],
+          "reason": "5 层优化 + 实战 4 级水位线 + 具体成本数据,深度强。"
+        },
+        {
+          "level": "average",
+          "answer": "短 prompt,缓存,小模型。能用缓存就用缓存,prompt 写得简洁一点。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["缓存"],
+          "reason": "提到 3 个方向但都浅,无具体方案,无成本数据。"
+        }
+      ],
+      "tags": ["llm", "cost", "optimization"],
+      "notes": "LLM 工程核心技能,生产级必备。"
+    },
+    {
+      "id": "case-023-agent-embedding",
+      "position": "AI Agent 工程师",
+      "level": "P6",
+      "category": "rag",
+      "difficulty": "medium",
+      "question": "Embedding 模型怎么选型?评估指标有哪些?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "选型 4 维度:1) 语言 - 中文 BGE-large-zh / M3E / BGE-M3 多语言;英文 text-embedding-3 / voyage;2) 领域 - 通用 vs 垂类(医疗 BGE-medical、法律需要专门训练);3) 维度 - 768/1024/1536,维度大精度高但存储贵 4 倍(1536 维 1 亿条 ≈ 600GB);4) 成本 - OpenAI $0.02/1M token vs 开源自部署(Qwen-Embedding 8B)。评估 3 层:1) 公开基准 - MTEB(Massive Text Embedding Benchmark)看排行榜;2) 业务评测集 - 自己标 100-500 条 query-doc 对,算 Recall@K / MRR / NDCG;3) 端到端 - RAG 整体准确率,因为最终目标不是 embedding 准而是回答准。实际项目我用 M3E + Milvus 中文检索,自定义 200 条 query 验证 Recall@10 = 0.85。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["MTEB", "BGE", "维度", "Recall@K", "MRR", "M3E"],
+          "reason": "4 维选型 + 3 层评估 + 实战数据,完整。"
+        },
+        {
+          "level": "average",
+          "answer": "中文用 BGE,英文用 OpenAI。可以用 MTEB 基准看哪个模型好。",
+          "expectedScore": 55,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.5,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["BGE", "MTEB"],
+          "reason": "提到选型 + 基准,无具体指标,无业务评测,无实战。"
+        }
+      ],
+      "tags": ["rag", "embedding", "evaluation"],
+      "notes": "RAG 工程核心技能。"
+    },
+    {
+      "id": "case-024-agent-hallucination",
+      "position": "AI Agent 工程师",
+      "level": "P6",
+      "category": "llm",
+      "difficulty": "medium",
+      "question": "如何降低 LLM 幻觉?实际项目里怎么做的?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "5 层防御:1) RAG 知识锚定 - 不让 LLM 自由发挥,回答必须基于检索到的文档,prompt 明确写'如果没有信息请回答不知道';2) 结构化输出 + Zod 校验 - LLM 输出必须是结构化 JSON,字段缺失或类型错就重试,我的项目 reviewer 节点评分 < 0.5 打回重做;3) Self-Consistency - 同一问题采样 3-5 个回答投票,适合高风险场景;4) 引用追溯 - RAG 输出时附带引用源(段落 + 文档 ID),用户可验证;5) 兜底文案 - 检测到不确定时给固定回复'这个问题我目前没有足够信息,建议您咨询专业人士',优于硬编。生产级方案需要 Eval 体系持续追踪幻觉率,Langfuse Dataset 跑回归。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["RAG", "Zod", "Self-Consistency", "引用追溯", "兜底文案", "Langfuse"],
+          "reason": "5 层防御 + 实战 reviewer 打回 + Eval 体系追踪,完整。"
+        },
+        {
+          "level": "average",
+          "answer": "用 RAG 给模型提供准确信息。改 prompt 强调不要瞎说。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["RAG", "prompt"],
+          "reason": "2 个方向,无具体方案,无多层防御设计。"
+        }
+      ],
+      "tags": ["llm", "hallucination", "guardrail"],
+      "notes": "LLM 生产级核心问题,必考。"
+    },
+    {
+      "id": "case-025-agent-mcp",
+      "position": "AI Agent 工程师",
+      "level": "P7",
+      "category": "agent",
+      "difficulty": "hard",
+      "question": "MCP 协议的设计原理?stdio / SSE / Streamable HTTP 三种传输方式对比?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "MCP (Model Context Protocol) 架构:Client(Claude Desktop / Cursor / 自研 Agent)<->Host(本地代理进程)<->Server(工具/资源提供方)三层,基于 JSON-RPC 2.0,能力声明:Tools(可调用函数)/ Resources(可读数据)/ Prompts(模板)。三种传输:1) stdio - 进程内 stdin/stdout,延迟最低(< 1ms),适合本地工具(文件/命令),但不能跨网络;2) SSE (Server-Sent Events) - HTTP 长连接,server 单向推 client 收,2024 主流但有反向通信麻烦(POST 单独开 endpoint),2025 已弃用推荐 Streamable HTTP;3) Streamable HTTP - 2025 新标准,HTTP POST + 可选 SSE response,既支持同步请求也支持流式,断线可重连,推荐用于远程 MCP server。沙箱:server 进程隔离,Host 限制文件系统/网络访问。Registry:类似 npm,集中管理 server 元信息,跨平台发现。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["JSON-RPC", "stdio", "SSE", "Streamable HTTP", "Tools", "Resources", "Prompts", "沙箱", "Registry"],
+          "reason": "协议架构 + 3 传输对比 + 沙箱 + Registry,前沿深度。"
+        },
+        {
+          "level": "average",
+          "answer": "MCP 用 JSON-RPC。stdio 是本地进程通信,SSE 是 HTTP 长连接。具体 Streamable HTTP 没用过,不太清楚。",
+          "expectedScore": 55,
+          "expectedCorrectness": 0.6,
+          "expectedDepth": 0.5,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["JSON-RPC", "stdio", "SSE"],
+          "reason": "知道 2 种传输,无最新 Streamable HTTP,无沙箱/Registry。"
+        }
+      ],
+      "tags": ["agent", "mcp", "protocol"],
+      "notes": "P7 进阶题,前沿协议理解。"
+    },
+    {
+      "id": "case-026-agent-mem0",
+      "position": "AI Agent 工程师",
+      "level": "P6",
+      "category": "agent",
+      "difficulty": "hard",
+      "question": "Mem0 / 长期记忆系统的原理?如何避免记忆污染和冗余?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "Mem0 核心思想:让 LLM 自己管理记忆,而不是开发者写规则。流程:1) 提取 - 用 LLM 从对话里抽取事实 fact('用户住上海'、'10 年前端经验'),存为原子记忆;2) 存储 - Embedding + Metadata(user_id / session_id)存向量库;3) 检索 - query → Embedding → topK 相似;4) 更新 - 新 fact 进来时,LLM 对比已有 memory,决定 ADD / UPDATE / DELETE / NOOP(语义去重,避免冗余)。3 个工程挑战:1) 记忆污染 - fact 提取质量差(LLM 抽错),需要 prompt 严格 + 人工 review 冷启动;2) 冗余 - 同 fact 多次出现,Mem0 用 LLM 对比 + 相似度阈值(0.85)兜底;3) 隐私 - GDPR 合规需要 DELETE API,Mem0 v2 之后支持。我的项目直接接 Mem0 Cloud API,但用 fetch 直连绕过 SDK 的路径硬编码 bug(SDK 还在用 v1 路径)。",
+          "expectedScore": 88,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.85,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["fact", "Embedding", "ADD", "UPDATE", "DELETE", "语义去重", "Mem0"],
+          "reason": "4 步流程 + 3 挑战 + 实项目 SDK 绕坑,深度强。"
+        },
+        {
+          "level": "average",
+          "answer": "长期记忆就是把对话存到向量数据库,查询时找相似的。Mem0 是一个开源的长期记忆框架。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["向量数据库", "Mem0"],
+          "reason": "基本概念对,无 LLM 提取 + ADD/UPDATE 决策机制,无挑战分析。"
+        }
+      ],
+      "tags": ["agent", "memory", "mem0"],
+      "notes": "记忆系统是 Agent 长期化核心。"
+    },
+    {
+      "id": "case-027-agent-hitl",
+      "position": "AI Agent 工程师",
+      "level": "P7",
+      "category": "agent",
+      "difficulty": "hard",
+      "question": "HITL (Human-in-the-Loop) 在 Agent 里怎么实现?LangGraph 的 interrupt 机制?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "HITL 三层实现:1) 硬中断 - 高风险操作(发邮件/扣款/生产部署)必须人工确认,LangGraph 用 interrupt() 暂停,人工 approve/resume 才会继续;2) 软中断 - 关键节点让用户审(生成了方案但没执行,用户先看);3) Reviewer Agent 自动审 - 用第二个 LLM 评第一个的输出,质量低自动打回。LangGraph interrupt 工作流:1) node 调 interrupt({type:'approve', payload:...}) → 图状态被 checkpoint 存;2) 主流程返回等待信号;3) 人工 approve 后调 graph.invoke(Command(resume='approve'), config={configurable:{thread_id}}) → 从 checkpoint 恢复继续。关键设计:thread_id 必须稳定(我项目用 sessionId),Checkpoint 用 PostgresSaver 跨进程持久化。我的项目多 Agent 架构里 reviewer < 0.5 分就触发 hitl_pending=true 走人工。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["interrupt", "PostgresSaver", "Checkpoint", "Command", "thread_id", "hitl_pending"],
+          "reason": "3 层 HITL + interrupt 工作流 + 实战架构,完整。"
+        },
+        {
+          "level": "poor",
+          "answer": "HITL 就是让人参与 AI 的决策。具体怎么实现,可以用 LangGraph 的暂停功能。",
+          "expectedScore": 30,
+          "expectedCorrectness": 0.4,
+          "expectedDepth": 0.2,
+          "expectedCompleteness": 0.3,
+          "expectedFeedbackKeywords": ["暂停"],
+          "reason": "概念模糊,无具体 API,无工作流,无实战。"
+        }
+      ],
+      "tags": ["agent", "hitl", "langgraph"],
+      "notes": "P7 必考,生产级 Agent 必备。"
+    },
+    {
+      "id": "case-028-agent-eval",
+      "position": "AI Agent 工程师",
+      "level": "P6",
+      "category": "llm",
+      "difficulty": "medium",
+      "question": "LLM 应用如何做评测?传统单元测试为什么失效?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "传统断言失效原因:LLM 输出非确定(温度 > 0 每次不同)、可能幻觉、长度不一、格式不固定。LLM 评测 4 个方法:1) 结构化校验(Zod schema) - 字段类型/必填/枚举,适合工具调用输出;2) LLM-as-Judge - 用 GPT-4 评 GPT-3.5 的输出(强相关模型评弱模型,或同模型用不同 prompt),prompt 明确评分维度(准确性/完整性/深度)和分数段;3) Embedding 相似度 - 期望答案 vs 实际答案算余弦相似度(阈值 0.8 算通过),适合开放式回答;4) 人工评测 + Golden Dataset - 标注 100-500 条标准答案,跑回归看分数掉没掉。生产 Agent 必须有 Eval pipeline,Langfuse Dataset 可以把 case 关联到 trace,持续追踪。我项目刚做 30 条 Golden Dataset,5 个核心指标(分数相关 / MAE / 档位一致率 / 关键词命中率)。",
+          "expectedScore": 92,
+          "expectedCorrectness": 0.95,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.95,
+          "expectedFeedbackKeywords": ["Zod", "LLM-as-Judge", "Embedding 相似度", "Golden Dataset", "Langfuse Dataset", "MAE"],
+          "reason": "4 评测方法 + Golden Dataset + 5 指标 + 自己项目实战,完整。"
+        },
+        {
+          "level": "average",
+          "answer": "传统断言要求输出固定,LLM 输出不确定所以不行。可以用 LLM 评 LLM,或者人工评测。",
+          "expectedScore": 50,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.4,
+          "expectedCompleteness": 0.5,
+          "expectedFeedbackKeywords": ["断言", "人工评测"],
+          "reason": "知道传统失效,提到 2 个方法,无具体指标,无工程化方案。"
+        }
+      ],
+      "tags": ["llm", "evaluation", "golden-dataset"],
+      "notes": "LLM 工程核心,本套评测集对应的方法论。"
+    },
+    {
+      "id": "case-029-agent-cs-agent",
+      "position": "AI Agent 工程师",
+      "level": "P7",
+      "category": "system-design",
+      "difficulty": "hard",
+      "question": "设计一个 AI 客服 Agent,需要支持多轮对话 + 知识库检索 + 工单创建。",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "架构 5 模块:1) 入口层 - API Gateway 鉴权 + 限流(Redis + Lua);2) 对话层 - 短期记忆(Redis 存 50 条最近消息,30 分钟过期)+ 长期记忆(Mem0 存用户偏好/历史工单);3) 意图识别 - Supervisor agent 分类(咨询/投诉/查询订单/转人工),用 withStructuredOutput(zod) 强结构化分类;4) 工具层 - RAG 检索公司知识库(Milvus + Rerank + Query Rewrite)+ 工单 API(OrderTool.create);5) 兜底层 - 兜底文案 + 转人工开关 + 敏感词拦截。核心流程:用户问 → 短期记忆补充上下文 → 意图分类 → 根据意图选工具(检索/创建)→ 生成回答 → 短期记忆更新。监控:全链路 Langfuse trace + 意图分类准确率监控 + 工单成功率监控。冷启动挑战:知识库不全时幻觉率高,需要真实工单数据集做 Golden Dataset 回归。",
+          "expectedScore": 90,
+          "expectedCorrectness": 0.9,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.9,
+          "expectedFeedbackKeywords": ["短期记忆", "Mem0", "RAG", "Milvus", "withStructuredOutput", "意图分类", "Langfuse"],
+          "reason": "5 模块 + 完整流程 + 监控 + 冷启动挑战,系统设计深度强。"
+        },
+        {
+          "level": "average",
+          "answer": "用 LLM 调工具查询订单和创建工单。需要 RAG 检索知识库。",
+          "expectedScore": 45,
+          "expectedCorrectness": 0.5,
+          "expectedDepth": 0.3,
+          "expectedCompleteness": 0.4,
+          "expectedFeedbackKeywords": ["LLM", "RAG"],
+          "reason": "基本要素对,无架构分层,无意图分类,无记忆设计,无监控。"
+        }
+      ],
+      "tags": ["agent", "system-design", "customer-service"],
+      "notes": "P7 系统设计实战题。"
+    },
+    {
+      "id": "case-030-agent-prompt",
+      "position": "AI Agent 工程师",
+      "level": "P5",
+      "category": "prompt",
+      "difficulty": "medium",
+      "question": "Prompt 工程有哪些核心技巧?怎么让 LLM 输出更稳定?",
+      "responses": [
+        {
+          "level": "excellent",
+          "answer": "10 个核心技巧:1) 角色设定 - 你是资深面试官,限定身份提高专业度;2) 任务描述 - 用动词明确('请输出 3 个优势'而不是'说说优势');3) Few-shot - 1-3 个例子比纯指令效果好 30%+;4) 思维链 - 复杂问题用 'Let me think step by step';5) 结构化输出 - 让 LLM 按 JSON / 表格输出,避免自然语言漂移;6) 分隔符 - 用 ### / ``` / <tag> 分隔指令和上下文,防止 prompt injection;7) 负样本 - '不要输出 Markdown 代码块';8) 输出长度限制 - '每个优势不超过 30 字';9) 温度调节 - 创意任务 0.7-1.0,精确任务 0-0.2,评估场景 0;10) Self-Critique - 让 LLM 自己审 '检查你刚才的回答是否漏了 X'。生产环境用 prompt 版本管理(PromptLayer / Langfuse),改了跑 Golden Dataset 看分数。",
+          "expectedScore": 92,
+          "expectedCorrectness": 0.95,
+          "expectedDepth": 0.9,
+          "expectedCompleteness": 0.95,
+          "expectedFeedbackKeywords": ["Few-shot", "思维链", "结构化输出", "分隔符", "负样本", "温度", "Self-Critique"],
+          "reason": "10 个技巧 + 温度场景 + 版本管理,完整。"
+        },
+        {
+          "level": "poor",
+          "answer": "写清楚一点,说清楚要什么,加几个例子,温度调低一点。",
+          "expectedScore": 35,
+          "expectedCorrectness": 0.35,
+          "expectedDepth": 0.25,
+          "expectedCompleteness": 0.35,
+          "expectedFeedbackKeywords": ["例子"],
+          "reason": "过于简略,无具体技巧,无工程化方法。"
+        }
+      ],
+      "tags": ["prompt", "engineering"],
+      "notes": "Prompt 工程基础,初级必答对。"
+    }
+  ]
+}
