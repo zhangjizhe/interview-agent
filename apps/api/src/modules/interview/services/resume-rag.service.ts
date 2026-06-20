@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { MilvusClient, DataType, MetricType, IndexType } from '@zilliz/milvus2-sdk-node';
 import { ConfigService } from '@nestjs/config';
 import { ParsedResume } from './resume-parser.service';
+import { scrubPdfStructureNoise, isPdfStructureToken } from '../../../common/pdf-noise';
 
 /**
  * 简历 RAG 服务（lazy init）
@@ -87,12 +88,23 @@ export class ResumeRAGService {
 
   /**
    * 把解析后的简历存进 Milvus
+   * 二次保险：即使上游 ResumeParserService 漏过 PDF 元数据，ingest 前再清一次
+   * rawText 段，并过滤掉 name/skills 里的 PDF 结构 token
    */
   async ingestResume(userId: string, position: string, parsed: ParsedResume): Promise<void> {
     await this.ensureCollection();
     try {
-      const summary = `岗位: ${position}\n技能: ${parsed.skills?.join('、') || '无'}\n经验: ${(parsed.experience || []).slice(0, 3).join('; ')}\n项目: ${(parsed.projects || []).slice(0, 2).join('、')}`;
-      const text = `${summary}\n\n${parsed.rawText?.slice(0, 1500) || ''}`;
+      // 二次清洗：name / skills / summary 段可能含 PDF 元数据泄漏
+      const cleanName = isPdfStructureToken(parsed.name || '')
+        ? '未命名候选人'
+        : parsed.name || '未命名候选人';
+      const cleanSkills = (parsed.skills || []).filter((s) => !isPdfStructureToken(s));
+      const cleanExperience = (parsed.experience || []).filter((s) => !isPdfStructureToken(s));
+      const cleanProjects = (parsed.projects || []).filter((s) => !isPdfStructureToken(s));
+      const cleanRawText = scrubPdfStructureNoise(parsed.rawText || '');
+
+      const summary = `岗位: ${position}\n技能: ${cleanSkills.join('、') || '无'}\n经验: ${cleanExperience.slice(0, 3).join('; ')}\n项目: ${cleanProjects.slice(0, 2).join('、')}`;
+      const text = `${summary}\n\n${cleanRawText.slice(0, 1500)}`;
       const vector = await this.embedText(text);
 
       await this.client.insert({
@@ -101,10 +113,10 @@ export class ResumeRAGService {
           {
             vector,
             userId,
-            name: parsed.name || '未命名候选人',
+            name: cleanName,
             position,
             summary,
-            skills: (parsed.skills || []).join('、'),
+            skills: cleanSkills.join('、'),
             createdAt: new Date().toISOString(),
           },
         ],
@@ -129,7 +141,19 @@ export class ResumeRAGService {
         output_fields: ['name', 'position', 'summary', 'skills', 'createdAt'],
         limit,
       });
-      return (result.data as any) || [];
+      const raw = (result.data as any) || [];
+      // 读取侧清洗：旧数据（修复前上传）可能含 PDF 元数据，
+      // 返回前再洗一次 name/skills/summary，确保前端不会展示 %PDF-1.7 / /ICCBased 等
+      return raw.map((r: any) => ({
+        ...r,
+        name: isPdfStructureToken(r.name || '') ? undefined : r.name,
+        position: r.position,
+        summary: scrubPdfStructureNoise(r.summary || ''),
+        skills: (r.skills || '')
+          .split(/[、,，;；\s]+/)
+          .filter((s: string) => s && !isPdfStructureToken(s))
+          .join('、'),
+      }));
     } catch (err) {
       this.logger.error(`Resume search failed: ${err.message}`);
       throw err;

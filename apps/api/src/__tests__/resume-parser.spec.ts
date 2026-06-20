@@ -8,22 +8,17 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { ResumeParserService } from '../modules/interview/services/resume-parser.service';
+import {
+  scrubPdfStructureNoise,
+  isPdfStructureToken,
+  looksLikePdfStructureNoise,
+} from '../common/pdf-noise';
 
-describe('ResumeParserService - PDF 解析', () => {
-  let service: ResumeParserService;
-
-  beforeEach(() => {
-    service = new ResumeParserService();
-  });
-
+describe('pdf-noise util', () => {
   describe('scrubPdfStructureNoise - PDF 元数据清洗', () => {
-    // 访问 private 方法做单元测试
-    const scrub = (text: string) =>
-      (service as unknown as { scrubPdfStructureNoise: (t: string) => string }).scrubPdfStructureNoise(text);
-
     it('清洗 PDF 头标识 %PDF-1.7', () => {
       const input = '%PDF-1.7\n张继哲\n18516604751\n%%EOF\n';
-      const out = scrub(input);
+      const out = scrubPdfStructureNoise(input);
       expect(out).not.toContain('%PDF-1.7');
       expect(out).not.toContain('%%EOF');
       expect(out).toContain('张继哲');
@@ -32,7 +27,7 @@ describe('ResumeParserService - PDF 解析', () => {
 
     it('清洗 PDF 对象引用 /ICCBased 11 0 R', () => {
       const input = '张继哲\n/ICCBased 11 0 R\nReact 工程师\n/F1 12 Tf\n';
-      const out = scrub(input);
+      const out = scrubPdfStructureNoise(input);
       expect(out).not.toContain('/ICCBased');
       expect(out).not.toContain('/F1 12 Tf');
       expect(out).toContain('张继哲');
@@ -41,7 +36,7 @@ describe('ResumeParserService - PDF 解析', () => {
 
     it('清洗 stream/endstream/obj 标记', () => {
       const input = '11 0 obj\nstream\nendstream\nendobj\n实际内容\n';
-      const out = scrub(input);
+      const out = scrubPdfStructureNoise(input);
       expect(out).not.toMatch(/\bstream\b/);
       expect(out).not.toMatch(/\bendstream\b/);
       expect(out).not.toMatch(/\d+\s+\d+\s+obj\b/);
@@ -50,7 +45,7 @@ describe('ResumeParserService - PDF 解析', () => {
 
     it('清洗 PDF 字典头 << /Length xxx', () => {
       const input = '<<\n/Length 1234\n/Foo <<\n正常内容\n';
-      const out = scrub(input);
+      const out = scrubPdfStructureNoise(input);
       expect(out).not.toMatch(/^<<$/m);
       expect(out).not.toMatch(/\/Length\s+\d+/);
       expect(out).toContain('正常内容');
@@ -69,13 +64,13 @@ React  Vue  TypeScript  LangChain  MCP Server
 北京交通大学 · 工程管理
 东北石油大学 · 通信技术
 `;
-      const out = scrub(resume);
+      const out = scrubPdfStructureNoise(resume);
       expect(out).toBe(resume.trim());
     });
 
     it('移除控制字符但保留换行和制表符', () => {
       const input = '张继哲\x00\x01\x02\nReact\t工程师\n\x7F内容';
-      const out = scrub(input);
+      const out = scrubPdfStructureNoise(input);
       expect(out).toContain('张继哲');
       expect(out).toContain('React\t工程师');
       expect(out).toContain('内容');
@@ -96,7 +91,7 @@ startxref
 1234
 % 实际简历内容
 `;
-      const out = scrub(input);
+      const out = scrubPdfStructureNoise(input);
       expect(out).toContain('张继哲');
       expect(out).toContain('AI Agent 前端开发工程师');
       expect(out).toContain('18516604751');
@@ -108,6 +103,71 @@ startxref
       expect(out).not.toContain('/Type /Catalog');
       expect(out).not.toContain('%%EOF');
       expect(out).not.toContain('startxref');
+    });
+  });
+
+  describe('isPdfStructureToken - 短字符串级 token 检测', () => {
+    it.each([
+      ['%PDF-1.7', true],
+      ['%%EOF', true],
+      ['/ICCBased', true],
+      ['/ICCBased 11 0 R', true],
+      ['/F1 12 Tf', true],
+      ['/Type /Catalog', true],
+      ['/Subtype /TrueType', true],
+      ['/Length 1234', true],
+      ['stream', true],
+      ['endstream', true],
+      ['11 0 obj', true],
+      ['startxref', true],
+      ['<<', true],
+      ['张继哲', false],
+      ['React', false],
+      ['AI Agent 工程师', false],
+      ['', false],
+    ])('isPdfStructureToken(%j) === %j', (input, expected) => {
+      expect(isPdfStructureToken(input)).toBe(expected);
+    });
+  });
+
+  describe('looksLikePdfStructureNoise - 粗筛', () => {
+    it('返回 true 当含 PDF 元数据', () => {
+      expect(looksLikePdfStructureNoise('张继哲\n%PDF-1.7\nReact')).toBe(true);
+      expect(looksLikePdfStructureNoise('clean text\n/ICCBased 11 0 R\nmore')).toBe(true);
+    });
+    it('返回 false 当不含 PDF 元数据', () => {
+      expect(looksLikePdfStructureNoise('张继哲\nReact\nAI Agent 工程师')).toBe(false);
+      expect(looksLikePdfStructureNoise('')).toBe(false);
+    });
+  });
+});
+
+describe('ResumeParserService - PDF 解析', () => {
+  let service: ResumeParserService;
+
+  beforeEach(() => {
+    service = new ResumeParserService();
+  });
+
+  describe('extractName - PDF 元数据兜底', () => {
+    // 访问 private 方法
+    const extractName = (text: string) =>
+      (service as unknown as { extractName: (t: string) => string }).extractName(text);
+
+    it('PDF 头 %PDF-1.7 不被当成姓名', () => {
+      const out = extractName('%PDF-1.7\n张继哲\n18516604751\n');
+      expect(out).not.toBe('%PDF-1.7');
+      expect(out).toBe('张继哲');
+    });
+
+    it('全 PDF 元数据无姓名 → 兜底为"候选人"', () => {
+      const out = extractName('%PDF-1.7\n/ICCBased 11 0 R\nstream\nendstream\n');
+      expect(out).toBe('候选人');
+    });
+
+    it('正常姓名提取', () => {
+      const out = extractName('张继哲\nAI Agent 前端开发工程师\n18516604751\n');
+      expect(out).toBe('张继哲');
     });
   });
 
@@ -133,6 +193,11 @@ startxref
           expect(r.rawText).not.toMatch(/\/Type\s+\/Catalog/);
           expect(r.rawText).not.toMatch(/\bstream\b/);
           expect(r.rawText).not.toMatch(/\bendstream\b/);
+          // name/skills 也不能是 PDF 元数据
+          expect(isPdfStructureToken(r.name || '')).toBe(false);
+          for (const s of r.skills || []) {
+            expect(isPdfStructureToken(s)).toBe(false);
+          }
           // 必须有实际内容
           expect(r.rawText.length).toBeGreaterThan(50);
         });

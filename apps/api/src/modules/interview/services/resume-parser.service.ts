@@ -1,4 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  scrubPdfStructureNoise,
+  isPdfStructureToken,
+} from '../../../common/pdf-noise';
 
 export interface ResumeAnalysis {
   name: string;
@@ -52,7 +56,7 @@ export class ResumeParserService {
     }
 
     // 清洗 PDF 内部结构噪音（兜底，对付 pdf-parse 偶发的元数据泄漏，如 %PDF-1.7 / /ICCBased）
-    rawText = this.scrubPdfStructureNoise(rawText);
+    rawText = scrubPdfStructureNoise(rawText);
 
     const text = rawText.trim().toLowerCase();
     const sentences = rawText.split(/[\n。！？]/).map((s) => s.trim()).filter((s) => s);
@@ -97,7 +101,7 @@ export class ResumeParserService {
     if (explicitMatches) {
       explicitMatches.forEach((m) => {
         const cleaned = m.replace(/[【\[\(（\]】\)）]/g, '').trim();
-        if (cleaned.length > 0 && cleaned.length < 20) {
+        if (cleaned.length > 0 && cleaned.length < 20 && !isPdfStructureToken(cleaned)) {
           found.push(cleaned);
         }
       });
@@ -117,8 +121,9 @@ export class ResumeParserService {
     const lines = text.split('\n').map((l) => l.trim()).filter((l) => l);
     // 简历开头的短句子通常是姓名
     for (let i = 0; i < Math.min(5, lines.length); i++) {
-      if (lines[i].length < 10 && !lines[i].includes('@') && lines[i].length > 0) {
-        return lines[i];
+      const line = lines[i];
+      if (line.length > 0 && line.length < 10 && !line.includes('@') && !isPdfStructureToken(line)) {
+        return line;
       }
     }
     return '候选人';
@@ -146,17 +151,27 @@ export class ResumeParserService {
   }
 
   private extractEducation(sentences: string[]): string[] {
-    return sentences.filter((s) => s.includes('学') || s.includes('学院') || s.includes('教育') || s.includes('学历'))
+    return sentences
+      .filter((s) => (s.includes('学') || s.includes('学院') || s.includes('教育') || s.includes('学历')) && !isPdfStructureToken(s))
       .slice(0, 3);
   }
 
   private extractExperience(sentences: string[]): string[] {
-    return sentences.filter((s) => (s.includes('公司') || s.includes('工作') || s.includes('负责') || s.includes('参与')))
+    return sentences
+      .filter(
+        (s) =>
+          (s.includes('公司') || s.includes('工作') || s.includes('负责') || s.includes('参与')) &&
+          !isPdfStructureToken(s),
+      )
       .slice(0, 5);
   }
 
   private extractProjects(sentences: string[]): string[] {
-    return sentences.filter((s) => s.includes('项目') || s.includes('负责') || s.includes('开发'))
+    return sentences
+      .filter(
+        (s) =>
+          (s.includes('项目') || s.includes('负责') || s.includes('开发')) && !isPdfStructureToken(s),
+      )
       .slice(0, 5);
   }
 
@@ -233,59 +248,6 @@ export class ResumeParserService {
       lines.push('');
     }
     return lines.join('\n').trim();
-  }
-
-  /**
-   * 清洗 PDF 内部结构噪音（兜底，主要对付 pdf-parse 偶发的元数据泄漏）。
-   * 规则：行内含 PDF 内部 PostScript 语法 → 删整行。
-   * 设计：宁严勿松——"PDF 元数据混进简历正文"的概率远大于"简历里写 /Type /Catalog"。
-   */
-  private scrubPdfStructureNoise(text: string): string {
-    const lines = text.split('\n');
-    const cleaned: string[] = [];
-    for (const raw of lines) {
-      const line = raw.trim();
-      if (!line) {
-        cleaned.push('');
-        continue;
-      }
-      // 行内含 PDF 内部 PostScript 标识 → 删整行
-      // - 头尾标记: %PDF-1.7, %%EOF, startxref
-      // - 对象声明: "11 0 obj" / "endobj" / "beginobj"
-      // - 对象引用: "/Name 11 0 R"（间接对象语法 = 数字 数字 R）
-      // - stream 标记: "stream" / "endstream"
-      // - 字典/对象头: "<<", "/Length 1234", "/Type /Catalog", "/Subtype /...", "/Filter /..."
-      // - 颜色/字体引用: "/ICCBased ...", "/F1 12 Tf", "/Font <<"
-      // - 资源/MediaBox: "/MediaBox [0 0 612 792]", "/Resources <<"
-      if (
-        /%PDF-\d/.test(line) ||
-        /%%EOF/.test(line) ||
-        /\bstartxref\b/.test(line) ||
-        /\b\d+\s+\d+\s+obj\b/.test(line) ||
-        /\bendobj\b/.test(line) ||
-        /\bbeginobj\b/.test(line) ||
-        /^\s*<<\s*$/.test(line) ||
-        /^\s*>>\s*$/.test(line) ||
-        /^\s*stream\s*$/.test(line) ||
-        /^\s*endstream\s*$/.test(line) ||
-        /\/ICCBased\b/.test(line) ||
-        /\/MediaBox\b/.test(line) ||
-        /\/Resources\b/.test(line) ||
-        /\/Type\s+\/[\w-]+/.test(line) || // /Type /Catalog /Type /Pages /Type /Font 等
-        /\/Subtype\s+\/[\w-]+/.test(line) || // /Subtype /Type1 /Subtype /TrueType 等
-        /\/Filter\s+\/[\w-]+/.test(line) || // /Filter /FlateDecode 等
-        /\/Length\s+\d+/.test(line) || // /Length 1234
-        /^\/[\w.-]+\s+\d+\s+\d+\s+R\s*$/.test(line) || // 整行是对象引用 "/F1 12 0 R"
-        /^\/[\w.-]+\s+[-\d.]+\s+(Tf|Tm|Td|TD|T\*|Tj|TJ)\s*$/.test(line) || // 整行是字体/矩阵命令 "/F1 12 Tf"
-        /^\/[\w.-]+\s+<<\s*$/.test(line) // 整行是字典开始 "/Font <<"
-      ) {
-        continue;
-      }
-      // 移除控制字符（保留 \n \r \t）
-      const noCtrl = line.replace(/[\x00-\x08\x0B-\x1F\x7F]/g, '');
-      if (noCtrl) cleaned.push(noCtrl);
-    }
-    return cleaned.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 }
 
