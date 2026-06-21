@@ -182,11 +182,13 @@ async function main() {
   console.log(`  📞 llm calls:         ${p.llmCalls}`);
 
   // bench 端计算 rate（API 返回的 BenchResult 只有 counts，没 rate）
+  // 防御性：当 llmCalls=0 / retries 字段缺失时 retryRate 会 NaN，导致验收显示失败
   const promptCacheTotal = p.promptCacheHits + p.promptCacheMisses;
   const semanticCacheTotal = p.semanticCacheHits + p.semanticCacheMisses;
   const promptCacheHitRate = promptCacheTotal > 0 ? p.promptCacheHits / promptCacheTotal : 0;
   const semanticCacheHitRate = semanticCacheTotal > 0 ? p.semanticCacheHits / semanticCacheTotal : 0;
-  const retryRate = p.llmCalls > 0 ? p.retries / p.llmCalls : 0;
+  // cost panel 不返 raw retries count，直接用 panel 的 retryRate（已算好）
+  const retryRate = Number.isFinite(p.retryRate) ? p.retryRate : 0;
   // Qwen-plus 单价（按官方计费）：input ¥0.004/1K, output ¥0.012/1K
   const estimatedCostCny = (usage.promptTokens / 1000) * 0.004 + (usage.completionTokens / 1000) * 0.012;
 

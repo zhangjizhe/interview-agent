@@ -106,17 +106,29 @@ export class InterviewController {
   }
 
   @Get('stats')
-  async tokenStats(@Query('userId') userId: string) {
-    if (!userId) return { totalTokens: 0, totalInterviews: 0 };
-    const user = await this.prisma.user.findUnique({
-      where: { email: `${userId}@demo.local` },
-    });
-    if (!user) {
-      return { totalTokens: 0, totalPrompt: 0, totalCompletion: 0, totalInterviews: 0, completedInterviews: 0 };
+  async tokenStats(@Query('userId') userId?: string) {
+    let where: any = undefined;
+
+    // 优先按 userId 过滤；找不到对应 user 时 fallback 到所有 demo-user-* 聚合
+    // (前端 localStorage 可能切过多次 user，DB 里没这个 userId 时不直接返 0)
+    if (userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { email: `${userId}@demo.local` },
+      });
+      if (user) {
+        where = { userId: user.id };
+      } else {
+        // fallback: 查所有 demo-user-* 前缀用户的总数据
+        const demoUsers = await this.prisma.user.findMany({
+          where: { email: { startsWith: 'demo-user-' } },
+          select: { id: true },
+        });
+        where = { userId: { in: demoUsers.map((u) => u.id) } };
+      }
     }
 
     const interviews = await this.prisma.interview.findMany({
-      where: { userId: user.id },
+      where,
       include: { messages: true },
     });
 
