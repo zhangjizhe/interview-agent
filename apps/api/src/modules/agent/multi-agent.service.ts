@@ -18,6 +18,7 @@ import {
   type InterviewAgentStateType,
 } from '../../agents/multi-agent/graph';
 import { LlmGatewayChatModel, threadIdStorage } from '../../agents/multi-agent/llm-gateway-chat-model';
+import { dedupFinalResponse } from '../../agents/multi-agent/dedup';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
 import { MemoryService } from '../memory/memory.service';
@@ -170,27 +171,32 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
-    // 流式输出策略：
+    // 流式输出策略（v2 - 真 streaming）：
     //
-    // 1. 用 LangGraph **invoke**（非 stream）跑完整图，拿到 state.final_response
-    //    —— reviewer 节点用 model.invoke() 生成 final_response,invoke 完成时
-    //    state.final_response 是完整字符串
-    // 2. 在这里**手动切块流式输出**：每 30ms yield 3 个字符（处理 emoji 用 Array.from），
-    //    模拟真实 token 流速。前端就能感受到"逐字出现"的视觉效果。
+    // 历史：v1 用 graph.invoke() 跑完整图，再手动切块 yield。前端必须等
+    //   supervisor→planner→executor→replanner→reviewer **5 个节点全跑完**
+    //   才能拿到第一个 token（首字延迟 ≈ 8-15s）。
     //
-    // 为什么不直接用 LangGraph stream + streamMode:'messages'：
-    //   - 节点用 model.stream() 时，LangChain 1.x 的 streamEvents 只 emit start/end，
-    //     不传播内部 stream 的 chunk（已验证：on_chat_model_stream 计数 = 0）
-    //   - 用 model.invoke() 又只能拿到完整 AIMessage（不是 delta），前端整块出来
+    // v2：用 graph.streamEvents(version:'v2') 监听 reviewer 节点内部的
+    //   model.stream() token，边生成边推给前端。
     //
-    // 为什么不调 LlmGateway.streamChat 重新生成 final_response：
-    //   - 浪费一次 LLM 调用（reviewer 已经生成过 final_response）
-    //   - 重新生成可能与原 final_response 不一致
+    // 链路：
+    //   reviewer.ts 改用 model.stream()（不再 invoke）
+    //   → LlmGatewayChatModel._streamResponseChunks() override 走 LlmGateway.streamChat()
+    //   → LangChain 1.x streamEvents v2 捕获 on_chat_model_stream 事件
+    //   → 本方法过滤 event.metadata.langgraph_node === 'reviewer' 的 token
+    //   → yield 给 interview-agent.service.processMessage
+    //   → SSE 推到前端 → 用户立刻看到首字
     //
-    // 手动切块流式的优势：
-    //   - 不依赖 LangChain stream 内部机制，行为可预测
-    //   - 流速可控（30ms / 3 字符 ≈ 100 字符/秒，符合人类阅读速度）
-    //   - 最终内容 100% 等于 reviewer 的 final_response，不会有"重新生成偏差"
+    // 为什么用 streamEvents 而不是 streamMode:'messages'：
+    //   - streamMode:'messages' 是 LangGraph 0.x 的事件协议，emit 的是节点 return 的
+    //     AIMessage chunk（节点用 model.invoke() 时是完整消息）
+    //   - streamEvents(version:'v2') 是 LangChain 1.x 推荐方式，能传播节点内部
+    //     model.stream() 的 on_chat_model_stream 事件（拿真 token delta）
+    //   - LlmGatewayChatModel._streamResponseChunks 已经 override 走 LlmGateway.streamChat，
+    //     真流式，所以 streamEvents 能拿到 chunk
+    //
+    // 预期：首字延迟 10s → 3-5s（节省 supervisor/planner/executor/replanner 串行等待）
     //
     // AsyncLocalStorage 包装：必须用 producer/queue 模式，让 ALS 上下文覆盖 generator 的整个生命周期
     const queue: any[] = [];
@@ -199,26 +205,38 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     const self = this;
     const producer = (async () => {
       try {
-        const state = await threadIdStorage.run({ threadId, userId }, async () =>
-          (await self.graph!.invoke(
+        await threadIdStorage.run({ threadId, userId }, async () => {
+          // streamEvents v2 不 emit 节点内部 ChatModel token（已验证：on_chat_model_stream 计数=0）
+          // 改用 LangGraph 1.x 原生 streamMode='messages'，会吐 [AIMessageChunk, metadata]
+          //
+          // 链路：reviewer 节点的 model.stream() → LlmGatewayChatModel._streamResponseChunks override
+          //   → LlmGateway.streamChat() 真流式 → AIMessageChunk 增量
+          //   → LangGraph 在 messages 模式下 emit 给外层
+          //   → 本方法过滤 metadata.langgraph_node === 'reviewer' 的 chunk
+          //   → yield 给前端
+          const stream = await self.graph!.stream(
             { messages: [new HumanMessage(userMessage)] } as any,
-            config,
-          )) as InterviewAgentStateType,
-        );
+            { ...config, streamMode: 'messages' as const },
+          );
 
-        const finalResponse = state.final_response || '';
-        if (finalResponse) {
-          // Dedup：消除 LLM 偶发重复输出（如"嗯嗯"重复一次 → 合并为"嗯"）
-          // 触发场景：reviewer 节点 retry 多次 + LLM 概率性输出重复段
-          // 实现：二分查找最大的"前半段 == 后半段"重复块,合并掉
-          const deduped = dedupFinalResponse(finalResponse);
-          // 按字符切块（用 Array.from 正确处理中文/emoji surrogate pair）
-          const chars = Array.from(deduped);
-          const chunkSize = 3;
-          for (let i = 0; i < chars.length; i += chunkSize) {
-            queue.push({ kind: 'data', content: chars.slice(i, i + chunkSize).join('') });
+          let tokenHitCount = 0;
+          for await (const [chunk, metadata] of stream) {
+            const node = (metadata as any)?.langgraph_node ?? '';
+            // 提取文本 delta：AIMessageChunk.content 可能是 string 或 MessageContentComplex[]
+            const c = chunk as any;
+            const piece =
+              typeof c?.content === 'string'
+                ? c.content
+                : Array.isArray(c?.content)
+                  ? c.content.map((b: any) => b?.text || '').join('')
+                  : '';
+            if (node === 'reviewer' && piece) {
+              tokenHitCount++;
+              queue.push({ kind: 'data', content: piece });
+            }
           }
-        }
+          self.logger.debug(`[stream] reviewer-token-hits=${tokenHitCount}`);
+        });
         done.v = true;
         queue.push({ kind: 'done' });
       } catch (e: any) {
@@ -418,20 +436,5 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
  * 只处理"前 N 字符 == 后 N 字符"的简单重复（最常见的形式）,
  * 复杂交叉重复不做处理(LLM 实际很少发生,过度处理反而会破坏正常内容)。
  */
-function dedupFinalResponse(text: string): string {
-  if (text.length < 20) return text;
-
-  // 从最大可能重复长度(取文本一半,且不超过 300 字符)开始往下找
-  const maxSearch = Math.min(300, Math.floor(text.length / 2));
-  for (let len = maxSearch; len >= 10; len--) {
-    const first = text.slice(0, len);
-    const second = text.slice(len, len + len);
-    if (first === second) {
-      // 找到重复块,合并:前半段 + 后半段之后的内容
-      const merged = first + text.slice(len + len);
-      // 递归检查合并后是否还有重复（理论上罕见,一次 dedup 通常够用）
-      return dedupFinalResponse(merged);
-    }
-  }
-  return text;
-}
+// dedupFinalResponse 已迁移到 agents/multi-agent/dedup.ts
+// 调用方从 '../../agents/multi-agent/dedup' import 共享版本

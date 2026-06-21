@@ -22,6 +22,7 @@ import { z } from 'zod';
 import { AIMessage } from 'langchain';
 import type { InterviewAgentStateType } from '../state';
 import { ReviewVerdictSchema } from '../state';
+import { dedupFinalResponse } from '../dedup';
 
 export const ReviewResultSchema = z.object({
     verdict: ReviewVerdictSchema,
@@ -57,10 +58,22 @@ export function createReviewerNode(model: BaseChatModel) {
             .join('\n\n');
 
         // 第一阶段：汇总生成 final_response
-        const synthesisResponse = await model.invoke([
-            {
-                role: 'system',
-                content: `你是一位专业的 AI 面试官小面。基于以下收集到的信息，给用户一个完整、专业的回复。
+        //
+        // P0 修复（首字延迟 10s → 3-5s）：改用 model.stream() 让 token 实时透传到 service
+        //
+        // 链路：model.stream() 内部触发 LlmGatewayChatModel._streamResponseChunks() override
+        //   → LlmGateway.streamChat() 真流式吐 token
+        //   → LangGraph streamEvents(version:'v2') 监听 on_chat_model_stream
+        //   → multi-agent.service.stream() 过滤 reviewer 节点的 token 推到前端
+        //
+        // 不再用 model.invoke() 是因为 invoke 一次性返回完整 AIMessage，
+        // service 只能等 reviewer 节点完成（即 supervisor→planner→executor→replanner→reviewer
+        // 全部跑完）才能 yield 第一个 token，用户感知到 10s 延迟。
+        const synthesisStream = await model.stream(
+            [
+                {
+                    role: 'system',
+                    content: `你是一位专业的 AI 面试官小面。基于以下收集到的信息，给用户一个完整、专业的回复。
 
 【用户意图】${state.user_intent}
 【收集到的信息】
@@ -72,11 +85,19 @@ ${pastStepsSummary}
 3. 如果是面试场景，每次只问一个问题
 4. 基于收集到的信息回答，不要编造
 5. 回复要直接面向用户，不要说"根据我收集到的信息..."`,
-            },
-            { role: 'user', content: lastMessage },
-        ], config);
-
-        const finalResponse = synthesisResponse.content as string;
+                },
+                { role: 'user', content: lastMessage },
+            ],
+            config,
+        );
+        let finalResponse = '';
+        for await (const chunk of synthesisStream) {
+            const piece = typeof chunk.content === 'string' ? chunk.content : '';
+            if (piece) finalResponse += piece;
+        }
+        // Dedup：消除 LLM 偶发重复输出（retry 时概率性输出"嗯嗯..."）
+        // 必须在 return 前 dedup，否则重复段已推到前端无法回收
+        finalResponse = dedupFinalResponse(finalResponse);
 
         // 第二阶段：审阅质量（结构化输出）
         const reviewResponse = await model.withStructuredOutput(ReviewResultSchema).invoke([
