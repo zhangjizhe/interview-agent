@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Langfuse Dashboard (Mock · Privacy-Safe)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #ffffff; color: #1f2937; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif; padding: 0; }
+  .frame { width: 1080px; padding: 16px 20px; background: #ffffff; }
+
+  /* 顶栏 */
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 14px; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+  .brand-logo { width: 18px; height: 18px; background: #1f2937; border-radius: 4px; }
+  .breadcrumb { color: #6b7280; font-size: 12px; }
+  .breadcrumb .sep { margin: 0 4px; }
+  .top-actions { display: flex; gap: 8px; align-items: center; }
+  .btn-clone { background: #1f2937; color: white; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+
+  /* 仪表盘标题 */
+  .title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .title { font-size: 16px; font-weight: 700; }
+  .filter-bar { display: flex; gap: 8px; }
+  .chip { padding: 3px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 11px; background: white; color: #374151; }
+  .chip .arrow { margin-left: 4px; color: #9ca3af; }
+
+  /* 卡片网格 */
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; }
+  .card .c-head { margin-bottom: 8px; }
+  .card .c-name { font-size: 12px; font-weight: 600; color: #111827; }
+  .card .c-desc { font-size: 10px; color: #6b7280; margin-top: 1px; }
+  .kpi { font-size: 24px; font-weight: 700; color: #111827; line-height: 1; margin-top: 4px; }
+  .kpi .unit { font-size: 13px; color: #6b7280; font-weight: 500; margin-left: 2px; }
+
+  /* 图表 */
+  .chart-area { height: 110px; position: relative; margin-top: 6px; }
+  .bar-chart { display: flex; align-items: end; height: 90px; gap: 4px; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb; position: relative; }
+  .bar { flex: 1; background: #6366f1; border-radius: 2px 2px 0 0; position: relative; min-height: 2px; }
+  .bar.alt { background: #06b6d4; }
+  .bar.zero { background: #e5e7eb; }
+  .x-axis { display: flex; justify-content: space-between; font-size: 9px; color: #9ca3af; padding: 4px 0 0; position: absolute; bottom: 0; left: 0; right: 0; }
+
+  .line-chart { position: relative; height: 100px; }
+  .y-axis { position: absolute; left: 0; top: 0; bottom: 14px; display: flex; flex-direction: column; justify-content: space-between; font-size: 9px; color: #9ca3af; }
+  .x-axis-l { position: absolute; bottom: 0; left: 24px; right: 0; display: flex; justify-content: space-between; font-size: 9px; color: #9ca3af; }
+  .line-svg { position: absolute; left: 24px; right: 0; top: 0; bottom: 14px; }
+
+  .h-bar-chart { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .h-row { display: flex; align-items: center; gap: 8px; font-size: 10px; }
+  .h-label { width: 70px; color: #6b7280; }
+  .h-track { flex: 1; height: 8px; background: #f3f4f6; border-radius: 4px; overflow: hidden; }
+  .h-fill { height: 100%; background: #6366f1; border-radius: 4px; }
+
+  /* Trace 树 */
+  .trace-tree { font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 10px; line-height: 1.7; }
+  .trace-tree .node { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .trace-tree .indent-1 { padding-left: 18px; }
+  .trace-tree .indent-2 { padding-left: 36px; }
+  .trace-tree .indent-3 { padding-left: 54px; }
+  .trace-tree .caret { color: #9ca3af; width: 10px; display: inline-block; }
+  .trace-tree .ico { width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center; border-radius: 3px; font-size: 9px; flex-shrink: 0; }
+  .trace-tree .ico.gen { background: #dbeafe; color: #1e40af; }
+  .trace-tree .ico.span { background: #fef3c7; color: #92400e; }
+  .trace-tree .ico.tool { background: #d1fae5; color: #065f46; }
+  .trace-tree .name { color: #1f2937; }
+  .trace-tree .meta { color: #6b7280; margin-left: 4px; }
+  .trace-tree .dur { margin-left: auto; color: #6366f1; font-weight: 600; }
+
+  /* Section title */
+  .section-title { font-size: 13px; font-weight: 700; color: #111827; margin: 14px 0 8px; display: flex; align-items: center; gap: 8px; }
+  .section-title .badge { font-size: 10px; padding: 2px 6px; background: #f3f4f6; color: #6b7280; border-radius: 4px; font-weight: 500; }
+
+  /* Mock badge */
+  .mock-tag { display: inline-block; padding: 2px 8px; background: #fef3c7; color: #92400e; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 8px; }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <!-- 顶栏 + 面包屑 -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-logo"></div>
+      <span>Langfuse <span style="color:#9ca3af;font-weight:400;font-size:11px;">v3.194.0</span></span>
+    </div>
+    <div class="breadcrumb">
+      project: <b>agent-demo</b>
+      <span class="sep">/</span>
+      <span>Dashboards</span>
+    </div>
+    <div class="top-actions">
+      <span style="font-size:11px;color:#6b7280;">⏱ 7d · Past 7 days</span>
+      <span class="btn-clone">⊕ Clone</span>
+    </div>
+  </div>
+
+  <!-- 仪表盘标题 + Mock 标注 -->
+  <div class="title-row">
+    <div>
+      <span class="title">LLM Observability Dashboard</span>
+      <span class="mock-tag">📊 MOCK · Privacy-Safe (no real data)</span>
+    </div>
+    <div class="filter-bar">
+      <span class="chip">7d<span class="arrow">▾</span></span>
+      <span class="chip">Filters<span class="arrow">▾</span></span>
+    </div>
+  </div>
+
+  <!-- ① 4 个核心 KPI -->
+  <div class="grid">
+    <div class="card">
+      <div class="c-head">
+        <div class="c-name">Total Trace Count</div>
+        <div class="c-desc">Total count of traces across all environments</div>
+      </div>
+      <div class="kpi">2.44<span class="unit">K</span></div>
+    </div>
+    <div class="card">
+      <div class="c-head">
+        <div class="c-name">Total Observation Count</div>
+        <div class="c-desc">Total count of observations across all environments</div>
+      </div>
+      <div class="kpi">5.06<span class="unit">K</span></div>
+    </div>
+    <div class="card">
+      <div class="c-head">
+        <div class="c-name">Total Cost (USD)</div>
+        <div class="c-desc">Total cost across all use cases</div>
+      </div>
+      <div class="kpi">$<span style="color:#059669;">3.24</span></div>
+    </div>
+    <div class="card">
+      <div class="c-head">
+        <div class="c-name">P95 Latency</div>
+        <div class="c-desc">95th percentile latency per request</div>
+      </div>
+      <div class="kpi">3.8<span class="unit">s</span></div>
+    </div>
+  </div>
+
+  <!-- ② 模型分布 + 趋势图 -->
+  <div class="section-title">Token 消耗 + 模型分布 <span class="badge">by Model</span></div>
+  <div class="grid">
+    <div class="card" style="grid-column: span 2;">
+      <div class="c-head">
+        <div class="c-name">Cost by Model Name</div>
+        <div class="c-desc">Total cost broken down by model name</div>
+      </div>
+      <div class="h-bar-chart">
+        <div class="h-row">
+          <span class="h-label">qwen-plus</span>
+          <span class="h-track"><span class="h-fill" style="width:72%;"></span></span>
+          <span style="color:#1f2937;font-weight:600;">$2.34</span>
+        </div>
+        <div class="h-row">
+          <span class="h-label">deepseek-chat</span>
+          <span class="h-track"><span class="h-fill" style="width:18%;background:#9ca3af;"></span></span>
+          <span style="color:#1f2937;font-weight:600;">$0.58</span>
+        </div>
+        <div class="h-row">
+          <span class="h-label">text-embedding-v3</span>
+          <span class="h-track"><span class="h-fill" style="width:9%;background:#06b6d4;"></span></span>
+          <span style="color:#1f2937;font-weight:600;">$0.29</span>
+        </div>
+        <div class="h-row">
+          <span class="h-label">qwen-turbo</span>
+          <span class="h-track"><span class="h-fill" style="width:1%;background:#d1d5db;"></span></span>
+          <span style="color:#1f2937;font-weight:600;">$0.03</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="c-head">
+        <div class="c-name">Tokens by Day</div>
+        <div class="c-desc">Input + Output tokens</div>
+      </div>
+      <div class="chart-area">
+        <div class="bar-chart">
+          <div class="bar zero" style="height:5%;"></div>
+          <div class="bar zero" style="height:5%;"></div>
+          <div class="bar zero" style="height:5%;"></div>
+          <div class="bar" style="height:25%;"></div>
+          <div class="bar zero" style="height:5%;"></div>
+          <div class="bar" style="height:55%;"></div>
+          <div class="bar alt" style="height:85%;"></div>
+        </div>
+        <div class="x-axis"><span>6/14</span><span>6/16</span><span>6/18</span><span>6/20</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ Trace 树 -->
+  <div class="section-title">Trace 树（单个 trace span 层级） <span class="badge">single trace detail</span></div>
+  <div class="card" style="padding:14px 16px;">
+    <div class="trace-tree">
+      <div class="node" style="padding:3px 0;border-bottom:1px dashed #e5e7eb;margin-bottom:4px;">
+        <span class="caret">▾</span>
+        <span class="ico gen">G</span>
+        <span class="name">interview-agent.run</span>
+        <span class="meta">· interviewId=demo-session · userId=user_001 · 2026-06-21 19:18:42</span>
+        <span class="dur">3,820 ms</span>
+      </div>
+
+      <div class="node indent-1">
+        <span class="caret">▾</span>
+        <span class="ico span">S</span>
+        <span class="name">agent.engine</span>
+        <span class="meta">engine=multi-agent · langgraph</span>
+        <span class="dur">3,815 ms</span>
+      </div>
+
+      <div class="node indent-2">
+        <span class="caret">▾</span>
+        <span class="ico span">S</span>
+        <span class="name">multi_agent.invoke</span>
+        <span class="meta">thread_id=demo-session</span>
+        <span class="dur">3,810 ms</span>
+      </div>
+
+      <div class="node indent-3">
+        <span class="caret">▾</span>
+        <span class="ico gen">G</span>
+        <span class="name">llm.planner_node</span>
+        <span class="meta">model=qwen-plus · in=1,243 · out=185</span>
+        <span class="dur">820 ms</span>
+      </div>
+
+      <div class="node indent-3">
+        <span class="caret">▾</span>
+        <span class="ico gen">G</span>
+        <span class="name">llm.executor_node</span>
+        <span class="meta">model=qwen-plus · in=2,180 · out=362 · cache=hit</span>
+        <span class="dur">1,240 ms</span>
+      </div>
+
+      <div class="node indent-3">
+        <span class="caret">▸</span>
+        <span class="ico tool">T</span>
+        <span class="name">mcp.knowledge_bank.search</span>
+        <span class="meta">milvus hybrid · top_k=5</span>
+        <span class="dur">68 ms</span>
+      </div>
+
+      <div class="node indent-3">
+        <span class="caret">▾</span>
+        <span class="ico gen">G</span>
+        <span class="name">llm.reviewer_node</span>
+        <span class="meta">model=qwen-plus · in=3,021 · out=148</span>
+        <span class="dur">950 ms</span>
+      </div>
+
+      <div class="node indent-3">
+        <span class="caret">▸</span>
+        <span class="ico span">S</span>
+        <span class="name">cost_panel.flush</span>
+        <span class="meta">prisma session_costs</span>
+        <span class="dur">12 ms</span>
+      </div>
+
+      <div class="node indent-1">
+        <span class="caret">▸</span>
+        <span class="ico span">S</span>
+        <span class="name">memory.append_short_term</span>
+        <span class="meta">redis hash · 1 msg</span>
+        <span class="dur">3 ms</span>
+      </div>
+
+      <div class="node indent-1">
+        <span class="caret">▸</span>
+        <span class="ico span">S</span>
+        <span class="name">langfuse.flush</span>
+        <span class="meta">batch=4 events</span>
+        <span class="dur">8 ms</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ Latency + Usage 行 -->
+  <div class="section-title">延迟 + 使用量趋势 <span class="badge">7d</span></div>
+  <div class="grid">
+    <div class="card" style="grid-column: span 2;">
+      <div class="c-head">
+        <div class="c-name">P95 Latency by Use Case</div>
+        <div class="c-desc">P95 latency metrics segmented by trace name</div>
+      </div>
+      <div class="line-chart">
+        <div class="y-axis"><span>4s</span><span>3s</span><span>2s</span><span>1s</span><span>0s</span></div>
+        <svg class="line-svg" viewBox="0 0 400 100" preserveAspectRatio="none">
+          <polyline fill="none" stroke="#6366f1" stroke-width="2"
+            points="0,80 60,75 120,70 180,60 240,55 300,72 360,68 400,65" />
+          <polyline fill="none" stroke="#06b6d4" stroke-width="2" stroke-dasharray="3,3"
+            points="0,85 60,82 120,78 180,76 240,75 300,80 360,78 400,77" />
+        </svg>
+        <div class="x-axis-l"><span>6/14</span><span>6/16</span><span>6/18</span><span>6/20</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="c-head">
+        <div class="c-name">Top Users (脱敏)</div>
+        <div class="c-desc">All userIds replaced with placeholder</div>
+      </div>
+      <div class="h-bar-chart">
+        <div class="h-row"><span class="h-label">user_001</span><span class="h-track"><span class="h-fill" style="width:88%;"></span></span></div>
+        <div class="h-row"><span class="h-label">user_002</span><span class="h-track"><span class="h-fill" style="width:62%;background:#9ca3af;"></span></span></div>
+        <div class="h-row"><span class="h-label">user_003</span><span class="h-track"><span class="h-fill" style="width:48%;background:#06b6d4;"></span></span></div>
+        <div class="h-row"><span class="h-label">user_004</span><span class="h-track"><span class="h-fill" style="width:31%;background:#a78bfa;"></span></span></div>
+        <div class="h-row"><span class="h-label">user_005</span><span class="h-track"><span class="h-fill" style="width:22%;background:#fbbf24;"></span></span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
