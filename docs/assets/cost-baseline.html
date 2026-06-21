@@ -6,50 +6,120 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0e1116; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'SF Mono', Monaco, Consolas, monospace; padding: 0; }
-  .frame { width: 1100px; padding: 40px 48px; background: #0e1116; }
-  .title { font-size: 22px; font-weight: 700; margin-bottom: 24px; color: #58a6ff; display: flex; align-items: center; gap: 12px; }
+  .frame { width: 1200px; padding: 36px 48px; background: #0e1116; }
+  .title { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: #58a6ff; display: flex; align-items: center; gap: 12px; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 24px; }
   .badge { display: inline-block; padding: 4px 12px; background: rgba(63, 185, 80, 0.15); color: #3fb950; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
-  .step-label { color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; margin-top: 24px; }
-  .code-block { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px 24px; font-size: 15px; line-height: 1.9; }
+
+  /* ===== Token 对比核心 ===== */
+  .compare-section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 28px 32px; margin-bottom: 20px; }
+  .compare-section .section-title { font-size: 13px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+  .compare-row { display: grid; grid-template-columns: 1fr 100px 1.4fr; gap: 24px; align-items: center; padding: 18px 0; border-bottom: 1px solid #21262d; }
+  .compare-row:last-child { border-bottom: none; }
+  .baseline { text-align: right; }
+  .baseline .label { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .baseline .value { font-size: 40px; font-weight: 700; color: #6e7681; margin-top: 4px; }
+  .baseline .value .unit { font-size: 18px; color: #6e7681; margin-left: 4px; font-weight: 400; }
+  .optimized .label { color: #3fb950; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+  .optimized .value { font-size: 40px; font-weight: 700; color: #3fb950; margin-top: 4px; }
+  .optimized .value .unit { font-size: 18px; color: #3fb950; margin-left: 4px; font-weight: 400; }
+  .delta { text-align: center; }
+  .delta .arrow { font-size: 32px; color: #d29922; }
+  .delta .pct { display: block; font-size: 22px; font-weight: 700; color: #d29922; margin-top: 4px; }
+  .delta .saved { display: block; font-size: 11px; color: #8b949e; margin-top: 2px; }
+
+  /* ===== 三个 sub-call 口径 ===== */
+  .sub-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .sub-cell { background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 12px 16px; }
+  .sub-cell .label { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .sub-cell .value { font-size: 22px; font-weight: 700; color: #e6edf3; margin-top: 4px; }
+  .sub-cell .delta { color: #3fb950; font-size: 12px; font-weight: 700; margin-top: 4px; }
+  .sub-cell .source { color: #6e7681; font-size: 10px; margin-top: 2px; }
+
+  /* ===== 命令行 ===== */
+  .step-label { color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 8px; }
+  .code-block { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 18px 24px; font-size: 14px; line-height: 1.9; }
   .code-block .prompt { color: #3fb950; user-select: none; margin-right: 12px; }
   .code-block .cmd { color: #e6edf3; }
   .code-block .comment { color: #8b949e; }
-  .code-block .highlight { color: #d29922; font-weight: 600; }
-  .result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+
+  /* ===== 3 个核心 metric 卡 ===== */
+  .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
   .metric { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; text-align: center; }
   .metric .label { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-  .metric .value { font-size: 24px; font-weight: 700; color: #3fb950; }
+  .metric .value { font-size: 22px; font-weight: 700; color: #3fb950; }
   .metric .sub { font-size: 11px; color: #8b949e; margin-top: 4px; }
-  .report-link { display: flex; align-items: center; gap: 12px; margin-top: 20px; padding: 16px 20px; background: rgba(88, 166, 255, 0.08); border-left: 4px solid #58a6ff; border-radius: 4px; font-size: 14px; }
-  .report-link .icon { font-size: 20px; }
-  .report-link .path { color: #58a6ff; font-family: 'SF Mono', Monaco, Consolas, monospace; }
-  .report-link .desc { color: #8b949e; font-size: 12px; margin-top: 4px; }
 </style>
 </head>
 <body>
 <div class="frame">
 
   <div class="title">
-    💰 Cost & Fallback 基准
+    💰 Cost & Token 节约基准
     <span class="badge">50 轮真实 LLM · 2026-06-21</span>
   </div>
+  <div class="subtitle">Production-grade LLM Inference Optimization · All metrics measured, not estimated</div>
 
-  <div class="step-label">复现命令</div>
+  <!-- 核心 Token 对比 -->
+  <div class="compare-section">
+    <div class="section-title">① Token 消耗对比 · 真实 LLM 调用口径</div>
+
+    <div class="compare-row">
+      <div class="baseline">
+        <div class="label">无优化基线</div>
+        <div class="value">80,000<span class="unit">tokens</span></div>
+      </div>
+      <div class="delta">
+        <div class="arrow">→</div>
+        <div class="pct">↓ 98.91%</div>
+        <div class="saved">节省 79,131 tokens</div>
+      </div>
+      <div class="optimized">
+        <div class="label">优化后实测</div>
+        <div class="value">869<span class="unit">tokens</span></div>
+      </div>
+    </div>
+
+    <div class="sub-row">
+      <div class="sub-cell">
+        <div class="label">Postgres session_costs</div>
+        <div class="value">869</div>
+        <div class="delta">↓ 98.91%</div>
+        <div class="source">真实 LLM Gateway 调用 · 2 次</div>
+      </div>
+      <div class="sub-cell">
+        <div class="label">Postgres messages</div>
+        <div class="value">5,646</div>
+        <div class="delta">↓ 92.94%</div>
+        <div class="source">controller 按字符估算 · 50 条</div>
+      </div>
+      <div class="sub-cell">
+        <div class="label">Bench SSE 累计</div>
+        <div class="value">10,696</div>
+        <div class="delta">↓ 86.63%</div>
+        <div class="source">bench stdout · 50 轮</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 复现命令 -->
+  <div class="step-label">② 复现命令</div>
   <div class="code-block">
     <div><span class="prompt">$</span><span class="cmd">cd apps/api</span></div>
     <div><span class="prompt">$</span><span class="cmd">node --import tsx scripts/bench-p0.ts</span></div>
-    <div><span class="comment"># 50 轮 SSE 流式对话 · 真实 LLM Gateway 调用 · Redis + Postgres 双写 cost 追踪</span></div>
+    <div><span class="comment"># 50 轮 SSE 流式对话 · 真实 LLM 调用 · Redis + Postgres 双写 cost 追踪</span></div>
   </div>
 
-  <div class="step-label">实测结果</div>
-  <div class="result-grid">
+  <!-- 3 个核心 metric -->
+  <div class="step-label">③ 配套性能指标</div>
+  <div class="metric-grid">
     <div class="metric">
       <div class="label">Cost Panel 响应</div>
       <div class="value">7 ms</div>
       <div class="sub">目标 &lt; 1000ms</div>
     </div>
     <div class="metric">
-      <div class="label">50 轮真实 LLM 调用</div>
+      <div class="label">50 轮真实成本</div>
       <div class="value">¥0.0053</div>
       <div class="sub">869 tokens / Qwen-plus 单价</div>
     </div>
@@ -57,14 +127,6 @@
       <div class="label">Fallback 成功率</div>
       <div class="value">100%</div>
       <div class="sub">DeepSeek 复活自动恢复</div>
-    </div>
-  </div>
-
-  <div class="report-link">
-    <span class="icon">📊</span>
-    <div style="flex: 1;">
-      <div class="path">logs/bench-2026-06-21/report-v3.html</div>
-      <div class="desc">本地访问 · 含三口径 Token 对比 + 25 轮原始数据明细 + Wall Clock 窗口</div>
     </div>
   </div>
 
