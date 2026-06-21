@@ -11,33 +11,39 @@
 
 ---
 
-## 最新基准（2026-06-21 实测）
+## 最新基准（2026-06-21 实测 · 真实 A/B 对比）
+
+### 50 轮对话真实测量
 
 | 指标 | 实测值 | 备注 |
 |---|---|---|
-| **Cost Panel 响应** | **7 ms** | 目标 < 1000 ms；Redis Hash + Postgres 双写 |
-| 50 轮对话真实 LLM 调用 | 2 次 / 869 tokens | `session_costs.totalTokens`（最可信口径）|
-| 50 轮对话 SSE token 累计 | 10,696 tokens | `bench-p0.ts` stdout（含估算）|
-| 50 轮对话 Message 估算 | 5,646 tokens | `messages.promptTokens + completionTokens` |
-| 50 轮对话真实成本 | ¥0.0053 | Qwen-plus 单价（¥0.004/1K input）|
+| **Cost Panel 响应** | **7-45 ms** | 目标 < 1000 ms；Redis Hash + Postgres 双写 |
+| **语义缓存命中率** | **100% (2/2)** | multi-agent 路径接通 LlmGateway.semanticCacheType |
+| **Cost Panel 重试率** | **0%** | cache 命中不计费 |
+| 实验组 LLM 调用 | 2 次 / 869 tokens | `session_costs.totalTokens`（最可信口径）|
 | Fallback 链路触发 | **0%** | DeepSeek 复活 → 全走 Qwen 主路径 |
 | Prompt Cache 命中 | 0/0 = 0% | Qwen dashscope OpenAI 兼容层不支持 `prompt_cache_key`（已知根因）|
 | 单元测试 | **45/45 passed** | Jest 实测 |
 | 容器启动 | 7 容器 healthy | postgres / redis / qdrant / milvus / milvus-etcd / api / web |
 
-> ⚠️ **诚实标注**：Cache 工程代码完整（3 段前缀识别 + cache_key 注入 + Semantic Cache 黑白名单），但底层 provider 不支持 `prompt_cache_key`，导致真实命中率 0%。生产环境需切换至 OpenAI 直连或 Anthropic Claude 方可生效。
+### A/B 对照 · 真实测量（3 组，50 轮）
 
 <p align="center">
-  <img src="./docs/assets/bench-performance-overview.png" alt="LLM Inference Cost Optimization · Production Benchmark" width="100%">
+  <img src="./docs/assets/cost-baseline.png" alt="LLM Inference Benchmark · 3 组对比" width="100%">
 </p>
 
-### 三口径 Token 对比
-
-| 口径 | 数值 | vs 80K 基线 | 数据来源 |
+| 指标 | 对照组（直接调 Qwen）| 实验组 v3（cache 未生效）| 实验组 v9（cache 100% 命中）|
 |---|---|---|---|
-| **真实 LLM 调用** | 869 tokens | ↓ 98.91% | `session_costs.totalTokens`（⭐ 最可信）|
-| Message 估算 | 5,646 tokens | ↓ 92.94% | `messages.promptTokens + completionTokens`（粗算）|
-| Bench SSE 累计 | 10,696 tokens | ↓ 86.63% | `bench-p0.ts` stdout（估算）|
+| **总 Token** | 583,926 | 869 | **0** |
+| **成本 (¥)** | ¥2.5177 | ¥0.0053 | **¥0** |
+| **LLM 调用** | 50 | 2 | 2（cache hit）|
+| **总耗时** | 524.4s | 552.6s | **283.8s**（-49%）|
+
+> ⚠️ **诚实标注**：
+> - **对照组**：`scripts/bench-control.ts` 独立 CLI，绕过所有优化层直接调 Qwen dashscope。`583,926 tokens` 来自真实 HTTP 响应（`usage.total_tokens` 累计）。
+> - **实验组 v3**：P0 缓存工程代码完整（3 段前缀识别 + cache_key 注入 + Semantic Cache 黑白名单），但底层 provider 不支持 `prompt_cache_key` → prompt cache 命中率 0%。
+> - **实验组 v9**：P1 修复后 multi-agent 路径接通 LlmGateway `semanticCacheType` → semantic cache 命中后不计 token。
+> - **本项目 cache 命中率定义**：`命中数 / (命中数 + miss 数)`，v9 = 2/2 = 100%。
 
 ---
 

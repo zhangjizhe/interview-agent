@@ -37,6 +37,11 @@ export interface LlmGatewayChatModelFields extends BaseChatModelParams {
   provider: 'qwen' | 'deepseek';
   interviewId?: string;
   userId?: string;
+  /**
+   * Semantic cache namespace · 命中后 0 LLM 调用 + 0 token + cost 计数 (provider='semantic_cache')
+   * 推荐值 'interview_question' / 'general_qa' (匹配 SemanticCacheService 白名单)
+   */
+  cacheType?: string;
 }
 
 /**
@@ -57,6 +62,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
   private provider: 'qwen' | 'deepseek';
   private interviewId: string;
   private userId: string;
+  private cacheType: string;
 
   constructor(fields: LlmGatewayChatModelFields) {
     super(fields);
@@ -64,6 +70,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
     this.provider = fields.provider;
     this.interviewId = fields.interviewId || 'unknown';
     this.userId = fields.userId || 'anonymous';
+    this.cacheType = fields.cacheType || 'interview_question';
 
     // LangChain v1.x：父类 lc_serializable 是 property，子类 override 必须用同样的方式
     // 用 defineProperty 在实例上覆盖，避免 TS2611 冲突
@@ -81,6 +88,11 @@ export class LlmGatewayChatModel extends BaseChatModel {
   /**
    * LangChain 内部调这个方法生成内容
    * 这里转给 LlmGateway，承接缓存、降级、成本埋点
+   *
+   * 缓存策略：传 semanticCacheType 给 llmGateway.chat(),
+   *   llmGateway 内部会查 cache 并 recordLlmCall(provider='semantic_cache')
+   *   命中 → 0 LLM 调用 + cost 计数
+   *   miss → 正常调 LLM + cost 计数 + 异步写 cache
    */
   async _generate(
     messages: BaseMessage[],
@@ -94,6 +106,8 @@ export class LlmGatewayChatModel extends BaseChatModel {
         messages: gatewayMessages,
         interviewId: resolvedInterviewId,
         userId: resolvedUserId,
+        // 关键：传 semanticCacheType 让 llmGateway 内部处理 cache 查 + 计数 + 回写
+        semanticCacheType: this.cacheType as any,
       },
       this.provider,
     );

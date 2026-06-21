@@ -58,6 +58,10 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
       const model = new LlmGatewayChatModel({
         llmGateway: this.llm,
         provider: providerName,
+        // cacheType 让 llmGateway.chat 内部查 semantic cache
+        // 命中 → 0 LLM 调用 + 0 token + cost 计数 (provider='semantic_cache')
+        // miss → 正常调 LLM + 异步写 cache
+        cacheType: 'interview_question',
         // P0 修复：不在初始化时硬编码 interviewId
         // LlmGatewayChatModel._generate 会从 LangGraph runtime config.configurable.thread_id 动态拿真实 sessionId
         // 这里写 'unknown' 仅作为 fallback（如果将来出现脱离 thread_id 的调用）

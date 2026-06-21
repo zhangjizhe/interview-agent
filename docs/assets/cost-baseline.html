@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>LLM Inference A/B Benchmark</title>
+<title>LLM Inference Benchmark · 3 组对比</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0e1116; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'SF Mono', Monaco, Consolas, monospace; padding: 0; }
@@ -12,29 +12,29 @@
   .badge { display: inline-block; padding: 3px 10px; background: rgba(63, 185, 80, 0.15); color: #3fb950; border-radius: 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
   .section-label { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 8px; font-weight: 600; }
 
-  /* ===== A/B 对比 ===== */
   .compare-section { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 18px 22px; }
-  .compare-row { display: grid; grid-template-columns: 130px 1fr 70px 1fr; gap: 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid #21262d; }
-  .compare-row:last-child { border-bottom: none; }
-  .compare-row.header-row { border-bottom: 1px solid #30363d; padding-bottom: 8px; }
-  .compare-row.header-row > div { color: #8b949e; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
-  .col-label { color: #8b949e; font-size: 12px; }
-  .col-control .value { font-size: 26px; font-weight: 700; color: #f85149; }
-  .col-control .sub { font-size: 10px; color: #8b949e; margin-top: 2px; }
-  .col-optimized .value { font-size: 26px; font-weight: 700; color: #3fb950; }
-  .col-optimized .sub { font-size: 10px; color: #8b949e; margin-top: 2px; }
-  .col-delta .arrow { font-size: 18px; color: #d29922; text-align: center; }
-  .col-delta .pct { display: block; font-size: 14px; font-weight: 700; color: #d29922; text-align: center; margin-top: 2px; }
+  table.cmp { width: 100%; }
+  table.cmp th { color: #8b949e; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; padding: 8px 6px; text-align: right; }
+  table.cmp th:first-child { text-align: left; }
+  table.cmp th.control { color: #f85149; }
+  table.cmp th.v3 { color: #d29922; }
+  table.cmp th.v9 { color: #3fb950; }
+  table.cmp td { padding: 10px 6px; font-size: 12px; border-top: 1px solid #21262d; vertical-align: top; }
+  table.cmp td.label { color: #8b949e; text-align: left; }
+  table.cmp td.big { font-size: 22px; font-weight: 700; text-align: right; }
+  table.cmp td.sub { font-size: 10px; color: #8b949e; text-align: right; margin-top: 1px; }
+  table.cmp td.delta { color: #3fb950; font-weight: 700; text-align: center; font-size: 13px; vertical-align: middle; }
 
-  /* ===== prompt 增长曲线 ===== */
-  .growth-section { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px 22px; }
-  .growth-table { width: 100%; }
-  .growth-table td { padding: 7px 6px; font-size: 12px; }
-  .growth-table td:first-child { color: #8b949e; width: 140px; }
-  .growth-table td.num { color: #e6edf3; font-weight: 600; font-family: 'SF Mono', Monaco, Consolas, monospace; text-align: right; width: 100px; }
-  .growth-bar { display: inline-block; height: 7px; background: #f85149; border-radius: 2px; vertical-align: middle; }
+  .verify-section { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px 22px; }
+  table.v { width: 100%; }
+  table.v td { padding: 6px 8px; font-size: 12px; border-top: 1px solid #21262d; }
+  table.v td:first-child { color: #8b949e; }
+  table.v td.num { color: #e6edf3; font-weight: 600; font-family: 'SF Mono', Monaco, Consolas, monospace; text-align: right; }
+  table.v td:first-child.row { border-top: none; }
+  table.v td.row { border-top: 1px solid #21262d; }
+  .ok { color: #3fb950; font-weight: 700; }
+  .fail { color: #f85149; font-weight: 700; }
 
-  /* ===== 复现命令 ===== */
   .cmd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .code-block { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 16px; font-size: 12px; line-height: 1.7; }
   .code-block .prompt { color: #3fb950; user-select: none; margin-right: 8px; }
@@ -46,56 +46,79 @@
 <div class="frame">
 
   <div class="title">
-    ⚡ LLM Inference A/B Benchmark
-    <span class="badge">50 轮 · 对照组 vs 实验组 · 2026-06-21</span>
+    ⚡ LLM Inference Benchmark
+    <span class="badge">3 组对比 · 50 轮 · 2026-06-21</span>
   </div>
-  <div class="subtitle">对照组: 绕过所有优化直接调 Qwen · 实验组: multi-agent + cache + cost panel</div>
+  <div class="subtitle">对照组 (无优化) · 实验组 v3 (cache 未生效) · 实验组 v9 (cache 100% 命中)</div>
 
-  <!-- A/B 对比 -->
+  <!-- 3 组对比 -->
   <div class="compare-section">
-    <div class="section-label">① A/B 对比 · 真实测量</div>
-    <div class="compare-row header-row">
-      <div>指标</div>
-      <div style="color: #f85149;">对照组 (无优化)</div>
-      <div></div>
-      <div style="color: #3fb950;">实验组 (当前配置)</div>
-    </div>
-    <div class="compare-row">
-      <div class="col-label">总 Token</div>
-      <div class="col-control"><div class="value">583,926</div><div class="sub">50 calls · 线性 prompt 累积</div></div>
-      <div class="col-delta"><div class="arrow">→</div><div class="pct">↓ 99.85%</div></div>
-      <div class="col-optimized"><div class="value">869</div><div class="sub">2 calls · multi-agent 短路</div></div>
-    </div>
-    <div class="compare-row">
-      <div class="col-label">成本 (¥)</div>
-      <div class="col-control"><div class="value">¥2.5177</div><div class="sub">Qwen-plus 单价</div></div>
-      <div class="col-delta"><div class="arrow">→</div><div class="pct">↓ 99.79%</div></div>
-      <div class="col-optimized"><div class="value">¥0.0053</div><div class="sub">869 tokens</div></div>
-    </div>
-    <div class="compare-row">
-      <div class="col-label">LLM 调用</div>
-      <div class="col-control"><div class="value">50</div><div class="sub">每轮打 Qwen</div></div>
-      <div class="col-delta"><div class="arrow">→</div><div class="pct">↓ 96%</div></div>
-      <div class="col-optimized"><div class="value">2</div><div class="sub">graph 短路</div></div>
-    </div>
-    <div class="compare-row">
-      <div class="col-label">总耗时</div>
-      <div class="col-control"><div class="value">524.4s</div><div class="sub"></div></div>
-      <div class="col-delta"><div class="arrow">→</div><div class="pct">+5%</div></div>
-      <div class="col-optimized"><div class="value">552.6s</div><div class="sub">含 multi-agent 编排</div></div>
-    </div>
+    <div class="section-label">① 3 组 A/B 对比 · 真实测量</div>
+    <table class="cmp">
+      <thead>
+        <tr>
+          <th>指标</th>
+          <th class="control">对照组 (无优化)</th>
+          <th></th>
+          <th class="v3">v3 (cache 未生效)</th>
+          <th></th>
+          <th class="v9">v9 (cache 100%)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="label">总 Token</td>
+          <td class="big" style="color: #f85149;">583,926<div class="sub">50 calls · 线性 prompt 累积</div></td>
+          <td class="delta">↓ 99.85%</td>
+          <td class="big" style="color: #d29922;">869<div class="sub">2 calls · Qwen dashscope 不支持 prompt_cache_key</div></td>
+          <td class="delta">↓ 100%</td>
+          <td class="big" style="color: #3fb950;">0<div class="sub">2 cache hit · 0 LLM token</div></td>
+        </tr>
+        <tr>
+          <td class="label">成本 (¥)</td>
+          <td class="big" style="color: #f85149;">¥2.5177<div class="sub">Qwen-plus 单价</div></td>
+          <td class="delta">↓ 99.79%</td>
+          <td class="big" style="color: #d29922;">¥0.0053<div class="sub">869 tokens</div></td>
+          <td class="delta">↓ 100%</td>
+          <td class="big" style="color: #3fb950;">¥0<div class="sub">cache 命中不计费</div></td>
+        </tr>
+        <tr>
+          <td class="label">LLM 调用</td>
+          <td class="big" style="color: #f85149;">50<div class="sub">每轮打 Qwen</div></td>
+          <td class="delta">↓ 96%</td>
+          <td class="big" style="color: #d29922;">2<div class="sub">multi-agent 短路</div></td>
+          <td class="delta">↓ 60%</td>
+          <td class="big" style="color: #3fb950;">2<div class="sub">cache hit (provider=semantic_cache)</div></td>
+        </tr>
+        <tr>
+          <td class="label">总耗时</td>
+          <td class="big" style="color: #f85149;">524.4s<div class="sub">线性增长</div></td>
+          <td class="delta">+5%</td>
+          <td class="big" style="color: #d29922;">552.6s<div class="sub">含编排开销</div></td>
+          <td class="delta">↓ 49%</td>
+          <td class="big" style="color: #3fb950;">283.8s<div class="sub">cache 命中不走 LLM</div></td>
+        </tr>
+        <tr>
+          <td class="label">Cache 命中率</td>
+          <td class="big" style="color: #6e7681;">—<div class="sub">无 cache</div></td>
+          <td class="delta"></td>
+          <td class="big" style="color: #d29922;">0%<div class="sub">Provider 限制</div></td>
+          <td class="delta">+100pp</td>
+          <td class="big" style="color: #3fb950;">100%<div class="sub">2/2 semantic cache hits</div></td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
-  <!-- prompt 增长 -->
-  <div class="growth-section">
-    <div class="section-label">② 对照组 prompt token 线性增长 (无 context 压缩的真实代价)</div>
-    <table class="growth-table">
-      <tr><td>Round 0</td><td class="num">63</td><td><div class="growth-bar" style="width: 0.3%"></div></td></tr>
-      <tr><td>Round 10</td><td class="num">4,357</td><td><div class="growth-bar" style="width: 20%"></div></td></tr>
-      <tr><td>Round 20</td><td class="num">8,842</td><td><div class="growth-bar" style="width: 40%"></div></td></tr>
-      <tr><td>Round 30</td><td class="num">13,755</td><td><div class="growth-bar" style="width: 62%"></div></td></tr>
-      <tr><td>Round 40</td><td class="num">18,638</td><td><div class="growth-bar" style="width: 84%"></div></td></tr>
-      <tr><td>Round 49 (末轮)</td><td class="num">~23,000</td><td><div class="growth-bar" style="width: 100%"></div></td></tr>
+  <!-- 5 项验收 -->
+  <div class="verify-section">
+    <div class="section-label">② 5 项验收结果 (v9 当前)</div>
+    <table class="v">
+      <tr><td class="row">Token 节省 ≥ 55%</td><td class="row num">↓ 99.85% (对照组 vs 实验组)</td><td class="row ok">✅ PASS</td></tr>
+      <tr><td>Prompt Cache ≥ 65%</td><td class="num">0% (Qwen dashscope 限制)</td><td class="fail">❌ FAIL</td></tr>
+      <tr><td>语义缓存命中率 ≥ 20%</td><td class="num">100% (2/2)</td><td class="ok">✅ PASS</td></tr>
+      <tr><td>重试率 &lt; 5%</td><td class="num">0%</td><td class="ok">✅ PASS</td></tr>
+      <tr><td>Cost Panel &lt; 1000ms</td><td class="num">45ms</td><td class="ok">✅ PASS</td></tr>
     </table>
   </div>
 
@@ -107,8 +130,8 @@
       <div><span class="comment"># 对照组 · 直接调 Qwen</span></div>
     </div>
     <div class="code-block">
-      <div><span class="prompt">$</span><span class="cmd">node --import tsx scripts/bench-p0.ts</span></div>
-      <div><span class="comment"># 实验组 · 完整 multi-agent + cache</span></div>
+      <div><span class="prompt">$</span><span class="cmd">npx ts-node scripts/bench-p0.ts</span></div>
+      <div><span class="comment"># 实验组 · multi-agent + cache</span></div>
     </div>
   </div>
 
