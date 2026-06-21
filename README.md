@@ -28,7 +28,7 @@
 > ⚠️ **诚实标注**：Cache 工程代码完整（3 段前缀识别 + cache_key 注入 + Semantic Cache 黑白名单），但底层 provider 不支持 `prompt_cache_key`，导致真实命中率 0%。生产环境需切换至 OpenAI 直连或 Anthropic Claude 方可生效。
 
 <p align="center">
-  <img src="./docs/assets/bench-report-v3.png" alt="Bench Report v3 — Cost Panel 7ms · Fallback 0% · 三口径 Token 对比 + 25 轮原始数据明细" width="100%">
+  <img src="./docs/assets/bench-performance-overview.png" alt="LLM Inference Cost Optimization · Production Benchmark" width="100%">
 </p>
 
 ### 三口径 Token 对比
