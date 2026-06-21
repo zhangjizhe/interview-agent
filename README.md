@@ -393,6 +393,83 @@ AGENT_ENGINE=llm-direct   # 直连 LLM（最小依赖降级兜底）
 
 ---
 
+## 部署说明：本地自托管 vs 云服务
+
+> ⚠️ **为什么这一节重要**：本仓库 `.env.example` 默认指向云服务（Mem0 Cloud / Langfuse Cloud），开箱即用无配置；但**生产 / 商用 / 隐私敏感场景必须切到本地自托管**。下表是所有外部依赖的部署模式说明，便于按场景选型。
+
+### 外部依赖部署模式
+
+| 依赖 | 本仓库默认 | 本地自托管方案 | 数据出域 | 适用场景 |
+|---|---|---|---|---|
+| **LLM（Qwen/DeepSeek）** | DashScope / DeepSeek 云 API | OpenAI 兼容私有部署（vLLM / Ollama / LocalAI） | ✅ 上云 | Demo / 生产需自托管 |
+| **Milvus** | Docker 容器本地部署 | ✅ 默认就是本地 | ❌ 不出域 | 生产可用 |
+| **Qdrant** | Docker 容器本地部署 | ✅ 默认就是本地 | ❌ 不出域 | 生产可用 |
+| **Postgres** | Docker 容器本地部署 | ✅ 默认就是本地 | ❌ 不出域 | 生产可用 |
+| **Redis** | Docker 容器本地部署 | ✅ 默认就是本地 | ❌ 不出域 | 生产可用 |
+| **Mem0** | **Mem0 Cloud（api.mem0.ai）** | Mem0 OSS + 自托管 Postgres / Qdrant 后端 | ⚠️ **默认上传第三方** | 隐私场景必切 |
+| **Langfuse** | **Langfuse Cloud（us.cloud.langfuse.com）** | Langfuse OSS + Docker 自部署 | ⚠️ **默认上传第三方** | 隐私场景必切 |
+
+### Mem0 切换为本地自托管
+
+Mem0 OSS (`mem0ai` 包) 支持接入自托管 vector store + LLM，避免数据上云：
+
+```bash
+# .env 配置：把 Mem0 切到本地 OSS（用项目已有的 Qdrant 做向量存储）
+MEM0_API_KEY=                       # 清空，不走 Cloud
+MEM0_HOST=http://localhost:8000     # 自托管 Mem0 OSS endpoint（需单独部署）
+# 或者彻底关掉 Mem0，仅用 Milvus 长期记忆
+MEM0_ENABLED=false
+```
+
+代码侧已实现自动降级：`apps/api/src/modules/memory/long-term/mem0.store.ts` 检测到 `MEM0_ENABLED=false` 时直接返回空，调用方 fallback 到 `milvus-memory.store.ts` 纯本地向量召回。
+
+### Langfuse 切换为本地自托管
+
+Langfuse OSS 提供 Docker 一键部署（[官方文档](https://langfuse.com/self-hosting)）：
+
+```bash
+# 1. 启动 Langfuse OSS（pg + clickhouse + langfuse-web + langfuse-worker）
+git clone https://github.com/langfuse/langfuse.git
+cd langfuse
+docker compose up -d
+
+# 2. .env 配置：切换到自托管
+LANGFUSE_HOST=http://localhost:3000        # 自托管 Langfuse endpoint
+LANGFUSE_PUBLIC_KEY=lf_pk_xxx              # 自托管项目 public key
+LANGFUSE_SECRET_KEY=lf_sk_xxx              # 自托管项目 secret key
+```
+
+代码侧已实现自动降级：`apps/api/src/infra/langfuse/langfuse.service.ts` 检测到 `LANGFUSE_PUBLIC_KEY` 为空时跳过调用，不影响主流程。
+
+### 关于本仓库的产品截图
+
+`docs/assets/product-showcase.png` 第 4 格是 **Langfuse Dashboard 模拟图（Privacy-Safe）**，不是云端真实截图：
+
+- ✅ 演示了 Trace 树 / Token 消耗 / 模型分布 / Latency 等核心可观测能力
+- ✅ 所有用户标识用 `user_001 / user_002` 占位，无真实 PII
+- ❌ 数字是 mock 的，不是真实 A/B 测量值（真实数据见 `docs/assets/cost-baseline.png`）
+
+要查看**真实 Langfuse 数据**：
+
+```bash
+# 1. 用 Docker 跑 Langfuse OSS（参考上面"切换为本地自托管"）
+# 2. 启动 interview-agent，会自动上报 trace 到 http://localhost:3000
+# 3. 浏览器打开 Langfuse → 选 agent-demo 项目 → 看真实 trace
+```
+
+### 商用部署检查清单
+
+部署到生产前逐项确认：
+
+- [ ] `MEM0_API_KEY` 清空，启用本地 Milvus 长期记忆（避免 GDPR 风险）
+- [ ] `LANGFUSE_PUBLIC_KEY` 指向自托管 Langfuse 或关闭
+- [ ] LLM API Key 走公司内部代理或私有部署（避免 token 泄漏）
+- [ ] Postgres / Redis / Qdrant / Milvus 全部本地 Docker 或 K8s 部署
+- [ ] 启用 HTTPS（Nginx + Let's Encrypt / ALB）
+- [ ] 配置 `.env.production` 不入 Git（参考 `.gitignore`）
+
+---
+
 ## 项目结构
 
 ```
