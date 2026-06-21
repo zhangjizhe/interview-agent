@@ -22,6 +22,7 @@ import { dedupFinalResponse } from '../../agents/multi-agent/dedup';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
 import { GitHubTool } from './tools/github.tool';
+import { NotionTool } from './tools/notion.tool';
 import { MemoryService } from '../memory/memory.service';
 import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
 import { McpRegistry } from '../interview/services/mcp-registry';
@@ -42,6 +43,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     private memory: MemoryService,
     private kb: KnowledgeBaseService,
     private github: GitHubTool,
+    private notion: NotionTool,
     private reflectionService?: ReflectionService, // ADR #10 Phase 1：可选注入，避免循环依赖
   ) {}
 
@@ -149,8 +151,22 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
       async (args: any) => this.github.execute('github_get_readme', args),
     );
 
+    // ADR #11：Notion 集成 3 个 tools
+    const bound7 = McpRegistry.bindExecute(
+      'notion_search',
+      async (args: any) => this.notion.execute('notion_search', args),
+    );
+    const bound8 = McpRegistry.bindExecute(
+      'notion_get_page',
+      async (args: any) => this.notion.execute('notion_get_page', args),
+    );
+    const bound9 = McpRegistry.bindExecute(
+      'notion_list_databases',
+      async (args: any) => this.notion.execute('notion_list_databases', args),
+    );
+
     this.logger.debug(
-      `[ToolBinding] bound ${[bound1, bound2, bound3, bound4, bound5, bound6].filter(Boolean).length}/6 tools via McpRegistry`,
+      `[ToolBinding] bound ${[bound1, bound2, bound3, bound4, bound5, bound6, bound7, bound8, bound9].filter(Boolean).length}/9 tools via McpRegistry`,
     );
   }
 

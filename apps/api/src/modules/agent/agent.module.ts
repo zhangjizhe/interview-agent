@@ -4,6 +4,7 @@ import { DeepAgentsAgentService } from './deepagents-agent.service';
 import { MultiAgentService } from './multi-agent.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
 import { GitHubTool } from './tools/github.tool';
+import { NotionTool } from './tools/notion.tool';
 import { ContextManager } from './services/context-manager.service';
 import { LlmModule } from '../llm/llm.module';
 import { MemoryModule } from '../memory/memory.module';
@@ -19,7 +20,8 @@ import { ReflectionModule } from '../reflection/reflection.module';
     DeepAgentsAgentService, // 写真实 deepagents
     MultiAgentService, // LangGraph 多 Agent（Supervisor 模式）
     BochaSearchTool,
-    GitHubTool, // ADR #11：MCP 第三方工具集成
+    GitHubTool, // ADR #11：GitHub 集成
+    NotionTool, // ADR #11：Notion 集成
     ContextManager,
   ],
   exports: [InterviewAgentService, DeepAgentsAgentService, MultiAgentService, ContextManager],

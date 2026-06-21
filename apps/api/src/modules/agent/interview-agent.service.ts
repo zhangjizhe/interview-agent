@@ -5,6 +5,7 @@ import { MemoryService, type WorkingState } from '../memory/memory.service';
 import { LangfuseService } from '../../infra/langfuse/langfuse.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
 import { GitHubTool } from './tools/github.tool';
+import { NotionTool } from './tools/notion.tool';
 import { ContextManager } from './services/context-manager.service';
 import { DeepAgentsAgentService } from './deepagents-agent.service';
 import { MultiAgentService } from './multi-agent.service';
@@ -176,6 +177,12 @@ export class InterviewAgentService {
       for (const ghDef of GitHubTool.definitions) {
         if (toolNames.has(ghDef.function.name)) {
           tools.push(ghDef);
+        }
+      }
+      // ADR #11：Notion 集成 3 个 tools
+      for (const notionDef of NotionTool.definitions) {
+        if (toolNames.has(notionDef.function.name)) {
+          tools.push(notionDef);
         }
       }
 

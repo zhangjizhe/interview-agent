@@ -338,3 +338,36 @@ McpRegistry.register({
   author: 'system',
   version: '1.0.0',
 });
+
+McpRegistry.register({
+  name: 'notion_search',
+  displayName: 'Notion 全文搜索',
+  description: '在 Notion 工作区全文搜索页面，按 query 匹配标题或内容',
+  emoji: '📝',
+  category: 'mcp',
+  enabled: true,
+  author: 'system',
+  version: '1.0.0',
+});
+
+McpRegistry.register({
+  name: 'notion_get_page',
+  displayName: 'Notion 页面内容',
+  description: '获取 Notion 页面详情（properties + markdown 格式内容）',
+  emoji: '📄',
+  category: 'mcp',
+  enabled: true,
+  author: 'system',
+  version: '1.0.0',
+});
+
+McpRegistry.register({
+  name: 'notion_list_databases',
+  displayName: 'Notion 数据库列表',
+  description: '列出当前 integration 可访问的所有 databases',
+  emoji: '🗂️',
+  category: 'mcp',
+  enabled: true,
+  author: 'system',
+  version: '1.0.0',
+});
