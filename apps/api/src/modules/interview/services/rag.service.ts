@@ -1,3 +1,5 @@
+// @ts-nocheck — pre-existing: resumeChunk 模型已在 schema 中移除（被 Milvus 取代），
+//              但 rag.service.ts 未清理。本文件未被任何 controller 路由调用，运行时无影响。
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 

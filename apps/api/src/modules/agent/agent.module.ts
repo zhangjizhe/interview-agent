@@ -9,9 +9,10 @@ import { MemoryModule } from '../memory/memory.module';
 import { PrismaModule } from '../../infra/prisma/prisma.module';
 import { KnowledgeBaseModule } from '../knowledge-base/knowledge-base.module';
 import { TaskQueueModule } from './task-queue.module';
+import { ReflectionModule } from '../reflection/reflection.module';
 
 @Module({
-  imports: [LlmModule, MemoryModule, PrismaModule, KnowledgeBaseModule, TaskQueueModule],
+  imports: [LlmModule, MemoryModule, PrismaModule, KnowledgeBaseModule, TaskQueueModule, ReflectionModule],
   providers: [
     InterviewAgentService, // 手写循环（兜底）
     DeepAgentsAgentService, // 写真实 deepagents

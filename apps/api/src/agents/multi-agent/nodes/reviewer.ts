@@ -24,15 +24,31 @@ import type { InterviewAgentStateType } from '../state';
 import { ReviewVerdictSchema } from '../state';
 import { dedupFinalResponse } from '../dedup';
 
+export const IssueTagSchema = z.enum([
+    'factual_error',    // 编造了不存在的事实（API 名称/库版本/数据等）
+    'incomplete',       // 漏答关键要点
+    'wrong_persona',    // 偏离面试官人设（如过于讨好 / Markdown 标题违规）
+    'format_violation', // 输出格式不合规
+    'too_long',         // 超过字数限制
+    'too_short',        // 回答不充分
+    'off_topic',        // 答非所问
+    'hallucination',    // 检索结果未支持的事实
+    'no_citation',      // 缺少引用标记 [1] [2]
+]);
+
 export const ReviewResultSchema = z.object({
     verdict: ReviewVerdictSchema,
     score: z.number().min(0).max(1).describe('质量评分（0-1）'),
     issues: z.array(z.string()).describe('存在的问题列表'),
     suggestion: z.string().describe('修改建议'),
     confidence: z.number().min(0).max(1).describe('审核置信度'),
+    // ADR #10 Phase 1 新增 ↓
+    issue_tags: z.array(IssueTagSchema).describe('结构化问题标签，用于 Layer 1 反思 + Layer 2 离线聚合'),
+    reflection: z.string().describe('自我反思文本："为什么 score=N? 下次该如何避免？"（失败时必填，通过时可空）'),
 });
 
 export type ReviewResult = z.infer<typeof ReviewResultSchema>;
+export type IssueTag = z.infer<typeof IssueTagSchema>;
 
 const MAX_RETRY_COUNT = 2;
 const HITL_SCORE_THRESHOLD = 0.5;
@@ -122,6 +138,17 @@ ${finalResponse}
 - issues: 问题列表（每项简洁描述）
 - suggestion: 具体修改建议
 - confidence: 你的审核置信度（0-1）
+- **issue_tags**: 结构化标签，从以下枚举选 1-3 个最匹配的：
+  - factual_error: 编造了不存在的事实（API 名称、库版本、数据等）
+  - incomplete: 漏答关键要点
+  - wrong_persona: 偏离面试官人设（过于讨好 / Markdown 标题违规 / 语气不专业）
+  - format_violation: 输出格式不合规
+  - too_long: 超过字数限制
+  - too_short: 回答不充分
+  - off_topic: 答非所问
+  - hallucination: 检索结果未支持的事实（编造）
+  - no_citation: 缺少引用标记 [1] [2]
+- **reflection**: 自我反思。如果 score < 0.7 必填（一句话："为什么 score=N？下次该如何避免？"），score ≥ 0.7 可空字符串。
 
 approved = 合格可输出，revise = 需要修改`,
             },
@@ -141,6 +168,9 @@ approved = 合格可输出，revise = 需要修改`,
                 review_score: reviewResponse.score,
                 review_issues: reviewResponse.issues,
                 review_suggestion: reviewResponse.suggestion,
+                // ADR #10 Phase 1 新增 ↓
+                issue_tags: reviewResponse.issue_tags,
+                reflection: reviewResponse.reflection,
                 hitl_pending: false,
             } as any;
         }
@@ -153,18 +183,25 @@ approved = 合格可输出，revise = 需要修改`,
                 review_score: reviewResponse.score,
                 review_issues: reviewResponse.issues,
                 review_suggestion: reviewResponse.suggestion,
+                // ADR #10 Phase 1 新增 ↓
+                issue_tags: reviewResponse.issue_tags,
+                reflection: reviewResponse.reflection,
                 hitl_pending: true,
             } as any;
         }
 
         // 不通过 → 打回重做：清空 final_response，增加 retry_count
         // past_steps 不清——下一轮 Planner 可以参考之前的执行结果
+        // ADR #10 Phase 1：把反思和 issue_tags 留在 state，planner 下一轮会读
         return {
             final_response: '',
             retry_count: (state.retry_count || 0) + 1,
             review_score: reviewResponse.score,
             review_issues: reviewResponse.issues,
             review_suggestion: reviewResponse.suggestion,
+            // ADR #10 Phase 1 新增 ↓
+            issue_tags: reviewResponse.issue_tags,
+            reflection: reviewResponse.reflection,
             hitl_pending: false,
         } as any;
     };

@@ -99,6 +99,22 @@ ${toolsPrompt}
 【已完成的步骤】
 ${pastStepsSummary}
 
+${
+  state.reflection
+    ? `【Reviewer 反思（必须重点避免）】
+${state.reflection}
+
+【Reviewer 高频问题标签】
+${(state.issue_tags || []).join(', ')}
+
+→ 重新规划时要**针对性调整**，比如：
+  - 反思提到 "factual_error" → 新 plan 增加 "事实核查" 步骤（knowledge_search 再查一遍）
+  - 反思提到 "incomplete" → 新 plan 增加 "补全要点" 步骤（focused ask_llm）
+  - 反思提到 "no_citation" → 新 plan 提示 ask_llm 必须带 [1] [2] 引用
+`
+    : ''
+}
+
 【用户最新消息】
 ${lastMessage}
 

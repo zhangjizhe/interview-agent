@@ -24,6 +24,7 @@ import { BochaSearchTool } from './tools/bocha-search.tool';
 import { MemoryService } from '../memory/memory.service';
 import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
 import { McpRegistry } from '../interview/services/mcp-registry';
+import { ReflectionService } from '../reflection/reflection.service';
 
 @Injectable()
 export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
@@ -39,6 +40,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     private bocha: BochaSearchTool,
     private memory: MemoryService,
     private kb: KnowledgeBaseService,
+    private reflectionService?: ReflectionService, // ADR #10 Phase 1：可选注入，避免循环依赖
   ) {}
 
   async onModuleInit() {
@@ -214,28 +216,79 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
           //   → LangGraph 在 messages 模式下 emit 给外层
           //   → 本方法过滤 metadata.langgraph_node === 'reviewer' 的 chunk
           //   → yield 给前端
+          //
+          // 副模式 streamMode: 'updates' 同时 emit 节点 return 的 state delta，
+          // 用于 ADR #10 Phase 1：捕获 reviewer 节点的 issue_tags / reflection 写入 reflection_log
           const stream = await self.graph!.stream(
             { messages: [new HumanMessage(userMessage)] } as any,
-            { ...config, streamMode: 'messages' as const },
+            { ...config, streamMode: ['messages', 'updates'] as const },
           );
 
           let tokenHitCount = 0;
-          for await (const [chunk, metadata] of stream) {
-            const node = (metadata as any)?.langgraph_node ?? '';
-            // 提取文本 delta：AIMessageChunk.content 可能是 string 或 MessageContentComplex[]
-            const c = chunk as any;
-            const piece =
-              typeof c?.content === 'string'
-                ? c.content
-                : Array.isArray(c?.content)
-                  ? c.content.map((b: any) => b?.text || '').join('')
-                  : '';
-            if (node === 'reviewer' && piece) {
-              tokenHitCount++;
-              queue.push({ kind: 'data', content: piece });
+          let reflectionCaptured: any = null;
+          for await (const event of stream) {
+            // streamMode: 'messages' → [chunk, metadata]
+            // streamMode: 'updates' → { nodeName: stateDelta }
+            const ev = event as any;
+            const messagesTuple = Array.isArray(ev) ? ev : null;
+            const updatesDict = !Array.isArray(ev) && typeof ev === 'object' ? ev : null;
+
+            if (messagesTuple && messagesTuple.length === 2) {
+              const [chunk, metadata] = messagesTuple;
+              const node = (metadata as any)?.langgraph_node ?? '';
+              const c = chunk as any;
+              const piece =
+                typeof c?.content === 'string'
+                  ? c.content
+                  : Array.isArray(c?.content)
+                    ? c.content.map((b: any) => b?.text || '').join('')
+                    : '';
+              if (node === 'reviewer' && piece) {
+                tokenHitCount++;
+                queue.push({ kind: 'data', content: piece });
+              }
+            } else if (updatesDict) {
+              // 捕获 reviewer 节点的 state delta（含 issue_tags + reflection + review_score）
+              if (updatesDict.reviewer) {
+                reflectionCaptured = updatesDict.reviewer;
+              }
             }
           }
-          self.logger.debug(`[stream] reviewer-token-hits=${tokenHitCount}`);
+          self.logger.debug(`[stream] reviewer-token-hits=${tokenHitCount} reflection-captured=${!!reflectionCaptured}`);
+
+          // ADR #10 Phase 1：写入 reflection_log
+          if (reflectionCaptured && self.reflectionService) {
+            const r = reflectionCaptured as any;
+            const question = userMessage;
+            const finalResponse = r.final_response || '';
+            const reviewScore = typeof r.review_score === 'number' ? r.review_score : 0;
+            const reviewIssues = Array.isArray(r.review_issues) ? r.review_issues : [];
+            const issueTags = Array.isArray(r.issue_tags) ? r.issue_tags : [];
+            const reflection = r.reflection || '';
+            const retryCount = typeof r.retry_count === 'number' ? r.retry_count : 0;
+            const hitlPending = !!r.hitl_pending;
+
+            // 仅当 reviewer 有实质评估时记录（避免空记录）
+            if (reviewScore > 0 || issueTags.length > 0) {
+              // fire-and-forget，失败仅 warn 不抛
+              self.reflectionService.record({
+                interviewId: threadId,
+                userId: userId || 'unknown',
+                question,
+                finalResponse,
+                reviewScore,
+                reviewIssues,
+                issueTags,
+                reflection: reflection || undefined,
+                retryCount,
+                hitlPending,
+                modelName: 'qwen-plus', // TODO: 从 config 读
+                nodeName: 'reviewer',
+              }).catch((e: any) => {
+                self.logger.warn(`reflection record failed: ${e.message}`);
+              });
+            }
+          }
         });
         done.v = true;
         queue.push({ kind: 'done' });

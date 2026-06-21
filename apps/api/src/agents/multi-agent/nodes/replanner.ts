@@ -74,6 +74,19 @@ ${pastStepsSummary}
 
 【失败次数】${state.retry_count}
 
+${
+  state.reflection
+    ? `【Reviewer 反思（重点关注）】
+${state.reflection}
+
+【Reviewer 标记的高频问题】
+${(state.issue_tags || []).join(', ')}
+
+→ 重新规划时**重点避免**上述反思中提到的问题
+`
+    : ''
+}
+
 【决策规则】
 - continue: 剩余步骤合理，继续执行
 - replan: 执行结果偏离预期，需要重新规划（提供新 plan）
@@ -82,7 +95,8 @@ ${pastStepsSummary}
 
 【注意】
 - 如果某步失败但有替代方案，选 replan
-- 如果失败超过 3 次，必须选 finish`,
+- 如果失败超过 3 次，必须选 finish
+- 如果有 Reviewer 反思，重新规划时要针对性调整（比如反思提到 factual_error，新 plan 应增加"事实核查"步骤）`,
             },
         ], config);
 

@@ -15,7 +15,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  interviews Interview[]
+  interviews      Interview[]
+  reflectionLogs  ReflectionLog[]
 
   @@map("users")
 }
@@ -37,6 +38,7 @@ model Interview {
   cost           SessionCost?
   tasks          InterviewTask[]
   answerHistories AnswerHistory[]
+  reflectionLogs ReflectionLog[]
 
   @@index([userId, startedAt])
   @@map("interviews")
@@ -170,6 +172,36 @@ model AnswerHistory {
 
   @@index([interviewId])
   @@map("answer_histories")
+}
+
+// ADR #10 Phase 1：Reviewer 反思日志
+// 每次 reviewer 节点执行时记录一次，用于：
+//   - Layer 1: 短期内给 planner 注入 reflection
+//   - Layer 2: cron 聚合高频 issue_tags，定位系统弱点
+model ReflectionLog {
+  id            String   @id @default(cuid())
+  interviewId   String
+  interview     Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question      String   @db.Text
+  finalResponse String   @db.Text
+  reviewScore   Float    // 0-1
+  reviewIssues  String[] // 自由文本 issues 列表
+  issueTags     String[] // 结构化标签 (factual_error / incomplete / hallucination ...)
+  reflection    String?  @db.Text // 自我反思文本
+  retryCount    Int      @default(0)
+  hitlPending   Boolean  @default(false)
+  modelName     String   // qwen-plus / deepseek-chat
+  nodeName      String   @default("reviewer") // 未来扩展支持其他节点
+  createdAt     DateTime @default(now())
+
+  @@index([interviewId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([reviewScore])
+  @@index([issueTags], type: Gin)
+  @@map("reflection_logs")
 }
 
 enum TaskType {

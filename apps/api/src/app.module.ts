@@ -14,6 +14,7 @@ import { KnowledgeBaseModule } from './modules/knowledge-base/knowledge-base.mod
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { McpModule } from './modules/mcp/mcp.module';
+import { ReflectionModule } from './modules/reflection/reflection.module';
 import { HealthController } from './common/health.controller';
 
 @Module({
@@ -36,6 +37,7 @@ import { HealthController } from './common/health.controller';
     MetricsModule,
     AuthModule, // P0-1 修复：JWT + Rate Limiting
     McpModule, // P1-4 修复：MCP 协议接入
+    ReflectionModule, // ADR #10 Phase 1：reviewer 反思日志
   ],
   controllers: [HealthController],
 })

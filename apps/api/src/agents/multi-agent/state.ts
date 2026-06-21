@@ -126,6 +126,26 @@ export const InterviewAgentState = Annotation.Root({
      */
     hitl_verdict: Annotation<'approved' | 'rejected'>(),
 
+    // ========== ADR #10 Reflection Phase 1 新增字段 ==========
+
+    /**
+     * Reviewer 结构化问题标签（ADR #10 Phase 1）。
+     * 取值：'factual_error' | 'incomplete' | 'wrong_persona' | 'format_violation' |
+     *       'too_long' | 'too_short' | 'off_topic' | 'hallucination' | 'no_citation'
+     * 用于：
+     *   - Layer 1: planner 下一轮注入 prompt，避免重蹈覆辙
+     *   - Layer 2: 离线 cron 聚合高频 issue tag，定位系统弱点
+     */
+    issue_tags: Annotation<string[]>(),
+
+    /**
+     * Reviewer 自我反思文本（ADR #10 Phase 1）。
+     * 格式："为什么 score=N？下次该如何避免？"
+     * 失败时（score < 0.7）必填，通过时可空。
+     * Planner 下一轮会把这段文本拼进 system prompt。
+     */
+    reflection: Annotation<string>(),
+
     /**
      * Handoffs: 当前步骤路由到的 Specialist Agent。
      * 由 Planner 在 PlanStep.specialist 中指定，Executor 执行时读取。
