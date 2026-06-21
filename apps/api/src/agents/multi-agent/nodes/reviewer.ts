@@ -23,6 +23,7 @@ import { AIMessage } from 'langchain';
 import type { InterviewAgentStateType } from '../state';
 import { ReviewVerdictSchema } from '../state';
 import { dedupFinalResponse } from '../dedup';
+import { detectHallucination } from '../citation';
 
 export const IssueTagSchema = z.enum([
     'factual_error',    // 编造了不存在的事实（API 名称/库版本/数据等）
@@ -115,6 +116,18 @@ ${pastStepsSummary}
         // 必须在 return 前 dedup，否则重复段已推到前端无法回收
         finalResponse = dedupFinalResponse(finalResponse);
 
+        // ADR #11：Hallucination 启发式检测（CRAG-lite 简化版）
+        // 把 past_steps 的 result 当作 citation 来源，检查 finalResponse 中的硬事实是否引用
+        const citationSources = state.past_steps.map((ps, idx) => ({
+            index: idx + 1,
+            sourceId: ps.step.id,
+            sourceType: 'knowledge_bank' as const, // 简化：统一标记为 KB
+            title: ps.step.description,
+            content: typeof ps.result === 'string' ? ps.result : JSON.stringify(ps.result),
+            score: ps.success ? 0.9 : 0.3,
+        }));
+        const hallucinationCheck = detectHallucination(finalResponse, citationSources);
+
         // 第二阶段：审阅质量（结构化输出）
         const reviewResponse = await model.withStructuredOutput(ReviewResultSchema).invoke([
             {
@@ -124,6 +137,18 @@ ${pastStepsSummary}
 【用户意图】${state.user_intent}
 【面试官回复】
 ${finalResponse}
+
+${
+  hallucinationCheck.hallucinated
+    ? `【Hallucination 警告（ADR #11 自动检测）】
+检测到 ${hallucinationCheck.missingFacts.length} 个未引用源的事实：${hallucinationCheck.missingFacts.slice(0, 5).join(', ')}
+引用标记数：${hallucinationCheck.citedCount}
+
+→ 如果这些事实确实是编造的，请打 'hallucination' 标签并降低 score
+→ 如果是常识性内容可忽略，但要在 issue_tags 中标注 'no_citation'（缺少引用标记）
+`
+    : ''
+}
 
 【审核标准】
 1. 相关性：是否直接回答了用户的问题
