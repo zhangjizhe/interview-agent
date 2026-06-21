@@ -456,13 +456,9 @@ curl -X POST "http://localhost:3001/api/knowledge-base/benchmark?limit=5&thresho
 
 ### Cost & Fallback 基准（50 轮真实 LLM）
 
-```bash
-cd apps/api && node --import tsx scripts/bench-p0.ts
-# 50 轮 SSE 流式对话
-# 实测：cost panel 9-10ms, total tokens 10,075, cost ¥0.0052
-```
-
-详细报告：[`logs/bench-2026-06-21/report-v3.html`](logs/bench-2026-06-21/report-v3.html)（本地访问，HTML 含三口径对比 + 25 轮原始数据明细 + Wall Clock 窗口）
+<p align="center">
+  <img src="./docs/assets/cost-baseline.png" alt="Cost & Fallback 基准 · 50 轮真实 LLM 实测" width="900">
+</p>
 
 ---
 
