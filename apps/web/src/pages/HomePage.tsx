@@ -94,18 +94,34 @@ export function HomePage() {
     queryKey: ['interviews', userId],
     queryFn: async () => {
       const r = await fetch(`/api/interview/list?userId=${userId}`);
+      if (!r.ok) throw new Error(`List API ${r.status}`);
       return safeJson(r);
     },
     refetchInterval: 3000,
+    retry: 3,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: stats } = useQuery({
     queryKey: ['token-stats', userId],
     queryFn: async () => {
-      const r = await fetch(`/api/interview/stats?userId=${userId}`);
-      return safeJson(r);
+      const url = `/api/interview/stats?userId=${encodeURIComponent(userId)}`;
+      console.log('[STATS DEBUG] fetch url:', url);
+      const r = await fetch(url);
+      console.log('[STATS DEBUG] response status:', r.status);
+      if (!r.ok) {
+        console.error('[STATS DEBUG] not ok:', r.status);
+        throw new Error(`Stats API ${r.status}`);
+      }
+      const data = await safeJson(r);
+      console.log('[STATS DEBUG] data:', data);
+      return data;
     },
     refetchInterval: 5000,
+    retry: 3,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // 工具列表（首页技能市场）

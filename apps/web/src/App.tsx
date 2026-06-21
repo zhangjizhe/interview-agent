@@ -78,10 +78,14 @@ function TopBar() {
   const { data: stats } = useQuery({
     queryKey: ['token-stats', userId],
     queryFn: async () => {
-      const r = await fetch(`/api/interview/token-stats?userId=${userId}`);
+      const r = await fetch(`/api/interview/stats?userId=${userId}`);
+      if (!r.ok) throw new Error(`Stats API ${r.status}`);
       return safeJson(r);
     },
     refetchInterval: 5000,
+    retry: 3,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   return (
