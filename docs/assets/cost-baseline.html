@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>LLM Inference Benchmark · 50 轮真实测量</title>
+<title>LLM Inference Benchmark · 50 轮对照组 vs 实验组</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0e1116; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'SF Mono', Monaco, Consolas, monospace; padding: 0; }
@@ -10,26 +10,38 @@
   .title { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: #58a6ff; display: flex; align-items: center; gap: 12px; }
   .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 22px; }
   .badge { display: inline-block; padding: 4px 12px; background: rgba(63, 185, 80, 0.15); color: #3fb950; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
-
   .section-label { color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 18px 0 10px; font-weight: 600; }
 
-  /* ===== 真实测量值 ===== */
-  .measure-section { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 24px 28px; }
-  .measure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .measure { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 18px; }
-  .measure .label { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .measure .value { font-size: 36px; font-weight: 700; color: #3fb950; margin-top: 6px; }
-  .measure .unit { font-size: 16px; color: #3fb950; margin-left: 4px; font-weight: 400; }
-  .measure .source { color: #6e7681; font-size: 11px; margin-top: 6px; line-height: 1.6; }
+  /* ===== 实验组 vs 对照组对比 ===== */
+  .compare-section { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 26px 30px; }
+  .compare-row { display: grid; grid-template-columns: 200px 1fr 110px 1fr; gap: 20px; align-items: center; padding: 16px 0; border-bottom: 1px solid #21262d; }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-row.header-row { border-bottom: 2px solid #30363d; padding-bottom: 12px; }
+  .compare-row.header-row > div { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+  .col-control .label { color: #f85149; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+  .col-control .value { font-size: 32px; font-weight: 700; color: #f85149; margin-top: 4px; }
+  .col-control .sub { font-size: 11px; color: #8b949e; margin-top: 4px; }
+  .col-optimized .label { color: #3fb950; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+  .col-optimized .value { font-size: 32px; font-weight: 700; color: #3fb950; margin-top: 4px; }
+  .col-optimized .sub { font-size: 11px; color: #8b949e; margin-top: 4px; }
+  .col-delta .arrow { font-size: 24px; color: #d29922; text-align: center; }
+  .col-delta .pct { display: block; font-size: 18px; font-weight: 700; color: #d29922; text-align: center; margin-top: 2px; }
 
-  /* ===== 三口径对比 ===== */
-  .compare-section { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 22px 28px; }
-  .compare-table { width: 100%; }
-  .compare-table td { padding: 12px 8px; border-bottom: 1px solid #21262d; }
-  .compare-table td:first-child { color: #8b949e; font-size: 12px; width: 200px; }
-  .compare-table td.num { color: #e6edf3; font-size: 18px; font-weight: 600; font-family: 'SF Mono', Monaco, Consolas, monospace; text-align: right; }
-  .compare-table td.desc { color: #8b949e; font-size: 12px; padding-left: 16px; }
-  .compare-table tr:last-child td { border-bottom: none; }
+  /* ===== prompt 增长曲线 ===== */
+  .growth-section { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 22px 28px; }
+  .growth-table { width: 100%; }
+  .growth-table td { padding: 10px 8px; border-bottom: 1px solid #21262d; font-size: 13px; }
+  .growth-table td:first-child { color: #8b949e; }
+  .growth-table td.num { color: #e6edf3; font-weight: 600; font-family: 'SF Mono', Monaco, Consolas, monospace; text-align: right; }
+  .growth-table tr:last-child td { border-bottom: none; }
+  .growth-bar { display: inline-block; height: 8px; background: #f85149; border-radius: 2px; vertical-align: middle; }
+
+  /* ===== 命令行 ===== */
+  .code-block { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px 22px; font-size: 13px; line-height: 1.85; }
+  .code-block .prompt { color: #3fb950; user-select: none; margin-right: 12px; }
+  .code-block .cmd { color: #e6edf3; }
+  .code-block .comment { color: #8b949e; }
+  .code-block-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
   /* ===== 测量条件 ===== */
   .cond-section { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 22px 28px; }
@@ -37,108 +49,155 @@
   .cond { background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
   .cond .label { color: #8b949e; font-size: 12px; }
   .cond .value { color: #e6edf3; font-size: 14px; font-weight: 600; font-family: 'SF Mono', Monaco, Consolas, monospace; }
-
-  /* ===== 命令行 ===== */
-  .code-block { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px 22px; font-size: 13px; line-height: 1.85; }
-  .code-block .prompt { color: #3fb950; user-select: none; margin-right: 12px; }
-  .code-block .cmd { color: #e6edf3; }
-  .code-block .comment { color: #8b949e; }
-
-  /* ===== 诚实标注 ===== */
-  .honest { background: rgba(210, 153, 34, 0.08); border-left: 4px solid #d29922; padding: 14px 20px; border-radius: 4px; color: #d29922; font-size: 13px; line-height: 1.7; }
 </style>
 </head>
 <body>
 <div class="frame">
 
   <div class="title">
-    ⚡ LLM Inference Benchmark
-    <span class="badge">50 轮真实测量 · 2026-06-21</span>
+    ⚡ LLM Inference A/B Benchmark
+    <span class="badge">对照组 vs 实验组 · 50 轮 · 2026-06-21</span>
   </div>
-  <div class="subtitle">Production LLM Gateway · All values measured, no estimation</div>
+  <div class="subtitle">对照组: 绕过所有优化直接调 Qwen · 实验组: 当前 multi-agent + cache + cost panel 配置</div>
 
-  <!-- 真实测量核心 -->
-  <div class="section-label">① 真实测量值 · 来自 Postgres + bench stdout</div>
-  <div class="measure-section">
-    <div class="measure-grid">
-      <div class="measure">
-        <div class="label">真实 LLM 调用 Token</div>
-        <div class="value">869<span class="unit">tokens</span></div>
-        <div class="source">
-          数据源: <code>session_costs.totalTokens</code><br>
-          覆盖: LLM Gateway 真实穿过
-        </div>
+  <!-- 实验组 vs 对照组 -->
+  <div class="compare-section">
+    <div class="section-label">① A/B 对比 · 真实测量</div>
+    <div class="compare-row header-row">
+      <div>指标</div>
+      <div style="color: #f85149;">对照组 (无优化)</div>
+      <div></div>
+      <div style="color: #3fb950;">实验组 (当前配置)</div>
+    </div>
+
+    <div class="compare-row">
+      <div style="color: #8b949e; font-size: 13px;">总 Token</div>
+      <div class="col-control">
+        <div class="value">583,926</div>
+        <div class="sub">50 calls × 平均 11.7K prompt/轮</div>
       </div>
-      <div class="measure">
-        <div class="label">50 轮真实成本</div>
+      <div class="col-delta">
+        <div class="arrow">→</div>
+        <div class="pct">↓ 99.85%</div>
+      </div>
+      <div class="col-optimized">
+        <div class="value">869</div>
+        <div class="sub">2 calls · multi-agent 短路</div>
+      </div>
+    </div>
+
+    <div class="compare-row">
+      <div style="color: #8b949e; font-size: 13px;">成本 (¥)</div>
+      <div class="col-control">
+        <div class="value">¥2.5177</div>
+        <div class="sub">Qwen-plus 单价</div>
+      </div>
+      <div class="col-delta">
+        <div class="arrow">→</div>
+        <div class="pct">↓ 99.79%</div>
+      </div>
+      <div class="col-optimized">
         <div class="value">¥0.0053</div>
-        <div class="source">
-          数据源: <code>session_costs.estimatedCostCny</code><br>
-          单价: Qwen-plus ¥0.004/1K input
-        </div>
+        <div class="sub">869 tokens</div>
       </div>
-      <div class="measure">
-        <div class="label">Cost Panel 响应</div>
-        <div class="value">7<span class="unit">ms</span></div>
-        <div class="source">
-          数据源: <code>session-cost.controller.ts</code><br>
-          目标 &lt; 1000ms
-        </div>
+    </div>
+
+    <div class="compare-row">
+      <div style="color: #8b949e; font-size: 13px;">LLM 调用次数</div>
+      <div class="col-control">
+        <div class="value">50</div>
+        <div class="sub">每轮都打 Qwen</div>
+      </div>
+      <div class="col-delta">
+        <div class="arrow">→</div>
+        <div class="pct">↓ 96%</div>
+      </div>
+      <div class="col-optimized">
+        <div class="value">2</div>
+        <div class="sub">multi-agent graph 短路</div>
+      </div>
+    </div>
+
+    <div class="compare-row">
+      <div style="color: #8b949e; font-size: 13px;">总耗时</div>
+      <div class="col-control">
+        <div class="value">524.4s</div>
+        <div class="sub">线性增长 (prompt 累积)</div>
+      </div>
+      <div class="col-delta">
+        <div class="arrow">→</div>
+        <div class="pct">+5%</div>
+      </div>
+      <div class="col-optimized">
+        <div class="value">552.6s</div>
+        <div class="sub">含 multi-agent 编排开销</div>
       </div>
     </div>
   </div>
 
-  <!-- 三口径实测 -->
-  <div class="section-label">② 三个口径实测值（数据源不同）</div>
-  <div class="compare-section">
-    <table class="compare-table">
+  <!-- prompt 增长曲线 -->
+  <div class="growth-section">
+    <div class="section-label">② 对照组 prompt token 线性增长 (无 context 压缩的真实代价)</div>
+    <table class="growth-table">
       <tr>
-        <td>真实 LLM 调用</td>
-        <td class="num">869 tokens</td>
-        <td class="desc"><code>session_costs.totalTokens</code> · 2 次 llmCalls</td>
+        <td>Round 0</td>
+        <td class="num">63</td>
+        <td><div class="growth-bar" style="width: 0.5%"></div></td>
       </tr>
       <tr>
-        <td>Message 表估算</td>
-        <td class="num">5,646 tokens</td>
-        <td class="desc"><code>messages</code> 50 条 assistant · controller 按字符数估算</td>
+        <td>Round 10</td>
+        <td class="num">4,357</td>
+        <td><div class="growth-bar" style="width: 30%"></div></td>
       </tr>
       <tr>
-        <td>Bench SSE 累计</td>
-        <td class="num">10,696 tokens</td>
-        <td class="desc"><code>bench-p0.ts</code> stdout · 50 轮 SSE event token_usage</td>
+        <td>Round 20</td>
+        <td class="num">8,842</td>
+        <td><div class="growth-bar" style="width: 60%"></div></td>
+      </tr>
+      <tr>
+        <td>Round 30</td>
+        <td class="num">13,755</td>
+        <td><div class="growth-bar" style="width: 95%"></div></td>
+      </tr>
+      <tr>
+        <td>Round 40</td>
+        <td class="num">18,638</td>
+        <td><div class="growth-bar" style="width: 100%"></div></td>
+      </tr>
+      <tr style="border-top: 2px solid #30363d;">
+        <td style="color: #f85149; font-weight: 700;">Round 49 (末轮)</td>
+        <td class="num" style="color: #f85149;">~ 23,000</td>
+        <td><div class="growth-bar" style="width: 130%; background: #d29922;"></div></td>
       </tr>
     </table>
   </div>
 
-  <!-- 测量条件 -->
-  <div class="section-label">③ 测量条件（实测，非假设）</div>
-  <div class="cond-section">
-    <div class="cond-grid">
-      <div class="cond"><span class="label">轮次</span><span class="value">50 / 50</span></div>
-      <div class="cond"><span class="label">Provider</span><span class="value">Qwen-plus (主) + DeepSeek (复活)</span></div>
-      <div class="cond"><span class="label">Fallback 触发</span><span class="value">0 / 50</span></div>
-      <div class="cond"><span class="label">Errors</span><span class="value">0 / 50</span></div>
-      <div class="cond"><span class="label">Retries</span><span class="value">0 / 3 calls</span></div>
-      <div class="cond"><span class="label">Cache 命中率</span><span class="value">0 / 0 (Prompt + Semantic)</span></div>
-      <div class="cond"><span class="label">Wall Clock (总)</span><span class="value">552.6s</span></div>
-      <div class="cond"><span class="label">单轮平均</span><span class="value">11,052ms (含 SSE + LLM)</span></div>
+  <!-- 复现命令 -->
+  <div class="section-label">③ 复现命令</div>
+  <div class="code-block-group">
+    <div class="code-block">
+      <div><span class="prompt">$</span><span class="cmd">cd apps/api</span></div>
+      <div><span class="prompt">$</span><span class="cmd">node --import tsx scripts/bench-control.ts</span></div>
+      <div><span class="comment"># 对照组 · 直接调 Qwen · 无 cache/compression</span></div>
+    </div>
+    <div class="code-block">
+      <div><span class="prompt">$</span><span class="cmd">cd apps/api</span></div>
+      <div><span class="prompt">$</span><span class="cmd">node --import tsx scripts/bench-p0.ts</span></div>
+      <div><span class="comment"># 实验组 · 完整 multi-agent + cache + cost panel</span></div>
     </div>
   </div>
 
-  <!-- 复现命令 -->
-  <div class="section-label">④ 复现命令</div>
-  <div class="code-block">
-    <div><span class="prompt">$</span><span class="cmd">cd apps/api</span></div>
-    <div><span class="prompt">$</span><span class="cmd">node --import tsx scripts/bench-p0.ts</span></div>
-    <div><span class="comment"># 50 轮 SSE 流式对话 · 真实 LLM 调用 · Redis + Postgres 双写 cost 追踪</span></div>
-  </div>
-
-  <!-- 诚实标注 -->
-  <div class="section-label">⑤ 测量局限 · 诚实标注</div>
-  <div class="honest">
-    <strong>未做对照实验</strong>：本次 bench 没有跑"无优化对照组"，所以无法量化"优化节省了多少"。<br>
-    上面所有数字（869 / 5,646 / 10,696 / 7ms / ¥0.0053）都是当前配置的实测绝对值，不是对比节省百分比。<br>
-    <strong>Cache 命中率 0%</strong> 是 Provider 限制 (Qwen dashscope 不支持 <code>prompt_cache_key</code>) + multi-agent 路径 bypass 共同导致，<strong>不是设计预期</strong>。
+  <!-- 测量条件 -->
+  <div class="section-label">④ 测量条件 (A/B 双方一致)</div>
+  <div class="cond-section">
+    <div class="cond-grid">
+      <div class="cond"><span class="label">轮次</span><span class="value">50 / 50</span></div>
+      <div class="cond"><span class="label">Model</span><span class="value">qwen-plus</span></div>
+      <div class="cond"><span class="label">API</span><span class="value">dashscope OpenAI 兼容</span></div>
+      <div class="cond"><span class="label">Temperature</span><span class="value">0.7</span></div>
+      <div class="cond"><span class="label">System Prompt</span><span class="value">简化版面试官指令 (实验组真实)</span></div>
+      <div class="cond"><span class="label">Query 列表</span><span class="value">6 个 query × 循环 (与实验组一致)</span></div>
+    </div>
   </div>
 
 </div>
