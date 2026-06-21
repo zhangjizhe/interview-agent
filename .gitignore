@@ -51,6 +51,13 @@ package-project.sh
 
 # 个人简历与面试问答（不入公开库）
 docs/RESUME.md
+docs/resume-project-description.md
+docs/resume-*.md
+docs/approval-drawer-design.md
+docs/approval-*.md
+
+# Bench / 内部报告（包含真实 token 数据 + 内部架构）
+logs/
 
 # 第三方抓取的电子书（版权风险，生成产物不入库）
 scripts/ai-interview-ebook.html
