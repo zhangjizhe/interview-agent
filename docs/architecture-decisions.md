@@ -335,3 +335,265 @@ private setCache(key: string, entry: StubCacheEntry): void {
 
 ### 实现位置
 `apps/api/src/modules/agent/services/context-manager.service.ts`
+
+---
+
+## 10. Reflection 自我修正闭环
+
+### 决策背景
+
+当前 Multi-Agent 图拓扑（supervisor → planner → executor → replanner → reviewer）具备**单次重试**能力（reviewer 不通过 → 回到 planner 重新规划，最多 2 次），但**没有跨 session 的反思 / 学习能力**：
+
+| 现状 | 问题 |
+|---|---|
+| reviewer 评分 < 0.5 → 重试当前 case | 重试用同样的 prompt，retry 同样的错误模式 |
+| 失败的 final_response 没有持久化 | 同样的问题用户问第二次，agent 还是会答错 |
+| 没有失败模式聚类 | 不知道"哪类问题总是失败" |
+| 没有 prompt 自我修正 | prompt 是手写的，不随失败数据演化 |
+
+这是 P7+ 面试官高频问的"你的 agent 怎么自我改进？"的设计点。
+
+### 设计方案：3 层闭环
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Layer 1: Online 反思                       │
+│   (单 session 内，每次失败立即调整)                              │
+│                                                              │
+│   reviewer 评分 < 0.5                                         │
+│     ↓                                                        │
+│   触发 reviewer 内部 reflection 步骤：                          │
+│     "为什么 score=0.3? 是事实错误/格式问题/逻辑跳跃?"           │
+│     ↓                                                       │
+│   生成 issue_tags: ['factual_error', 'incomplete']            │
+│     ↓                                                       │
+│   路由到 planner 时**带 issue_tags 上 prompt**                │
+│     "上次出现 factual_error 和 incomplete，重点避免"            │
+└─────────────────────────────────────────────────────────────┘
+                              ↕ (数据下沉)
+┌─────────────────────────────────────────────────────────────┐
+│                    Layer 2: Offline 模式聚类                    │
+│   (cron job，分析过去 N 天的失败 case)                           │
+│                                                              │
+│   reflection_log 表：                                         │
+│     - session_id, question, final_response                    │
+│     - review_score, review_issues, issue_tags                 │
+│     - retry_count, hitl_pending                              │
+│                                                              │
+│   每 24h cron：                                               │
+│     SELECT issue_tags, COUNT(*) FROM reflection_log           │
+│       WHERE review_score < 0.5                               │
+│       GROUP BY issue_tags                                     │
+│     ↓                                                       │
+│     Top 3 高频 issue：'factual_error: 35%'                      │
+│                      'incomplete: 22%'                       │
+│                      'wrong_persona: 18%'                    │
+│     ↓                                                       │
+│     自动生成"系统性弱点报告"，推送给开发者                         │
+└─────────────────────────────────────────────────────────────┘
+                              ↕ (演化)
+┌─────────────────────────────────────────────────────────────┐
+│                    Layer 3: Prompt Evolution                  │
+│   (人工 + LLM 协作，每 2 周一次)                                │
+│                                                              │
+│   输入：Layer 2 的高频 issue + 典型 bad case (5-10 条)          │
+│     ↓                                                       │
+│   LLM 生成 prompt patch 建议：                                 │
+│     "在 system prompt 加入：'避免编造没出现过的 API 名称，      │
+│      不确定时回答"我不确定"而不是硬猜"'"                         │
+│     ↓                                                       │
+│   开发者审核 + A/B 测试                                       │
+│     ↓                                                       │
+│   合并到 reviewer prompt 的负面清单                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 关键数据流（Layer 1 详细设计）
+
+```typescript
+// reviewer 节点扩展：失败时输出 issue_tags
+interface ReviewResult {
+  verdict: 'approved' | 'revise';
+  score: number;          // 0-1
+  issues: string[];       // 自由文本
+  suggestion: string;
+  confidence: number;
+  // 新增 ↓
+  issue_tags?: IssueTag[]; // 结构化标签
+  reflection?: string;     // 自我反思文本（Layer 1 反馈给 planner）
+}
+
+type IssueTag =
+  | 'factual_error'      // 编造了不存在的事实
+  | 'incomplete'         // 漏答关键要点
+  | 'wrong_persona'      // 偏离面试官人设
+  | 'format_violation'   // Markdown / 标题违规
+  | 'too_long'           // 超过字数限制
+  | 'too_short'          // 回答不充分
+  | 'off_topic';         // 答非所问
+
+// replanner 节点扩展：路由到 planner 时带 reflection
+const replannerNode = async (state) => {
+  if (state.review_score < 0.5) {
+    return {
+      next_action: 'revise',
+      retry_count: state.retry_count + 1,
+      // 新增 ↓
+      injection: {
+        reflection: state.review_suggestion,  // 上一轮的反思
+        issue_tags: state.issue_tags,          // 上一轮的问题标签
+      },
+    };
+  }
+  return { next_action: 'reviewer' };
+};
+
+// planner 节点扩展：把 injection 拼进 system prompt
+const plannerSystemPrompt = `
+  ${basePrompt}
+  
+  ${state.injection ? `
+  【上一轮反思（重点避免）】
+  ${state.injection.reflection}
+  
+  【历史问题标签】
+  ${state.injection.issue_tags.join(', ')}
+  ` : ''}
+`;
+```
+
+### 失败日志持久化
+
+新增 `reflection_log` 表（Prisma schema）：
+
+```prisma
+model ReflectionLog {
+  id              String   @id @default(cuid())
+  sessionId       String
+  userId          String
+  question        String   @db.Text
+  finalResponse   String   @db.Text
+  reviewScore     Float
+  reviewIssues    String[] // 自由文本 issues 列表
+  issueTags       String[] // 结构化标签（factual_error 等）
+  retryCount      Int      @default(0)
+  hitlPending     Boolean  @default(false)
+  modelName       String   // qwen-plus / deepseek-chat
+  createdAt       DateTime @default(now())
+  
+  @@index([createdAt])
+  @@index([reviewScore])
+  @@index([issueTags], type: Gin)
+}
+```
+
+### Layer 2 离线聚类（未来迭代）
+
+```typescript
+// apps/api/scripts/reflect-cron.ts
+// 每 24h 执行
+const recent = await prisma.reflectionLog.findMany({
+  where: {
+    reviewScore: { lt: 0.5 },
+    createdAt: { gte: subDays(new Date(), 7) },
+  },
+});
+
+const tagCount = countBy(recent.flatMap(r => r.issueTags));
+const topIssues = Object.entries(tagCount)
+  .sort(([,a], [,b]) => b - a)
+  .slice(0, 5);
+
+// 输出 Markdown 报告
+const report = `
+## 过去 7 天失败模式 Top 5
+${topIssues.map(([tag, count]) => `- ${tag}: ${count} 次 (${(count/recent.length*100).toFixed(1)}%)`).join('\n')}
+`;
+await fs.writeFile(`docs/reflect-${formatDate(new Date())}.md`, report);
+```
+
+### 评估价值
+
+| 面试问题 | 当前能答 | 加 Reflection 后 |
+|---|---|---|
+| "你的 agent 怎么自我改进？" | "没有，靠 prompt engineering 调优" | "3 层闭环：单 session 反思 + 离线模式聚类 + prompt 演化" |
+| "如何避免重试同样的错误？" | "LLM 概率性问题，重试就好" | "issue_tags 路由给下一轮 planner，prompt 注入历史反思" |
+| "如何做 Agent 评测？" | "bench 50 轮真实 LLM 调用，cost-baseline.png" | "+ reflection_log 失败聚类 + LLM-as-judge 自动评估" |
+| "Agent 设计 tradeoff？" | "靠 reviewer 重试兜底" | "trade-off：在线反思消耗 token vs 离线聚合不实时" |
+
+### 实施优先级
+
+| Phase | 内容 | 工期 | ROI |
+|---|---|---|---|
+| Phase 1 | reviewer 加 issue_tags + reflection 字段 | 2-3 天 | 高（面试必问） |
+| Phase 2 | reflection_log 表 + 失败日志持久化 | 1-2 天 | 中（数据积累） |
+| Phase 3 | Layer 1 prompt injection 闭环 | 3-5 天 | 高（用户可感知） |
+| Phase 4 | Layer 2 cron 聚类 | 2-3 天 | 中（开发者收益） |
+| Phase 5 | Layer 3 prompt evolution | 1-2 周 | 低（边际收益递减） |
+
+### 计划实现位置
+
+- **Phase 1-3**: `apps/api/src/agents/multi-agent/nodes/reviewer.ts` + `replanner.ts` + `planner.ts`
+- **Phase 2**: `apps/api/prisma/schema.prisma` + `apps/api/src/modules/reflection/`
+- **Phase 4**: `apps/api/scripts/reflect-cron.ts` + Langfuse 报表
+- **Phase 5**: `docs/prompt-evolution/` + 开发者 review 流程
+
+---
+
+## 11. 已知短板与改进路线（v15 评估师反馈）
+
+> 本节来自 2026-06-21 v15 代码评估报告，逐项分析客观性 + 是否值得更新。
+
+### 4.1 Reflection 自我修正闭环缺失
+
+**客观性**：✅ 客观（见 ADR #10，已有设计方案）
+**优先级**：P0（面试必问）
+**工期**：2-3 周全量；先做 Phase 1-3 即可讲清楚
+
+### 4.2 MCP 工具仅基础接入，未拓展外部第三方工具
+
+**客观性**：✅ 客观
+**现状**：`McpRegistry` 注册了 `memory_recall / knowledge_search / bocha_search` 3 个内部 tool，**没有接入外部 MCP server**（如 GitHub MCP / Notion MCP / Slack MCP）
+**改造方案**：
+1. 引入 `@modelcontextprotocol/sdk` 的 `Client` 类（已在 dependencies）
+2. 配置 GitHub MCP server endpoint（`https://api.githubcopilot.com/mcp/`）
+3. 把外部 tool 注册进 `McpRegistry`
+4. 候选人可让 agent 读自己 GitHub 仓库代码作为面试材料
+
+**工期**：2-3 天
+**面试价值**：高（差异化亮点，国内 MCP 网关项目稀缺）
+
+### 4.3 幻觉抑制 + 检索结果溯源引用
+
+**客观性**：✅ 客观
+**现状**：planner / executor 节点的 tool 调用结果直接拼到 prompt，没有 [1]/[2] 引用标记；reviewer 也没检查"是否引用了检索结果"
+**改造方案**：
+1. tool 返回结构化加 `source: {docId, chunkId, score}`
+2. prompt 模板要求 LLM 输出 `[1] [2]` 引用标记
+3. reviewer 加 hallucination 检测：`final_response 中的事实是否能在 retrieved_chunks 中找到对应来源`
+4. 失败时打回并提示"请基于以下检索结果回答：[1] [2]"
+
+**工期**：1-2 周
+**面试价值**：中（P7 高频，但工程量大）
+
+### 4.4 缓存自适应阈值
+
+**客观性**：✅ 客观
+**现状**：Semantic Cache 用 Qwen embedding-v3 + Qdrant cosine 阈值 0.92（黑白名单硬编码）
+**改造方案**：
+1. 每小时统计 cache hit rate / 误命中率（用户反馈"答非所问"）
+2. 误命中 > 5% 时自动提升阈值到 0.95
+3. 误命中 < 1% 时自动降低阈值到 0.88
+4. 持久化阈值到 Redis，cron 任务调优
+
+**工期**：1-2 天
+**面试价值**：低（锦上添花）
+
+### 优先级判断（P9 视角）
+
+| 短板 | 评估师建议 | 我的判断 | 理由 |
+|---|---|---|---|
+| Reflection | 必做 | **P0 先做设计方案**（ADR #10）+ 后续 Phase 1-3 | 面试必问，设计能讲 15 分钟 |
+| MCP 第三方 | 必做 | **P1 做 2-3 天接 GitHub MCP** | 差异化亮点，性价比最高 |
+| 幻觉抑制 | 必做 | **P2 看时间** | 工程量大，简历主轴用现有 Langfuse trace 更稳 |
+| 缓存自适应 | 必做 | **P3 不做** | 边际收益低，1-2 天换 5% 命中率提升不划算 |
