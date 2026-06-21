@@ -34,6 +34,8 @@ interface BenchResult {
   llmCalls: number;
   durationMs: number;
   costPanelResponseMs: number;
+  retryRate?: number;        // cost panel 已计算, 可选读取
+  fallbackRate?: number;    // cost panel 已计算, 可选读取
 }
 
 async function callChat(sessionId: string, userInput: string): Promise<{ content: string; usage: any }> {
