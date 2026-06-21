@@ -209,6 +209,23 @@ stub 决策缓存（LRU 1000 条）保护 Prompt Prefix Cache 命中率；用户
 
 ---
 
+## 产品截图
+
+<p align="center">
+  <img src="./docs/assets/product-showcase.png" alt="产品截图合集 · 架构 + 对话 + 报告 + Langfuse" width="100%">
+</p>
+
+| 子图 | 内容 | 数据源 |
+|---|---|---|
+| ① 3 层系统架构 | 前端 SPA · NestJS + LangGraph · 7 容器 + 双模型 | 手画 SVG（`_arch.html`） |
+| ② 对话界面 | SSE 流式 token 输出，真实 multi-agent 路径 | `puppeteer` 截 localhost:5173 |
+| ③ 报告界面 | 总分 + 4 维度评分 + 优点/不足/建议 | `puppeteer` 截 localhost:5173 |
+| ④ Langfuse Dashboard | Trace / Token / 模型分布 | 待补（云服务截图） |
+
+> 📝 **如何补 Langfuse 截图**：把云端截图命名为 `docs/assets/_langfuse.png`，改 `_showcase.html` 里 `④` 那块的 `<div class="cell-body placeholder">` 为 `<div class="cell-body"><img src="_langfuse.png"></div>`，重新跑 `node /tmp/render.js _showcase.html product-showcase.png 2300`。
+
+---
+
 ## 技术栈
 
 | 层 | 选型 | 备注 |

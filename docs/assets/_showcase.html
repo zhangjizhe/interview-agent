@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Interview Agent · 产品展示合图</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0e1116; color: #e6edf3; font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; padding: 20px 24px; }
+  .frame { width: 2200px; padding: 24px 32px; background: #0e1116; }
+  .title { font-size: 24px; font-weight: 700; color: #58a6ff; margin-bottom: 6px; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 22px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .cell { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 14px 16px; }
+  .cell-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .cell-tag { display: inline-block; padding: 3px 10px; background: rgba(88, 166, 255, 0.15); color: #58a6ff; border-radius: 10px; font-size: 11px; font-weight: 700; }
+  .cell-name { font-size: 15px; font-weight: 600; color: #e6edf3; }
+  .cell-sub { font-size: 11px; color: #8b949e; margin-left: auto; }
+  .cell-body { background: #0e1116; border: 1px solid #21262d; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 540px; }
+  .cell-body img { width: 100%; height: auto; display: block; }
+  .cell-body.placeholder { padding: 40px; flex-direction: column; gap: 12px; text-align: center; border-style: dashed; border-color: #30363d; }
+  .cell-body.placeholder .ico { font-size: 48px; }
+  .cell-body.placeholder .text-main { color: #8b949e; font-size: 14px; }
+  .cell-body.placeholder .text-sub { color: #6e7681; font-size: 11px; line-height: 1.6; }
+  .footer { margin-top: 18px; color: #6e7681; font-size: 11px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <div class="title">⚡ Interview Agent · 产品展示合图</div>
+  <div class="subtitle">架构 + 对话 + 报告 + Langfuse · 4 子图（Langfuse 截图待你补）</div>
+
+  <div class="grid">
+
+    <!-- ① 架构图 -->
+    <div class="cell">
+      <div class="cell-head">
+        <span class="cell-tag">①</span>
+        <span class="cell-name">3 层系统架构</span>
+        <span class="cell-sub">前端 SPA · NestJS + LangGraph · 7 容器 + 双模型</span>
+      </div>
+      <div class="cell-body"><img src="_arch.png" alt="arch"></div>
+    </div>
+
+    <!-- ② 对话界面 -->
+    <div class="cell">
+      <div class="cell-head">
+        <span class="cell-tag">②</span>
+        <span class="cell-name">对话界面 · SSE 流式输出</span>
+        <span class="cell-sub">真实 LLM 逐 token 输出（multi-agent 路径）</span>
+      </div>
+      <div class="cell-body"><img src="_interview.png" alt="interview"></div>
+    </div>
+
+    <!-- ③ 报告界面 -->
+    <div class="cell">
+      <div class="cell-head">
+        <span class="cell-tag">③</span>
+        <span class="cell-name">面试报告 · 4 维度评分</span>
+        <span class="cell-sub">总分 + 逻辑 / 学习 / 技术 / 沟通 + 优点/不足/建议</span>
+      </div>
+      <div class="cell-body"><img src="_report.png" alt="report"></div>
+    </div>
+
+    <!-- ④ Langfuse（占位） -->
+    <div class="cell">
+      <div class="cell-head">
+        <span class="cell-tag">④</span>
+        <span class="cell-name">Langfuse Dashboard</span>
+        <span class="cell-sub">us.cloud.langfuse.com · Trace 可观测</span>
+      </div>
+      <div class="cell-body placeholder">
+        <div class="ico">📊</div>
+        <div class="text-main">Langfuse Dashboard 截图</div>
+        <div class="text-sub">
+          展示内容：Trace 树 · Token 消耗 · 模型分布<br>
+          状态：<b style="color:#d29922">待你补图（云服务截图）</b><br>
+          上传位置：<code style="color:#58a6ff">docs/assets/_langfuse.png</code>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    生成于 2026-06-21 · interview-agent v14 · 实测数据 · 无估算基线
+  </div>
+
+</div>
+</body>
+</html>
