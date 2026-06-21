@@ -307,12 +307,34 @@ McpRegistry.register({
 });
 
 McpRegistry.register({
-  name: 'github_lookup',
-  displayName: 'GitHub 仓库查询',
-  description: '查询候选人 GitHub 仓库、贡献统计（占位）',
+  name: 'github_get_user',
+  displayName: 'GitHub 用户信息',
+  description: '查询 GitHub 用户的公开信息（粉丝数、bio、贡献统计）。用于面试场景中评估候选人 GitHub 活跃度',
   emoji: '🐙',
   category: 'mcp',
-  enabled: false,
-  author: 'todo',
-  version: '0.0.1',
+  enabled: true,
+  author: 'system',
+  version: '1.0.0',
+});
+
+McpRegistry.register({
+  name: 'github_list_repos',
+  displayName: 'GitHub 仓库列表',
+  description: '列出 GitHub 用户的公开仓库，按 stars 排序。用于评估候选人的开源贡献和技术栈',
+  emoji: '📦',
+  category: 'mcp',
+  enabled: true,
+  author: 'system',
+  version: '1.0.0',
+});
+
+McpRegistry.register({
+  name: 'github_get_readme',
+  displayName: 'GitHub README',
+  description: '获取仓库 README 内容（Markdown），用于深入评估候选人的项目质量',
+  emoji: '📖',
+  category: 'mcp',
+  enabled: true,
+  author: 'system',
+  version: '1.0.0',
 });

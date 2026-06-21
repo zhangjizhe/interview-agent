@@ -4,6 +4,7 @@ import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { MemoryService, type WorkingState } from '../memory/memory.service';
 import { LangfuseService } from '../../infra/langfuse/langfuse.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
+import { GitHubTool } from './tools/github.tool';
 import { ContextManager } from './services/context-manager.service';
 import { DeepAgentsAgentService } from './deepagents-agent.service';
 import { MultiAgentService } from './multi-agent.service';
@@ -170,6 +171,12 @@ export class InterviewAgentService {
       const toolNames = new Set(availableTools.map((t) => t.name));
       if (toolNames.has('bocha_search')) {
         tools.push(BochaSearchTool.definition);
+      }
+      // ADR #11：MCP 第三方工具集成（GitHub 3 个 tools）
+      for (const ghDef of GitHubTool.definitions) {
+        if (toolNames.has(ghDef.function.name)) {
+          tools.push(ghDef);
+        }
       }
 
       this.langfuse.logSpan({

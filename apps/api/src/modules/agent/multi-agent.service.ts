@@ -21,6 +21,7 @@ import { LlmGatewayChatModel, threadIdStorage } from '../../agents/multi-agent/l
 import { dedupFinalResponse } from '../../agents/multi-agent/dedup';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
+import { GitHubTool } from './tools/github.tool';
 import { MemoryService } from '../memory/memory.service';
 import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
 import { McpRegistry } from '../interview/services/mcp-registry';
@@ -40,6 +41,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     private bocha: BochaSearchTool,
     private memory: MemoryService,
     private kb: KnowledgeBaseService,
+    private github: GitHubTool,
     private reflectionService?: ReflectionService, // ADR #10 Phase 1：可选注入，避免循环依赖
   ) {}
 
@@ -129,8 +131,26 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
       },
     );
 
+    // github_get_user — GitHub 用户信息（ADR #11：MCP 第三方工具集成）
+    const bound4 = McpRegistry.bindExecute(
+      'github_get_user',
+      async (args: any) => this.github.execute('github_get_user', args),
+    );
+
+    // github_list_repos — GitHub 仓库列表
+    const bound5 = McpRegistry.bindExecute(
+      'github_list_repos',
+      async (args: any) => this.github.execute('github_list_repos', args),
+    );
+
+    // github_get_readme — GitHub 仓库 README
+    const bound6 = McpRegistry.bindExecute(
+      'github_get_readme',
+      async (args: any) => this.github.execute('github_get_readme', args),
+    );
+
     this.logger.debug(
-      `[ToolBinding] bound ${[bound1, bound2, bound3].filter(Boolean).length}/3 tools via McpRegistry`,
+      `[ToolBinding] bound ${[bound1, bound2, bound3, bound4, bound5, bound6].filter(Boolean).length}/6 tools via McpRegistry`,
     );
   }
 
