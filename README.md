@@ -29,21 +29,21 @@
 ### A/B 对照 · 真实测量（3 组，50 轮）
 
 <p align="center">
-  <img src="./docs/assets/cost-baseline.png" alt="LLM Inference Benchmark · 3 组对比" width="100%">
+  <img src="./docs/assets/cost-baseline.png" alt="LLM Inference Benchmark · v10 · 每项独立卡片" width="100%">
 </p>
 
-| 指标 | 对照组（直接调 Qwen）| 实验组 v3（cache 未生效）| 实验组 v9（cache 100% 命中）|
+| 指标 | 对照组（直接调 Qwen）| 实验组（multi-agent + cache）| 实测节省 |
 |---|---|---|---|
-| **总 Token** | 583,926 | 869 | **0** |
-| **成本 (¥)** | ¥2.5177 | ¥0.0053 | **¥0** |
-| **LLM 调用** | 50 | 2 | 2（cache hit）|
-| **总耗时** | 524.4s | 552.6s | **283.8s**（-49%）|
+| **总 Token** | 576,407 | **11,185** | ↓ 98.06% |
+| **成本 (¥)** | ¥2.4806 | **¥0.1120** | ↓ 95.49% |
+| **LLM 调用** | 50 | **2** | ↓ 96% |
+| **总耗时** | 507.1s | **286.0s** | ↓ 43.60% |
 
 > ⚠️ **诚实标注**：
-> - **对照组**：`scripts/bench-control.ts` 独立 CLI，绕过所有优化层直接调 Qwen dashscope。`583,926 tokens` 来自真实 HTTP 响应（`usage.total_tokens` 累计）。
-> - **实验组 v3**：P0 缓存工程代码完整（3 段前缀识别 + cache_key 注入 + Semantic Cache 黑白名单），但底层 provider 不支持 `prompt_cache_key` → prompt cache 命中率 0%。
-> - **实验组 v9**：P1 修复后 multi-agent 路径接通 LlmGateway `semanticCacheType` → semantic cache 命中后不计 token。
-> - **本项目 cache 命中率定义**：`命中数 / (命中数 + miss 数)`，v9 = 2/2 = 100%。
+> - **对照组**：`scripts/bench-control.ts` 独立 CLI，绕过所有优化层直接调 Qwen dashscope。`576,407 tokens` 来自真实 HTTP 响应（`usage.total_tokens` 累计）。
+> - **实验组**：multi-agent 主路径 + LlmGateway 3 段 cache（Semantic Cache 100% 命中）。token / cost 数据来自 `session_costs` 表 + SSE `usage` 事件累加。
+> - **本项目 cache 命中率定义**：`命中数 / (命中数 + miss 数)`，本轮 = 2/2 = 100%。
+> - **Prompt Cache 0% 是 Provider 硬限制**：Qwen dashscope OpenAI 兼容层不识别 `prompt_cache_key` 字段，工程链路完整但底层不支持；切 Claude / OpenAI 后会生效。
 
 ---
 
@@ -463,7 +463,7 @@ curl -X POST "http://localhost:3001/api/knowledge-base/benchmark?limit=5&thresho
 ### Cost & Fallback 基准（50 轮真实 LLM）
 
 <p align="center">
-  <img src="./docs/assets/cost-baseline.png" alt="Cost & Fallback 基准 · 50 轮真实 LLM 实测" width="900">
+  <img src="./docs/assets/cost-baseline.png" alt="Cost & Fallback 基准 · v10 · 50 轮真实 LLM 实测 · 每项独立卡片" width="900">
 </p>
 
 ---

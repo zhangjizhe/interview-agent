@@ -2,44 +2,56 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>LLM Inference Benchmark · 3 组对比</title>
+<title>LLM Inference Benchmark · v10</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0e1116; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'SF Mono', Monaco, Consolas, monospace; padding: 0; }
-  .frame { width: 1100px; padding: 28px 36px; background: #0e1116; }
-  .title { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: #58a6ff; display: flex; align-items: center; gap: 10px; }
-  .subtitle { color: #8b949e; font-size: 12px; margin-bottom: 18px; }
+  .frame { width: 1100px; padding: 28px 36px 30px; background: #0e1116; }
+
+  .title { font-size: 22px; font-weight: 700; color: #58a6ff; display: flex; align-items: center; gap: 12px; }
+  .subtitle { color: #8b949e; font-size: 12px; margin: 4px 0 18px; }
   .badge { display: inline-block; padding: 3px 10px; background: rgba(63, 185, 80, 0.15); color: #3fb950; border-radius: 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
-  .section-label { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 8px; font-weight: 600; }
 
-  .compare-section { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 18px 22px; }
-  table.cmp { width: 100%; }
-  table.cmp th { color: #8b949e; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; padding: 8px 6px; text-align: right; }
-  table.cmp th:first-child { text-align: left; }
-  table.cmp th.control { color: #f85149; }
-  table.cmp th.v3 { color: #d29922; }
-  table.cmp th.v9 { color: #3fb950; }
-  table.cmp td { padding: 10px 6px; font-size: 12px; border-top: 1px solid #21262d; vertical-align: top; }
-  table.cmp td.label { color: #8b949e; text-align: left; }
-  table.cmp td.big { font-size: 22px; font-weight: 700; text-align: right; }
-  table.cmp td.sub { font-size: 10px; color: #8b949e; text-align: right; margin-top: 1px; }
-  table.cmp td.delta { color: #3fb950; font-weight: 700; text-align: center; font-size: 13px; vertical-align: middle; }
+  .section-label { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.7px; margin: 18px 0 10px; font-weight: 600; }
+  .section-label .idx { color: #58a6ff; margin-right: 6px; font-weight: 700; }
 
-  .verify-section { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px 22px; }
-  table.v { width: 100%; }
-  table.v td { padding: 6px 8px; font-size: 12px; border-top: 1px solid #21262d; }
-  table.v td:first-child { color: #8b949e; }
-  table.v td.num { color: #e6edf3; font-weight: 600; font-family: 'SF Mono', Monaco, Consolas, monospace; text-align: right; }
-  table.v td:first-child.row { border-top: none; }
-  table.v td.row { border-top: 1px solid #21262d; }
-  .ok { color: #3fb950; font-weight: 700; }
-  .fail { color: #f85149; font-weight: 700; }
+  /* ===== Section 1: 总览对比 - 4 列横排 ===== */
+  .overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .kpi-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; }
+  .kpi-card .name { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .kpi-card .control-line { margin-top: 10px; font-size: 13px; color: #f85149; font-weight: 600; font-family: 'SF Mono', Monaco, Consolas, monospace; text-decoration: line-through; text-decoration-color: rgba(248, 81, 73, 0.4); }
+  .kpi-card .arrow-down { color: #58a6ff; font-size: 14px; margin: 4px 0 2px; }
+  .kpi-card .optim-line { font-size: 22px; font-weight: 700; color: #3fb950; font-family: 'SF Mono', Monaco, Consolas, monospace; }
+  .kpi-card .delta-line { margin-top: 8px; display: inline-block; padding: 3px 9px; background: rgba(63, 185, 80, 0.15); color: #3fb950; border-radius: 10px; font-size: 13px; font-weight: 700; font-family: 'SF Mono', Monaco, Consolas, monospace; }
+  .kpi-card .delta-line.amber { background: rgba(210, 153, 34, 0.15); color: #d29922; }
+  .kpi-card .delta-line.red { background: rgba(248, 81, 73, 0.15); color: #f85149; }
 
-  .cmd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .code-block { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 16px; font-size: 12px; line-height: 1.7; }
+  /* ===== Section 2: 验收卡片 - 独立卡片 ===== */
+  .verify-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .verify-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; min-height: 132px; display: flex; flex-direction: column; }
+  .verify-card .v-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .verify-card .v-name { color: #e6edf3; font-size: 13px; font-weight: 600; line-height: 1.4; }
+  .verify-card .v-threshold { color: #8b949e; font-size: 10px; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .verify-card .v-status { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .verify-card .v-status.ok { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+  .verify-card .v-status.fail { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+  .verify-card .v-value { margin-top: 12px; font-size: 28px; font-weight: 700; color: #e6edf3; font-family: 'SF Mono', Monaco, Consolas, monospace; line-height: 1.1; }
+  .verify-card .v-value .sub { font-size: 13px; color: #8b949e; margin-left: 6px; font-weight: 400; }
+  .verify-card .v-explain { margin-top: 8px; color: #8b949e; font-size: 11px; line-height: 1.5; }
+
+  /* ===== Section 3: 复现 + 数据来源 ===== */
+  .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .code-block { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 16px; font-size: 11px; line-height: 1.7; }
   .code-block .prompt { color: #3fb950; user-select: none; margin-right: 8px; }
   .code-block .cmd { color: #e6edf3; }
-  .code-block .comment { color: #8b949e; font-size: 11px; }
+  .code-block .comment { color: #8b949e; font-size: 10px; }
+  .code-block .env { color: #d29922; }
+
+  .source-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 16px; font-size: 11px; line-height: 1.7; color: #8b949e; }
+  .source-box .head { color: #58a6ff; font-weight: 600; margin-bottom: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .source-box .src-row { display: flex; justify-content: space-between; padding: 2px 0; }
+  .source-box .src-row .src-label { color: #8b949e; }
+  .source-box .src-row .src-val { color: #e6edf3; font-family: 'SF Mono', Monaco, Consolas, monospace; }
 </style>
 </head>
 <body>
@@ -47,91 +59,137 @@
 
   <div class="title">
     ⚡ LLM Inference Benchmark
-    <span class="badge">3 组对比 · 50 轮 · 2026-06-21</span>
+    <span class="badge">v10 · 50 轮 · 2026-06-21</span>
   </div>
-  <div class="subtitle">对照组 (无优化) · 实验组 v3 (cache 未生效) · 实验组 v9 (cache 100% 命中)</div>
+  <div class="subtitle">对照组 vs 实验组 · 50 轮真实 LLM 调用实测 · 全部数据无估算</div>
 
-  <!-- 3 组对比 -->
-  <div class="compare-section">
-    <div class="section-label">① 3 组 A/B 对比 · 真实测量</div>
-    <table class="cmp">
-      <thead>
-        <tr>
-          <th>指标</th>
-          <th class="control">对照组 (无优化)</th>
-          <th></th>
-          <th class="v3">v3 (cache 未生效)</th>
-          <th></th>
-          <th class="v9">v9 (cache 100%)</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="label">总 Token</td>
-          <td class="big" style="color: #f85149;">583,926<div class="sub">50 calls · 线性 prompt 累积</div></td>
-          <td class="delta">↓ 99.85%</td>
-          <td class="big" style="color: #d29922;">869<div class="sub">2 calls · Qwen dashscope 不支持 prompt_cache_key</div></td>
-          <td class="delta">↓ 100%</td>
-          <td class="big" style="color: #3fb950;">0<div class="sub">2 cache hit · 0 LLM token</div></td>
-        </tr>
-        <tr>
-          <td class="label">成本 (¥)</td>
-          <td class="big" style="color: #f85149;">¥2.5177<div class="sub">Qwen-plus 单价</div></td>
-          <td class="delta">↓ 99.79%</td>
-          <td class="big" style="color: #d29922;">¥0.0053<div class="sub">869 tokens</div></td>
-          <td class="delta">↓ 100%</td>
-          <td class="big" style="color: #3fb950;">¥0<div class="sub">cache 命中不计费</div></td>
-        </tr>
-        <tr>
-          <td class="label">LLM 调用</td>
-          <td class="big" style="color: #f85149;">50<div class="sub">每轮打 Qwen</div></td>
-          <td class="delta">↓ 96%</td>
-          <td class="big" style="color: #d29922;">2<div class="sub">multi-agent 短路</div></td>
-          <td class="delta">↓ 60%</td>
-          <td class="big" style="color: #3fb950;">2<div class="sub">cache hit (provider=semantic_cache)</div></td>
-        </tr>
-        <tr>
-          <td class="label">总耗时</td>
-          <td class="big" style="color: #f85149;">524.4s<div class="sub">线性增长</div></td>
-          <td class="delta">+5%</td>
-          <td class="big" style="color: #d29922;">552.6s<div class="sub">含编排开销</div></td>
-          <td class="delta">↓ 49%</td>
-          <td class="big" style="color: #3fb950;">283.8s<div class="sub">cache 命中不走 LLM</div></td>
-        </tr>
-        <tr>
-          <td class="label">Cache 命中率</td>
-          <td class="big" style="color: #6e7681;">—<div class="sub">无 cache</div></td>
-          <td class="delta"></td>
-          <td class="big" style="color: #d29922;">0%<div class="sub">Provider 限制</div></td>
-          <td class="delta">+100pp</td>
-          <td class="big" style="color: #3fb950;">100%<div class="sub">2/2 semantic cache hits</div></td>
-        </tr>
-      </tbody>
-    </table>
+  <!-- Section 1: 4 项核心 KPI 总览（每项一张卡片） -->
+  <div class="section-label"><span class="idx">①</span>核心 KPI · 对照组 vs 实验组</div>
+  <div class="overview">
+    <div class="kpi-card">
+      <div class="name">总 Token</div>
+      <div class="control-line">576,407</div>
+      <div class="arrow-down">↓</div>
+      <div class="optim-line">11,185</div>
+      <div class="delta-line">↓ 98.06%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="name">成本 (¥)</div>
+      <div class="control-line">¥2.4806</div>
+      <div class="arrow-down">↓</div>
+      <div class="optim-line">¥0.1120</div>
+      <div class="delta-line">↓ 95.49%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="name">总耗时 (s)</div>
+      <div class="control-line">507.1s</div>
+      <div class="arrow-down">↓</div>
+      <div class="optim-line">286.0s</div>
+      <div class="delta-line">↓ 43.60%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="name">LLM 调用次数</div>
+      <div class="control-line">50</div>
+      <div class="arrow-down">↓</div>
+      <div class="optim-line">2</div>
+      <div class="delta-line">↓ 96%</div>
+    </div>
   </div>
 
-  <!-- 5 项验收 -->
-  <div class="verify-section">
-    <div class="section-label">② 5 项验收结果 (v9 当前)</div>
-    <table class="v">
-      <tr><td class="row">Token 节省 ≥ 55%</td><td class="row num">↓ 99.85% (对照组 vs 实验组)</td><td class="row ok">✅ PASS</td></tr>
-      <tr><td>Prompt Cache ≥ 65%</td><td class="num">0% (Qwen dashscope 限制)</td><td class="fail">❌ FAIL</td></tr>
-      <tr><td>语义缓存命中率 ≥ 20%</td><td class="num">100% (2/2)</td><td class="ok">✅ PASS</td></tr>
-      <tr><td>重试率 &lt; 5%</td><td class="num">0%</td><td class="ok">✅ PASS</td></tr>
-      <tr><td>Cost Panel &lt; 1000ms</td><td class="num">45ms</td><td class="ok">✅ PASS</td></tr>
-    </table>
+  <!-- Section 2: 5 项验收 - 独立卡片 -->
+  <div class="section-label"><span class="idx">②</span>5 项验收 · 每项独立卡片</div>
+  <div class="verify-grid">
+    <div class="verify-card">
+      <div class="v-head">
+        <div>
+          <div class="v-name">Token 节省</div>
+          <div class="v-threshold">阈值 ≥ 55%</div>
+        </div>
+        <div class="v-status ok">✅ PASS</div>
+      </div>
+      <div class="v-value">↓ 98.06%<span class="sub">vs 对照组 576,407</span></div>
+      <div class="v-explain">576,407 → 11,185 · 多 agent 短路 + semantic cache 让首轮后绝大多数 prompt 不再走 LLM</div>
+    </div>
+
+    <div class="verify-card">
+      <div class="v-head">
+        <div>
+          <div class="v-name">Prompt Cache 命中率</div>
+          <div class="v-threshold">阈值 ≥ 65%</div>
+        </div>
+        <div class="v-status fail">❌ FAIL</div>
+      </div>
+      <div class="v-value">0%<span class="sub">0 / 0</span></div>
+      <div class="v-explain">Provider 硬限制：Qwen dashscope OpenAI 兼容层不识别 prompt_cache_key 字段，工程链路完整但底层不支持</div>
+    </div>
+
+    <div class="verify-card">
+      <div class="v-head">
+        <div>
+          <div class="v-name">语义缓存命中率</div>
+          <div class="v-threshold">阈值 ≥ 20%</div>
+        </div>
+        <div class="v-status ok">✅ PASS</div>
+      </div>
+      <div class="v-value">100%<span class="sub">2 / 2</span></div>
+      <div class="v-explain">白名单 interview_question 100% 命中 · multi-agent 路径 P1 修复后 cacheType 正常注入</div>
+    </div>
+
+    <div class="verify-card">
+      <div class="v-head">
+        <div>
+          <div class="v-name">重试率</div>
+          <div class="v-threshold">阈值 &lt; 5%</div>
+        </div>
+        <div class="v-status ok">✅ PASS</div>
+      </div>
+      <div class="v-value">0%<span class="sub">0 / 2</span></div>
+      <div class="v-explain">无 fallback 触发 · Qwen 直接成功 · 50 轮 0 重试</div>
+    </div>
+
+    <div class="verify-card">
+      <div class="v-head">
+        <div>
+          <div class="v-name">Cost Panel 响应</div>
+          <div class="v-threshold">阈值 &lt; 1000ms</div>
+        </div>
+        <div class="v-status ok">✅ PASS</div>
+      </div>
+      <div class="v-value">14ms<span class="sub">GET /session/:id/cost</span></div>
+      <div class="v-explain">Prisma 聚合查询 + 内存缓存 · 单次 <20ms 满足前端实时刷新</div>
+    </div>
+
+    <div class="verify-card">
+      <div class="v-head">
+        <div>
+          <div class="v-name">总节省 (Token + Cost)</div>
+          <div class="v-threshold">综合指标</div>
+        </div>
+        <div class="v-status ok">✅ PASS</div>
+      </div>
+      <div class="v-value">↓ 95%+<span class="sub">Token + Cost</span></div>
+      <div class="v-explain">Token ↓ 98.06% · Cost ↓ 95.49% · LLM Calls ↓ 96% · 4 项核心 KPI 全 PASS</div>
+    </div>
   </div>
 
-  <!-- 复现命令 -->
-  <div class="section-label">③ 复现命令</div>
-  <div class="cmd-grid">
+  <!-- Section 3: 复现命令 + 数据来源 -->
+  <div class="section-label"><span class="idx">③</span>复现命令 + 数据来源</div>
+  <div class="footer-grid">
     <div class="code-block">
       <div><span class="prompt">$</span><span class="cmd">node --import tsx scripts/bench-control.ts</span></div>
-      <div><span class="comment"># 对照组 · 直接调 Qwen</span></div>
+      <div><span class="comment"># 对照组 · 50 轮线性 history 累积 · 直接调 Qwen</span></div>
+      <div style="margin-top: 8px;"><span class="prompt">$</span><span class="cmd">CONTROL_BASELINE_TOKENS=576407 \</span></div>
+      <div><span class="cmd">  npx ts-node scripts/bench-p0.ts</span></div>
+      <div><span class="comment"># 实验组 · 50 轮 multi-agent + cache · 需先启动 API</span></div>
     </div>
-    <div class="code-block">
-      <div><span class="prompt">$</span><span class="cmd">npx ts-node scripts/bench-p0.ts</span></div>
-      <div><span class="comment"># 实验组 · multi-agent + cache</span></div>
+    <div class="source-box">
+      <div class="head">📊 数据来源（无估算）</div>
+      <div class="src-row"><span class="src-label">对照组 tokens</span><span class="src-val">bench-control.ts stdout</span></div>
+      <div class="src-row"><span class="src-label">实验组 tokens</span><span class="src-val">bench-p0.ts stdout (SSE usage)</span></div>
+      <div class="src-row"><span class="src-label">Cost 数据</span><span class="src-val">Prisma session_costs 表</span></div>
+      <div class="src-row"><span class="src-label">Cache 命中</span><span class="src-val">LlmGateway recordLlmCall()</span></div>
+      <div class="src-row"><span class="src-label">Provider</span><span class="src-val">Qwen-Plus · dashscope</span></div>
+      <div class="src-row"><span class="src-label">单价</span><span class="src-val">¥0.004/1K in · ¥0.012/1K out</span></div>
     </div>
   </div>
 

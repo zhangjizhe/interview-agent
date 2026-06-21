@@ -23,6 +23,11 @@ const USER_ID = process.env.USER_ID || 'bench-user';
 const POSITION = process.env.POSITION || '前端开发';
 const LEVEL = 'P6';
 const ROUNDS = 50;
+// 对照组实测基线（来自 bench-control.ts 50 轮真实跑）。必须用真实数据，禁止编造假设基线。
+// 不传 CONTROL_BASELINE_TOKENS 时跳过 "Token 节省 ≥ 55%" 这条验收。
+const CONTROL_BASELINE_TOKENS = process.env.CONTROL_BASELINE_TOKENS
+  ? parseInt(process.env.CONTROL_BASELINE_TOKENS, 10)
+  : null;
 
 interface BenchResult {
   totalTokens: number;
@@ -175,12 +180,20 @@ async function main() {
   const panel = await getCostPanel(sessionId);
   const p = panel.data;
   const totalTokens = usage.promptTokens + usage.completionTokens;
-  const tokenSaved = 80000 - totalTokens; // 假设基线 80K
+  // 真实节省率（必须基于对照组 bench-control 实测，禁止任何编造/估算基线）
+  const tokenSaved = CONTROL_BASELINE_TOKENS !== null ? CONTROL_BASELINE_TOKENS - totalTokens : null;
+  const tokenSavedPct = tokenSaved !== null && CONTROL_BASELINE_TOKENS! > 0
+    ? (tokenSaved / CONTROL_BASELINE_TOKENS!) * 100
+    : null;
 
   console.log('\n=== Benchmark Results ===');
   console.log(`  ⏱  total wall:        ${(totalElapsed / 1000).toFixed(1)}s`);
   console.log(`  📊 total tokens:      ${totalTokens.toLocaleString()}`);
-  console.log(`  💾 token saved:       ~${tokenSaved.toLocaleString()} (${((tokenSaved / 80000) * 100).toFixed(1)}%)`);
+  if (tokenSaved !== null && tokenSavedPct !== null) {
+    console.log(`  💾 token saved:       ${tokenSaved.toLocaleString()} (↓${tokenSavedPct.toFixed(2)}% vs 对照组 ${CONTROL_BASELINE_TOKENS!.toLocaleString()})`);
+  } else {
+    console.log(`  💾 token saved:       N/A (未设 CONTROL_BASELINE_TOKENS，跳过真实基线对比)`);
+  }
   console.log(`  📞 llm calls:         ${p.llmCalls}`);
 
   // bench 端计算 rate（API 返回的 BenchResult 只有 counts，没 rate）
@@ -202,7 +215,13 @@ async function main() {
 
   // 验收
   const checks = [
-    { name: 'Token 节省 ≥ 55%', pass: tokenSaved / 80000 >= 0.55 },
+    {
+      name: CONTROL_BASELINE_TOKENS !== null
+        ? `Token 节省 ≥ 55% (vs 对照组实测 ${CONTROL_BASELINE_TOKENS.toLocaleString()})`
+        : 'Token 节省 ≥ 55% (跳过：未设 CONTROL_BASELINE_TOKENS)',
+      pass: tokenSavedPct !== null && tokenSavedPct >= 55,
+      skipped: tokenSavedPct === null,
+    },
     { name: 'Prompt Cache 命中率 ≥ 65%', pass: promptCacheHitRate >= 0.65 },
     { name: '语义缓存命中率 ≥ 20%', pass: semanticCacheHitRate >= 0.20 },
     { name: '重试率 < 5%', pass: retryRate < 0.05 },
@@ -210,8 +229,16 @@ async function main() {
   ];
 
   console.log('\n=== Acceptance ===');
-  checks.forEach((c) => console.log(`  ${c.pass ? '✅' : '❌'} ${c.name}`));
-  const allPass = checks.every((c) => c.pass);
+  checks.forEach((c) => {
+    if ((c as any).skipped) {
+      console.log(`  ⏭  ${c.name}`);
+    } else {
+      console.log(`  ${c.pass ? '✅' : '❌'} ${c.name}`);
+    }
+  });
+  // 被跳过的项不影响整体 PASS/FAIL
+  const scorable = checks.filter((c) => !(c as any).skipped);
+  const allPass = scorable.every((c) => c.pass);
   process.exit(allPass ? 0 : 1);
 }
 
