@@ -164,9 +164,17 @@ export const configuration = (): AppConfig => ({
       maxTokens: parseInt(process.env.LLM_DEFAULT_MAX_TOKENS, 10) || 32000,
     },
   },
-  // P0-1 修复：JWT + Rate Limiting
+  // P0 安全修复（审查员发现）：商用必须显式设置 JWT_SECRET 环境变量，
+  // 未设置 + NODE_ENV=production → 启动失败（fail-fast，避免默认密钥泄漏）。
+  // 默认值仅用于 demo/开发环境，且字符串本身包含 "INSECURE-DEV" 自描述，
+  // 任何代码审计 / grep 都能立刻发现这是 placeholder。
   auth: {
-    jwtSecret: process.env.JWT_SECRET || 'interview-agent-dev-secret-change-in-production',
+    jwtSecret: process.env.JWT_SECRET || (() => {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('JWT_SECRET must be set when NODE_ENV=production (商用环境必须显式设置 JWT_SECRET)');
+      }
+      return 'INSECURE-DEV-DO-NOT-USE-IN-PRODUCTION-CHANGE-ME-PLEASE-32-CHARS';
+    })(),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
   throttler: {

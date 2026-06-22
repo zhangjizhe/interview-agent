@@ -15,8 +15,10 @@ services:
       - '5432:5432'
     environment:
       POSTGRES_DB: interview
-      POSTGRES_USER: dev
-      POSTGRES_PASSWORD: dev123
+      POSTGRES_USER: ${POSTGRES_USER:-dev}
+      # P1-11 修复（审查员发现）：商用必须从 .env 显式注入密码，未设置则用 dev 默认值（仅本地开发）
+      # .env.example 已说明 POSTGRES_PASSWORD 配置项
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev123}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -102,8 +104,8 @@ services:
     ports:
       - '3001:3001'
     environment:
-      # compose 内部用 service name
-      DATABASE_URL: postgresql://dev:dev123@postgres:5432/interview
+      # compose 内部用 service name；密码从 .env 注入（dev 默认 dev123，仅本地开发）
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev123}@postgres:5432/interview
       REDIS_URL: redis://redis:6379
       QDRANT_URL: http://qdrant:6333
       MILVUS_URL: http://milvus:19530
