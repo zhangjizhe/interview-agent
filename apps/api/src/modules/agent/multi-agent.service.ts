@@ -244,49 +244,52 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     const producer = (async () => {
       try {
         await threadIdStorage.run({ threadId, userId }, async () => {
-          // streamEvents v2 不 emit 节点内部 ChatModel token（已验证：on_chat_model_stream 计数=0）
-          // 改用 LangGraph 1.x 原生 streamMode='messages'，会吐 [AIMessageChunk, metadata]
+          // 修复：改回 streamEvents(version:'v2') 捕获 reviewer 节点内部 model.stream() token
           //
-          // 链路：reviewer 节点的 model.stream() → LlmGatewayChatModel._streamResponseChunks override
-          //   → LlmGateway.streamChat() 真流式 → AIMessageChunk 增量
-          //   → LangGraph 在 messages 模式下 emit 给外层
-          //   → 本方法过滤 metadata.langgraph_node === 'reviewer' 的 chunk
-          //   → yield 给前端
+          // 之前用 streamMode:'messages' 失败原因：
+          //   - reviewer 节点内部调 model.stream() 消费完所有 chunk 后，用 new AIMessage(finalResponse)
+          //     一次性 return，LangGraph messages 模式只在节点 return 后 emit 完整 AIMessage
+          //   - 用户实际收到的是一次性完整回复，非流式
           //
-          // 副模式 streamMode: 'updates' 同时 emit 节点 return 的 state delta，
-          // 用于 ADR #10 Phase 1：捕获 reviewer 节点的 issue_tags / reflection 写入 reflection_log
-          const stream = await self.graph!.stream(
+          // 现在修复��路：
+          //   - LlmGatewayChatModel._streamResponseChunks 已添加 runManager.handleLLMNewToken()
+          //   - 这样 LangChain 回调系统会触发 on_chat_model_stream 事件
+          //   - streamEvents v2 能捕获这些事件 → 拿到真实 token delta
+          //   - 过滤 event.metadata.langgraph_node === 'reviewer' 推给前端
+          //
+          // 副处理：同时监听 on_chain_end 捕获 reviewer 节点的 state delta（含 issue_tags 等）
+          const eventStream = await self.graph!.streamEvents(
             { messages: [new HumanMessage(userMessage)] } as any,
-            { ...config, streamMode: ['messages', 'updates'] as const },
+            { ...config, version: 'v2' },
           );
 
           let tokenHitCount = 0;
           let reflectionCaptured: any = null;
-          for await (const event of stream) {
-            // streamMode: 'messages' → [chunk, metadata]
-            // streamMode: 'updates' → { nodeName: stateDelta }
+          for await (const event of eventStream) {
             const ev = event as any;
-            const messagesTuple = Array.isArray(ev) ? ev : null;
-            const updatesDict = !Array.isArray(ev) && typeof ev === 'object' ? ev : null;
+            const eventName: string = ev.event ?? '';
+            const node: string = ev.metadata?.langgraph_node ?? '';
 
-            if (messagesTuple && messagesTuple.length === 2) {
-              const [chunk, metadata] = messagesTuple;
-              const node = (metadata as any)?.langgraph_node ?? '';
-              const c = chunk as any;
+            // 捕获 reviewer 节点内部 ChatModel 的流式 token
+            if (eventName === 'on_chat_model_stream' && node === 'reviewer') {
+              const chunk = ev.data?.chunk as any;
               const piece =
-                typeof c?.content === 'string'
-                  ? c.content
-                  : Array.isArray(c?.content)
-                    ? c.content.map((b: any) => b?.text || '').join('')
+                typeof chunk?.content === 'string'
+                  ? chunk.content
+                  : Array.isArray(chunk?.content)
+                    ? chunk.content.map((b: any) => b?.text || '').join('')
                     : '';
-              if (node === 'reviewer' && piece) {
+              if (piece) {
                 tokenHitCount++;
                 queue.push({ kind: 'data', content: piece });
               }
-            } else if (updatesDict) {
-              // 捕获 reviewer 节点的 state delta（含 issue_tags + reflection + review_score）
-              if (updatesDict.reviewer) {
-                reflectionCaptured = updatesDict.reviewer;
+            }
+
+            // 捕获 reviewer 节点完成后的 state delta（含 issue_tags / reflection / review_score）
+            if (eventName === 'on_chain_end' && node === 'reviewer') {
+              const output = ev.data?.output as any;
+              if (output) {
+                reflectionCaptured = output;
               }
             }
           }

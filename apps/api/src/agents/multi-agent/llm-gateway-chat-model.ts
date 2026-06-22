@@ -142,7 +142,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
   async *_streamResponseChunks(
     messages: BaseMessage[],
     options: this['ParsedCallOptions'],
-    _runManager?: CallbackManagerForLLMRun,
+    runManager?: CallbackManagerForLLMRun,
   ): AsyncGenerator<ChatGenerationChunk> {
     const { resolvedInterviewId, resolvedUserId, gatewayMessages } = this.buildGatewayPayload(messages, options);
 
@@ -159,6 +159,9 @@ export class LlmGatewayChatModel extends BaseChatModel {
     )) {
       // 文本 delta：每个 token 一块 ChatGenerationChunk（AIMessageChunk 用于 LangGraph messages stream 增量累加）
       if (chunk.content) {
+        // 关键修复：调用 runManager.handleLLMNewToken，让 LangChain 回调系统能捕获 token
+        // 这样 streamEvents(version:'v2') 的 on_chat_model_stream 事件才能被触发
+        await runManager?.handleLLMNewToken(chunk.content);
         yield new ChatGenerationChunk({
           message: new AIMessageChunk({ content: chunk.content }),
           text: chunk.content,
