@@ -251,7 +251,12 @@ export class LlmGatewayChatModel extends BaseChatModel {
    * 这样 LangGraph 的 supervisor/planner/reviewer 用 `model.withStructuredOutput(zodSchema).invoke(...)` 时
    * 不用管 tool calling 细节，LlmGateway 当作纯 prompt-based JSON 模型用。
    */
-  withStructuredOutput(schema: any, _options?: any): any {
+  withStructuredOutput(schema: any, _options?: any): {
+    invoke: (input: any, options?: any) => Promise<any>;
+    stream: (input: any) => Promise<never>;
+    /** 标识这是结构化输出 executor（非 BaseChatModel），不支持 .pipe() / .bind() */
+    _isStructuredOutputExecutor: true;
+  } {
     const model = this;
     // P0 修复：把 zod schema 递归 dump 到 prompt（含嵌套 object/array），让 LLM 知道字段怎么命名
     const describeField = (v: any, depth = 0): string => {
