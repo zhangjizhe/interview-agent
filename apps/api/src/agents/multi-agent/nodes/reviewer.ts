@@ -118,10 +118,24 @@ ${pastStepsSummary}
 
         // ADR #11：Hallucination 启发式检测（CRAG-lite 简化版）
         // 把 past_steps 的 result 当作 citation 来源，检查 finalResponse 中的硬事实是否引用
+        //
+        // R-P2-2 修复：sourceType 之前硬编码 'knowledge_bank'，根据 ps.step.tool
+        // 实际来源动态判断：
+        //   - bocha_search → web_search
+        //   - memory_recall → memory
+        //   - github_* → github_repo
+        //   - knowledge_bank / 无 tool → knowledge_bank（兼容旧数据）
+        const inferSourceType = (tool?: string): 'knowledge_bank' | 'memory' | 'github_repo' | 'web_search' => {
+            if (!tool) return 'knowledge_bank';
+            if (tool === 'bocha_search') return 'web_search';
+            if (tool === 'memory_recall') return 'memory';
+            if (tool.startsWith('github_')) return 'github_repo';
+            return 'knowledge_bank';
+        };
         const citationSources = state.past_steps.map((ps, idx) => ({
             index: idx + 1,
             sourceId: ps.step.id,
-            sourceType: 'knowledge_bank' as const, // 简化：统一标记为 KB
+            sourceType: inferSourceType(ps.step.tool),
             title: ps.step.description,
             content: typeof ps.result === 'string' ? ps.result : JSON.stringify(ps.result),
             score: ps.success ? 0.9 : 0.3,

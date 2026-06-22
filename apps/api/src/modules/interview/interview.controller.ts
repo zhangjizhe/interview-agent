@@ -992,9 +992,9 @@ export class InterviewController {
     res.status(HttpStatus.OK);
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
+res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
-res.flushHeaders();
+    res.flushHeaders();
 
     // R-P2-20 修复：user message 长度上限 10000 字符（约 2000-3000 tokens）。
     // 原 Prisma @db.Text 无限制，恶意用户可发超长消息导致 DB / LLM 上下文压力。

@@ -98,10 +98,40 @@ export function detectHallucination(
     citedMatches.map((m) => parseInt(m.slice(1, -1), 10)).filter((n) => !isNaN(n)),
   );
 
-  // 2. 提取 final_response 中的"硬事实"
-  //    - 数字 + 点号（如 1.0, 16.8, 3.14）
-  //    - 大写开头的专有名词（React、Vue、TypeScript、Kubernetes）
-  //    - 包含数字的版本模式（v\d+、\d+\.\d+）
+// 2. 提取 final_response 中的"硬事实"
+//    - 数字 + 点号（如 1.0, 16.8, 3.14）
+//    - 大写开头的专有名词（React、Vue、TypeScript、Kubernetes）
+//    - 包含数字的版本模式（v\d+、\d+\.\d+）
+//
+// R-P1-5 修复：原 factPatterns 误报率高——API / SQL / HTTP / React 等常见技术
+// 词在面试场景几乎必出现，但 citation source 未必包含。增加白名单：
+// 1. 常见技术缩写（API/SQL/HTTP/JSON 等）加入白名单，跳过幻觉检测
+// 2. 常见技术框架名（React/Vue/Angular/Node/Java/Python 等）加入白名单
+// 3. 白名单匹配不区分大小写
+//
+// 注意：白名单应只包含"通用术语"。具体 API 名称（如 React.useState）、库
+// 版本号（如 16.8.0）仍需 citation 引用支持。
+  const TECHNICAL_WHITELIST = new Set([
+    // 常见缩写
+    'api', 'apis', 'sql', 'http', 'https', 'json', 'xml', 'yaml', 'css', 'html',
+    'url', 'uri', 'uuid', 'tcp', 'udp', 'dns', 'ssl', 'tls', 'ssh', 'rpc',
+    'sdk', 'ide', 'cli', 'ui', 'ux', 'io', 'os', 'vm', 'gc', 'jwt', 'oauth',
+    'orm', 'mvc', 'mvvm', 'rest', 'graphql', 'grpc', 'soap', 'crud',
+    // 常见语言/框架
+    'react', 'vue', 'angular', 'svelte', 'node', 'deno', 'bun',
+    'javascript', 'typescript', 'java', 'python', 'golang', 'rust', 'csharp',
+    'ruby', 'php', 'swift', 'kotlin', 'scala', 'swift',
+    'next', 'nuxt', 'nest', 'express', 'koa', 'fastapi', 'django', 'flask',
+    'spring', 'rails', 'laravel', 'gin', 'echo', 'fiber',
+    // 常见工具/平台
+    'docker', 'kubernetes', 'k8s', 'helm', 'istio', 'envoy',
+    'redis', 'memcached', 'mongodb', 'postgres', 'mysql', 'sqlite', 'elasticsearch',
+    'kafka', 'rabbitmq', 'rocketmq', 'pulsar', 'nats',
+    'aws', 'gcp', 'azure', 'aliyun', 'tencent',
+    'git', 'github', 'gitlab', 'jenkins', 'argocd', 'terraform',
+    'npm', 'yarn', 'pnpm', 'pip', 'cargo', 'maven', 'gradle',
+  ]);
+
   const factPatterns = [
     /\bv?\d+\.\d+(\.\d+)?\b/g,          // 版本号 v1.2.3 / 1.2.3
     /\b[A-Z][a-zA-Z]+(?:[A-Z][a-z]+)+\b/g, // PascalCase: ReactFiber → React Fiber
@@ -111,7 +141,13 @@ export function detectHallucination(
   const facts = new Set<string>();
   for (const pat of factPatterns) {
     const matches = finalResponse.match(pat);
-    if (matches) matches.forEach((m) => facts.add(m));
+    if (matches) {
+      matches.forEach((m) => {
+        // 过滤白名单（不区分大小写）
+        if (TECHNICAL_WHITELIST.has(m.toLowerCase())) return;
+        facts.add(m);
+      });
+    }
   }
 
   // 3. 拼出所有 citation 的 content
