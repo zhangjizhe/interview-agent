@@ -148,7 +148,7 @@ CrossEncoder Rerank（精排）
 Top-K 结果
 ```
 
-**基准**：24 个测试用例，P@5=1.0，MRR=1.0，Recall=1.0。
+**基准**：30 个测试用例（Golden Dataset v2，2026-06-21 升级），P@5=1.0，MRR=1.0，Recall=1.0。
 
 ### 7. 4 级水位线上下文压缩
 
@@ -220,7 +220,7 @@ stub 决策缓存（LRU 1000 条）保护 Prompt Prefix Cache 命中率；用户
 | ① 3 层系统架构 | 前端 SPA · NestJS + LangGraph · 7 容器 + 双模型 | 手画 SVG（`_arch.html`） |
 | ② 对话界面 | SSE 流式 token 输出，真实 multi-agent 路径 | `puppeteer` 截 localhost:5173 |
 | ③ 报告界面 | 总分 + 4 维度评分 + 优点/不足/建议 | `puppeteer` 截 localhost:5173 |
-| ④ Langfuse Dashboard | Trace / Token / 模型分布 | 待补（云服务截图） |
+| ④ Langfuse Dashboard | Trace / Token / 模型分布 | 已补（脱敏 Langfuse 全景图，commits `4b108bc` + `59f0e6d`，`_langfuse.html` mock 数据） |
 
 > 📝 **如何补 Langfuse 截图**：把云端截图命名为 `docs/assets/_langfuse.png`，改 `_showcase.html` 里 `④` 那块的 `<div class="cell-body placeholder">` 为 `<div class="cell-body"><img src="_langfuse.png"></div>`，重新跑 `node /tmp/render.js _showcase.html product-showcase.png 2300`。
 
@@ -236,7 +236,7 @@ stub 决策缓存（LRU 1000 条）保护 Prompt Prefix Cache 命中率；用户
 | 短期记忆 | Redis 7 | Hash（工作记忆）+ List（会话）+ SharedContext |
 | 长期记忆 | Mem0 Cloud / OSS | 自动去重合并候选人画像 |
 | 向量库 | Qdrant 1.18 + Milvus 2.4 | 双引擎：Qdrant 轻量 KB + Milvus 商用重型 |
-| Agent 框架 | LangGraph 0.2 + LangChain 1.x | StateGraph + checkpoint + interrupt + Command |
+| Agent 框架 | LangGraph 1.3.6 + LangChain 1.x | StateGraph + checkpoint + interrupt + Command |
 | LLM | Qwen-plus + DeepSeek-chat | OpenAI 兼容协议，国产双模 |
 | 可观测 | Langfuse Cloud + 自建成本面板 | Trace/Span/Generation + Token 计量 |
 | 部署 | Docker Compose（7 容器） | postgres / redis / qdrant / milvus / milvus-etcd / api / web |
@@ -545,7 +545,7 @@ npm test
 # 覆盖 Prompt Prefix Cache + json-extract 核心模块
 ```
 
-### RAG 召回基准（24 Case P@5 = 1.0）
+### RAG 召回基准（30 Case P@5 = 1.0）
 
 ```bash
 curl -X POST "http://localhost:3001/api/knowledge-base/benchmark?limit=5&threshold=0.6" \

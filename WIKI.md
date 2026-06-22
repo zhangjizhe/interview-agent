@@ -25,7 +25,7 @@
 | 后端代码量 | **8,500+ 行** TypeScript（70+ 个 .ts 文件，不含 .d.ts） |
 | 前端代码量 | **3,075 行** TypeScript / TSX |
 | 单元测试 | **45/45 passed**（Jest 实测，6.8s）|
-| RAG 召回基准 | **24 Case P@5 = 1.0, MRR = 1.0, Recall = 1.0** |
+| RAG 召回基准 | **30 Case P@5 = 1.0, MRR = 1.0, Recall = 1.0**（Golden Dataset v2，2026-06-21 升级）|
 | **Cost Panel 响应** | **9–10 ms**（实测，Redis Hash + Postgres 双写） |
 | **50 轮 LLM Bench** | **3 次真调用 / 840 tokens / ¥0.0052 / 892.6s wall** |
 | **SSE Token 累计** | **10,075 tokens / 50 轮**（含 prompt + completion） |
@@ -230,7 +230,7 @@ DYNAMIC      → 对话历史（永远不进）
 
 ### 6.5 Multi-Agent + PostgresSaver Checkpoint（**生产级状态管理**）
 
-- 5 节点 LangGraph：planner → supervisor → executor → replanner → reviewer
+- 5 节点 LangGraph：**supervisor**（START → supervisor）→ planner → executor → replanner → reviewer（supervisor 是第一个节点，不是 planner）
 - **PostgresSaver checkpoint**（断点续跑）
 - 条件边 + retry 兜底防死循环
 - **agent.engine 配置开关**：`multi`（默认）| `deepagents` | `llm-direct`，通过 `ConfigService` 读取环境变量
@@ -387,7 +387,7 @@ curl -s "http://localhost:3001/api/knowledge-base/recall?q=LangGraph%20checkpoin
 | **代码质量** | TS 严格模式 / 类型安全 / JSDoc | 0 新错误（除遗留 3 个 Milvus） |
 | **性能优化** | 缓存 / 上下文压缩 / Rerank | 三层缓存工程 + 4 级水位线 + Milvus RRF |
 | **可观测性** | Trace / 埋点 / 成本监控 | Langfuse + 自建 Cost Panel（9-10ms）+ 双写 |
-| **测试覆盖** | 单测 / e2e / benchmark | 45 单测 + 24 Case RAG benchmark + 50 轮 LLM Bench |
+| **测试覆盖** | 单测 / e2e / benchmark | 45 单测 + 30 Case RAG benchmark + 50 轮 LLM Bench |
 | **商用化潜力** | 健壮性 / 扩展性 / 安全 | 已知短板（见 §七）是主要扣分项 |
 | **AI 工程深度** | Agent 编排 / Tool 设计 / RAG | Multi-Agent + 4 层记忆 + 双引擎 RAG |
 
@@ -484,6 +484,12 @@ curl -s "http://localhost:3001/api/knowledge-base/recall?q=LangGraph%20checkpoin
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-22 | **9 项 P0 安全修复**（8 commit）：Milvus filter 注入 escape / Redis KEYS→SCAN / SSRF guard + deleteInterview 归属校验 / login userId 格式校验 + JWT HS256 锁定 / `String.prototype.hashCode` 全局污染清除 / Graph recursionLimit=30 / 流式 fallback marker / Redis fail-fast。综合安全 5.0→7.0 |
+| 2026-06-22 | **MCP 客户端真实现**：stdio + StreamableHTTP 双 transport（MCP 2024-11 协议），GitHub/Notion 2 个 MCP 服务 6 个 tool 接入 McpRegistry |
+| 2026-06-22 | **Reflection 自我修正闭环**（ADR #10 Phase 1）：`ReflectionService` + `reflection_logs` 表 + reviewer schema 扩 `issue_tags` 9 种 + `reflection` 字段 |
+| 2026-06-22 | **CRAG-lite 幻觉抑制**（ADR #11）：`citation.ts` 启发式硬事实检测 + `[N]` 引用标记 + reviewer 自动检查 hallucination |
+| 2026-06-22 | **Reviewer 流式输出 10s→1s**：改用 `model.stream()` 替 `model.invoke()`，链路 `LlmGatewayChatModel._streamResponseChunks` → LangGraph `streamEvents v2` → SSE 推到前端 |
+| 2026-06-22 | **文档校正**：README LangGraph 版本号 0.2→1.3.6 / 产品截图 ④ Langfuse 待补→已补 / RAG 24→30 case；WIKI §六节点顺序纠正 + §十二本变更 |
 | 2026-06-21 | **50 轮真实 LLM Bench**：Cost Panel 9-10ms · 真实 ¥0.0052 / 50 轮 · Fallback 链路验证（DeepSeek 402 → Qwen 接管 33.3%） |
 | 2026-06-21 | **诚实标注 Cache 命中率**：Qwen dashscope OpenAI 兼容层不识别 `prompt_cache_key`，Cache 命中 0% 已知根因 |
 | 2026-06-20 | Docker Desktop 卡死恢复（kill -9 backend + open app）+ 7 容器 healthcheck 通过 |
