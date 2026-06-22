@@ -377,8 +377,14 @@ CRAG-lite 架构，启发式硬事实检测 + 引用溯源：
 ```bash
 # 1. 配置环境变量
 cp .env.example .env
-# 必填：QWEN_API_KEY / DEEPSEEK_API_KEY
+# 必填：QWEN_API_KEY / DEEPSEEK_API_KEY / JWT_SECRET
+#   └─ JWT_SECRET：.env.example 已给 dev 占位值（≥32 字符），本地跑通即可；
+#      商用 / 隐私敏感场景必须 `openssl rand -base64 48` 重生成
 # 可选：LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / BOCHA_API_KEY / MEM0_API_KEY
+#
+# ⚠️ 修复 2026-06-22：docker-compose.yml 写死 NODE_ENV=production（触发 P0-3
+#    fail-fast），JWT_SECRET 必须显式设。未设时 docker compose 启动时立即报错：
+#      "JWT_SECRET must be set in .env (商用必填，dev 占位见 .env.example)"
 
 # 2. 一键启动 7 个容器
 docker compose up -d --build

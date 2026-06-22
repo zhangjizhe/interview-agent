@@ -110,6 +110,10 @@ services:
       QDRANT_URL: http://qdrant:6333
       MILVUS_URL: http://milvus:19530
       NODE_ENV: production
+      # 修复 2026-06-22：docker compose 启动时 fail-fast，提示必须设 JWT_SECRET
+      # 之前隐式依赖 .env，存在但配置漏写时容器要跑 3s 后 API 进程才报错（用户体验差）
+      # 用 docker compose 的 ${VAR:?msg} 语法，VAR 未设置时 docker compose 立即报错
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (商用必填，dev 占位见 .env.example)}
       PORT: 3001
       PRISMA_LOG: '1'
     env_file:
