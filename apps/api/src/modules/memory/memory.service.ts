@@ -4,6 +4,27 @@ import { MilvusLongTermMemory } from './long-term/milvus-memory.store';
 import { Mem0CloudMemory } from './long-term/mem0.store';
 import { ChatMessage, Memory } from './interfaces/memory-store.interface';
 
+/**
+ * 32-bit string hash. Standalone function — do NOT extend String.prototype.
+ *
+ * 修复 P0-6：原实现用 `declare global { interface String { hashCode(): number } }`
+ * 污染全局 String 原型，影响整个进程所有字符串操作；且 32-bit hash 碰撞率高
+ * （生日攻击约 65536 条就有 50% 碰撞概率）。改为工具函数，作用域局限本文件。
+ *
+ * Note: collision risk remains — for production, swap to a 64-bit hash (e.g.
+ * FNV-1a 64) or a real KDF. This is a minimum-risk fix that stops the global
+ * pollution; correctness improvement is tracked separately.
+ */
+function hashString(s: string): number {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    const char = s.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // 强制转 32-bit int
+  }
+  return hash;
+}
+
 export type { WorkingState };
 
 interface AuditEntry {
@@ -48,7 +69,7 @@ export class MemoryService {
   ) {}
 
   private getMemoryKey(userId: string, content: string): string {
-    return `${userId}-${content.slice(0, 50).hashCode()}`;
+    return `${userId}-${hashString(content.slice(0, 50))}`;
   }
 
   private validateMemoryContent(content: string): boolean {
@@ -246,19 +267,3 @@ export class MemoryService {
     this.memoryMetadata.delete(memoryKey);
   }
 }
-
-declare global {
-  interface String {
-    hashCode(): number;
-  }
-}
-
-String.prototype.hashCode = function (): number {
-  let hash = 0;
-  for (let i = 0; i < this.length; i++) {
-    const char = this.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-  return hash;
-};
