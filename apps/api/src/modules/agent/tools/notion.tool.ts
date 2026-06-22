@@ -107,20 +107,31 @@ export class NotionTool {
     if (!this.token) {
       throw new Error('Notion token not configured (set NOTION_TOKEN in .env)');
     }
-    const response = await fetch(`${NOTION_API_BASE}${path}`, {
-      method: body ? 'POST' : 'GET',
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json',
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new Error(`Notion API ${response.status}: ${text.slice(0, 200)}`);
+    // R-P2-4 修复：fetch 加 AbortController 超时控制（默认 15s）
+    // 原代码无超时，Notion API 响应慢时会阻塞 Agent 主流程。
+    const TIMEOUT_MS = 15000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${NOTION_API_BASE}${path}`, {
+        method: body ? 'POST' : 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Notion-Version': NOTION_VERSION,
+          'Content-Type': 'application/json',
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Notion API ${response.status}: ${text.slice(0, 200)}`);
+      }
+      return response.json() as Promise<T>;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    return response.json() as Promise<T>;
   }
 
   /**
@@ -161,19 +172,33 @@ export class NotionTool {
     const page = await this.fetchJson<any>(`/pages/${args.page_id}`);
     const title = this.extractTitle(page);
 
-    // 2. 拿 page blocks
-    const blocksRes = await this.fetchJson<any>(`/blocks/${args.page_id}/children?page_size=100`);
-    const blocks = blocksRes.results || [];
+    // 2. R-P2-5 修复：分页拉取所有 blocks（之前只拿 page_size=100，长页面截断）
+    // Notion API: has_more=true 时带 next_cursor 继续翻页
+    const PAGE_SIZE = 100;
+    const MAX_PAGES = 20; // 安全上限，防止无限循环
+    const allBlocks: any[] = [];
+    let cursor: string | undefined;
+    let pageCount = 0;
+    do {
+      const blocksRes = await this.fetchJson<any>(
+        `/blocks/${args.page_id}/children?page_size=${PAGE_SIZE}` +
+        (cursor ? `&start_cursor=${cursor}` : ''),
+      );
+      const blocks = blocksRes.results || [];
+      allBlocks.push(...blocks);
+      cursor = blocksRes.has_more ? blocksRes.next_cursor : undefined;
+      pageCount++;
+    } while (cursor && pageCount < MAX_PAGES);
 
     // 3. 把 blocks 转 markdown（简化版：只处理 paragraph / heading / bulleted_list）
-    const markdown = this.blocksToMarkdown(blocks);
+    const markdown = this.blocksToMarkdown(allBlocks);
 
     return {
       id: page.id,
       title,
       url: page.url,
       markdown,
-      blockCount: blocks.length,
+      blockCount: allBlocks.length,
     };
   }
 
