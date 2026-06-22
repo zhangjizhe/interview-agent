@@ -83,9 +83,32 @@ export interface AppConfig {
   };
 }
 
-export const configuration = (): AppConfig => ({
-  port: parseInt(process.env.PORT, 10) || 3001,
-  webPort: parseInt(process.env.WEB_PORT, 10) || 5173,
+/**
+ * 严格整数解析：undefined / 非数字 / 0 / 负数 / NaN / >65535 都 fallback。
+ * 修 R-P2-24：原 `parseInt(s, 10) || fallback` 把 0 / NaN / 负数都当 falsy fallback，
+ * 且不报错（静默吞错）。商用未正确设 PORT 时启动后 listen(NaN) 才崩。
+ */
+function parsePortOr(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) && n > 0 && n <= 65535 ? n : fallback;
+}
+
+export const configuration = (): AppConfig => {
+  // R-P2-23 修复：商用未设 LLM API Key 启动时立即报错（fail-fast），
+  // 而不是运行时 401/402 才暴露（fail-late）。demo 模式仍可用空 apiKey 启动。
+  if (
+    process.env.NODE_ENV === 'production' &&
+    !process.env.QWEN_API_KEY &&
+    !process.env.DEEPSEEK_API_KEY
+  ) {
+    throw new Error(
+      '商用环境必须显式设置 QWEN_API_KEY 或 DEEPSEEK_API_KEY（至少一个）',
+    );
+  }
+  return {
+  port: parsePortOr(process.env.PORT, 3001),
+  webPort: parsePortOr(process.env.WEB_PORT, 5173),
   nodeEnv: process.env.NODE_ENV || 'development',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   database: {
@@ -93,7 +116,7 @@ export const configuration = (): AppConfig => ({
   },
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
-    sessionTtl: parseInt(process.env.REDIS_SESSION_TTL, 10) || 3600,
+    sessionTtl: parsePortOr(process.env.REDIS_SESSION_TTL, 3600),
   },
   qdrant: {
     url: process.env.QDRANT_URL || 'http://localhost:6333',
@@ -155,13 +178,13 @@ export const configuration = (): AppConfig => ({
   // P0-3 修复：按 provider 配置 maxTokens，区分模型能力
   llm: {
     qwen: {
-      maxTokens: parseInt(process.env.QWEN_MAX_TOKENS, 10) || 128000,
+      maxTokens: parsePortOr(process.env.QWEN_MAX_TOKENS, 128000),
     },
     deepseek: {
-      maxTokens: parseInt(process.env.DEEPSEEK_MAX_TOKENS, 10) || 64000,
+      maxTokens: parsePortOr(process.env.DEEPSEEK_MAX_TOKENS, 64000),
     },
     default: {
-      maxTokens: parseInt(process.env.LLM_DEFAULT_MAX_TOKENS, 10) || 32000,
+      maxTokens: parsePortOr(process.env.LLM_DEFAULT_MAX_TOKENS, 32000),
     },
   },
   // P0 安全修复（审查员发现）：商用必须显式设置 JWT_SECRET 环境变量，
@@ -181,4 +204,5 @@ export const configuration = (): AppConfig => ({
     ttl: parseInt(process.env.THROTTLER_TTL || '60', 10),
     limit: parseInt(process.env.THROTTLER_LIMIT || '60', 10),
   },
-});
+  };
+}
