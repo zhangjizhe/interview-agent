@@ -30,6 +30,7 @@ import {
 } from '@langchain/core/messages';
 import { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
+import { RunnableLambda, type Runnable } from '@langchain/core/runnables';
 import type { LlmGatewayService } from '../../modules/llm/llm.gateway.service';
 
 export interface LlmGatewayChatModelFields extends BaseChatModelParams {
@@ -250,13 +251,13 @@ export class LlmGatewayChatModel extends BaseChatModel {
    *
    * 这样 LangGraph 的 supervisor/planner/reviewer 用 `model.withStructuredOutput(zodSchema).invoke(...)` 时
    * 不用管 tool calling 细节，LlmGateway 当作纯 prompt-based JSON 模型用。
+   *
+   * 修复 (2026-06-22 build error)：原实现返回裸 `{ invoke, stream, _isStructuredOutputExecutor }`
+   * 对象，缺 Runnable 31 个方法（lc_runnable / withRetry / withConfig / ...），被 LangGraph 1.4.x
+   * 严格类型检查拒绝。改用 `RunnableLambda` 包装，自动实现 Runnable 接口，stream 由 transform
+   * 转发（保持原"只支持 invoke"语义，因为 RunnableLambda 的 stream 会调一次 func 并 yield 整块）。
    */
-  withStructuredOutput(schema: any, _options?: any): {
-    invoke: (input: any, options?: any) => Promise<any>;
-    stream: (input: any) => Promise<never>;
-    /** 标识这是结构化输出 executor（非 BaseChatModel），不支持 .pipe() / .bind() */
-    _isStructuredOutputExecutor: true;
-  } {
+  withStructuredOutput(schema: any, _options?: any): Runnable {
     const model = this;
     // P0 修复：把 zod schema 递归 dump 到 prompt（含嵌套 object/array），让 LLM 知道字段怎么命名
     const describeField = (v: any, depth = 0): string => {
@@ -294,8 +295,8 @@ export class LlmGatewayChatModel extends BaseChatModel {
       return `\n\n【输出 JSON Schema】必须用以下**精确字段名和类型**（不要拼错、不要自创字段名）：\n{\n${lines.join(',\n')}\n}`;
     };
     const jsonInstruction = `\n\n【输出格式要求】必须严格输出**纯 JSON 对象**（不要 markdown 代码块、不要任何额外文字/解释/前缀）。` + schemaDump(schema);
-    const executor = {
-      async invoke(input: any, options?: any): Promise<any> {
+    return new RunnableLambda({
+      func: async (input: any, options?: any): Promise<any> => {
         const messages = Array.isArray(input) ? input : [input];
         // 注入 JSON 输出指示到 system prompt
         const augmentedMessages = (messages as any[]).map((m, i) => {
@@ -309,7 +310,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
         }
         const result = await model._generate(augmentedMessages as any, options || {});
         const text = result.generations[0]?.text ?? '';
-// 鲁棒解析：去掉 markdown fence + 提取首尾 {} 区间（应对 LLM 在 JSON 前后加中文解释）
+        // 鲁棒解析：去掉 markdown fence + 提取首尾 {} 区间（应对 LLM 在 JSON 前后加中文解释）
         let cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
         const firstBrace = cleaned.indexOf('{');
         const lastBrace = cleaned.lastIndexOf('}');
@@ -331,10 +332,6 @@ export class LlmGatewayChatModel extends BaseChatModel {
           );
         }
       },
-      async stream(_input: any): Promise<any> {
-        throw new Error('withStructuredOutput.stream not supported on LlmGatewayChatModel');
-      },
-    };
-    return executor;
+    });
   }
 }
