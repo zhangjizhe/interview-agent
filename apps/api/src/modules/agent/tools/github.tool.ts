@@ -52,6 +52,8 @@ export interface GitHubReadme {
   repo: string;
   content: string; // base64 decoded markdown
   size: number;
+  /** true if content was truncated due to MAX_README_SIZE */
+  truncated?: boolean;
 }
 
 @Injectable()
@@ -127,13 +129,23 @@ export class GitHubTool {
     };
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
 
-    const url = `${GITHUB_API_BASE}${path}`;
-    const response = await fetch(url, { headers });
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new Error(`GitHub API ${response.status}: ${text.slice(0, 200)}`);
+    // R-P2-4 修复：fetch 加 AbortController 超时控制（默认 15s）
+    // 原代码无超时，GitHub API 限流 / 慢响应时阻塞 Agent 主流程。
+    const TIMEOUT_MS = 15000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const url = `${GITHUB_API_BASE}${path}`;
+      const response = await fetch(url, { headers, signal: controller.signal });
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`GitHub API ${response.status}: ${text.slice(0, 200)}`);
+      }
+      return response.json() as Promise<T>;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    return response.json() as Promise<T>;
   }
 
   async getUser(args: { username: string }): Promise<GitHubUser> {
@@ -154,11 +166,13 @@ export class GitHubTool {
     const data = await this.fetchJson<{ content: string; encoding: string; size: number }>(
       `/repos/${encodeURIComponent(args.owner)}/${encodeURIComponent(args.repo)}/readme`,
     );
-    // GitHub 返回 base64 编码的 content
+    // R-P2-6 修复：README 截断到 100KB，防止超大文件（如 1MB README）导致内存峰值。
+    // GitHub base64 解码后 UTF-8 文本可能数倍膨胀，提前截断避免 OOM。
+    const MAX_README_SIZE = 100 * 1024;
     const decoded = data.encoding === 'base64'
-      ? Buffer.from(data.content, 'base64').toString('utf8')
-      : data.content;
-    return { repo: fullName, content: decoded, size: data.size };
+      ? Buffer.from(data.content, 'base64').toString('utf8').slice(0, MAX_README_SIZE)
+      : data.content.slice(0, MAX_README_SIZE);
+    return { repo: fullName, content: decoded, size: data.size, truncated: data.size > MAX_README_SIZE };
   }
 
   /**
