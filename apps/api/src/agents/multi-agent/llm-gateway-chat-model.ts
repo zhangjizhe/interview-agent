@@ -150,6 +150,9 @@ export class LlmGatewayChatModel extends BaseChatModel {
         messages: gatewayMessages,
         interviewId: resolvedInterviewId,
         userId: resolvedUserId,
+        // R-P1-6 修复：传 semanticCacheType 让 llmGateway 内部处理 cache 查 + 计数 + 回写。
+        // 原 L148 漏传，导致流式调用绕开语义缓存（_generate 已传），缓存命中率偏低。
+        semanticCacheType: this.cacheType as any,
       },
       this.provider,
     )) {
