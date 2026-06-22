@@ -134,7 +134,12 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
       let dedupDelta = delta;
       const lastContent = last.content;
       if (lastContent.length > 0 && delta.length > 0) {
-        const maxOverlap = Math.min(delta.length, lastContent.length);
+        // R-P2-14 修复：限制 maxOverlap 上限，避免 streaming 热点 O(n²) 退化。
+        // 原实现每次 append 都 O(min(delta, lastContent))，累计 O(n²)。
+        // LLM 实际重复 token 极少超过 200 字符，cap 到 200 既能覆盖所有真实场景
+        // 又把单次 append 限制到 O(200) 常数时间。
+        const MAX_OVERLAP = 200;
+        const maxOverlap = Math.min(delta.length, lastContent.length, MAX_OVERLAP);
         for (let overlap = maxOverlap; overlap > 0; overlap--) {
           if (lastContent.endsWith(delta.slice(0, overlap))) {
             dedupDelta = delta.slice(overlap);

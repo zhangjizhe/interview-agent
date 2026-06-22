@@ -234,7 +234,14 @@ export function InterviewPage() {
   // HITL 审批：轮询图状态
   useEffect(() => {
     if (!interviewId || !resumeConfirmed) return;
-    const interval = setInterval(async () => {
+
+    // R-P2-16 修复：
+    // - 3s → 10s 节省 70% 请求
+    // - visibilitychange 暂停：tab 不活跃时停轮询（visibilityState === 'hidden'）
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const poll = async () => {
+      if (document.visibilityState === 'hidden') return;
       try {
         const res = await fetch(`/api/hitl/graph-status/${interviewId}`);
         const data = await safeJson(res);
@@ -248,8 +255,13 @@ export function InterviewPage() {
           setHitlPending(false);
         }
       } catch {}
-    }, 3000);
-    return () => clearInterval(interval);
+    };
+
+    poll();
+    intervalId = setInterval(poll, 10000);
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [interviewId, resumeConfirmed, hitlPending, setHitlPending]);
 
   // HITL 审批：通过/拒绝
