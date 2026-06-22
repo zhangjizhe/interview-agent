@@ -240,50 +240,50 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     const producer = (async () => {
       try {
         await threadIdStorage.run({ threadId, userId }, async () => {
-          // streamMode: 'messages' + 'updates' 双模式：
-          // LangGraph 多 streamMode 时每个 event 是 [mode, data] 元组：
-          //   ['messages', [AIMessageChunk, metadata]]  ← token 级增量
-          //   ['updates',  { nodeName: stateDelta }]    ← 节点 state delta
-          // 单 streamMode 时才是裸 [AIMessageChunk, metadata] 或 { nodeName: stateDelta }
-          const stream = await self.graph!.stream(
+          // 流式输出策略（v4 - streamEvents + on_chat_model_stream）：
+          //
+          // v1: graph.invoke() 跑完整图 → 手动切块 yield → 首字延迟 8-15s
+          // v2: streamEvents(version:'v2') → 0 token（未加 handleLLMNewToken）
+          // v3: graph.stream(streamMode: ['messages', 'updates']) → 0 token（reviewer 消费完才 return）
+          // v4: streamEvents(version:'v2') + handleLLMNewToken → ✅ 实时 token
+          //
+          // 关键：reviewer 节点用 model.stream() 消费所有 token 后才 return，
+          // 所以 streamMode:'messages' 只能在节点完成后看到完整消息。
+          // 必须用 streamEvents 监听 on_chat_model_stream 事件，
+          // LlmGatewayChatModel._streamResponseChunks 已加 handleLLMNewToken，
+          // 能在 token 生成时实时触发回调。
+          const eventStream = await self.graph!.streamEvents(
             { messages: [new HumanMessage(userMessage)] } as any,
-            { ...config, streamMode: ['messages', 'updates'] as const },
+            { ...config, version: 'v2' },
           );
 
           let tokenHitCount = 0;
           let reflectionCaptured: any = null;
-          for await (const event of stream) {
+          for await (const event of eventStream) {
             const ev = event as any;
+            const eventName: string = ev.event ?? '';
+            const node: string = ev.metadata?.langgraph_node ?? '';
 
-            // 兼容多模式 [mode, data] 和单模式两种格式
-            let mode: string | null = null;
-            let data: any = ev;
-
-            if (Array.isArray(ev) && ev.length === 2 && typeof ev[0] === 'string' && (ev[0] === 'messages' || ev[0] === 'updates')) {
-              // 多模式格式：[mode, data]
-              mode = ev[0];
-              data = ev[1];
-            }
-
-            if (mode === 'messages' || (mode === null && Array.isArray(data) && data.length === 2)) {
-              // messages 事件：data = [AIMessageChunk, metadata]
-              const [chunk, metadata] = data;
-              const node = (metadata as any)?.langgraph_node ?? '';
-              const c = chunk as any;
+            // 捕获 reviewer 节点内部 ChatModel 的流式 token
+            if (eventName === 'on_chat_model_stream' && node === 'reviewer') {
+              const chunk = ev.data?.chunk as any;
               const piece =
-                typeof c?.content === 'string'
-                  ? c.content
-                  : Array.isArray(c?.content)
-                    ? c.content.map((b: any) => b?.text || '').join('')
+                typeof chunk?.content === 'string'
+                  ? chunk.content
+                  : Array.isArray(chunk?.content)
+                    ? chunk.content.map((b: any) => b?.text || '').join('')
                     : '';
-              if (node === 'reviewer' && piece) {
+              if (piece) {
                 tokenHitCount++;
                 queue.push({ kind: 'data', content: piece });
               }
-            } else if (mode === 'updates' || (mode === null && !Array.isArray(data) && typeof data === 'object')) {
-              // updates 事件：data = { nodeName: stateDelta }
-              if (data?.reviewer) {
-                reflectionCaptured = data.reviewer;
+            }
+
+            // 捕获 reviewer 节点完成后的 state delta（含 issue_tags / reflection / review_score）
+            if (eventName === 'on_chain_end' && node === 'reviewer') {
+              const output = ev.data?.output as any;
+              if (output) {
+                reflectionCaptured = output;
               }
             }
           }
