@@ -136,7 +136,7 @@ export class HitlService {
    */
   async getAllPending(): Promise<HitlPending[]> {
     const client = this.redis.getClient();
-    const keys = await client.keys('hitl:*:pending');
+    const keys = await this.scanKeys('hitl:*:pending');
 
     const pending: HitlPending[] = [];
     for (const key of keys) {
@@ -152,6 +152,27 @@ export class HitlService {
     }
 
     return pending;
+  }
+
+  /**
+   * Iterate matching keys via SCAN instead of KEYS.
+   *
+   * KEYS is O(N) and blocks the Redis main thread — never safe in production.
+   * SCAN is incremental and yields between batches so other commands can
+   * interleave. ioredis scanStream returns a Readable; we collect batches into
+   * an array. count is a hint per round-trip, not a hard cap.
+   */
+  private scanKeys(pattern: string): Promise<string[]> {
+    const client = this.redis.getClient();
+    return new Promise<string[]>((resolve, reject) => {
+      const keys: string[] = [];
+      const stream = client.scanStream({ match: pattern, count: 100 });
+      stream.on('data', (batch: string[]) => {
+        for (const k of batch) keys.push(k);
+      });
+      stream.on('end', () => resolve(keys));
+      stream.on('error', reject);
+    });
   }
 
   /**

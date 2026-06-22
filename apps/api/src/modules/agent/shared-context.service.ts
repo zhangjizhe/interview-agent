@@ -132,7 +132,7 @@ export class SharedContextService {
       await client.del(this.getSessionKey(sessionId));
       this.logger.debug(`[SharedContext] Cleared context for session ${sessionId}`);
     } else {
-      const keys = await client.keys('shared-ctx:*');
+      const keys = await this.scanKeys('shared-ctx:*');
       if (keys.length > 0) {
         await client.del(...keys);
       }
@@ -146,13 +146,13 @@ export class SharedContextService {
       const count = await client.hlen(this.getSessionKey(sessionId));
       return count;
     }
-    const keys = await client.keys('shared-ctx:*');
+    const keys = await this.scanKeys('shared-ctx:*');
     return keys.length;
   }
 
   async cleanupExpired(): Promise<void> {
     const client = this.redis.getClient();
-    const keys = await client.keys('shared-ctx:*');
+    const keys = await this.scanKeys('shared-ctx:*');
     for (const key of keys) {
       const ttl = await client.ttl(key);
       if (ttl === -2) {
@@ -160,5 +160,28 @@ export class SharedContextService {
         this.logger.debug(`[SharedContext] Cleaned up expired key ${key}`);
       }
     }
+  }
+
+  /**
+   * Iterate matching keys via SCAN instead of KEYS.
+   *
+   * KEYS is O(N) and blocks the Redis main thread — never safe in production
+   * (the whole instance freezes until the scan completes). SCAN is incremental
+   * and yields between batches so other commands can interleave.
+   *
+   * ioredis exposes a Readable stream via scanStream; we collect batches into a
+   * single array. count is a hint per round-trip, not a hard cap.
+   */
+  private scanKeys(pattern: string): Promise<string[]> {
+    const client = this.redis.getClient();
+    return new Promise<string[]>((resolve, reject) => {
+      const keys: string[] = [];
+      const stream = client.scanStream({ match: pattern, count: 100 });
+      stream.on('data', (batch: string[]) => {
+        for (const k of batch) keys.push(k);
+      });
+      stream.on('end', () => resolve(keys));
+      stream.on('error', reject);
+    });
   }
 }
