@@ -107,16 +107,11 @@ export function HomePage() {
     queryKey: ['token-stats', userId],
     queryFn: async () => {
       const url = `/api/interview/stats?userId=${encodeURIComponent(userId)}`;
-      console.log('[STATS DEBUG] fetch url:', url);
       const r = await fetch(url);
-      console.log('[STATS DEBUG] response status:', r.status);
       if (!r.ok) {
-        console.error('[STATS DEBUG] not ok:', r.status);
         throw new Error(`Stats API ${r.status}`);
       }
-      const data = await safeJson(r);
-      console.log('[STATS DEBUG] data:', data);
-      return data;
+      return safeJson(r);
     },
     refetchInterval: 5000,
     retry: 3,
