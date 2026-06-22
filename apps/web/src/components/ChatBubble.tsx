@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Bot, User as UserIcon } from 'lucide-react';
+import { Bot, User as UserIcon, Loader2 } from 'lucide-react';
 
 interface ChatBubbleProps {
   role: 'user' | 'assistant';
@@ -13,6 +13,7 @@ export const ChatBubble = memo(function ChatBubble({
   streaming,
 }: ChatBubbleProps) {
   const isUser = role === 'user';
+  const showThinkingPlaceholder = streaming && !content;
 
   return (
     <div className={`flex gap-2 md:gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -22,9 +23,9 @@ export const ChatBubble = memo(function ChatBubble({
         }`}
       >
         {isUser ? (
-          <UserIcon className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" />
+          <UserIcon className="w-3.5 h-3.5 md:w-4 h-4 text-white" />
         ) : (
-          <Bot className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" />
+          <Bot className="w-3.5 h-3.5 md:w-4 h-4 text-white" />
         )}
       </div>
       <div
@@ -34,8 +35,20 @@ export const ChatBubble = memo(function ChatBubble({
             : 'bg-white border border-slate-200 text-slate-900'
         }`}
       >
-        {content || (streaming ? '' : '')}
-        {streaming && (
+        {showThinkingPlaceholder ? (
+          <span className="inline-flex items-center gap-2 text-slate-500">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>思考中</span>
+            <span className="inline-flex gap-0.5">
+              <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-1 h-1 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </span>
+          </span>
+        ) : (
+          content
+        )}
+        {streaming && content && (
           <span className="inline-block w-1.5 h-4 bg-blue-500 ml-0.5 animate-pulse align-middle" />
         )}
       </div>
