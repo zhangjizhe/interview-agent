@@ -6,7 +6,7 @@
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
 [![NestJS](https://img.shields.io/badge/NestJS-10-red)](https://nestjs.com/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-0.2-green)](https://langchain-ai.github.io/langgraphjs/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1.3.6-green)](https://langchain-ai.github.io/langgraphjs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
@@ -23,7 +23,7 @@
 | 实验组 LLM 调用 | 2 次 / 869 tokens | `session_costs.totalTokens`（最可信口径）|
 | Fallback 链路触发 | **0%** | DeepSeek 复活 → 全走 Qwen 主路径 |
 | Prompt Cache 命中 | 0/0 = 0% | Qwen dashscope OpenAI 兼容层不支持 `prompt_cache_key`（已知根因）|
-| 单元测试 | **45/45 passed** | Jest 实测 |
+| 单元测试 | **105/105 passed** | Jest 83 + node:test 22 |
 | 容器启动 | 7 容器 healthy | postgres / redis / qdrant / milvus / milvus-etcd / api / web |
 
 ### A/B 对照 · 真实测量（3 组，50 轮）
@@ -130,7 +130,9 @@ L4 结构化      Prisma/PG     面试结束后归档，支持历史复盘
 | `AnswerHistory` | 答案历史 + LLM 评分（completeness / correctness / depth） |
 
 - **Agent 决策**：`agentDecide()` 一次 LLM 调用同时输出 `score` + `shouldFollowUp` + `followUpQuestion` + `shouldAdvance` + `advancedQuestion`
-- **降级兜底**：LLM 不可用时 `heuristicDecide()` 启发式回退
+- **语义驱动**：追问/进阶由 LLM 基于回答内容自主判断，不是 `score < 0.5` 硬阈值
+- **降级兜底**：LLM 不可用时 `heuristicDecide()` 启发式回退（整词边界匹配，Milvus 不可用时本地题库兜底）
+- **主流程已接入**：`completeTask` 在 assistant 回复后调用，评分 + 写 answerHistory + 更新 task status
 
 ### 6. RAG 双引擎 — Hybrid Retrieval + Re-ranking
 
@@ -150,7 +152,16 @@ Top-K 结果
 
 **基准**：30 个测试用例（Golden Dataset v2，2026-06-21 升级），P@5=1.0，MRR=1.0，Recall=1.0。
 
-### 7. 4 级水位线上下文压缩
+### 7. Citation 幻觉检测 — CRAG-lite 引用溯源
+
+基于 80+ 常见技术术语白名单的启发式硬事实检测 + `[N]` 引用标记：
+
+- **`detectHallucination()`**：识别回答中的硬事实声明，检查是否有对应引用支撑
+- **`buildCitationContext()`**：为 LLM 上下文注入引用指令 + 源类型推断（`inferSourceType`）
+- **Reviewer 集成**：reviewer 节点自动检查 hallucination，评分时考虑引用完整性
+- **白名单 80+ 术语**：避免常见技术术语（React / Docker / REST 等）被误判为硬事实
+
+### 8. 4 级水位线上下文压缩
 
 | Tier | 触发条件 | 策略 |
 |------|---------|------|
@@ -159,7 +170,7 @@ Top-K 结果
 | T2 | 80%–95% | Prune：替换为 `[已压缩]` stub |
 | T3 | ≥ 95% | 增量 LLM 摘要 |
 
-stub 决策缓存（LRU 1000 条）保护 Prompt Prefix Cache 命中率；用户消息只裁代码块保留纯文本。
+stub 决策缓存（LRU 1000 条，64-bit djb2 hash）保护 Prompt Prefix Cache 命中率；用户消息只裁代码块保留纯文本。
 
 ---
 
@@ -189,6 +200,7 @@ stub 决策缓存（LRU 1000 条）保护 Prompt Prefix Cache 命中率；用户
 │  │   hitl_review (interrupt)                        │   │
 │  │   Specialist Handoffs: interviewer/evaluator/... │   │
 │  │   PostgresSaver Checkpoint                       │   │
+│  │   Citation (CRAG-lite 幻觉检测 + 引用溯源)         │   │
 │  └─────────────────┬──────────────────────────────┘   │
 │          ┌──────────┴───────────┐                       │
 │  ┌───────▼──────┐   ┌──────────▼──────┐                │
@@ -198,6 +210,9 @@ stub 决策缓存（LRU 1000 条）保护 Prompt Prefix Cache 命中率；用户
 │  │ L3 Milvus    │   │ +Rerank        │                │
 │  │    +Mem0     │   │ Qdrant KB      │                │
 │  │ L4 Prisma    │   └─────────────────┘                │
+│  └──────────────┘                                       │
+│  ┌──────────────┐                                       │
+│  │ Auth Module   │ JWT HS256 + userId 格式校验           │
 │  └──────────────┘                                       │
 └─────────────────────────────────────────────────────────┘
          │          │          │          │
@@ -233,12 +248,13 @@ stub 决策缓存（LRU 1000 条）保护 Prompt Prefix Cache 命中率；用户
 | 前端 | React 18 + Vite + TypeScript + Tailwind | SSE 流式渲染 + HITL 审批面板 |
 | 后端 | NestJS 10 + TypeScript | 模块化 DI，装饰器生态 |
 | 数据库 | PostgreSQL 16 + Prisma | 9 张业务表（含 InterviewTask / AnswerHistory） |
-| 短期记忆 | Redis 7 | Hash（工作记忆）+ List（会话）+ SharedContext |
+| 短期记忆 | Redis 7 | Hash（工作记忆）+ List（会话）+ SharedContext（SCAN 替代 KEYS） |
 | 长期记忆 | Mem0 Cloud / OSS | 自动去重合并候选人画像 |
 | 向量库 | Qdrant 1.18 + Milvus 2.4 | 双引擎：Qdrant 轻量 KB + Milvus 商用重型 |
 | Agent 框架 | LangGraph 1.3.6 + LangChain 1.x | StateGraph + checkpoint + interrupt + Command |
 | LLM | Qwen-plus + DeepSeek-chat | OpenAI 兼容协议，国产双模 |
-| 可观测 | Langfuse Cloud + 自建成本面板 | Trace/Span/Generation + Token 计量 |
+| 认证 | JWT (HS256) + userId 格式校验 | 生产环境 fail-fast，RBAC 待补充 |
+| 可观测 | Langfuse Cloud + 自建成本面板 | 三层确定性采样（djb2 hash，trace 10% / span 50% / gen 100%）|
 | 部署 | Docker Compose（7 容器） | postgres / redis / qdrant / milvus / milvus-etcd / api / web |
 
 ---
@@ -323,7 +339,19 @@ Planner 在 PlanStep 中指定 `specialist` 字段，Executor 按类型路由到
 | searcher | 联网搜索、信息检索 | 需要外部知识时 |
 | general | 通用处理 | 其他场景 |
 
-### 7. JSON 容错解析
+### 7. Citation 幻觉检测
+
+CRAG-lite 架构，启发式硬事实检测 + 引用溯源：
+
+```typescript
+// 1. detectHallucination()：识别硬事实声明，检查引用支撑
+// 2. 80+ 常见技术术语白名单（React/Docker/REST...），避免误报
+// 3. inferSourceType()：动态推断引用源类型（documentation/code/example）
+// 4. buildCitationContext()：注入引用指令到 LLM 上下文
+// 5. Reviewer 集成：评分时考虑引用完整性
+```
+
+### 8. JSON 容错解析
 
 解决 LLM 输出 markdown 包装 + 嵌套结构时正则贪婪匹配失效问题：
 
@@ -475,7 +503,7 @@ LANGFUSE_SECRET_KEY=lf_sk_xxx              # 自托管项目 secret key
 ```
 interview-agent/
 ├── apps/
-│   ├── api/                              # NestJS 后端（8,500+ 行 TS）
+│   ├── api/                              # NestJS 后端（15,000+ 行 TS，99 个 .ts 文件）
 │   │   └── src/
 │   │       ├── modules/
 │   │       │   ├── llm/                  # Inference Gateway + 三层缓存 + 成本追踪
@@ -489,20 +517,34 @@ interview-agent/
 │   │       │   │   ├── interview-agent.service.ts          ★ 主流程（10 步）
 │   │       │   │   ├── multi-agent.service.ts              ★ LangGraph 编排 + HITL resume
 │   │       │   │   ├── deepagents-agent.service.ts
-│   │       │   │   └── services/context-manager.ts         ★ 4 级水位线压缩
+│   │       │   │   ├── services/context-manager.ts         ★ 4 级水位线压缩
+│   │       │   │   ├── shared-context.service.ts           ★ 多 Agent 共享上下文（SCAN 替代 KEYS）
+│   │       │   │   └── tools/
+│   │       │   │       ├── bocha-search.tool.ts            ★ 联网搜索
+│   │       │   │       ├── notion.tool.ts                  ★ Notion 3 工具（15s 超时 + 分页）
+│   │       │   │       └── github.tool.ts                  ★ GitHub 3 工具（README 截断）
 │   │       │   ├── agents/multi-agent/
 │   │       │   │   ├── state.ts                            ★ Zod schema + SpecialistType
-│   │       │   │   ├── graph.ts                            ★ 拓扑定义 + hitl_review + interrupt
+│   │       │   │   ├── graph.ts                            ★ 拓扑定义 + hitl_review + recursionLimit=30
+│   │       │   │   ├── llm-gateway-chat-model.ts           ★ BaseChatModel 适配器 + 流式
+│   │       │   │   ├── citation.ts                         ★ CRAG-lite 幻觉检测 + 引用溯源
 │   │       │   │   └── nodes/                              ★ 7 节点实现
 │   │       │   ├── interview/
 │   │       │   │   ├── controllers/hitl.controller.ts      ★ HITL 审批 + graph-resume
 │   │       │   │   └── services/
-│   │       │   │       ├── dynamic-task-queue.service.ts    ★ 动态任务队列
+│   │       │   │       ├── dynamic-task-queue.service.ts    ★ 动态任务队列 + Agent 决策
+│   │       │   │       ├── heuristic-decide.util.ts         ★ 启发式回退（整词边界匹配）
+│   │       │   │       ├── escape-milvus.util.ts            ★ Milvus filter 注入防护
+│   │       │   │       ├── question-bank.service.ts         ★ Milvus 混合检索 + RRF + Rerank
 │   │       │   │       ├── hitl.service.ts                 ★ HITL Redis 状态
 │   │       │   │       └── mcp-registry.ts                 ★ 工具注册表
+│   │       │   ├── auth/                # 认证（JWT + userId 格式校验 + HS256 锁定）
+│   │       │   ├── reflection/           # Reflection 自我修正闭环
 │   │       │   ├── memory/               # 四层记忆
 │   │       │   └── knowledge-base/       # Qdrant 知识库
 │   │       ├── infra/                    # Redis / Prisma / Langfuse / Qdrant
+│   │       │   ├── langfuse/sampling.util.ts               ★ djb2 确定性三层采样
+│   │       │   └── config/configuration.ts                 ★ parseSafeInt + LLM fail-fast
 │   │       └── common/json-extract.ts   ★ LLM JSON 容错解析
 │   └── web/                              # React 前端
 ├── docker-compose.yml                    # 7 容器编排
@@ -536,13 +578,13 @@ interview-agent/
 
 ## 测试与基准
 
-### 单元测试（45 个，全过）
+### 单元测试（105 个，全过）
 
 ```bash
 cd apps/api
 npm test
-# Jest 实测: 45/45 passed, 6.8s
-# 覆盖 Prompt Prefix Cache + json-extract 核心模块
+# Jest 实测: 105/105 passed (Jest 83 + node:test 22)
+# 覆盖 Agent 决策 / Citation 幻觉检测 / ContextManager / Langfuse 采样 / JSON 容错解析 等核心模块
 ```
 
 ### RAG 召回基准（30 Case P@5 = 1.0）
@@ -577,12 +619,14 @@ curl -X POST "http://localhost:3001/api/knowledge-base/benchmark?limit=5&thresho
 ## 已知局限
 
 1. **Prompt Prefix Cache 依赖底层 Provider**：当前 Qwen dashscope OpenAI 兼容层不识别 `prompt_cache_key`，生产环境需切换至 OpenAI 直连或 Anthropic Claude 方可生效
-2. **测试覆盖**：45 个单测（Jest），覆盖率 < 30%；前端 Vitest 与 Playwright e2e 待补充
+2. **测试覆盖**：105 个单测（Jest 83 + node:test 22），核心业务逻辑（Agent 决策 / Citation / SSE / 评分 / Langfuse 采样）已有覆盖；前端 Vitest 与 Playwright e2e 待补充；7 个 Jest spec 因依赖未对齐暂 skip
 3. **Provider 临时错 retry**：当前仅 Provider 级 fallback，单次调用内部无指数退避
-4. **认证机制**：当前 MVP 阶段简化身份标识，OAuth2 + RBAC 待补充
+4. **认证机制**：JWT HS256 + userId 格式校验已落地，OAuth2 + RBAC 待补充
 5. **Mem0 Cloud**：候选画像数据传到第三方 SaaS，GDPR 合规存疑；建议商用时切本地 OSS 或 per-tenant namespace
-6. **SSE 单连接**：未实现连接复用，每个浏览器 tab 一个长连接
+6. **SSE 单连接**：未实现连接复用，每个浏览器 tab 一个长连接；断线重连无 server-side offset（已知限制）
 7. **Milvus 单机部署**：数据量 < 100K 足够；> 1M 需考虑分片
+8. **搜索结果下一轮可见**：bocha_search 结果注入短期记忆后需下一轮 LLM 才能看到，当前轮回复已发出无法修改
+9. **Reflection 闭环**：Phase 1 已落地（`reflection_logs` 表 + `issue_tags` 9 种），Phase 2 自动修正策略待实现
 
 ---
 
