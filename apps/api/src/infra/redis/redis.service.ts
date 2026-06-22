@@ -15,13 +15,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       maxRetriesPerRequest: 3,
       lazyConnect: true,
     });
-    
-    try {
-      await this.client.connect();
-      this.logger.log(`✅ Redis connected to ${url}`);
-    } catch (err) {
-      this.logger.error(`❌ Redis connection failed: ${err.message}`);
-    }
+
+    // 修复 P0-9：fail-fast。Redis 不可用时直接抛错让 NestJS 启动失败，
+    // 而不是悄悄吞掉错误导致后续所有 Redis 操作雪崩（缓存静默失效 + 启动正常但运行时崩溃）。
+    // 上层（docker-compose / k8s）通过 health check + restart 策略恢复。
+    await this.client.connect();
+    this.logger.log(`✅ Redis connected to ${url}`);
   }
 
   async onModuleDestroy() {
