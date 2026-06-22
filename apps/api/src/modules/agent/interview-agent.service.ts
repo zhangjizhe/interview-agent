@@ -403,6 +403,8 @@ export class InterviewAgentService {
     strengths: string[];
     weaknesses: string[];
     suggestions: string[];
+    /** token 用量，controller 写入 session_costs */
+    usage?: { promptTokens: number; completionTokens: number };
   }> {
     const bank: BankKey = matchBank(ctx.position);
     const questions = pickQuestions(bank, 5);
@@ -461,7 +463,7 @@ export class InterviewAgentService {
     return {
       ...result,
       usage: response.usage, // 把 token 透出给 controller
-    } as any;
+    };
   }
 
   private detectSearchIntent(userInput: string, aiResponse: string): boolean {
