@@ -137,7 +137,9 @@ export class LangfuseService implements OnModuleInit {
     usage?: { promptTokens: number; completionTokens: number };
     metadata?: Record<string, any>;
   }) {
-    if (!this.client) return;
+    // R-P1-8 修复：traceId 缺失时早返回（与 logSpan/logToolCall 一致），
+    // 避免 Langfuse SDK 生成 orphan generation 然后静默丢弃。
+    if (!this.client || !params.traceId) return;
     this.client.generation({
       traceId: params.traceId,
       name: params.name,
@@ -159,7 +161,9 @@ export class LangfuseService implements OnModuleInit {
     output?: any;
     metadata?: Record<string, any>;
   }) {
-    if (!this.client) return;
+    // R-P1-8 修复：traceId 缺失（trace 被采样跳过）时早返回，不再调 Langfuse
+    // client 传 undefined traceId（之前会生成 orphan generation 然后静默丢）。
+    if (!this.client || !params.traceId) return;
     if (!this.shouldSample('span')) {
       return; // 跳过不上报
     }
@@ -183,7 +187,8 @@ export class LangfuseService implements OnModuleInit {
     metadata?: Record<string, any>;
     error?: string;
   }) {
-    if (!this.client) return;
+    // R-P1-8 修复：traceId 缺失时早返回（与 logSpan 一致）
+    if (!this.client || !params.traceId) return;
     if (!this.shouldSample('span')) {
       return; // 跳过不上报
     }
