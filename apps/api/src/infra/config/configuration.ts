@@ -27,6 +27,12 @@ export interface AppConfig {
     apiKey: string;
     baseUrl: string;
   };
+  github: {
+    token?: string;
+  };
+  notion: {
+    token?: string;
+  };
   langfuse: {
     publicKey: string;
     secretKey: string;
@@ -105,6 +111,12 @@ export const configuration = (): AppConfig => ({
   bocha: {
     apiKey: process.env.BOCHA_API_KEY || '',
     baseUrl: process.env.BOCHA_BASE_URL || 'https://api.bochaai.com/v1',
+  },
+  github: {
+    token: process.env.GITHUB_TOKEN,
+  },
+  notion: {
+    token: process.env.NOTION_TOKEN,
   },
   langfuse: {
     publicKey: process.env.LANGFUSE_PUBLIC_KEY || '',
