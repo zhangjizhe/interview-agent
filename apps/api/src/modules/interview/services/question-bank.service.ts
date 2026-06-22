@@ -26,6 +26,21 @@ import {
   FunctionType,
 } from '@zilliz/milvus2-sdk-node';
 
+/**
+ * Escape a user-supplied string for safe inclusion in a Milvus filter expression.
+ *
+ * Milvus filter grammar wraps string literals in double quotes; backslashes and
+ * double quotes inside the literal must be escaped. Without escaping, an attacker
+ * can break out of the string and inject arbitrary filter expressions, e.g.
+ *   position == "\"; \"1==1 or position == \"x"
+ *
+ * Defense: replace `\` first (otherwise we'd double-escape the escapes we just
+ * added for `"`), then escape `"`.
+ */
+function escapeMilvusString(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 export interface QuestionItem {
   id?: string;          // Milvus auto-id
   questionId: string;    // 业务 id（uuid）
@@ -276,11 +291,11 @@ export class QuestionBankService {
     try {
       const { position, level, category, limit = 5, rerank = true } = options;
 
-      // 拼 filter
+      // 拼 filter（user-supplied 值必须 escape，防止 Milvus 表达式注入）
       const filters: string[] = [];
-      if (position) filters.push(`position == "${position}"`);
-      if (level) filters.push(`level == "${level}"`);
-      if (category) filters.push(`category == "${category}"`);
+      if (position) filters.push(`position == "${escapeMilvusString(position)}"`);
+      if (level) filters.push(`level == "${escapeMilvusString(level)}"`);
+      if (category) filters.push(`category == "${escapeMilvusString(category)}"`);
       const filter = filters.length > 0 ? filters.join(' and ') : undefined;
 
       // 双路召回
@@ -410,7 +425,7 @@ export class QuestionBankService {
   async list(position?: string, limit = 20): Promise<QuestionItem[]> {
     await this.ensureCollection();
     try {
-      const filter = position ? `position == "${position}"` : undefined;
+      const filter = position ? `position == "${escapeMilvusString(position)}"` : undefined;
       const result = await this.client.query({
         collection_name: this.COLLECTION,
         filter,
@@ -442,7 +457,7 @@ export class QuestionBankService {
     try {
       await this.client.delete({
         collection_name: this.COLLECTION,
-        filter: `questionId == "${questionId}"`,
+        filter: `questionId == "${escapeMilvusString(questionId)}"`,
       });
       return { deleted: true };
     } catch (err: any) {
