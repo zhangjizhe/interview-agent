@@ -80,7 +80,7 @@ export function createExecutorNode(model: BaseChatModel) {
         try {
             switch (step.action) {
                 case 'search':
-                case 'recall_memory':
+                case 'memory_recall':
                 case 'query_knowledge_bank':
                 case 'generate_question': {
                     // 调用 MCP 工具

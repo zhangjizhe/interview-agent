@@ -23,7 +23,7 @@ export type SpecialistType = z.infer<typeof SpecialistTypeSchema>;
 export const PlanStepSchema = z.object({
     id: z.string().describe('步骤唯一标识，如 step-1'),
     action: z
-        .enum(['search', 'recall_memory', 'query_knowledge_bank', 'ask_llm', 'generate_question'])
+        .enum(['search', 'memory_recall', 'query_knowledge_bank', 'ask_llm', 'generate_question'])
         .describe('动作类型'),
     tool: z.string().optional().describe('MCP 工具名（如 bocha_search）'),
     args: z.record(z.any()).optional().describe('工具参数'),
