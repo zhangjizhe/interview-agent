@@ -87,8 +87,18 @@ export function createPlannerNode(model: BaseChatModel, config?: PlannerConfig) 
 【用户意图】${state.user_intent}
 【意图目标】${intentPrompt[state.user_intent] || '通用处理'}
 
-【可用工具】
+【可用工具】（用于 step.tool 字段，**只能选下面列出的**，不要自创）
 ${toolsPrompt}
+
+⚠️ **重要：step.action 字段只能从以下 5 个枚举值中选**：
+- "search": 调用 step.tool 执行搜索/查询类工具（bocha_search / knowledge_bank / github_* / notion_*）
+- "memory_recall": 调用 memory_recall 工具做长期记忆检索（tool 字段写 "memory_recall"）
+- "query_knowledge_bank": 调用 knowledge_bank 工具做面试题库 RAG
+- "ask_llm": 不调工具，让 LLM 自己生成内容（无需 step.tool，step.description 描述生成要求）
+- "generate_question": 生成下一道面试题（无需 step.tool）
+
+❌ **绝对不能**把 MCP 工具名（github_get_user / notion_search 等）直接当 action！
+✅ MCP 工具只能通过 action="search" + tool="<mcp_tool_name>" 调用。
 
 【可用 Specialist Agent（Handoffs 路由）】
 - interviewer: 面试官 Agent，擅长出题、追问、评估回答质量

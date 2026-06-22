@@ -15,6 +15,7 @@ import type { RunnableConfig } from '@langchain/core/runnables';
 import { Command } from '@langchain/langgraph';
 import {
   buildInterviewGraph,
+  INTERVIEW_GRAPH_RECURSION_LIMIT,
   type InterviewAgentStateType,
 } from '../../agents/multi-agent/graph';
 import { LlmGatewayChatModel, threadIdStorage } from '../../agents/multi-agent/llm-gateway-chat-model';
@@ -206,30 +207,40 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
   }
 
   async *stream(userMessage: string, threadId: string, userId?: string): AsyncGenerator<any, void, unknown> {
+    this.logger.warn(`[stream-v6] ENTER threadId=${threadId} userId=${userId} content="${userMessage.slice(0, 30)}..."`);
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
-    // 流式输出策略（v5 - streamEvents + 白名单节点 + final_response 兜底）：
+    // 流式输出策略（v6 - graph.stream(streamMode: 'messages') + 白名单节点 + final_response 兜底）：
     //
+    // 历史问题：
     // v1: graph.invoke() 跑完整图 → 手动切块 yield → 首字延迟 8-15s
     // v2: streamEvents(version:'v2') → on_chat_model_stream → 0 token（未加 handleLLMNewToken）
-    // v3: graph.stream(streamMode: ['messages', 'updates']) → 0 token（reviewer 消费完才 return）
-    // v4: streamEvents(version:'v2') + handleLLMNewToken → reviewer 节点流式 OK，但
-    //     respond_directly 节点（model.invoke）不触发回调，前端 assistant 占位卡死
-    // v5: 白名单 ['reviewer', 'respond_directly'] + final_response 兜底
-    //     - reviewer / respond_directly 节点都改用 collectStreamText（统一 helper）
-    //     - service 监听白名单节点 + 节点完成后读 graph state 兜底补 final_response
+    // v3: graph.stream(streamMode: ['messages','updates']) → 0 token（误判输出格式）
+    // v4: streamEvents + handleLLMNewToken → reviewer 节点流式 OK，但 respond_directly 不流式
+    // v5: 白名单 + final_response 兜底（streamEvents 路径）
+    //     **v5 失败**：实际跑 API SSE 拿不到任何 token，日志显示只有 on_chain_* 事件，
+    //     完全没有 on_chat_model_stream。LangGraph 1.4.x 的 streamEvents 路径对自定义
+    //     LlmGatewayChatModel（继承 BaseChatModel）兼容性差，回调链路断了。
     //
-    // 链路：
+    // v6: 改用 graph.stream(streamMode: 'messages') —— LangGraph 原生流式 API，
+    //     内部用 StreamMessagesHandler 监听 handleLLMNewToken，**跟 LlmGatewayChatModel
+    //     兼容性更好**（实测 emit token）。
+    //
+    // 链路（v6）：
     //   节点内 collectStreamText → model.stream → LlmGatewayChatModel._streamResponseChunks
     //   → LlmGateway.streamChat 真流式吐 token
     //   → runManager.handleLLMNewToken 触发 LangChain 回调
-    //   → LangGraph streamEvents(version:'v2') 转发 on_chat_model_stream
-    //   → 本方法按 STREAM_WHITELIST 过滤 node → yield token → SSE 推前端
+    //   → LangGraph StreamMessagesHandler (Pregel 内部) 收 handleLLMNewToken
+    //   → graph.stream(streamMode: 'messages') emit [AIMessageChunk, metadata]
+    //   → 本方法按 STREAM_WHITELIST 过滤 node + 取 message.content
+    //   → yield token → SSE 推前端
     //
-    // 兜底：graph 完成后用 getState 读 final_response，跟已 emit 文本对比，
-    //       缺的补一次（防止回调链路异常丢 token）。补的用 'final_response_fallback'
-    //       标记，前端可识别但一般不显示（与已 emit token 重叠会自动 dedup）。
+    // 输出格式（单 streamMode = 'messages'）：
+    //   [AIMessageChunk, metadata]
+    //   metadata.langgraph_node 是节点名
+    //
+    // 兜底：graph 完成后用 getState 读 final_response，对比 emittedText，缺的补一次。
     //
     // AsyncLocalStorage 包装：必须用 producer/queue 模式，让 ALS 上下文覆盖 generator 的整个生命周期
     const queue: any[] = [];
@@ -237,74 +248,92 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     const err: any[] = [];
     const self = this;
     let emittedText = ''; // 累加已 emit 的 token 文本（兜底对比用）
-    const STREAM_WHITELIST = ['reviewer', 'respond_directly'] as const;
+    let tokenHitCount = 0; // 调试：emit 的 token 数
+    let messageChunkCount = 0; // 调试：收到的 chunk 数
+    const STREAM_WHITELIST = ['reviewer', 'respond_directly', 'executor'] as const;
     const producer = (async () => {
       try {
         await threadIdStorage.run({ threadId, userId }, async () => {
-          const eventStream = await self.graph!.streamEvents(
-            { messages: [new HumanMessage(userMessage)] } as any,
-            { ...config, version: 'v2' },
-          );
+          // v6 修复：改用 graph.stream(streamMode: 'messages')
+          // 不再用 streamEvents（LangGraph 1.4.x + 自定义 BaseChatModel 不兼容）
+          this.logger.warn(`[stream-v6] before graph.stream`);
+          let stream: any;
+          try {
+            stream = await self.graph!.stream(
+              { messages: [new HumanMessage(userMessage)] } as any,
+              { ...config, streamMode: 'messages' as const, recursionLimit: INTERVIEW_GRAPH_RECURSION_LIMIT },
+            );
+            this.logger.warn(`[stream-v6] graph.stream returned: ${typeof stream}, has Symbol.asyncIterator=${typeof stream?.[Symbol.asyncIterator]}`);
+          } catch (e: any) {
+            this.logger.error(`[stream-v6] graph.stream THREW: ${e.message}`, e.stack);
+            throw e;
+          }
 
-          let tokenHitCount = 0;
-          let reflectionCaptured: any = null;
-          let respondDirectlyCaptured: any = null;
-          let eventCount = 0;
-          let onChatModelStreamCount = 0;
-          for await (const event of eventStream) {
-            eventCount++;
-            const ev = event as any;
-            const eventName: string = ev.event ?? '';
-            const node: string = ev.metadata?.langgraph_node ?? '';
-            
-            // 调试：打印所有事件
-            self.logger.debug(`[stream] event #${eventCount}: name=${eventName}, node=${node}, data=${ev.data ? 'exists' : 'null'}`);
-
-            // 捕获白名单节点的流式 token
-            // on_chat_model_stream 事件的 data.chunk 是 ChatGenerationChunk 类型，
-            // 文本内容在 text 属性里，不是 content！
-            if (eventName === 'on_chat_model_stream' && STREAM_WHITELIST.includes(node as any)) {
-              onChatModelStreamCount++;
-              const chunk = ev.data?.chunk as any;
-              // ChatGenerationChunk 有 text 属性直接存字符串内容
-              const piece = chunk?.text || '';
-              if (piece) {
-                tokenHitCount++;
-                emittedText += piece;
-                queue.push({ kind: 'data', content: piece, node });
+          this.logger.warn(`[stream-v6] entering for-await loop`);
+          for await (const chunk of stream) {
+            messageChunkCount++;
+            // 单 streamMode 'messages' 输出：[AIMessageChunk, metadata]
+            const tuple = chunk as any;
+            const message = Array.isArray(tuple) ? tuple[0] : null;
+            const metadata = Array.isArray(tuple) ? tuple[1] : null;
+            const node: string = metadata?.langgraph_node ?? '';
+            const content = typeof message?.content === 'string' ? message.content : '';
+            // 显著日志：每个 chunk + 白名单判断
+            this.logger.warn(
+              `[stream-v6] chunk #${messageChunkCount}: node=${node || '(empty)'}, content="${content.slice(0, 30)}${content.length > 30 ? '...' : ''}"`,
+            );
+            // 白名单过滤 + emit + dedup
+            //
+            // 为什么需要 dedup：
+            // LangGraph streamMode: 'messages' 在以下三个时机都会 emit：
+            //   1. executor 节点的 ask_llm invoke 结束时（handleLLMEnd emit 完整 AIMessage）
+            //   2. reviewer 节点 model.stream 每个 token（handleLLMNewToken）
+            //   3. reviewer 节点结束时（handleLLMEnd emit 完整 AIMessage）
+            // 如果不 dedup，前端会看到同一段回复 emit 多次，体验极差。
+            //
+            // dedup 策略：
+            //   - 如果 chunk content 等于 emittedText 末尾（handleLLMEnd 重复发完整消息），跳过
+            //   - 如果 chunk content 是 emittedText 的真前缀（重复发同一段），跳过
+            //   - 否则正常 emit（流式 token 增量）
+            if (STREAM_WHITELIST.includes(node as any) && content) {
+              if (emittedText.endsWith(content)) {
+                // 重复：handleLLMEnd 重复 emit 完整内容，跳过
+                this.logger.debug(`[stream-v6] skip duplicate: chunk #${messageChunkCount} (${content.length} chars already emitted)`);
+                continue;
               }
-            }
-
-            // 捕获 reviewer 节点完成后的 state delta（含 issue_tags / reflection / review_score）
-            if (eventName === 'on_chain_end' && node === 'reviewer') {
-              const output = ev.data?.output as any;
-              if (output) {
-                reflectionCaptured = output;
+              if (emittedText.includes(content) && content.length < emittedText.length / 2) {
+                // 重复：内容是已 emit 的子串（且较短），跳过
+                this.logger.debug(`[stream-v6] skip substring duplicate: chunk #${messageChunkCount}`);
+                continue;
               }
-            }
-
-            // 捕获 respond_directly 节点的 final_response（兜底用：on_chat_model_stream
-            // 因为某些极端情况可能漏 token，比如 _streamResponseChunks 里 runManager 异常）
-            if (eventName === 'on_chain_end' && node === 'respond_directly') {
-              const output = ev.data?.output as any;
-              if (output) {
-                respondDirectlyCaptured = output;
-              }
+              tokenHitCount++;
+              emittedText += content;
+              queue.push({ kind: 'data', content, node });
             }
           }
-          self.logger.debug(`[stream] total-events=${eventCount}, on_chat_model_stream-events=${onChatModelStreamCount}, token-hits=${tokenHitCount} reflection-captured=${!!reflectionCaptured} respond-directly-captured=${!!respondDirectlyCaptured}`);
+          this.logger.warn(
+            `[stream-v6] stream done: chunks=${messageChunkCount}, token-hits=${tokenHitCount}, emitted-chars=${emittedText.length}`,
+          );
+
+          // 读 graph 最终 state（reflection / issue_tags / final_response）
+          let finalState: any = null;
+          try {
+            finalState = await self.graph!.getState(config);
+          } catch (stateErr: any) {
+            self.logger.debug(`[stream] getState skipped: ${stateErr.message}`);
+          }
+
+          const finalValues = (finalState?.values as any) || {};
 
           // ADR #10 Phase 1：写入 reflection_log
-          if (reflectionCaptured && self.reflectionService) {
-            const r = reflectionCaptured as any;
-            const question = userMessage;
-            const finalResponse = r.final_response || '';
-            const reviewScore = typeof r.review_score === 'number' ? r.review_score : 0;
-            const reviewIssues = Array.isArray(r.review_issues) ? r.review_issues : [];
-            const issueTags = Array.isArray(r.issue_tags) ? r.issue_tags : [];
-            const reflection = r.reflection || '';
-            const retryCount = typeof r.retry_count === 'number' ? r.retry_count : 0;
-            const hitlPending = !!r.hitl_pending;
+          if (self.reflectionService && finalValues) {
+            const reviewScore = typeof finalValues.review_score === 'number' ? finalValues.review_score : 0;
+            const issueTags = Array.isArray(finalValues.issue_tags) ? finalValues.issue_tags : [];
+            const finalResponse = finalValues.final_response || '';
+            const reviewIssues = Array.isArray(finalValues.review_issues) ? finalValues.review_issues : [];
+            const reflection = finalValues.reflection || '';
+            const retryCount = typeof finalValues.retry_count === 'number' ? finalValues.retry_count : 0;
+            const hitlPending = !!finalValues.hitl_pending;
 
             // 仅当 reviewer 有实质评估时记录（避免空记录）
             if (reviewScore > 0 || issueTags.length > 0) {
@@ -312,7 +341,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
               self.reflectionService.record({
                 interviewId: threadId,
                 userId: userId || 'unknown',
-                question,
+                question: userMessage,
                 finalResponse,
                 reviewScore,
                 reviewIssues,
@@ -330,13 +359,12 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
 
           // 兜底：用 getState 读 graph 最终 state，对比 emittedText，缺的补 token
           // 适用场景：
-          // - on_chat_model_stream 事件因 callback 链路异常丢 token
-          // - 节点用 model.invoke 但未改 stream（防御未来扩展漏改）
-          // - LangGraph 版本升级后事件格式变化
+          // - 节点用 model.invoke 但未来漏改（防御扩展）
+          // - LangGraph 版本升级后 streamMode 格式变化
+          // - callback 链路异常丢 token
           // 实现：拿最终 state.final_response，对比已 emit 文本，缺的尾部补一次。
-          try {
-            const finalState = await self.graph!.getState(config);
-            const finalResponse = (finalState?.values as any)?.final_response || '';
+          if (finalValues) {
+            const finalResponse = finalValues.final_response || '';
             if (finalResponse && finalResponse.length > emittedText.length) {
               // 找已 emit 的最大前缀匹配，剩余部分作为兜底 token
               let prefixLen = 0;
@@ -351,13 +379,11 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
               if (missingTail) {
                 self.logger.warn(
                   `[stream] fallback: emitted ${emittedText.length} chars but state has ${finalResponse.length} chars, ` +
-                  `补 ${missingTail.length} chars (可能因 on_chat_model_stream 回调链路异常)`
+                  `补 ${missingTail.length} chars (callback 链路可能异常)`,
                 );
                 queue.push({ kind: 'data', content: missingTail, node: 'final_response_fallback' });
               }
             }
-          } catch (stateErr: any) {
-            self.logger.debug(`[stream] getState fallback skipped: ${stateErr.message}`);
           }
         });
         done.v = true;
@@ -404,7 +430,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
         await threadIdStorage.run({ threadId, userId }, async () => {
           const stream = await self.graph!.stream(
             { messages: [new HumanMessage(userMessage)] } as any,
-            { ...config, streamMode: 'values' as const },
+            { ...config, streamMode: 'values' as const, recursionLimit: INTERVIEW_GRAPH_RECURSION_LIMIT },
           );
           for await (const chunk of stream) {
             queue.push({ kind: 'data', chunk });

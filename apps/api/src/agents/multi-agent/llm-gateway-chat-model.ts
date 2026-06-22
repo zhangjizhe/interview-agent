@@ -315,29 +315,63 @@ export class LlmGatewayChatModel extends BaseChatModel {
         if (!augmentedMessages[0] || augmentedMessages[0].role !== 'system') {
           augmentedMessages.unshift({ role: 'system', content: '你是一个 JSON 输出助手。' + jsonInstruction });
         }
-        const result = await model._generate(augmentedMessages as any, options || {});
-        const text = result.generations[0]?.text ?? '';
-        // 鲁棒解析：去掉 markdown fence + 提取首尾 {} 区间（应对 LLM 在 JSON 前后加中文解释）
-        let cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
-        const firstBrace = cleaned.indexOf('{');
-        const lastBrace = cleaned.lastIndexOf('}');
-        if (firstBrace >= 0 && lastBrace > firstBrace) {
-          cleaned = cleaned.slice(firstBrace, lastBrace + 1);
-        }
-        try {
-          const parsed = JSON.parse(cleaned);
-          // zod 验证（如果有 schema.parse）
-          if (schema && typeof schema.parse === 'function') {
-            return schema.parse(parsed);
+
+        // 兜底：parser 最多重试 1 次，避免单次 LLM 抖动导致整个 graph 抛错
+        // （LangGraph 内部节点抛错 → graph 失败 → SSE 0 token 给前端）
+        let lastErr: Error | null = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const result = await model._generate(
+              attempt === 0 ? augmentedMessages as any : [
+                ...augmentedMessages,
+                { role: 'user', content: '上次输出未通过校验，请重新严格按 schema 输出纯 JSON object，不要任何额外文字。' },
+              ],
+              options || {},
+            );
+            const text = result.generations[0]?.text ?? '';
+            // 鲁棒解析：去掉 markdown fence + 提取首尾 {} 区间（应对 LLM 在 JSON 前后加中文解释）
+            let cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+            const firstBrace = cleaned.indexOf('{');
+            const lastBrace = cleaned.lastIndexOf('}');
+            if (firstBrace >= 0 && lastBrace > firstBrace) {
+              cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+            }
+            const parsed = JSON.parse(cleaned);
+            // zod 验证（如果有 schema.parse）
+            if (schema && typeof schema.parse === 'function') {
+              return schema.parse(parsed);
+            }
+            return parsed;
+          } catch (err: any) {
+            lastErr = err;
+            // 继续 retry
           }
-          return parsed;
-        } catch (err: any) {
-          throw new Error(
-            `withStructuredOutput: failed to parse LLM output as JSON.\n` +
-            `Output: ${text.slice(0, 500)}\n` +
-            `Parse error: ${err.message}`,
-          );
         }
+
+        // 兜底：2 次都失败，根据 schema 字段推断最小可用结构返回
+        // 避免 graph 整个崩溃导致前端 SSE 0 token
+        const schemaShape = (schema as any)?._def?.shape?.() || (schema as any)?.shape;
+        if (schemaShape && typeof schemaShape === 'object') {
+          const fallback: Record<string, any> = {};
+          for (const [k, v] of Object.entries(schemaShape)) {
+            const t = (v as any)?._def?.typeName;
+            if (t === 'ZodString') fallback[k] = '';
+            else if (t === 'ZodNumber') fallback[k] = 0;
+            else if (t === 'ZodBoolean') fallback[k] = false;
+            else if (t === 'ZodArray') fallback[k] = [];
+            else if (t === 'ZodObject') fallback[k] = {};
+            else if (t === 'ZodOptional') fallback[k] = undefined;
+            else fallback[k] = null;
+          }
+          // 兜底日志（让 reviewer / supervisor 等节点能继续走，不卡死 SSE）
+          return fallback;
+        }
+
+        // 真没招了才抛错（不应该到这里）
+        throw new Error(
+          `withStructuredOutput: failed to parse LLM output as JSON after 2 attempts.\n` +
+          `Last error: ${lastErr?.message}`,
+        );
       },
     });
   }
