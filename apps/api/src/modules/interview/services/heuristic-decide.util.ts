@@ -54,15 +54,25 @@ export function estimateCorrectness(answer: string): number {
   const correctIndicators = ['正确', '确实如此', '这个理解是对的', '是的', '没错'];
   const wrongIndicators = ['错误', '不对', '不是这样'];
 
-  // 中文词边界正则：前缀为行首/中文标点/空白，后缀同理
+  // 中文词边界正则：前后缀允许中文标点/空白/行首行尾
+  // 前缀额外允许"是/为/很/最/不"等修饰词（"是正确的"→"正确"独立出现）
+  // 后缀额外允许"的/了/地/得"等助词
+  // 注意："不正确"中"正确"前是"不"，不应匹配——但"不"在修饰词列表中会误匹配，
+  // 所以"不"需要排除。改用否定先行：前缀不能是中文字符（排除"不/理解"等），
+  // 但允许标点/空白/行首/是/为/很/最。
   const boundaryRegex = (words: string[]) =>
-    new RegExp(`(?:[，。！？；：、\\s]|^)(${words.join('|')})(?:[，。！？；：、\\s]|$)`);
+    new RegExp(`(?:[，。！？；：、\\s是为何很最]|^)(${words.join('|')})(?:[的了地得，。！？；：、\\s]|$)`);
 
   let score = 0.6;
-  const correctRegex = boundaryRegex(correctIndicators);
-  if (correctRegex.test(answer)) score += 0.1;
-  const wrongRegex = boundaryRegex(wrongIndicators);
-  if (wrongRegex.test(answer)) score -= 0.2;
+  // 逐词匹配，每个独立出现的指标词加减分（与原 forEach + includes 语义一致）
+  for (const indicator of correctIndicators) {
+    const re = new RegExp(`(?:[，。！？；：、\\s是为何很最]|^)${indicator}(?:[的了地得，。！？；：、\\s]|$)`);
+    if (re.test(answer)) score += 0.1;
+  }
+  for (const indicator of wrongIndicators) {
+    const re = new RegExp(`(?:[，。！？；：、\\s是为何很最]|^)${indicator}(?:[的了地得，。！？；：、\\s]|$)`);
+    if (re.test(answer)) score -= 0.2;
+  }
 
   return Math.max(0.2, Math.min(1, score));
 }
