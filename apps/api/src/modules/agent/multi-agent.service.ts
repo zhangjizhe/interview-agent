@@ -209,49 +209,38 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
-    // 流式输出策略（v3 - graph.stream + streamMode 双模式）：
+    // 流式输出策略（v5 - streamEvents + 白名单节点 + final_response 兜底）：
     //
     // v1: graph.invoke() 跑完整图 → 手动切块 yield → 首字延迟 8-15s
-    // v2: streamEvents(version:'v2') → on_chat_model_stream → 0 token（实测失败）
-    // v3: graph.stream(streamMode: ['messages', 'updates']) → 正确解析多模式格式
-    //
-    // v2 失败根因：streamEvents 的 on_chat_model_stream 在 LangGraph 1.3.x +
-    //   LlmGatewayChatModel 自定义 BaseChatModel 下不触发（LangChain 回调系统
-    //   对自定义 model 的 _streamResponseChunks + handleLLMNewToken 链路不稳定）
-    //
-    // v3 修复：graph.stream(streamMode: ['messages', 'updates']) 是 LangGraph 原生
-    //   流式 API，直接 emit 节点内部 model.stream() 的 AIMessageChunk。
-    //   关键：多 streamMode 时输出格式为 [mode, data] 元组，不是裸 [chunk, metadata]。
-    //   之前 0 token 就是因为把 ['messages', [chunk, metadata]] 当 [chunk, metadata] 解析，
-    //   chunk = 'messages' 字符串，content 永远 undefined。
+    // v2: streamEvents(version:'v2') → on_chat_model_stream → 0 token（未加 handleLLMNewToken）
+    // v3: graph.stream(streamMode: ['messages', 'updates']) → 0 token（reviewer 消费完才 return）
+    // v4: streamEvents(version:'v2') + handleLLMNewToken → reviewer 节点流式 OK，但
+    //     respond_directly 节点（model.invoke）不触发回调，前端 assistant 占位卡死
+    // v5: 白名单 ['reviewer', 'respond_directly'] + final_response 兜底
+    //     - reviewer / respond_directly 节点都改用 collectStreamText（统一 helper）
+    //     - service 监听白名单节点 + 节点完成后读 graph state 兜底补 final_response
     //
     // 链路：
-    //   reviewer.ts 用 model.stream() → LlmGatewayChatModel._streamResponseChunks()
-    //   → LlmGateway.streamChat() 真流式 → AIMessageChunk 增量
-    //   → LangGraph streamMode:'messages' emit [AIMessageChunk, metadata]
-    //   → 多模式包装为 ['messages', [AIMessageChunk, metadata]]
-    //   → 本方法正确解包 → yield token → SSE 推前端
+    //   节点内 collectStreamText → model.stream → LlmGatewayChatModel._streamResponseChunks
+    //   → LlmGateway.streamChat 真流式吐 token
+    //   → runManager.handleLLMNewToken 触发 LangChain 回调
+    //   → LangGraph streamEvents(version:'v2') 转发 on_chat_model_stream
+    //   → 本方法按 STREAM_WHITELIST 过滤 node → yield token → SSE 推前端
+    //
+    // 兜底：graph 完成后用 getState 读 final_response，跟已 emit 文本对比，
+    //       缺的补一次（防止回调链路异常丢 token）。补的用 'final_response_fallback'
+    //       标记，前端可识别但一般不显示（与已 emit token 重叠会自动 dedup）。
     //
     // AsyncLocalStorage 包装：必须用 producer/queue 模式，让 ALS 上下文覆盖 generator 的整个生命周期
     const queue: any[] = [];
     const done = { v: false };
     const err: any[] = [];
     const self = this;
+    let emittedText = ''; // 累加已 emit 的 token 文本（兜底对比用）
+    const STREAM_WHITELIST = ['reviewer', 'respond_directly'] as const;
     const producer = (async () => {
       try {
         await threadIdStorage.run({ threadId, userId }, async () => {
-          // 流式输出策略（v4 - streamEvents + on_chat_model_stream）：
-          //
-          // v1: graph.invoke() 跑完整图 → 手动切块 yield → 首字延迟 8-15s
-          // v2: streamEvents(version:'v2') → 0 token（未加 handleLLMNewToken）
-          // v3: graph.stream(streamMode: ['messages', 'updates']) → 0 token（reviewer 消费完才 return）
-          // v4: streamEvents(version:'v2') + handleLLMNewToken → ✅ 实时 token
-          //
-          // 关键：reviewer 节点用 model.stream() 消费所有 token 后才 return，
-          // 所以 streamMode:'messages' 只能在节点完成后看到完整消息。
-          // 必须用 streamEvents 监听 on_chat_model_stream 事件，
-          // LlmGatewayChatModel._streamResponseChunks 已加 handleLLMNewToken，
-          // 能在 token 生成时实时触发回调。
           const eventStream = await self.graph!.streamEvents(
             { messages: [new HumanMessage(userMessage)] } as any,
             { ...config, version: 'v2' },
@@ -259,6 +248,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
 
           let tokenHitCount = 0;
           let reflectionCaptured: any = null;
+          let respondDirectlyCaptured: any = null;
           let eventCount = 0;
           let onChatModelStreamCount = 0;
           for await (const event of eventStream) {
@@ -270,20 +260,18 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
             // 调试：打印所有事件
             self.logger.debug(`[stream] event #${eventCount}: name=${eventName}, node=${node}, data=${ev.data ? 'exists' : 'null'}`);
 
-            // 捕获 reviewer 节点内部 ChatModel 的流式 token
+            // 捕获白名单节点的流式 token
             // on_chat_model_stream 事件的 data.chunk 是 ChatGenerationChunk 类型，
             // 文本内容在 text 属性里，不是 content！
-            if (eventName === 'on_chat_model_stream' && node === 'reviewer') {
+            if (eventName === 'on_chat_model_stream' && STREAM_WHITELIST.includes(node as any)) {
               onChatModelStreamCount++;
               const chunk = ev.data?.chunk as any;
-              // 调试：打印 chunk 结构
-              self.logger.debug(`[stream] on_chat_model_stream #${onChatModelStreamCount}: chunk=${JSON.stringify(chunk)}`);
               // ChatGenerationChunk 有 text 属性直接存字符串内容
               const piece = chunk?.text || '';
-              self.logger.debug(`[stream] piece="${piece}"`);
               if (piece) {
                 tokenHitCount++;
-                queue.push({ kind: 'data', content: piece });
+                emittedText += piece;
+                queue.push({ kind: 'data', content: piece, node });
               }
             }
 
@@ -294,8 +282,17 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
                 reflectionCaptured = output;
               }
             }
+
+            // 捕获 respond_directly 节点的 final_response（兜底用：on_chat_model_stream
+            // 因为某些极端情况可能漏 token，比如 _streamResponseChunks 里 runManager 异常）
+            if (eventName === 'on_chain_end' && node === 'respond_directly') {
+              const output = ev.data?.output as any;
+              if (output) {
+                respondDirectlyCaptured = output;
+              }
+            }
           }
-          self.logger.debug(`[stream] total-events=${eventCount}, on_chat_model_stream-events=${onChatModelStreamCount}, reviewer-token-hits=${tokenHitCount} reflection-captured=${!!reflectionCaptured}`);
+          self.logger.debug(`[stream] total-events=${eventCount}, on_chat_model_stream-events=${onChatModelStreamCount}, token-hits=${tokenHitCount} reflection-captured=${!!reflectionCaptured} respond-directly-captured=${!!respondDirectlyCaptured}`);
 
           // ADR #10 Phase 1：写入 reflection_log
           if (reflectionCaptured && self.reflectionService) {
@@ -330,6 +327,38 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
               });
             }
           }
+
+          // 兜底：用 getState 读 graph 最终 state，对比 emittedText，缺的补 token
+          // 适用场景：
+          // - on_chat_model_stream 事件因 callback 链路异常丢 token
+          // - 节点用 model.invoke 但未改 stream（防御未来扩展漏改）
+          // - LangGraph 版本升级后事件格式变化
+          // 实现：拿最终 state.final_response，对比已 emit 文本，缺的尾部补一次。
+          try {
+            const finalState = await self.graph!.getState(config);
+            const finalResponse = (finalState?.values as any)?.final_response || '';
+            if (finalResponse && finalResponse.length > emittedText.length) {
+              // 找已 emit 的最大前缀匹配，剩余部分作为兜底 token
+              let prefixLen = 0;
+              const maxCheck = Math.min(emittedText.length, finalResponse.length);
+              for (let i = maxCheck; i > 0; i--) {
+                if (emittedText.endsWith(finalResponse.slice(0, i))) {
+                  prefixLen = i;
+                  break;
+                }
+              }
+              const missingTail = finalResponse.slice(prefixLen);
+              if (missingTail) {
+                self.logger.warn(
+                  `[stream] fallback: emitted ${emittedText.length} chars but state has ${finalResponse.length} chars, ` +
+                  `补 ${missingTail.length} chars (可能因 on_chat_model_stream 回调链路异常)`
+                );
+                queue.push({ kind: 'data', content: missingTail, node: 'final_response_fallback' });
+              }
+            }
+          } catch (stateErr: any) {
+            self.logger.debug(`[stream] getState fallback skipped: ${stateErr.message}`);
+          }
         });
         done.v = true;
         queue.push({ kind: 'done' });
@@ -347,7 +376,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
           yield {
             type: 'token',
             content: item.content,
-            node: 'reviewer',
+            node: item.node,
           };
           // 30ms 间隔模拟 token 流速（约 100 字/秒，符合人类阅读速度）
           await new Promise((r) => setTimeout(r, 30));

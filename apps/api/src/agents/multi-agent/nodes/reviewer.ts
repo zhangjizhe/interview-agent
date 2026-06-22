@@ -24,6 +24,7 @@ import type { InterviewAgentStateType } from '../state';
 import { ReviewVerdictSchema } from '../state';
 import { dedupFinalResponse } from '../dedup';
 import { detectHallucination } from '../citation';
+import { collectStreamText } from '../stream-helper';
 
 export const IssueTagSchema = z.enum([
     'factual_error',    // 编造了不存在的事实（API 名称/库版本/数据等）
@@ -85,7 +86,8 @@ export function createReviewerNode(model: BaseChatModel) {
         state: InterviewAgentStateType,
         config?: any,
     ): Promise<Partial<InterviewAgentStateType>> {
-        const lastMessage = state.messages[state.messages.length - 1]?.content ?? '';
+        const lastMessageRaw = state.messages[state.messages.length - 1]?.content;
+        const lastMessage: string = typeof lastMessageRaw === 'string' ? lastMessageRaw : '';
         const pastStepsSummary = state.past_steps
             .map(
                 (ps) =>
@@ -105,11 +107,12 @@ export function createReviewerNode(model: BaseChatModel) {
         // 不再用 model.invoke() 是因为 invoke 一次性返回完整 AIMessage，
         // service 只能等 reviewer 节点完成（即 supervisor→planner→executor→replanner→reviewer
         // 全部跑完）才能 yield 第一个 token，用户感知到 10s 延迟。
-        const synthesisStream = await model.stream(
-            [
-                {
-                    role: 'system',
-                    content: `你是一位专业的 AI 面试官小面。基于以下收集到的信息，给用户一个完整、专业的回复。
+        //
+        // 2026-06-22 抽 helper：respond_directly 也用相同 helper 保持一致。
+        const { fullText: finalResponseRaw } = await collectStreamText(model, [
+            {
+                role: 'system',
+                content: `你是一位专业的 AI 面试官小面。基于以下收集到的信息，给用户一个完整、专业的回复。
 
 【用户意图】${state.user_intent}
 【收集到的信息】
@@ -121,19 +124,12 @@ ${pastStepsSummary}
 3. 如果是面试场景，每次只问一个问题
 4. 基于收集到的信息回答，不要编造
 5. 回复要直接面向用户，不要说"根据我收集到的信息..."`,
-                },
-                { role: 'user', content: lastMessage },
-            ],
-            config,
-        );
-        let finalResponse = '';
-        for await (const chunk of synthesisStream) {
-            const piece = typeof chunk.content === 'string' ? chunk.content : '';
-            if (piece) finalResponse += piece;
-        }
+            },
+            { role: 'user', content: lastMessage },
+        ], config);
         // Dedup：消除 LLM 偶发重复输出（retry 时概率性输出"嗯嗯..."）
         // 必须在 return 前 dedup，否则重复段已推到前端无法回收
-        finalResponse = dedupFinalResponse(finalResponse);
+        const finalResponse = dedupFinalResponse(finalResponseRaw);
 
         // ADR #11：Hallucination 启发式检测（CRAG-lite 简化版）
         // 把 past_steps 的 result 当作 citation 来源，检查 finalResponse 中的硬事实是否引用

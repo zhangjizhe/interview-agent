@@ -41,6 +41,7 @@ import { createReviewerNode, reviewerRouter } from './nodes/reviewer';
 import { LlmGatewayChatModel } from './llm-gateway-chat-model';
 import { HumanMessage, AIMessage, BaseMessage } from 'langchain';
 import { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
+import { collectStreamText } from './stream-helper';
 export interface StreamChunk {
   type: 'token' | 'step' | 'final_response' | 'error' | 'hitl_pending';
   content?: string;
@@ -84,13 +85,22 @@ export function buildInterviewGraph(
     const reviewerNode = createReviewerNode(model);
 
     // respond_directly 节点：general_qa 直接调 LLM 回复，不走规划
+    //
+    // 修复（2026-06-22 流式无结果 bug）：
+    // 原实现用 model.invoke()，不触发 LangChain on_chat_model_stream 回调，
+    // 外层 MultiAgentService.stream 监听 node==='reviewer' 单点过滤时直接漏掉这条路径，
+    // 前端 assistant 占位永远是空的。
+    //
+    // 现在改用 collectStreamText（model.stream + runManager.handleLLMNewToken），
+    // 跟 reviewer 节点保持一致。token 实时推到前端 + final_response 完整写 state。
     const respondDirectlyNode = async (
         state: InterviewAgentStateType,
         config?: any,
     ): Promise<Partial<InterviewAgentStateType>> => {
-        const lastMessage =
-            state.messages[state.messages.length - 1]?.content ?? '';
-        const response = await model.invoke([
+        const lastMsgContent = state.messages[state.messages.length - 1]?.content;
+        const lastMessage: string =
+            typeof lastMsgContent === 'string' ? lastMsgContent : '';
+        const { fullText } = await collectStreamText(model, [
             {
                 role: 'system',
                 content:
@@ -98,12 +108,11 @@ export function buildInterviewGraph(
             },
             { role: 'user', content: lastMessage },
         ], config);
-        const text = response.content as string;
         // 既要 push AIMessage 到 messages（让 state 完整 + checkpointer 持久化完整对话），
         // 也要 set final_response（向后兼容 controller 取值）
         return {
-            messages: [new AIMessage(text)],
-            final_response: text,
+            messages: [new AIMessage(fullText)],
+            final_response: fullText,
         };
     };
 
