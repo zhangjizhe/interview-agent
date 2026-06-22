@@ -201,8 +201,14 @@ export function buildInterviewGraph(
     // 30 步对应正常流程（supervisor→planner→executor→replanner→reviewer）+ 多次
     // 重试 + 多次 HITL reject。超出会被 LangGraph 抛 GraphRecursionError，上层应
     // 捕获并 fallback 到"评审失败"模板回复。
+    //
+    // 注：LangGraph v1.x 的 StateGraph.compile() 类型签名已移除 `recursionLimit`，
+    // 调用方应在 graph.invoke(input, { recursionLimit: INTERVIEW_GRAPH_RECURSION_LIMIT }) 处传入。
+    // 导出 INTERVIEW_GRAPH_RECURSION_LIMIT 供 index.ts 等调用方使用。
     return graph.compile({
       checkpointer,
-      recursionLimit: 30,
     });
-}
+  }
+
+/** 图级递归上限（P0-7）。调用方在 graph.invoke 时传入 config.recursionLimit */
+export const INTERVIEW_GRAPH_RECURSION_LIMIT = 30;

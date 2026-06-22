@@ -65,9 +65,15 @@ export class AuthService {
     };
 
     // 锁定算法为 HS256，防止 algorithm confusion（攻击者伪造 alg=none / RS256）
+    // @types/jsonwebtoken 9.x 升级：expiresIn 类型从 string 收紧到 StringValue | number
+    // （StringValue = `${number}d|h|m|s` 模板字面量）。config 读出的动态 string 不自动
+    // narrow 到 StringValue，所以显式 cast。
+    //
+    // 注：'ms' 是 @types/jsonwebtoken 的间接依赖，不在 apps/api/package.json 显式列出，
+    // 无法 `import type { StringValue } from 'ms'`。这里用内联模板字面量类型表达相同约束。
     const accessToken = await this.jwtService.signAsync(payload, {
       algorithm: 'HS256',
-      expiresIn,
+      expiresIn: expiresIn as unknown as `${number}${'d' | 'h' | 'm' | 's'}`,
     });
 
     return {

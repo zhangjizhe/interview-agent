@@ -27,7 +27,7 @@
  */
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage } from 'langchain';
-import { buildInterviewGraph } from './graph';
+import { buildInterviewGraph, INTERVIEW_GRAPH_RECURSION_LIMIT } from './graph';
 import type { InterviewAgentStateType } from './state';
 
 // ── Re-export 公共类型 ──────────────────────────────────────────
@@ -102,9 +102,13 @@ export async function runInterviewAgent(
     /** 总调用次数（用于估算 token） */
     steps: number;
 }> {
-    const result = await agent.invoke({
-        messages: [new HumanMessage(userMessage)],
-    } as Partial<InterviewAgentStateType>);
+    // P0-7 修复：传 recursionLimit 给 invoke，触发 GraphRecursionError 兜底
+    const result = await agent.invoke(
+        {
+            messages: [new HumanMessage(userMessage)],
+        } as Partial<InterviewAgentStateType>,
+        { recursionLimit: INTERVIEW_GRAPH_RECURSION_LIMIT },
+    );
 
     return {
         response: result.final_response || '',

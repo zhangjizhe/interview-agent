@@ -346,7 +346,7 @@ export class InterviewAgentService {
         try {
           await this.memory.appendMessage(ctx.sessionId, {
             role: 'system',
-            content: `[联网搜索] 用户问"${userInput.slice(0, 200)}"\n搜索结果摘要：${typeof searchResult === 'string' ? searchResult.slice(0, 2000) : JSON.stringify(searchResult).slice(0, 2000)}`,
+            content: `[联网搜索] 用户问"${userInput.slice(0, 200)}"\n搜索结果摘要：${JSON.stringify(searchResult ?? '').slice(0, 2000)}`,
           });
         } catch (e) {
           this.logger.warn(`search memory append failed (non-fatal): ${e.message}`);

@@ -17,7 +17,7 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { McpRegistry } from '../interview/services/mcp-registry';
+import { McpRegistry, type McpToolMetadata } from '../interview/services/mcp-registry';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 /**
@@ -61,7 +61,7 @@ export class McpAdapterService implements OnModuleInit {
       name: tool.name,
       description: tool.description,
       inputSchema: this.buildInputSchema(tool),
-    }));
+    })) as unknown as Tool[];
   }
 
   /**
@@ -81,7 +81,7 @@ export class McpAdapterService implements OnModuleInit {
    * }
    * ```
    */
-  private buildInputSchema(tool: McpTool): Record<string, any> {
+  private buildInputSchema(tool: McpToolMetadata): Record<string, any> {
     if (tool.configSchema && typeof tool.configSchema === 'object' && tool.configSchema.type === 'object') {
       // 工具自带完整 schema，优先用之
       return tool.configSchema;
