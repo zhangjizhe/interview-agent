@@ -212,7 +212,6 @@ export class LangfuseService implements OnModuleInit {
     if (!this.client || !params.traceId) return;
     // R-P2-11 修复：跟随 trace 上报，不再独立采样
     this.client.span({
-    this.client.span({
       traceId: params.traceId,
       name: `tool.${params.name}`,
       input: params.input,
