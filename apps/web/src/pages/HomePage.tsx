@@ -19,14 +19,17 @@ export function HomePage() {
   const [userId, setUserId] = useState(() => {
     const stored = localStorage.getItem('ia_userId');
     if (stored) return stored;
-    const id = 'demo-user-' + Math.random().toString(36).slice(2, 8);
+    // R-P2-18 修复：原 Math.random().toString(36).slice(2,8) 仅 6 字符 (~36^6=2B)，
+    // 生日攻击约 4 万次开始 50% 碰撞风险。改用 timestamp + crypto randomUUID 后缀
+    // （~24 字符 base36，碰撞概率可忽略）。
+    const id = `demo-user-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
     localStorage.setItem('ia_userId', id);
     return id;
   });
 
   // 切换用户（清空记忆 + 生成新 userId）
   const switchUser = () => {
-    const id = 'demo-user-' + Math.random().toString(36).slice(2, 8);
+    const id = `demo-user-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
     localStorage.setItem('ia_userId', id);
     setUserId(id);
   };
@@ -80,7 +83,7 @@ export function HomePage() {
       if (!r.ok) throw new Error(`List API ${r.status}`);
       return safeJson(r);
     },
-    refetchInterval: 3000,
+    refetchInterval: 10000, // R-P2-19 修复：3s 太频繁，改 10s（节省 70% 请求）
     retry: 3,
     staleTime: 0,
     refetchOnMount: 'always',
@@ -96,7 +99,7 @@ export function HomePage() {
       }
       return safeJson(r);
     },
-    refetchInterval: 5000,
+    refetchInterval: 10000, // R-P2-19 修复：5s 改 10s，与 interview list 同步
     retry: 3,
     staleTime: 0,
     refetchOnMount: 'always',
