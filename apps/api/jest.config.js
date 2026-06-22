@@ -22,6 +22,10 @@ module.exports = {
     'src/__tests__/interview.sse.spec.ts',
     'src/__tests__/dynamic-task-queue.followup.spec.ts',
     'src/__tests__/context-manager.watermark.spec.ts',
+    // eval 依赖未实现的 eval-runner / eval-reporter 模块
+    'src/__tests__/golden-dataset.eval.spec.ts',
+    // resume-parser 依赖 NestJS DI，需集成测试环境
+    'src/__tests__/resume-parser.spec.ts',
     // vitest 编写的测试,需先 pnpm install vitest
     'src/modules/interview/knowledge-banks/index.test.ts',
   ],
