@@ -259,18 +259,28 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
 
           let tokenHitCount = 0;
           let reflectionCaptured: any = null;
+          let eventCount = 0;
+          let onChatModelStreamCount = 0;
           for await (const event of eventStream) {
+            eventCount++;
             const ev = event as any;
             const eventName: string = ev.event ?? '';
             const node: string = ev.metadata?.langgraph_node ?? '';
+            
+            // 调试：打印所有事件
+            self.logger.debug(`[stream] event #${eventCount}: name=${eventName}, node=${node}, data=${ev.data ? 'exists' : 'null'}`);
 
             // 捕获 reviewer 节点内部 ChatModel 的流式 token
             // on_chat_model_stream 事件的 data.chunk 是 ChatGenerationChunk 类型，
             // 文本内容在 text 属性里，不是 content！
             if (eventName === 'on_chat_model_stream' && node === 'reviewer') {
+              onChatModelStreamCount++;
               const chunk = ev.data?.chunk as any;
+              // 调试：打印 chunk 结构
+              self.logger.debug(`[stream] on_chat_model_stream #${onChatModelStreamCount}: chunk=${JSON.stringify(chunk)}`);
               // ChatGenerationChunk 有 text 属性直接存字符串内容
               const piece = chunk?.text || '';
+              self.logger.debug(`[stream] piece="${piece}"`);
               if (piece) {
                 tokenHitCount++;
                 queue.push({ kind: 'data', content: piece });
@@ -285,7 +295,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
               }
             }
           }
-          self.logger.debug(`[stream] reviewer-token-hits=${tokenHitCount} reflection-captured=${!!reflectionCaptured}`);
+          self.logger.debug(`[stream] total-events=${eventCount}, on_chat_model_stream-events=${onChatModelStreamCount}, reviewer-token-hits=${tokenHitCount} reflection-captured=${!!reflectionCaptured}`);
 
           // ADR #10 Phase 1：写入 reflection_log
           if (reflectionCaptured && self.reflectionService) {

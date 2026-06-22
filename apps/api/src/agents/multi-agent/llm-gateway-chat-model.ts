@@ -145,6 +145,9 @@ export class LlmGatewayChatModel extends BaseChatModel {
     runManager?: CallbackManagerForLLMRun,
   ): AsyncGenerator<ChatGenerationChunk> {
     const { resolvedInterviewId, resolvedUserId, gatewayMessages } = this.buildGatewayPayload(messages, options);
+    
+    // 调试：检查 runManager 是否存在
+    console.log(`[LlmGatewayChatModel._streamResponseChunks] runManager=${runManager ? 'exists' : 'undefined'}`);
 
     for await (const chunk of this.llmGateway.streamChat(
       {
@@ -161,6 +164,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
       if (chunk.content) {
         // 关键修复：调用 runManager.handleLLMNewToken，让 LangChain 回调系统能捕获 token
         // 这样 streamEvents(version:'v2') 的 on_chat_model_stream 事件才能被触发
+        console.log(`[LlmGatewayChatModel._streamResponseChunks] calling handleLLMNewToken with: "${chunk.content}"`);
         await runManager?.handleLLMNewToken(chunk.content);
         yield new ChatGenerationChunk({
           message: new AIMessageChunk({ content: chunk.content }),
