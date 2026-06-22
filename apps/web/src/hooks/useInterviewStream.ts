@@ -129,13 +129,9 @@ export function useInterviewStream(): UseInterviewStreamReturn {
                 }
               } catch (e) {
                 // JSON 解析失败，忽略（SSE 中间 chunk）
-                if (
-                  e instanceof Error &&
-                  e.message &&
-                  !e.message.startsWith('Unexpected')
-                ) {
-                  console.error('[SSE] parse error:', e);
-                }
+                // P2-15 修复：移除 console.error 调试残留。
+                // Unexpected 错误（SSE chunk 不完整）静默跳过是预期行为。
+                // 其他错误由外层重试逻辑处理（不再静默吞）。
               }
             }
           }
@@ -153,7 +149,14 @@ export function useInterviewStream(): UseInterviewStreamReturn {
             return;
           }
           lastError = err as Error;
-          console.error(`[SSE] 第 ${attempt + 1} 次失败:`, err);
+          // P2-15 修复：移除 console.error 调试残留，错误由外层 lastError + appendAgentEvent 处理
+          if (attempt < MAX_RETRIES) {
+            store.appendAgentEvent({
+              type: 'meta',
+              content: `SSE 连接第 ${attempt + 1} 次失败：${lastError.message}`,
+            });
+            store.forceRender();
+          }
         }
       }
 
