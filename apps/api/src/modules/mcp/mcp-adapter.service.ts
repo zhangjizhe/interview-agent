@@ -60,12 +60,38 @@ export class McpAdapterService implements OnModuleInit {
     return tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: {
-        type: 'object',
-        properties: this.inferToolParams(tool.name),
-        required: this.getRequiredParams(tool.name),
-      },
+      inputSchema: this.buildInputSchema(tool),
     }));
+  }
+
+  /**
+   * 构造工具的 inputSchema（OpenAI function calling 格式）
+   *
+   * R-P2-9 修复：原 inferToolParams / getRequiredParams 硬编码 4 个工具
+   * 的 schema，新增工具必须改代码。新协议：
+   * 1. 工具可在 McpToolMetadata.configSchema 声明完整 inputSchema（JSON Schema 格式）
+   * 2. 未声明的 → fallback 到 inferToolParams 硬编码（向后兼容）
+   *
+   * configSchema 格式（OpenAI function calling 标准）：
+   * ```
+   * {
+   *   type: 'object',
+   *   properties: { query: { type: 'string', description: '...' } },
+   *   required: ['query'],
+   * }
+   * ```
+   */
+  private buildInputSchema(tool: McpTool): Record<string, any> {
+    if (tool.configSchema && typeof tool.configSchema === 'object' && tool.configSchema.type === 'object') {
+      // 工具自带完整 schema，优先用之
+      return tool.configSchema;
+    }
+    // fallback：硬编码 schema
+    return {
+      type: 'object',
+      properties: this.inferToolParams(tool.name),
+      required: this.getRequiredParams(tool.name),
+    };
   }
 
   /**
