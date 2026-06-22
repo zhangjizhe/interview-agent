@@ -265,14 +265,12 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
             const node: string = ev.metadata?.langgraph_node ?? '';
 
             // 捕获 reviewer 节点内部 ChatModel 的流式 token
+            // on_chat_model_stream 事件的 data.chunk 是 ChatGenerationChunk 类型，
+            // 文本内容在 text 属性里，不是 content！
             if (eventName === 'on_chat_model_stream' && node === 'reviewer') {
               const chunk = ev.data?.chunk as any;
-              const piece =
-                typeof chunk?.content === 'string'
-                  ? chunk.content
-                  : Array.isArray(chunk?.content)
-                    ? chunk.content.map((b: any) => b?.text || '').join('')
-                    : '';
+              // ChatGenerationChunk 有 text 属性直接存字符串内容
+              const piece = chunk?.text || '';
               if (piece) {
                 tokenHitCount++;
                 queue.push({ kind: 'data', content: piece });
