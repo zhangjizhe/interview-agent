@@ -84,11 +84,15 @@ export interface AppConfig {
 }
 
 /**
- * 严格整数解析：undefined / 非数字 / 0 / 负数 / NaN / >65535 都 fallback。
+ * 严格整数解析：undefined / 非数字 / 0 / 负数 / NaN 都 fallback 到默认值。
  * 修 R-P2-24：原 `parseInt(s, 10) || fallback` 把 0 / NaN / 负数都当 falsy fallback，
  * 且不报错（静默吞错）。商用未正确设 PORT 时启动后 listen(NaN) 才崩。
+ *
+ * 命名：叫 parseSafeInt 而非 parsePortOr，因为实际用途是"任何整数环境变量
+ * 的严格解析"（PORT / WEB_PORT / sessionTtl / maxTokens 等），不只限端口。
+ * 审查员 2026-06-22 反馈：parsePortOr 用在 maxTokens 会让面试官疑惑。
  */
-function parsePortOr(value: string | undefined, fallback: number): number {
+function parseSafeInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
   const n = parseInt(value, 10);
   return Number.isFinite(n) && n > 0 && n <= 65535 ? n : fallback;
@@ -107,8 +111,8 @@ export const configuration = (): AppConfig => {
     );
   }
   return {
-  port: parsePortOr(process.env.PORT, 3001),
-  webPort: parsePortOr(process.env.WEB_PORT, 5173),
+  port: parseSafeInt(process.env.PORT, 3001),
+  webPort: parseSafeInt(process.env.WEB_PORT, 5173),
   nodeEnv: process.env.NODE_ENV || 'development',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   database: {
@@ -116,7 +120,7 @@ export const configuration = (): AppConfig => {
   },
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
-    sessionTtl: parsePortOr(process.env.REDIS_SESSION_TTL, 3600),
+    sessionTtl: parseSafeInt(process.env.REDIS_SESSION_TTL, 3600),
   },
   qdrant: {
     url: process.env.QDRANT_URL || 'http://localhost:6333',
@@ -178,13 +182,13 @@ export const configuration = (): AppConfig => {
   // P0-3 修复：按 provider 配置 maxTokens，区分模型能力
   llm: {
     qwen: {
-      maxTokens: parsePortOr(process.env.QWEN_MAX_TOKENS, 128000),
+      maxTokens: parseSafeInt(process.env.QWEN_MAX_TOKENS, 128000),
     },
     deepseek: {
-      maxTokens: parsePortOr(process.env.DEEPSEEK_MAX_TOKENS, 64000),
+      maxTokens: parseSafeInt(process.env.DEEPSEEK_MAX_TOKENS, 64000),
     },
     default: {
-      maxTokens: parsePortOr(process.env.LLM_DEFAULT_MAX_TOKENS, 32000),
+      maxTokens: parseSafeInt(process.env.LLM_DEFAULT_MAX_TOKENS, 32000),
     },
   },
   // P0 安全修复（审查员发现）：商用必须显式设置 JWT_SECRET 环境变量，
