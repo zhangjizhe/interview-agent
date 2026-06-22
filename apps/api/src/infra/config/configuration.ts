@@ -91,11 +91,15 @@ export interface AppConfig {
  * 命名：叫 parseSafeInt 而非 parsePortOr，因为实际用途是"任何整数环境变量
  * 的严格解析"（PORT / WEB_PORT / sessionTtl / maxTokens 等），不只限端口。
  * 审查员 2026-06-22 反馈：parsePortOr 用在 maxTokens 会让面试官疑惑。
+ *
+ * 上限：移除 `<= 65535` 上限（审查员第二轮反馈）。maxTokens（如 200000）可远超
+ * 65535，保留端口上限会导致 maxTokens 静默 fallback。端口范围校验应由调用方
+ * 自行负责（用 Number.isInteger(n) && n <= 65535 校验后传给 parseSafeInt）。
  */
 function parseSafeInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
   const n = parseInt(value, 10);
-  return Number.isFinite(n) && n > 0 && n <= 65535 ? n : fallback;
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 export const configuration = (): AppConfig => {
