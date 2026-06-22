@@ -196,5 +196,13 @@ export function buildInterviewGraph(
         // respond_directly → END
         .addEdge('respond_directly', END);
 
-    return graph.compile({ checkpointer });
+    // 修复 P0-7：图级递归兜底，防止 HITL 反复 reject + reviewer 反复 revise 形成的
+    // 无限循环（reviewer 节点的 retry_count 局部兜底无法覆盖 HITL 路径）。
+    // 30 步对应正常流程（supervisor→planner→executor→replanner→reviewer）+ 多次
+    // 重试 + 多次 HITL reject。超出会被 LangGraph 抛 GraphRecursionError，上层应
+    // 捕获并 fallback 到"评审失败"模板回复。
+    return graph.compile({
+      checkpointer,
+      recursionLimit: 30,
+    });
 }
