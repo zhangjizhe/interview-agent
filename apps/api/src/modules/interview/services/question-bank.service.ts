@@ -25,6 +25,7 @@ import {
   IndexType,
   FunctionType,
 } from '@zilliz/milvus2-sdk-node';
+import { escapeMilvusString } from './escape-milvus.util';
 
 /**
  * Escape a user-supplied string for safe inclusion in a Milvus filter expression.
@@ -37,9 +38,9 @@ import {
  * Defense: replace `\` first (otherwise we'd double-escape the escapes we just
  * added for `"`), then escape `"`.
  */
-function escapeMilvusString(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
+// @internal - 实际实现见 escape-milvus.util.ts（独立文件避免 Milvus SDK 拉入测试）
+// 保留 export 是为了向后兼容（外部若 import 此文件中的 escapeMilvusString）
+export { escapeMilvusString } from './escape-milvus.util';
 
 export interface QuestionItem {
   id?: string;          // Milvus auto-id

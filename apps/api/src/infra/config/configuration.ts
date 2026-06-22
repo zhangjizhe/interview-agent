@@ -96,7 +96,8 @@ export interface AppConfig {
  * 65535，保留端口上限会导致 maxTokens 静默 fallback。端口范围校验应由调用方
  * 自行负责（用 Number.isInteger(n) && n <= 65535 校验后传给 parseSafeInt）。
  */
-function parseSafeInt(value: string | undefined, fallback: number): number {
+// @internal - 导出用于单元测试（src/__tests__/configuration.spec.ts）
+export function parseSafeInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
   const n = parseInt(value, 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;

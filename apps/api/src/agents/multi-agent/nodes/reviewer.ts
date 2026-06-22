@@ -51,6 +51,25 @@ export const ReviewResultSchema = z.object({
 export type ReviewResult = z.infer<typeof ReviewResultSchema>;
 export type IssueTag = z.infer<typeof IssueTagSchema>;
 
+/**
+ * 根据 past_steps 工具名推断 sourceType（R-P2-2 修复）
+ *   - bocha_search → web_search
+ *   - memory_recall → memory
+ *   - github_* → github_repo
+ *   - 其他（含 knowledge_bank）→ knowledge_bank（兼容旧数据）
+ *
+ * @internal 导出用于单元测试（src/__tests__/reviewer.spec.ts）
+ */
+export function inferSourceType(
+  tool?: string,
+): 'knowledge_bank' | 'memory' | 'github_repo' | 'web_search' {
+  if (!tool) return 'knowledge_bank';
+  if (tool === 'bocha_search') return 'web_search';
+  if (tool === 'memory_recall') return 'memory';
+  if (tool.startsWith('github_')) return 'github_repo';
+  return 'knowledge_bank';
+}
+
 const MAX_RETRY_COUNT = 2;
 const HITL_SCORE_THRESHOLD = 0.5;
 
@@ -120,18 +139,11 @@ ${pastStepsSummary}
         // 把 past_steps 的 result 当作 citation 来源，检查 finalResponse 中的硬事实是否引用
         //
         // R-P2-2 修复：sourceType 之前硬编码 'knowledge_bank'，根据 ps.step.tool
-        // 实际来源动态判断：
+        // 实际来源动态判断（函数已提取到顶层 export inferSourceType）
         //   - bocha_search → web_search
         //   - memory_recall → memory
         //   - github_* → github_repo
         //   - knowledge_bank / 无 tool → knowledge_bank（兼容旧数据）
-        const inferSourceType = (tool?: string): 'knowledge_bank' | 'memory' | 'github_repo' | 'web_search' => {
-            if (!tool) return 'knowledge_bank';
-            if (tool === 'bocha_search') return 'web_search';
-            if (tool === 'memory_recall') return 'memory';
-            if (tool.startsWith('github_')) return 'github_repo';
-            return 'knowledge_bank';
-        };
         const citationSources = state.past_steps.map((ps, idx) => ({
             index: idx + 1,
             sourceId: ps.step.id,

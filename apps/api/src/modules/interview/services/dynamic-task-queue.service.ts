@@ -3,6 +3,12 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { LlmGatewayService } from '../../llm/llm.gateway.service';
 import { QuestionBankService } from './question-bank.service';
 import { z } from 'zod';
+import {
+  extractKeywords,
+  estimateCorrectness,
+  estimateDepth,
+  heuristicDecide,
+} from './heuristic-decide.util';
 
 export interface InterviewTask {
   id: string;
@@ -308,59 +314,15 @@ export class DynamicTaskQueueService {
    * 这里的阈值是 fallback 逻辑，不是主路径——主路径由 LLM 自主决策
    */
   private heuristicDecide(question: string, answer: string, category: string): AgentDecision {
-    const lengthScore = Math.min(answer.length / 200, 1);
-    const keywords = this.extractKeywords(question);
-    const keywordMatch = keywords.length > 0
-      ? keywords.filter((k) => answer.includes(k)).length / keywords.length
-      : 0.5;
+    return heuristicDecide(question, answer, category);
+  }
 
-    const completeness = 0.6 * lengthScore + 0.4 * keywordMatch;
-    const correctness = this.estimateCorrectness(answer);
-    const depth = this.estimateDepth(answer);
-    const score = (completeness + correctness + depth) / 3;
-
-    let feedback = '';
-    if (score < 0.4) feedback = '回答较为简略，建议深入阐述';
-    else if (score < 0.7) feedback = '回答基本覆盖要点，部分细节可补充';
-    else feedback = '回答完整且深入';
-
-    // fallback 规则：LLM 不可用时才用阈值
-    const shouldFollowUp = score < 0.5 && score > 0.15; // 太差也不追问
-    const shouldAdvance = score > 0.8;
-
-    const fallbackFollowUps: Record<string, string[]> = {
-      frontend: [
-        '能具体展开你刚才提到的那个点吗？在实际项目中遇到过什么问题？',
-        '你提到的这个概念，在最新版本中有什么变化？对实际开发有什么影响？',
-      ],
-      backend: [
-        '你刚才提到的方案，在高并发场景下会有什么问题？如何优化？',
-        '生产环境中使用这个方案，需要注意哪些边界情况？',
-      ],
-      algorithm: [
-        '你给出的解法，有没有更优的方式？时间复杂度能进一步降低吗？',
-        '这个解法在最坏情况下表现如何？有没有退化风险？',
-      ],
-    };
-
-    const categoryFollowUps = fallbackFollowUps[category] || fallbackFollowUps.frontend;
-
-    return {
-      score,
-      completeness,
-      correctness,
-      depth,
-      feedback,
-      keyPoints: keywords,
-      missingPoints: [],
-      shouldFollowUp,
-      followUpQuestion: shouldFollowUp
-        ? categoryFollowUps[Math.floor(Math.random() * categoryFollowUps.length)]
-        : null,
-      followUpReason: shouldFollowUp ? 'fallback: 回答质量偏低，需要追问' : null,
-      shouldAdvance,
-      advancedQuestion: null, // fallback 不生成进阶题
-    };
+  /**
+   * 启发式回退：LLM 不可用时用规则兜底
+   * @internal 实际实现在 heuristic-decide.util.ts（独立文件避免拉入 Prisma/Milvus）
+   */
+  static heuristicDecideStatic(question: string, answer: string, category: string): AgentDecision {
+    return heuristicDecide(question, answer, category);
   }
 
   /**
@@ -418,45 +380,36 @@ export class DynamicTaskQueueService {
   }
 
   private extractKeywords(question: string): string[] {
-    const keywords: string[] = [];
-    const patterns = [
-      /(useState|useEffect|useRef|useContext|useReducer)/g,
-      /(React|Vue|Angular|Node\.js|TypeScript)/g,
-      /(算法|数据结构|时间复杂度|空间复杂度)/g,
-      /(微服务|分布式|高并发|缓存)/g,
-    ];
-    patterns.forEach((pattern) => {
-      const matches = question.match(pattern);
-      if (matches) keywords.push(...matches);
-    });
-    return [...new Set(keywords)];
+    return extractKeywords(question);
+  }
+
+  /**
+   * @internal 实际实现在 heuristic-decide.util.ts
+   */
+  static extractKeywords(question: string): string[] {
+    return extractKeywords(question);
   }
 
   private estimateCorrectness(answer: string): number {
-    // R-P2-8 修复：wrongIndicators 改为整词边界匹配，避免误伤。
-    // 原 includes() 子串匹配："我之前理解错误"会被识别为"错误"扣分；
-    // "这种做法不正确"在否定语境下也被扣分。改用 word boundary 风格正则
-    // （中文标点作为分隔符），让"错误"只在作为独立词时扣分。
-    const correctIndicators = ['正确', '确实如此', '这个理解是对的', '是的', '没错'];
-    const wrongIndicators = ['错误', '不对', '不是这样'];
+    return estimateCorrectness(answer);
+  }
 
-    let score = 0.6;
-    correctIndicators.forEach((indicator) => {
-      if (answer.includes(indicator)) score += 0.1;
-    });
-    // 用 \b 风格边界：英文 \b + 中文标点
-    const wrongRegex = new RegExp(
-      `(?:[，。！？；：、\\s]|^)(${wrongIndicators.join('|')})(?:[，。！？；：、\\s]|$)`,
-    );
-    if (wrongRegex.test(answer)) score -= 0.2;
-
-    return Math.max(0.2, Math.min(1, score));
+  /**
+   * @internal 实际实现在 heuristic-decide.util.ts
+   */
+  static estimateCorrectness(answer: string): number {
+    return estimateCorrectness(answer);
   }
 
   private estimateDepth(answer: string): number {
-    const depthIndicators = ['原理', '底层', '源码', '实现', '机制', '流程', '步骤'];
-    const count = depthIndicators.filter((i) => answer.includes(i)).length;
-    return Math.min(1, 0.3 + count * 0.15);
+    return estimateDepth(answer);
+  }
+
+  /**
+   * @internal 实际实现在 heuristic-decide.util.ts
+   */
+  static estimateDepth(answer: string): number {
+    return estimateDepth(answer);
   }
 
   async getQueueStatus(interviewId: string): Promise<{

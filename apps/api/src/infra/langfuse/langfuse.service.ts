@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Langfuse } from 'langfuse';
+import { shouldSampleWith } from './sampling.util';
 type Generation = any;
 
 /**
@@ -64,21 +65,19 @@ export class LangfuseService implements OnModuleInit {
    * 关联字段保证 trace 完整性。
    */
   private shouldSample(type: 'trace' | 'span' | 'generation', seed?: string): boolean {
-    const rate = this.sampleRate[type];
-    if (rate >= 1) return true;
-    if (rate <= 0) return false;
-    if (!seed) {
-      // 没传 seed 时回退到随机（不推荐，会失去一致性）
-      return Math.random() < rate;
-    }
-    // 简单 hash：djb2 算法
-    let hash = 5381;
-    for (let i = 0; i < seed.length; i++) {
-      hash = ((hash << 5) + hash) + seed.charCodeAt(i);
-      hash = hash & hash; // 32-bit
-    }
-    const normalized = Math.abs(hash) / 0x7fffffff; // 0-1
-    return normalized < rate;
+    return shouldSampleWith(this.sampleRate, type, seed);
+  }
+
+  /**
+   * 纯函数版 shouldSample（@internal - 实际实现在 sampling.util.ts）
+   * 保留此方法以向后兼容外部调用（LangfuseService.shouldSampleWith(rates, type, seed)）
+   */
+  static shouldSampleWith(
+    sampleRate: { trace: number; span: number; generation: number },
+    type: 'trace' | 'span' | 'generation',
+    seed?: string,
+  ): boolean {
+    return shouldSampleWith(sampleRate, type, seed);
   }
 
   /**
