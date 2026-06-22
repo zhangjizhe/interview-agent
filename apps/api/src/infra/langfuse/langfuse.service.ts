@@ -53,11 +53,32 @@ export class LangfuseService implements OnModuleInit {
   }
 
   /**
-   * 采样判断
+   * 采样判断：使用确定性 hash（基于 traceId/name）保证同一请求内
+   * trace / span / generation 采样决策一致，避免 trace 被采样但 span
+   * 未被采样导致 Langfuse 上看到"有 trace 无 span"的不完整 trace 树。
+   *
+   * R-P2-11 修复：原 Math.random() 不可复现，同一请求重试时采样结果不同，
+   * 导致 trace 数据碎片化。改用 hash(seed) % 100 < rate*100 决策。
+   *
+   * 商用：如果需要严格概率采样可保留 Math.random()，但需配合 traceId
+   * 关联字段保证 trace 完整性。
    */
-  private shouldSample(type: 'trace' | 'span' | 'generation'): boolean {
+  private shouldSample(type: 'trace' | 'span' | 'generation', seed?: string): boolean {
     const rate = this.sampleRate[type];
-    return Math.random() < rate;
+    if (rate >= 1) return true;
+    if (rate <= 0) return false;
+    if (!seed) {
+      // 没传 seed 时回退到随机（不推荐，会失去一致性）
+      return Math.random() < rate;
+    }
+    // 简单 hash：djb2 算法
+    let hash = 5381;
+    for (let i = 0; i < seed.length; i++) {
+      hash = ((hash << 5) + hash) + seed.charCodeAt(i);
+      hash = hash & hash; // 32-bit
+    }
+    const normalized = Math.abs(hash) / 0x7fffffff; // 0-1
+    return normalized < rate;
   }
 
   /**
@@ -164,9 +185,9 @@ export class LangfuseService implements OnModuleInit {
     // R-P1-8 修复：traceId 缺失（trace 被采样跳过）时早返回，不再调 Langfuse
     // client 传 undefined traceId（之前会生成 orphan generation 然后静默丢）。
     if (!this.client || !params.traceId) return;
-    if (!this.shouldSample('span')) {
-      return; // 跳过不上报
-    }
+    // R-P2-11 修复：traceId 存在时跟随 trace 上报，不再独立采样。
+    // 原 shouldSample('span') 会让同一 trace 下的 span 被独立采样，导致
+    // trace 树不完整（trace 有但 span 缺失）。
     this.client.span({
       traceId: params.traceId,
       name: params.name,
@@ -177,7 +198,7 @@ export class LangfuseService implements OnModuleInit {
   }
 
   /**
-   * 记录工具调用（50% 采样）
+   * 记录工具调用
    */
   logToolCall(params: {
     traceId: string;
@@ -189,9 +210,8 @@ export class LangfuseService implements OnModuleInit {
   }) {
     // R-P1-8 修复：traceId 缺失时早返回（与 logSpan 一致）
     if (!this.client || !params.traceId) return;
-    if (!this.shouldSample('span')) {
-      return; // 跳过不上报
-    }
+    // R-P2-11 修复：跟随 trace 上报，不再独立采样
+    this.client.span({
     this.client.span({
       traceId: params.traceId,
       name: `tool.${params.name}`,
