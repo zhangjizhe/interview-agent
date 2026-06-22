@@ -337,12 +337,46 @@ export class InterviewAgentService {
         yield { type: 'tool_call', toolName: 'bocha_search' };
         const searchResult = await this.bocha.execute({ query: userInput });
         yield { type: 'tool_result', toolName: 'bocha_search', toolResult: searchResult };
+
+        // R-P1-1 修复：搜索结果累积到短期记忆 + 标记 system context。
+        // 原代码搜索结果仅 yield 给前端，LLM 上下文看不到。本次回复已经发出，
+        // 但下次同一 session 的 LLM 调用会看到这条 system 消息，能基于
+        // 搜索结果回答（不是真的"重新生成"，但确保后续对话引用搜索数据）。
+        // 限制：内容截断到 2000 字符防止短期记忆爆炸；标记 [联网搜索] 前缀便于后续识别。
+        try {
+          await this.memory.appendMessage(ctx.sessionId, {
+            role: 'system',
+            content: `[联网搜索] 用户问"${userInput.slice(0, 200)}"\n搜索结果摘要：${typeof searchResult === 'string' ? searchResult.slice(0, 2000) : JSON.stringify(searchResult).slice(0, 2000)}`,
+          });
+        } catch (e) {
+          this.logger.warn(`search memory append failed (non-fatal): ${e.message}`);
+        }
       }
 
       await this.memory.appendMessage(ctx.sessionId, {
         role: 'assistant',
         content: fullResponse,
       });
+
+      // R-P1-2 修复：completeTask 接入主流程。
+      // 原代码 getNextTask 拿当前任务，但任务完成后没调 completeTask 更新状态，
+      // 导致 getNextTask 反复返回同一任务（永远卡在 task 1）。
+      // 现在在 assistant 回复完成后调 completeTask（agentDecide 评分 + 写
+      // answerHistory + 更新 task status 为 COMPLETED），让下一轮 getNextTask
+      // 能拿下一个任务。try/catch 兜底：completeTask 失败不影响主流程。
+      if (currentTask) {
+        try {
+          await this.taskQueue.completeTask(
+            ctx.sessionId,
+            currentTask.id,
+            userInput,
+          );
+        } catch (e: any) {
+          this.logger.warn(
+            `completeTask failed for ${currentTask.id} (non-fatal): ${e.message}`,
+          );
+        }
+      }
 
       // 更新工作记忆状态：题目索引 + 已覆盖技能
       // P0-2 修复：题号从 taskQueue.getQueueStatus 取值（已完成的题数）
