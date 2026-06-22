@@ -123,7 +123,14 @@ export function InterviewPage() {
             })),
           );
         }
-        if (data?.report) setReport(data.report);
+        // 修复 2026-06-22：只展示 status=COMPLETED 的报告，避免 IN_PROGRESS
+        // interview 进入页面就显示报告（应继续聊天）。与后端 GET /:id 双层防御。
+        if (data?.status === 'COMPLETED' && data?.report) {
+          setReport(data.report);
+        } else if (data?.status && data.status !== 'COMPLETED') {
+          // IN_PROGRESS / PENDING 时显式清空（防止 stale state 残留）
+          setReport(null);
+        }
         if (data?.resume) setResume(data.resume);
         if (typeof data?.resumeConfirmed === 'boolean') {
           setResumeConfirmed(data.resumeConfirmed);

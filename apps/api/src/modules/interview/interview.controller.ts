@@ -584,6 +584,10 @@ export class InterviewController {
     const demoUserId = user?.email?.replace(/@demo\.local$/, '') || interview.userId;
     const resumes = await this.resumeRag.searchByUser(demoUserId, 1).catch(() => []);
     const latest = resumes[0] || null;
+    // 修复 2026-06-22：IN_PROGRESS interview 不返回 report，避免前端进入"已完成"页面
+    // 而是显示聊天界面。COMPLETED 才返回 report 让前端展示报告。
+    // 双层防御：后端是数据层（其他调用方也受益），前端是 UI 层（即使后端漏过滤也不显示）。
+    const isCompleted = interview.status === 'COMPLETED';
     return {
       ...interview,
       resume: latest ? {
@@ -594,6 +598,8 @@ export class InterviewController {
         createdAt: latest.createdAt,
       } : null,
       resumeConfirmed: interview.resumeConfirmed,
+      // IN_PROGRESS 时 report 字段置 null，前端 setReport(null) 不触发报告视图
+      report: isCompleted ? interview.report : null,
     };
   }
 
