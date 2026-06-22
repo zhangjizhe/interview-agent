@@ -4,24 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, FileText, ChevronRight, Plus, BarChart3, X, Cpu, Sparkles, Upload, CheckCircle2, Loader2 } from 'lucide-react';
 import type { McpToolMeta } from '@interview-agent/shared-types';
-
-// 安全 JSON 解析：API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
-async function safeJson(res: Response): Promise<any> {
-  const text = await res.text();
-  if (!res.ok) {
-    try {
-      const data = JSON.parse(text);
-      return { _error: true, _status: res.status, ...data };
-    } catch {
-      return { _error: true, _status: res.status, message: `服务不可用 (HTTP ${res.status})` };
-    }
-  }
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
-}
+import { safeJson } from '../utils/safeJson';
 
 // 默认岗位改为「前端开发工程师」—— 更符合通用 demo 直觉
 // （之前默认是 AI Agent 工程师，会让用户误以为选了"前端"但实际是 agent）

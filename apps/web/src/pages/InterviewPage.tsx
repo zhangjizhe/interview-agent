@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { safeJson } from '../utils/safeJson';
 import {
   Send,
   Bot,
@@ -28,23 +29,7 @@ import { CotPanel } from '../components/CotPanel';
 import { useInterviewStore } from '../store/interview-store';
 import type { Report } from '@interview-agent/shared-types';
 
-// 安全 JSON 解析：API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
-async function safeJson(res: Response): Promise<any> {
-  const text = await res.text();
-  if (!res.ok) {
-    try {
-      const data = JSON.parse(text);
-      return { _error: true, _status: res.status, ...data };
-    } catch {
-      return { _error: true, _status: res.status, message: `服务不可用 (HTTP ${res.status})` };
-    }
-  }
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
-}
+// safeJson 已提取到 utils/safeJson.ts（审查员 R-P2-17 去重）
 
 export function InterviewPage() {
   const { id: interviewId } = useParams<{ id: string }>();
