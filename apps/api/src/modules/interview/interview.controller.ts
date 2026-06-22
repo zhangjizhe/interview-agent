@@ -58,6 +58,63 @@ interface MessageDto {
   content: string;
 }
 
+/**
+ * SSRF 防护：校验外部 URL 安全性（修复 P0-3）。
+ *
+ * 防御策略（最小可行版，demo 阶段）：
+ * - 强制 https（拒绝 file://、http://、gopher:// 等）
+ * - 拒绝常见内网 / loopback / link-local IP 字面量
+ *   （127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16,
+ *    169.254.0.0/16 含 AWS metadata 169.254.169.254, 0.0.0.0/8）
+ * - 拒绝 localhost / *.local / *.internal
+ * - 拒绝 IPv6 字面量（demo 阶段简化）
+ *
+ * 已知限制（不修复，留给网络层）：
+ * - DNS rebinding：攻击者用 attacker.com 解析到 127.0.0.1，本校验不拦截
+ *   商用应配合 eBPF / sidecar（e.g. Istio OutboundTrafficPolicy）或自定义
+ *   undici Agent 解析 → IP → 校验后用 IP 发起请求
+ *
+ * 抛 BadRequestException 让前端显示明确错误（不静默拒绝）。
+ */
+function assertSafeExternalUrl(rawUrl: string): void {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new BadRequestException('invalid url');
+  }
+
+  if (url.protocol !== 'https:') {
+    throw new BadRequestException(`url must use https (got ${url.protocol})`);
+  }
+
+  const host = url.hostname.toLowerCase();
+
+  if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1') {
+    throw new BadRequestException(`url blocked: ${host} is a loopback address`);
+  }
+
+  const blockedPatterns: RegExp[] = [
+    /^10\./,                              // 10.0.0.0/8
+    /^192\.168\./,                        // 192.168.0.0/16
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./,     // 172.16.0.0/12
+    /^169\.254\./,                        // 169.254.0.0/16 (link-local, AWS metadata!)
+    /^0\./,                               // 0.0.0.0/8
+    /\.internal$/,
+    /\.local$/,
+  ];
+  for (const pat of blockedPatterns) {
+    if (pat.test(host)) {
+      throw new BadRequestException(`url blocked: ${host} is in a private/internal range`);
+    }
+  }
+
+  // IPv6 字面量（除 ::1 已在前面拒绝）：demo 阶段直接禁
+  if (host.includes(':')) {
+    throw new BadRequestException(`url blocked: IPv6 literal not allowed in demo`);
+  }
+}
+
 @Controller('interview')
 export class InterviewController {
   private readonly logger = new Logger(InterviewController.name);
@@ -338,6 +395,9 @@ export class InterviewController {
     if (!dto.url) throw new BadRequestException('url is required');
     if (!dto.position) throw new BadRequestException('position is required');
 
+    // SSRF 防护：拒绝内网 / loopback / 非 https（修复 P0-3）
+    assertSafeExternalUrl(dto.url);
+
     // 抓取网页 HTML
     let html = '';
     try {
@@ -422,27 +482,36 @@ export class InterviewController {
 
   /**
    * 直接删除指定面试（前端弹窗确认后调用）
+   *
+   * 归属校验：userId 必填，不传或查不到 user 一律拒绝——不留"跳过校验"的口子。
+   * 修复 P0-4：之前 `if (userId)` 整个 if 块可被不传 userId 绕过，导致任何
+   * 拿到 interviewId 的人都能删除任意面试。
    */
   @Delete(':interviewId')
   async deleteInterview(
     @Param('interviewId') interviewId: string,
     @Query('userId') userId?: string,
   ) {
+    // 1) userId 必填：不传 → forbidden（防止任意人知道 interviewId 就能删）
+    if (!userId) {
+      return { deleted: false, reason: 'forbidden', message: 'userId required' };
+    }
+
     const interview = await this.prisma.interview.findUnique({
       where: { id: interviewId },
     });
     if (!interview) {
       return { deleted: false, reason: 'not_found' };
     }
-    // 校验归属（防误删）
-    if (userId) {
-      const user = await this.prisma.user.findUnique({
-        where: { email: `${userId}@demo.local` },
-      });
-      if (user && interview.userId !== user.id) {
-        return { deleted: false, reason: 'forbidden' };
-      }
+
+    // 2) 归属校验：user 查不到也视作 forbidden（不留"查不到就不校验"的口子）
+    const user = await this.prisma.user.findUnique({
+      where: { email: `${userId}@demo.local` },
+    });
+    if (!user || interview.userId !== user.id) {
+      return { deleted: false, reason: 'forbidden' };
     }
+
     await this.prisma.interview.delete({ where: { id: interviewId } });
     this.logger.log(`Deleted interview ${interviewId} (manual cleanup)`);
     return { deleted: true, reason: 'manual_cleanup' };
