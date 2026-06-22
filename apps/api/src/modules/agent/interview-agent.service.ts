@@ -197,9 +197,15 @@ export class InterviewAgentService {
       });
 
       let fullResponse = '';
+      // P1-3 修复：appendMessage (L101) 已把 user 消息写入短期记忆，
+      // shortTermMessages 末尾可能就是当前 userInput（取决于 buildContext
+      // 实现是否含本轮消息）。拼接时去重，避免 LLM 看到两条相同 user 消息。
+      const lastShortMsg = context.shortTermMessages[context.shortTermMessages.length - 1];
+      const userAlreadyInShortTerm =
+        lastShortMsg?.role === 'user' && lastShortMsg?.content === userInput;
       const messages: ChatMessage[] = [
         { role: 'system', content: systemPrompt },
-        ...context.shortTermMessages,
+        ...(userAlreadyInShortTerm ? context.shortTermMessages.slice(0, -1) : context.shortTermMessages),
         { role: 'user', content: userInput },
       ];
 
