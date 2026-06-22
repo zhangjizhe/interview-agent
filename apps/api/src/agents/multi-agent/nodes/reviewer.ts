@@ -203,7 +203,22 @@ approved = 合格可输出，revise = 需要修改`,
 
         // 防死循环：重试次数超限强制通过
         const isRetryExhausted = (state.retry_count || 0) >= MAX_RETRY_COUNT;
-        const shouldApprove = reviewResponse.verdict === 'approved' || isRetryExhausted;
+        // 2026-06-23 修复：加 MIN_APPROVE_SCORE 兜底，LLM 倾向判 revise（prompt 没说明确阈值）
+        // 导致 score=0.65 也被判 revise → 死循环 → recursion 撞限
+        // 现在 score >= 0.6 直接 approve，避免 executor 重复生成相同回复
+        const MIN_APPROVE_SCORE = 0.6;
+        const shouldApprove =
+            reviewResponse.verdict === 'approved' ||
+            reviewResponse.score >= MIN_APPROVE_SCORE ||
+            isRetryExhausted;
+
+        // 调试日志：每次 reviewer 决策时打印
+        // eslint-disable-next-line no-console
+        console.log(
+          `[reviewer] retry_count=${state.retry_count || 0}, ` +
+          `verdict=${reviewResponse.verdict}, score=${reviewResponse.score}, ` +
+          `isRetryExhausted=${isRetryExhausted}, shouldApprove=${shouldApprove}`,
+        );
 
         // HITL 触发：评分争议且未超重试上限 → 暂停等待 HR 审批
         const needsHitl = !shouldApprove && reviewResponse.score < HITL_SCORE_THRESHOLD && !isRetryExhausted;

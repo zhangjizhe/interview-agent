@@ -220,4 +220,4 @@ export function buildInterviewGraph(
   }
 
 /** 图级递归上限（P0-7）。调用方在 graph.invoke 时传入 config.recursionLimit */
-export const INTERVIEW_GRAPH_RECURSION_LIMIT = 30;
+export const INTERVIEW_GRAPH_RECURSION_LIMIT = 60;

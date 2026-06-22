@@ -18,6 +18,7 @@
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { InterviewAgentStateType, PastStep, SpecialistType } from '../state';
 import { McpRegistry } from '../../../modules/interview/services/mcp-registry';
+import { collectStreamText } from '../stream-helper';
 
 /**
  * Specialist Agent 的 system prompt 映射
@@ -102,8 +103,8 @@ export function createExecutorNode(model: BaseChatModel) {
                 case 'ask_llm': {
                     // 直接调 LLM 生成内容
                     // Handoffs: 根据 step.specialist 选择对应的 Specialist prompt
-                    const lastMessage =
-                        state.messages[state.messages.length - 1]?.content ?? '';
+                    const lastMsgRaw = state.messages[state.messages.length - 1]?.content;
+                    const lastMessage: string = typeof lastMsgRaw === 'string' ? lastMsgRaw : '';
                     const contextFromPastSteps = state.past_steps
                         .map(
                             (ps) =>
@@ -114,7 +115,12 @@ export function createExecutorNode(model: BaseChatModel) {
                     const specialistType: SpecialistType = step.specialist || 'general';
                     const specialistPrompt = SPECIALIST_PROMPTS[specialistType];
 
-                    const llmResponse = await model.invoke([
+                    // 2026-06-23 修复：改用 collectStreamText（model.stream）
+                    // 原 model.invoke() 不触发 LangChain on_chat_model_stream 回调，
+                    // 前端 SSE 只能等整个 LLM 输出完才一次性 emit（"突然出现全文"）。
+                    // 现在用流式调用 + runManager.handleLLMNewToken → LangGraph streamMode
+                    // 'messages' 实时 emit AIMessageChunk → SSE 逐字推到前端。
+                    const { fullText } = await collectStreamText(model, [
                         {
                             role: 'system',
                             content: `${specialistPrompt}
@@ -127,7 +133,7 @@ ${contextFromPastSteps || '（无）'}
                         { role: 'user', content: lastMessage },
                     ], config);
 
-                    result = llmResponse.content as string;
+                    result = fullText;
                     success = true;
                     break;
                 }
