@@ -433,16 +433,22 @@ export class DynamicTaskQueueService {
   }
 
   private estimateCorrectness(answer: string): number {
+    // R-P2-8 修复：wrongIndicators 改为整词边界匹配，避免误伤。
+    // 原 includes() 子串匹配："我之前理解错误"会被识别为"错误"扣分；
+    // "这种做法不正确"在否定语境下也被扣分。改用 word boundary 风格正则
+    // （中文标点作为分隔符），让"错误"只在作为独立词时扣分。
     const correctIndicators = ['正确', '确实如此', '这个理解是对的', '是的', '没错'];
-    const wrongIndicators = ['错误', '不对', '不是这样', '不正确'];
+    const wrongIndicators = ['错误', '不对', '不是这样'];
 
     let score = 0.6;
     correctIndicators.forEach((indicator) => {
       if (answer.includes(indicator)) score += 0.1;
     });
-    wrongIndicators.forEach((indicator) => {
-      if (answer.includes(indicator)) score -= 0.2;
-    });
+    // 用 \b 风格边界：英文 \b + 中文标点
+    const wrongRegex = new RegExp(
+      `(?:[，。！？；：、\\s]|^)(${wrongIndicators.join('|')})(?:[，。！？；：、\\s]|$)`,
+    );
+    if (wrongRegex.test(answer)) score -= 0.2;
 
     return Math.max(0.2, Math.min(1, score));
   }
