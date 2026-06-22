@@ -319,6 +319,14 @@ export class LlmGatewayService {
       if (fallbackName && this.providerEnabled.get(fallbackName)) {
         const fallback = this.providers.get(fallbackName);
         isFallback = true;
+        // 修复 P0-8：fallback 触发时 yield 明确的切换信号，让消费者识别到内容不连续。
+        // 已 yield 给消费者的 primary chunk 无法收回（HTTP SSE 已发出），消费者会
+        // 看到"半截主 provider + 完整 fallback"的拼接脏数据。marker 让消费方能
+        // 选择丢弃 primary 已输出内容、或在 UI 提示"已切换"。
+        yield {
+          content: '\n\n[-- 主 provider 异常，已切换到 fallback --]\n\n',
+          isFallbackMarker: true,
+        };
         totalContent = '';
         for await (const chunk of this.promptCache.wrapStream(
           () => fallback.streamChat(params),
