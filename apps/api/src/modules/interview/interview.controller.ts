@@ -994,7 +994,24 @@ export class InterviewController {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
+res.flushHeaders();
+
+    // R-P2-20 修复：user message 长度上限 10000 字符（约 2000-3000 tokens）。
+    // 原 Prisma @db.Text 无限制，恶意用户可发超长消息导致 DB / LLM 上下文压力。
+    // 限制后用 SSE error event 通知前端，不静默吞。
+    const MAX_USER_MESSAGE_CHARS = 10000;
+    if (!dto.content || typeof dto.content !== 'string' || dto.content.length === 0) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: '消息内容不能为空' })}\n\n`);
+      (res as any).flush?.();
+      res.end();
+      return;
+    }
+    if (dto.content.length > MAX_USER_MESSAGE_CHARS) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: `消息超过 ${MAX_USER_MESSAGE_CHARS} 字符限制（当前 ${dto.content.length}）` })}\n\n`);
+      (res as any).flush?.();
+      res.end();
+      return;
+    }
 
     const interview = await this.prisma.interview.findUnique({
       where: { id: interviewId },
