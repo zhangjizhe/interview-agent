@@ -45,23 +45,23 @@ export function extractKeywords(question: string): string[] {
 /**
  * 评估回答正确性（启发式）
  *
- * R-P2-8 修复：wrongIndicators 改为整词边界匹配，避免误伤。
- * 原 includes() 子串匹配："我之前理解错误"会被识别为"错误"扣分；
- * "这种做法不正确"在否定语境下也被扣分。改用 word boundary 风格正则
- * （中文标点作为分隔符），让"错误"只在作为独立词时扣分。
+ * R-P2-8 修复：wrongIndicators 和 correctIndicators 都改为整词边界匹配。
+ * 原 includes() 子串匹配："这种做法不正确"会匹配到"正确"加分；
+ * "我之前理解错误"会匹配到"错误"扣分。改用 word boundary 风格正则
+ * （中文标点作为分隔符），让指标词只在作为独立词时生效。
  */
 export function estimateCorrectness(answer: string): number {
   const correctIndicators = ['正确', '确实如此', '这个理解是对的', '是的', '没错'];
   const wrongIndicators = ['错误', '不对', '不是这样'];
 
+  // 中文词边界正则：前缀为行首/中文标点/空白，后缀同理
+  const boundaryRegex = (words: string[]) =>
+    new RegExp(`(?:[，。！？；：、\\s]|^)(${words.join('|')})(?:[，。！？；：、\\s]|$)`);
+
   let score = 0.6;
-  correctIndicators.forEach((indicator) => {
-    if (answer.includes(indicator)) score += 0.1;
-  });
-  // 用 \b 风格边界：英文 \b + 中文标点
-  const wrongRegex = new RegExp(
-    `(?:[，。！？；：、\\s]|^)(${wrongIndicators.join('|')})(?:[，。！？；：、\\s]|$)`,
-  );
+  const correctRegex = boundaryRegex(correctIndicators);
+  if (correctRegex.test(answer)) score += 0.1;
+  const wrongRegex = boundaryRegex(wrongIndicators);
   if (wrongRegex.test(answer)) score -= 0.2;
 
   return Math.max(0.2, Math.min(1, score));
