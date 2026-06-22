@@ -55,6 +55,15 @@ export function useInterviewStream(): UseInterviewStreamReturn {
             type: 'meta',
             content: `连接断开，第 ${attempt} 次重连中...`,
           });
+
+          // R-P1-9 已知限制：项目 SSE 协议未设计 offset / Last-Event-ID 字段，
+          // server 端不存消息状态，所以无法做真正的断点续传。
+          // 当前降级处理：依赖 store.appendToLastMessage 的 dedup 逻辑
+          // （MAX_OVERLAP=200，R-P2-14 修复）检测 lastContent 末尾与 delta
+          // 开头的重叠，server 完全重发时 200 字符上限足够覆盖 token 级重复。
+          // 用户感知：极少见重复 token（最多 200 字符），不会看到明显重复内容。
+          // 真断点续传需要 server-side 支持（详见未来 ADR）。
+
           store.forceRender();
           await sleep(RETRY_DELAY_MS * Math.pow(2, attempt - 1));
           if (controller.signal.aborted) break;

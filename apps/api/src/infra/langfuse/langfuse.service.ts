@@ -92,7 +92,11 @@ export class LangfuseService implements OnModuleInit {
   }) {
     // P1-6 修复：按采样率决定是否上报
     if (!this.client) return null;
-    if (!this.shouldSample('trace')) {
+    // R-P2-11 第二轮：传 seed 让采样决策确定性。
+    // seed = name + sessionId，保证同一请求 trace 决策一致；
+    // 重试时同 seed 走同一条采样路径（trace 包含/不包含）。
+    const traceSeed = `${params.name}|${params.sessionId ?? ''}|${params.userId ?? ''}`;
+    if (!this.shouldSample('trace', traceSeed)) {
       return null; // 跳过不上报
     }
     return this.client.trace({
