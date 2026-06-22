@@ -136,6 +136,16 @@ export class McpAdapterService implements OnModuleInit {
    * 执行工具调用
    */
   async callTool(toolName: string, args: any): Promise<any> {
+    // R-P2-10 修复：基础参数校验
+    // 原代码直接传 args 给 tool.execute()，恶意 / 错误参数可能导致工具异常。
+    // 这里只做基础校验：args 必须是对象 + 必要字段类型检查。
+    // 深度校验（如 zod schema）由各工具自行处理（BochaSearchTool 等已有 schema）。
+    if (args !== null && typeof args !== 'object') {
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ error: `args must be an object (got ${typeof args})` }) }],
+      };
+    }
+
     const tool = McpRegistry.get(toolName);
 
     if (!tool) {
