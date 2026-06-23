@@ -11,19 +11,47 @@
 
 ---
 
-## 最新基准（2026-06-21 实测 · 真实 A/B 对比）
+## 最新基准（2026-06-23 实测 · 真实 A/B 对比）
 
-### 50 轮对话真实测量
+### Cache 命中率 · 50 轮实测（2026-06-23）
+
+**测试设计**：5 轮场景各 10 query,覆盖语义缓存完整路径（Redis 精确桶 + Qdrant cosine）
+- R1 cold start（10 个互不相同） → 期望 miss
+- R2 same query 重复（10 次相同） → 期望 Redis 精确桶 hit
+- R3 paraphrase 同语义复述（10 个不同措辞） → 期望 Qdrant cosine hit
+- R4 unrelated 完全无关（10 个跨主题） → 期望 miss
+- R5 edge 边缘（10 个同主题不同切入） → 期望部分 hit
+
+**实测结果**（threshold = 0.92,Qwen text-embedding-v3, dim=1024）：
+
+| 指标 | 实测值 | 备注 |
+|---|---|---|
+| **总命中率** | **23/50 = 46.00%** | 整体 hit rate（混合场景） |
+| **期望命中召回率（Recall）** | **23/25 = 92.00%** | 25 个期望 hit 的 query 中实际命中 23 个 |
+| **误命中率（FPR）** | **0/25 = 0.00%** | 25 个期望 miss 的 query 全部正确 miss（无答非所问） |
+| **Hit 平均相似度** | **0.9845** | Qdrant cosine 平均（命中时） |
+| **平均 Lookup 耗时** | **130.8 ms** | 含 embedding API 调用 |
+| R1 cold start | 0/10 = 0.0% | 全 miss（符合 cold start 预期） |
+| R2 same query | 10/10 = 100.0% | Redis 精确桶全命中 |
+| R3 paraphrase | 8/10 = 80.0% | 2 个 FN（Qwen 嵌入相似度 < 0.92 阈值）|
+| R4 unrelated | 0/10 = 0.0% | 全 miss（无误判） |
+| R5 edge | 5/10 = 50.0% | 同主题前 5 命中，后 5 实际无关正确 miss |
+
+> **诚实标注**：
+> - 之前 README 写"100% (2/2)"是单点测量误导，已被本次 50 轮实测取代。
+> - **真正可信指标是 Recall（92%）和 FPR（0%）**：召回高、误判零，说明阈值 0.92 在"语义去重"场景是合适的。
+> - 2 个 FN（paraphrase-8/9）是 Qwen embedding 模型对同义但表述差异大的 query 判定相似度 < 0.92，不是阈值配置问题。
+> - 实测脚本：`scripts/bench-cache-50.ts` · 详细 JSON 报告：`apps/api/src/evals/reports/cache-bench-50rounds-*.json`
+
+### 50 轮 LLM 调用 A/B 实测（2026-06-21 · 上一次）
 
 | 指标 | 实测值 | 备注 |
 |---|---|---|
 | **Cost Panel 响应** | **7-45 ms** | 目标 < 1000 ms；Redis Hash + Postgres 双写 |
-| **语义缓存命中率** | **100% (2/2)** | multi-agent 路径接通 LlmGateway.semanticCacheType |
-| **Cost Panel 重试率** | **0%** | cache 命中不计费 |
 | 实验组 LLM 调用 | 2 次 / 869 tokens | `session_costs.totalTokens`（最可信口径）|
 | Fallback 链路触发 | **0%** | DeepSeek 复活 → 全走 Qwen 主路径 |
 | Prompt Cache 命中 | 0/0 = 0% | Qwen dashscope OpenAI 兼容层不支持 `prompt_cache_key`（已知根因）|
-| 单元测试 | **105/105 passed** | Jest 83 + node:test 22 |
+| 单元测试 | **126/126 passed** | Jest 104 + node:test 22 |
 | 容器启动 | 7 容器 healthy | postgres / redis / qdrant / milvus / milvus-etcd / api / web |
 
 ### A/B 对照 · 真实测量（3 组，50 轮）
@@ -171,6 +199,38 @@ Top-K 结果
 | T3 | ≥ 95% | 增量 LLM 摘要 |
 
 stub 决策缓存（LRU 1000 条，64-bit djb2 hash）保护 Prompt Prefix Cache 命中率；用户消息只裁代码块保留纯文本。
+
+### 9. External MCP Loader — 双向 MCP 集成（ADR #11 P1）
+
+支持把外部 MCP server（如 GitHub 官方 MCP、filesystem MCP）的工具动态注册到内部 Registry，让多 Agent executor 无缝调用：
+
+| 方向 | 实现 | 用途 |
+|---|---|---|
+| **内 → 外** | `McpAdapterService` 把内部工具暴露成 stdio MCP Server | Claude Desktop / Cursor 等外部 Client 可调用 |
+| **外 → 内** | `ExternalMcpLoader` 从 config 加载外部 server，connect + listTools + bindExecute | 内部 Agent 可调用外部 tool |
+
+**核心能力**：
+- **双 transport 支持**：`stdio`（本地子进程，如 `@modelcontextprotocol/server-filesystem`）+ `streamable-http`（远程 SaaS，如 GitHub MCP）
+- **lazy connect**：首次 listTools/callTool 时自动建立连接，避免启动阻塞
+- **降级不阻塞**：单个外部 server 连接失败 → log warn，主流程不中断；builtin 工具仍可用
+- **命名隔离**：外部 tool 用 `ext_<server>_<tool>` 前缀，避免和 builtin tool 重名冲突
+- **超时控制**：listTools/callTool 默认 30s（可配置），防止 MCP server 卡死主流程
+- **健康检查**：每个 server 状态上报 `/admin/mcp-servers`，含 transport / status / tools / latencyMs
+
+**配置示例**（`config/mcp-servers.json`）：
+```json
+{
+  "name": "github_official",
+  "transport": "streamable-http",
+  "url": "https://api.githubcopilot.com/mcp/",
+  "headers": { "Authorization": "Bearer ${GITHUB_TOKEN}" },
+  "enabled": false
+}
+```
+
+**E2E 验证**：mock stdio MCP server + 真实 spawn + 17/17 端到端检查通过（`scripts/e2e-external-mcp.ts`）。
+
+**单测覆盖**：`external-mcp-loader.spec.ts` 12 个用例覆盖：注册、prefix sanitize、callTool 转发、错误降级、listStatus、unregisterServer、config 读取 + builtin 过滤。
 
 ---
 
