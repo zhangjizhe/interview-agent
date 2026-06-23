@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LlmGatewayService } from '../../llm/llm.gateway.service';
+import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { ResumeParserService, type ParsedResume } from '../services/resume-parser.service';
 import { ResumeRAGService } from '../services/resume-rag.service';
 import { matchBank, pickQuestions, type BankKey } from '../knowledge-banks';
@@ -31,7 +32,7 @@ export class ResumeController {
     private resumeParser: ResumeParserService,
     private resumeRag: ResumeRAGService,
     private llm: LlmGatewayService,
-    private prisma: any, // ResolveUserId 需要 PrismaService，这里简写避开循环 import
+    private prisma: PrismaService,
   ) {}
 
   /**

@@ -19,6 +19,7 @@ import { QuestionGeneratorService } from './services/question-generator.service'
 import { ScoringService } from './services/scoring.service';
 import { RagService } from './services/rag.service';
 import { HitlService } from './services/hitl.service';
+import { PrismaService } from '../../infra/prisma/prisma.service';
 
 @Module({
   imports: [AgentModule, MemoryModule, LlmModule, TaskQueueModule, AuthModule],
@@ -44,6 +45,7 @@ import { HitlService } from './services/hitl.service';
     ScoringService,
     RagService,
     HitlService,
+    PrismaService,
   ],
   exports: [
     ResumeParserService,
