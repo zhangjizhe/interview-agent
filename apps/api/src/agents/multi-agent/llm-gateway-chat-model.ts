@@ -31,6 +31,7 @@ import {
 import { ChatGenerationChunk, ChatResult } from '@langchain/core/outputs';
 import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
 import { RunnableLambda, type Runnable } from '@langchain/core/runnables';
+import { Logger } from '@nestjs/common';
 import type { LlmGatewayService } from '../../modules/llm/llm.gateway.service';
 
 export interface LlmGatewayChatModelFields extends BaseChatModelParams {
@@ -64,6 +65,8 @@ export class LlmGatewayChatModel extends BaseChatModel {
   private interviewId: string;
   private userId: string;
   private cacheType: string;
+  // 静态 Logger：LlmGatewayChatModel 不是 Nest Provider，不能注入 Logger（审查员 2026-06-23 反馈）
+  private static readonly logger = new Logger(LlmGatewayChatModel.name);
 
   constructor(fields: LlmGatewayChatModelFields) {
     super(fields);
@@ -161,7 +164,18 @@ export class LlmGatewayChatModel extends BaseChatModel {
       if (chunk.content) {
         // 关键修复：调用 runManager.handleLLMNewToken，让 LangChain 回调系统能捕获 token
         // 这样 streamEvents(version:'v2') 的 on_chat_model_stream 事件才能被触发
-        await runManager?.handleLLMNewToken(chunk.content);
+        // try/catch 兜底（审查员 2026-06-23 反馈）：runManager 可能 undefined 或抛错，
+        // 不能让单个 token 的回调失败终止整个 stream —— 仍要 yield ChatGenerationChunk
+        // 保证 LLM 流式输出继续（fallback 行为 = 不通知 callback，但 token 仍到前端）
+        try {
+          if (runManager) {
+            await runManager.handleLLMNewToken(chunk.content);
+          }
+        } catch (err: any) {
+          LlmGatewayChatModel.logger.debug(
+            `handleLLMNewToken fallback (token still yielded): ${err.message}`,
+          );
+        }
         yield new ChatGenerationChunk({
           message: new AIMessageChunk({ content: chunk.content }),
           text: chunk.content,
