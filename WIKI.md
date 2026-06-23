@@ -579,6 +579,9 @@ curl -s "http://localhost:3001/api/knowledge-base/recall?q=LangGraph%20checkpoin
 
 | 日期 | 变更 |
 |------|------|
+| 2026-06-23 | **GraphRecursionError 错误边界**：multi-agent.stream for-await 外包 try/catch，catch 后 emit 降级提示（"回答生成超时，可能进入状态机死循环，请重试或换个问法"）不中断流式，consumer 仍走完 getState / reflection / report（commit 8978834） |
+| 2026-06-23 | **Configuration URL 格式 fail-fast**：新增 `assertValidUrl(value, name, protocols[])`，启动时校验 `DATABASE_URL` / `REDIS_URL` / `QDRANT_URL` / `MILVUS_URL`；demo/dev 模式允许空值用默认值，商用模式必填 + 协议匹配（`postgresql:` / `redis:` / `http:` / `https:`），错配启动前即报错而不是运行时连错库（commit af2ac46） |
+| 2026-06-23 | **LlmGatewayChatModel 流式稳定性**：`handleLLMNewToken` callback 失败时 try/catch 降级（NestJS 静态 `Logger.debug` 记录，因为 `BaseChatModel` 子类不在 DI 容器），`ChatGenerationChunk` 仍正常 yield —— 避免单个 token 的回调失败终止整个 stream 到前端（commit 43bbdfb） |
 | 2026-06-22 | **completeTask 接入主流程**：assistant 回复后调用 completeTask，评分 + 写 answerHistory + 更新 task status |
 | 2026-06-22 | **bocha_search 搜索注入短期记忆**：搜索结果写入 system message，下一轮 LLM 可见 |
 | 2026-06-22 | **Citation 白名单 + sourceType 推断**：80+ 常见技术术语白名单 + `inferSourceType()` 动态推断 |
