@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
-import { InterviewController } from './interview.controller';
 import { ToolsController } from './tools.controller';
 import { AdminMcpController } from './admin-mcp.controller';
 import { HitlController } from './controllers/hitl.controller';
+import { InterviewLifecycleController } from './controllers/interview-lifecycle.controller';
+import { ResumeController } from './controllers/resume.controller';
+import { QuestionBankController } from './controllers/question-bank.controller';
+import { EvaluationController } from './controllers/evaluation.controller';
+import { InterviewFlowController } from './controllers/interview-flow.controller';
 import { AgentModule } from '../agent/agent.module';
 import { TaskQueueModule } from '../agent/task-queue.module';
 import { AuthModule } from '../auth/auth.module';
@@ -18,7 +22,20 @@ import { HitlService } from './services/hitl.service';
 
 @Module({
   imports: [AgentModule, MemoryModule, LlmModule, TaskQueueModule, AuthModule],
-  controllers: [InterviewController, ToolsController, AdminMcpController, HitlController],
+  // 注册顺序保证：LifecycleController（含 list/stats 等静态路由）必须最先注册，
+  // FlowController（含 :interviewId/message 等参数路由）最后注册。
+  // NestJS 跨 controller 按注册顺序匹配路由，避免 /interview/list 被
+  // /interview/:interviewId 抢先匹配。
+  controllers: [
+    InterviewLifecycleController,
+    ResumeController,
+    QuestionBankController,
+    EvaluationController,
+    InterviewFlowController,
+    ToolsController,
+    AdminMcpController,
+    HitlController,
+  ],
   providers: [
     ResumeParserService,
     ResumeRAGService,
