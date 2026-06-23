@@ -115,6 +115,20 @@ export function createExecutorNode(model: BaseChatModel) {
                     const specialistType: SpecialistType = step.specialist || 'general';
                     const specialistPrompt = SPECIALIST_PROMPTS[specialistType];
 
+                    // 2026-06-24 修复：注入轮次上下文，避免追问时 executor 节点也走"开场白"模板
+                    // 之前：executor.interviewer prompt 是固定的"资深 AI 面试官"开场，
+                    //       R2/R3/R4 都会重复"好的我们开始吧！+ 出题"——和 reviewer 同一类 bug
+                    // 现在：根据 messages 数量判定轮次，第 2 轮及以后显式告诉 LLM "这是追问，不要开场白"
+                    const userMsgCount = state.messages.filter(
+                        (m: any) => m?._getType?.() === 'human' || m?.role === 'user',
+                    ).length;
+                    const roundCount = Math.max(1, Math.ceil(userMsgCount / 2));
+                    const roundHint = roundCount > 1
+                        ? `\n【重要·第 ${roundCount} 轮】这是对话第 ${roundCount} 轮，候选人已经听过开场白。
+不要再加开场白 / "我们开始吧" / 出第一道基础题。
+直接基于候选人最新消息回应，自然延续上轮对话。\n`
+                        : '';
+
                     // 2026-06-23 修复：改用 collectStreamText（model.stream）
                     // 原 model.invoke() 不触发 LangChain on_chat_model_stream 回调，
                     // 前端 SSE 只能等整个 LLM 输出完才一次性 emit（"突然出现全文"）。
@@ -125,6 +139,7 @@ export function createExecutorNode(model: BaseChatModel) {
                             role: 'system',
                             content: `${specialistPrompt}
 
+${roundHint}
 【已收集信息】
 ${contextFromPastSteps || '（无）'}
 

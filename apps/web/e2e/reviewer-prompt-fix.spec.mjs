@@ -28,13 +28,16 @@ const WEB_URL = process.env.WEB_URL || 'http://localhost:5173';
 const API_URL = process.env.API_URL || 'http://localhost:3001';
 
 // 开场白模板关键词（命中 = bug 复现）
+// 排除正常过渡话术："咱们先从基础开始" 是合理的对话推进
 const OPENING_PATTERNS = [
   /那咱们立刻切换/,
   /切换.*赛道/,
   /来第一问[：:]/,
-  /来.*开始面试/,
   /很高兴.*一起进行/,
-  /咱们.*开始/,
+  /欢迎.*来到面试/,
+  /今天和你一起进行这场/,
+  /咱们立刻/,
+  /AI Agent 开发的赛道/,
 ];
 
 async function main() {

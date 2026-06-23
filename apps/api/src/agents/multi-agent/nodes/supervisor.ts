@@ -57,9 +57,28 @@ ${lastMessage}
             },
         ], config);
 
-        return {
+        // 2026-06-24 修复：每轮新对话清空"上一轮 reviewer 残留状态"
+        // 否则 reviewerRouter 看 state.final_response 非空直接 return 'end'，
+        // 新 user message 永远不进 reviewer 处理（导致 R3/R4 输出完全相同）
+        // 同时清空 retry_count / reflection / review_* / hitl_* 等，
+        // 避免 reviewer 上一轮 revise→planner 的循环状态污染新一轮
+        const cleared = {
             user_intent: response.intent as UserIntent,
-        };
+            final_response: '',
+            retry_count: 0,
+            reflection: '',
+            issue_tags: [],
+            hitl_pending: false,
+            hitl_verdict: undefined,
+            past_steps: [],  // 也清空 past_steps（每轮新规划从空开始累积）
+            plan: [],
+            current_step_idx: 0,
+            // review_* 不在 state schema 中（reviewer 用 as any 写入），用 any 清空
+            review_score: undefined,
+            review_issues: [],
+            review_suggestion: '',
+        } as any;
+        return cleared;
     };
 }
 
