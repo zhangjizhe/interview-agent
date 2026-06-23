@@ -270,45 +270,69 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
           }
 
           this.logger.debug(`[stream-v6] entering for-await loop`);
-          for await (const chunk of stream) {
-            messageChunkCount++;
-            // 单 streamMode 'messages' 输出：[AIMessageChunk, metadata]
-            const tuple = chunk as any;
-            const message = Array.isArray(tuple) ? tuple[0] : null;
-            const metadata = Array.isArray(tuple) ? tuple[1] : null;
-            const node: string = metadata?.langgraph_node ?? '';
-            const content = typeof message?.content === 'string' ? message.content : '';
-            // 调试日志：每个 chunk + 白名单判断
-            this.logger.debug(
-              `[stream-v6] chunk #${messageChunkCount}: node=${node || '(empty)'}, content="${content.slice(0, 30)}${content.length > 30 ? '...' : ''}"`,
+          // 审查员 2026-06-23：GraphRecursionError 错误边界
+          // LangGraph 在循环条件判断有误时（如状态机里两个节点互相路由）会抛 GraphRecursionError，
+          // 整个 stream 终止，前端看到 stream 中断 + 没有任何降级提示。
+          // 兜底策略：catch → emit 降级消息（"回答超时 / 状态机死循环"） → 仍写 getState / reflection。
+          let streamError: Error | null = null;
+          try {
+            for await (const chunk of stream) {
+              messageChunkCount++;
+              // 单 streamMode 'messages' 输出：[AIMessageChunk, metadata]
+              const tuple = chunk as any;
+              const message = Array.isArray(tuple) ? tuple[0] : null;
+              const metadata = Array.isArray(tuple) ? tuple[1] : null;
+              const node: string = metadata?.langgraph_node ?? '';
+              const content = typeof message?.content === 'string' ? message.content : '';
+              // 调试日志：每个 chunk + 白名单判断
+              this.logger.debug(
+                `[stream-v6] chunk #${messageChunkCount}: node=${node || '(empty)'}, content="${content.slice(0, 30)}${content.length > 30 ? '...' : ''}"`,
+              );
+              // 白名单过滤 + emit + dedup
+              //
+              // 为什么需要 dedup：
+              // LangGraph streamMode: 'messages' 在以下三个时机都会 emit：
+              //   1. executor 节点的 ask_llm invoke 结束时（handleLLMEnd emit 完整 AIMessage）
+              //   2. reviewer 节点 model.stream 每个 token（handleLLMNewToken）
+              //   3. reviewer 节点结束时（handleLLMEnd emit 完整 AIMessage）
+              // 如果不 dedup，前端会看到同一段回复 emit 多次，体验极差。
+              //
+              // dedup 策略：
+              //   - 如果 chunk content 等于 emittedText 末尾（handleLLMEnd 重复发完整消息），跳过
+              //   - 如果 chunk content 是 emittedText 的真前缀（重复发同一段），跳过
+              //   - 否则正常 emit（流式 token 增量）
+              if (STREAM_WHITELIST.includes(node as any) && content) {
+                if (emittedText.endsWith(content)) {
+                  // 重复：handleLLMEnd 重复 emit 完整内容，跳过
+                  this.logger.debug(`[stream-v6] skip duplicate: chunk #${messageChunkCount} (${content.length} chars already emitted)`);
+                  continue;
+                }
+                if (emittedText.includes(content) && content.length < emittedText.length / 2) {
+                  // 重复：内容是已 emit 的子串（且较短），跳过
+                  this.logger.debug(`[stream-v6] skip substring duplicate: chunk #${messageChunkCount}`);
+                  continue;
+                }
+                tokenHitCount++;
+                emittedText += content;
+                queue.push({ kind: 'data', content, node });
+              }
+            }
+          } catch (e: any) {
+            streamError = e;
+            const isRecursionError =
+              e?.name === 'GraphRecursionError' ||
+              (typeof e?.message === 'string' && /recursion/i.test(e.message));
+            this.logger.error(
+              `[stream-v6] graph.stream threw (${isRecursionError ? 'GraphRecursionError' : 'unknown'}): ${e.message}`,
+              e.stack,
             );
-            // 白名单过滤 + emit + dedup
-            //
-            // 为什么需要 dedup：
-            // LangGraph streamMode: 'messages' 在以下三个时机都会 emit：
-            //   1. executor 节点的 ask_llm invoke 结束时（handleLLMEnd emit 完整 AIMessage）
-            //   2. reviewer 节点 model.stream 每个 token（handleLLMNewToken）
-            //   3. reviewer 节点结束时（handleLLMEnd emit 完整 AIMessage）
-            // 如果不 dedup，前端会看到同一段回复 emit 多次，体验极差。
-            //
-            // dedup 策略：
-            //   - 如果 chunk content 等于 emittedText 末尾（handleLLMEnd 重复发完整消息），跳过
-            //   - 如果 chunk content 是 emittedText 的真前缀（重复发同一段），跳过
-            //   - 否则正常 emit（流式 token 增量）
-            if (STREAM_WHITELIST.includes(node as any) && content) {
-              if (emittedText.endsWith(content)) {
-                // 重复：handleLLMEnd 重复 emit 完整内容，跳过
-                this.logger.debug(`[stream-v6] skip duplicate: chunk #${messageChunkCount} (${content.length} chars already emitted)`);
-                continue;
-              }
-              if (emittedText.includes(content) && content.length < emittedText.length / 2) {
-                // 重复：内容是已 emit 的子串（且较短），跳过
-                this.logger.debug(`[stream-v6] skip substring duplicate: chunk #${messageChunkCount}`);
-                continue;
-              }
-              tokenHitCount++;
-              emittedText += content;
-              queue.push({ kind: 'data', content, node });
+            // 降级：emit 提示消息到前端（如果之前没 emit 过任何 token）
+            const FALLBACK_MESSAGE = isRecursionError
+              ? '\n\n⚠️ 回答生成超时（可能进入状态机死循环），请重试或换个问法。'
+              : '\n\n⚠️ 回答生成中断，请重试。';
+            if (!emittedText) {
+              queue.push({ kind: 'data', content: FALLBACK_MESSAGE.trim(), node: 'stream_fallback' });
+              emittedText = FALLBACK_MESSAGE.trim();
             }
           }
           this.logger.debug(
