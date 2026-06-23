@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { McpRegistry } from './modules/interview/services/mcp-registry';
+import { ExternalMcpLoader } from './modules/mcp/external-mcp-loader';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -43,6 +44,19 @@ async function bootstrap() {
   if (result.errors.length > 0) {
     Logger.warn(`MCP config had ${result.errors.length} errors: ${result.errors.join('; ')}`, 'Bootstrap');
   }
+
+  // 加载外部 MCP server（GitHub MCP / Notion MCP 等 streamable-http / stdio）
+  // 失败降级：单个 server 失败不阻塞 API 启动，builtin 工具仍可用
+  const extResult = await ExternalMcpLoader.loadFromConfig(configPath);
+  if (extResult.errors.length > 0) {
+    Logger.warn(
+      `ExternalMcpLoader had ${extResult.errors.length} errors: ${extResult.errors.join('; ')}`,
+      'Bootstrap',
+    );
+  }
+
+  // OnModuleDestroy hook — 优雅关闭外部 MCP 连接
+  app.enableShutdownHooks();
 
   await app.listen(port);
   Logger.log(`🚀 API server running on http://localhost:${port}`, 'Bootstrap');

@@ -1,6 +1,6 @@
 {
   "_comment": "MCP 服务器配置 - 商用项目手动维护。添加新 MCP：1) npm install  2) 在本文件加一项  3) 重启 API。运行时不支持 add/delete（避免 token 浪费）",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "servers": [
     {
       "name": "bocha_search",
@@ -36,20 +36,36 @@
       "version": "1.0.0"
     },
     {
-      "name": "github_lookup",
-      "displayName": "GitHub 仓库查询",
-      "description": "查询候选人 GitHub 仓库、贡献统计（占位，待实现）",
+      "_note": "GitHub 官方 MCP server (streamable-http)，候选场景：候选人让 agent 读自己 GitHub 仓库代码作为面试材料。需要 GITHUB_TOKEN 环境变量，默认 disabled（没配 token 时禁用避免启动失败）",
+      "name": "github_official",
+      "displayName": "GitHub 官方 MCP",
+      "description": "GitHub 官方 MCP server (streamable-http transport)，支持仓库搜索、Issue、PR、Actions 等 100+ 工具",
       "emoji": "🐙",
+      "category": "mcp",
+      "transport": "streamable-http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_TOKEN}"
+      },
+      "enabled": false,
+      "author": "github",
+      "version": "1.0.0",
+      "timeoutMs": 30000
+    },
+    {
+      "_note": "filesystem stdio MCP（本地文件访问，主要用于读取候选人上传的 PDF / 简历文件等）",
+      "name": "filesystem",
+      "displayName": "本地文件系统",
+      "description": "filesystem stdio MCP server，提供本地文件读取/搜索能力",
+      "emoji": "📁",
       "category": "mcp",
       "transport": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
-      },
-      "author": "system",
-      "version": "0.0.1",
-      "_note": "占位示例：实际部署需要先 npm install + 配置 GITHUB_TOKEN"
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "enabled": false,
+      "author": "modelcontextprotocol",
+      "version": "1.0.0",
+      "timeoutMs": 15000
     }
   ]
 }

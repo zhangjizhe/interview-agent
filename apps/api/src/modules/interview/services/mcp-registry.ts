@@ -86,6 +86,14 @@ class McpRegistryClass {
   }
 
   /**
+   * 注销一个工具（ExternalMcpLoader 卸载时用）
+   * @returns true if removed, false if not found
+   */
+  unregister(name: string): boolean {
+    return this.entries.delete(name);
+  }
+
+  /**
    * NestJS 模块初始化时调用：为已注册的工具绑定真实执行函数
    * 例如 BochaSearchTool.execute 需要 ConfigService，只能在 DI 容器中注入
    */
