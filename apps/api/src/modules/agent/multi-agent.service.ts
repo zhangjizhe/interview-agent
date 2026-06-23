@@ -207,7 +207,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
   }
 
   async *stream(userMessage: string, threadId: string, userId?: string): AsyncGenerator<any, void, unknown> {
-    this.logger.warn(`[stream-v6] ENTER threadId=${threadId} userId=${userId} content="${userMessage.slice(0, 30)}..."`);
+    this.logger.debug(`[stream-v6] ENTER threadId=${threadId} userId=${userId} content="${userMessage.slice(0, 30)}..."`);
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
@@ -256,20 +256,20 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
         await threadIdStorage.run({ threadId, userId }, async () => {
           // v6 修复：改用 graph.stream(streamMode: 'messages')
           // 不再用 streamEvents（LangGraph 1.4.x + 自定义 BaseChatModel 不兼容）
-          this.logger.warn(`[stream-v6] before graph.stream`);
+          this.logger.debug(`[stream-v6] before graph.stream`);
           let stream: any;
           try {
             stream = await self.graph!.stream(
               { messages: [new HumanMessage(userMessage)] } as any,
               { ...config, streamMode: 'messages' as const, recursionLimit: INTERVIEW_GRAPH_RECURSION_LIMIT },
             );
-            this.logger.warn(`[stream-v6] graph.stream returned: ${typeof stream}, has Symbol.asyncIterator=${typeof stream?.[Symbol.asyncIterator]}`);
+            this.logger.debug(`[stream-v6] graph.stream returned: ${typeof stream}, has Symbol.asyncIterator=${typeof stream?.[Symbol.asyncIterator]}`);
           } catch (e: any) {
             this.logger.error(`[stream-v6] graph.stream THREW: ${e.message}`, e.stack);
             throw e;
           }
 
-          this.logger.warn(`[stream-v6] entering for-await loop`);
+          this.logger.debug(`[stream-v6] entering for-await loop`);
           for await (const chunk of stream) {
             messageChunkCount++;
             // 单 streamMode 'messages' 输出：[AIMessageChunk, metadata]
@@ -278,8 +278,8 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
             const metadata = Array.isArray(tuple) ? tuple[1] : null;
             const node: string = metadata?.langgraph_node ?? '';
             const content = typeof message?.content === 'string' ? message.content : '';
-            // 显著日志：每个 chunk + 白名单判断
-            this.logger.warn(
+            // 调试日志：每个 chunk + 白名单判断
+            this.logger.debug(
               `[stream-v6] chunk #${messageChunkCount}: node=${node || '(empty)'}, content="${content.slice(0, 30)}${content.length > 30 ? '...' : ''}"`,
             );
             // 白名单过滤 + emit + dedup
@@ -311,7 +311,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
               queue.push({ kind: 'data', content, node });
             }
           }
-          this.logger.warn(
+          this.logger.debug(
             `[stream-v6] stream done: chunks=${messageChunkCount}, token-hits=${tokenHitCount}, emitted-chars=${emittedText.length}`,
           );
 

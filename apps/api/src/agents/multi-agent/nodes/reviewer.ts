@@ -212,14 +212,6 @@ approved = 合格可输出，revise = 需要修改`,
             reviewResponse.score >= MIN_APPROVE_SCORE ||
             isRetryExhausted;
 
-        // 调试日志：每次 reviewer 决策时打印
-        // eslint-disable-next-line no-console
-        console.log(
-          `[reviewer] retry_count=${state.retry_count || 0}, ` +
-          `verdict=${reviewResponse.verdict}, score=${reviewResponse.score}, ` +
-          `isRetryExhausted=${isRetryExhausted}, shouldApprove=${shouldApprove}`,
-        );
-
         // HITL 触发：评分争议且未超重试上限 → 暂停等待 HR 审批
         const needsHitl = !shouldApprove && reviewResponse.score < HITL_SCORE_THRESHOLD && !isRetryExhausted;
 

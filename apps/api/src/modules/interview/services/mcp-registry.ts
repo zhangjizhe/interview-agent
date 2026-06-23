@@ -17,6 +17,18 @@
  * - 面试 agent 创建时调用 getAvailableTools(userId) 拿到过滤后的工具列表
  */
 
+// 简化日志工具（全局单例无法注入 Logger）
+const logInfo = (msg: string) => {
+  if (process.env.NODE_ENV !== 'test') {
+    console.log(msg);
+  }
+};
+const logWarn = (msg: string) => {
+  if (process.env.NODE_ENV !== 'test') {
+    console.warn(msg);
+  }
+};
+
 export interface McpToolMetadata {
   name: string;
   displayName: string;
@@ -110,11 +122,10 @@ class McpRegistryClass {
         }
       }
       this.configLoaded = true;
-      // eslint-disable-next-line no-console
-      console.log(`[McpRegistry] ✅ Loaded ${loaded} MCP servers from config (${errors.length} errors)`);
+      logInfo(`[McpRegistry] ✅ Loaded ${loaded} MCP servers from config (${errors.length} errors)`);
     } catch (e: any) {
       errors.push(`config load failed: ${e.message}`);
-      console.warn(`[McpRegistry] ⚠️  Could not load config ${configPath}: ${e.message}`);
+      logWarn(`[McpRegistry] ⚠️  Could not load config ${configPath}: ${e.message}`);
     }
     return { loaded, errors };
   }
