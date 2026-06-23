@@ -9,7 +9,7 @@
  *
  * LangGraph interrupt 联动版：
  * - GET /hitl/graph-status/:interviewId - 检查图是否处于 HITL 中断状态
- * - POST /hitl/graph-resume/:interviewId - HR 审批后恢复图执行
+ * - POST /hitl/graph-resume/:interviewId - HR 审批后恢复图执行（公开接口，无需认证）
  */
 import { Controller, Get, Post, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { HitlService } from '../services/hitl.service';
@@ -82,20 +82,20 @@ export class HitlController {
    * HR 审批后恢复图执行
    * POST /hitl/graph-resume/:interviewId
    * Body: { verdict: 'approved' | 'rejected' }
+   * 
+   * 公开接口：面试者可以自己决定是否接受争议回答，无需 JWT 认证
    */
   @Post('graph-resume/:interviewId')
-  @UseGuards(JwtAuthGuard)
   async graphResume(
     @Param('interviewId') interviewId: string,
     @Body() body: { verdict: 'approved' | 'rejected' },
-    @Req() req: any,
   ) {
     if (!body.verdict || !['approved', 'rejected'].includes(body.verdict)) {
       return { success: false, message: 'verdict must be "approved" or "rejected"' };
     }
 
     // 同步更新 Redis HITL 状态
-    const reviewerId = req.user?.userId || 'hr-system';
+    const reviewerId = 'interviewee'; // 面试者自己审批
     if (body.verdict === 'approved') {
       await this.hitl.approve(interviewId, reviewerId);
     } else {
