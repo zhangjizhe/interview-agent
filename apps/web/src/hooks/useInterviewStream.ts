@@ -45,6 +45,29 @@ export function useInterviewStream(): UseInterviewStreamReturn {
 
       let lastError: Error | null = null;
 
+      // 2026-06-23 修复：loading 兜底 — 即使后端 SSE 没正常发 [DONE]，
+      // 60 秒无新事件就强制 setStreaming(false)，避免按钮永久转圈。
+      // 后端已经在 controller 加了 [DONE] flush 等待，这里是最后防线。
+      const STREAM_IDLE_TIMEOUT_MS = 60_000;
+      let streamIdleTimer: ReturnType<typeof setTimeout> | null = null;
+      const resetStreamIdleTimer = () => {
+        if (streamIdleTimer) clearTimeout(streamIdleTimer);
+        streamIdleTimer = setTimeout(() => {
+          // 60 秒没新事件 + 还在 streaming → 强制兜底
+          const currentStreaming = useInterviewStore.getState().streaming;
+          if (currentStreaming) {
+            useInterviewStore.getState().appendAgentEvent({
+              type: 'error',
+              error: 'SSE 流式超时（60 秒无事件），已强制结束流式',
+            });
+            useInterviewStore.getState().finalizeLastMessage();
+            useInterviewStore.getState().setStreaming(false);
+            useInterviewStore.getState().forceRender();
+          }
+        }, STREAM_IDLE_TIMEOUT_MS);
+      };
+      resetStreamIdleTimer();
+
       for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         if (controller.signal.aborted) break;
 
@@ -108,6 +131,9 @@ export function useInterviewStream(): UseInterviewStreamReturn {
 
               try {
                 const event: AgentEvent = JSON.parse(data);
+
+                // 收到任何有效事件都重置 idle timer（说明 SSE 还活着）
+                resetStreamIdleTimer();
 
                 if (event.type === 'token' && event.content) {
                   store.appendToLastMessage(event.content);
@@ -179,6 +205,8 @@ export function useInterviewStream(): UseInterviewStreamReturn {
         store.setError(lastError.message);
         store.forceRender();
       }
+      // 清理 idle timer
+      if (streamIdleTimer) clearTimeout(streamIdleTimer);
     },
     [],
   );
