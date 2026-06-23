@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "node e2e/streaming-flow.spec.mjs",
-    "e2e:defensive": "node e2e/homepage-defensive.spec.mjs"
+    "e2e:defensive": "node e2e/homepage-defensive.spec.mjs",
+    "e2e:reviewer": "node e2e/reviewer-prompt-fix.spec.mjs",
+    "e2e:all": "node e2e/streaming-flow.spec.mjs && node e2e/homepage-defensive.spec.mjs && node e2e/reviewer-prompt-fix.spec.mjs"
   },
   "dependencies": {
     "@interview-agent/shared-types": "workspace:*",

@@ -183,7 +183,13 @@ async function main() {
 
   // ===== 阶段 4：SSE 事件序列验证 =====
   console.log('\n[4/5] Verify SSE event sequence');
-  const events = await page.evaluate(() => window.__sseEvents);
+  // 等待 events 累积到至少 5 个（避免 LLM 流式启动时序问题）
+  let events = [];
+  for (let i = 0; i < 20; i++) {
+    events = await page.evaluate(() => window.__sseEvents || []);
+    if (events.length >= 5) break;
+    await sleep(500);
+  }
   const byType = {};
   for (const e of events) byType[e.type] = (byType[e.type] || 0) + 1;
   console.log(`  events: ${JSON.stringify(byType)}`);

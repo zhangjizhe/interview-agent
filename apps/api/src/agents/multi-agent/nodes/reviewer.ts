@@ -88,12 +88,25 @@ export function createReviewerNode(model: BaseChatModel) {
     ): Promise<Partial<InterviewAgentStateType>> {
         const lastMessageRaw = state.messages[state.messages.length - 1]?.content;
         const lastMessage: string = typeof lastMessageRaw === 'string' ? lastMessageRaw : '';
-        const pastStepsSummary = state.past_steps
-            .map(
-                (ps) =>
-                    `[${ps.step.description}]\n${(ps.result as string).slice(0, 500)}`,
-            )
-            .join('\n\n');
+
+        // 2026-06-24 修复：追问重复开场白 bug
+        // 根因：第二轮以后，past_steps 累积了 respond_directly 节点的开场白模板 + executor
+        //       上一轮追问的中间响应，reviewer 把这些都拼进 prompt → LLM 看到模板就复述
+        //       到 final_response（"那咱们立刻切换到 AI Agent 开发的赛道...来第一问"）
+        // 修复：
+        //   1. round_count = user message 数（粗略判断轮次）
+        //   2. 只取最近 3 个 step（避免历史 step 的开场白模板被注入）
+        //   3. 第 2 轮及以后 prompt 显式告诉 LLM "这是追问，不要重复开场白"
+        const userMessageCount = state.messages.filter(
+            (m: any) => m?._getType?.() === 'human' || m?.role === 'user' || (typeof m?.content === 'string' && m.content && !m.tool_call_id),
+        ).length;
+        const roundCount = Math.max(1, Math.ceil(userMessageCount / 2));  // 每 2 条消息 = 1 轮
+        const recentSteps = state.past_steps.slice(-3);
+        const pastStepsSummary = recentSteps.length > 0
+            ? recentSteps
+                .map((ps) => `[${ps.step.description}]\n${(ps.result as string).slice(0, 300)}`)
+                .join('\n\n')
+            : '（本轮无工具调用）';
 
         // 第一阶段：汇总生成 final_response
         //
@@ -109,13 +122,26 @@ export function createReviewerNode(model: BaseChatModel) {
         // 全部跑完）才能 yield 第一个 token，用户感知到 10s 延迟。
         //
         // 2026-06-22 抽 helper：respond_directly 也用相同 helper 保持一致。
+        //
+        // 2026-06-24 修复追问重复开场白：第 2 轮及以后 prompt 显式告诉 LLM
+        // "这是追问，直接回应用户最新消息，不要重复开场白/历史 step 内容"
+        const roundContext = roundCount > 1
+            ? `\n【重要·第 ${roundCount} 轮追问】这是对话的第 ${roundCount} 轮，候选人已经回答过前面的问题。
+不要再加开场白、不要再自我介绍、不要再"切换赛道"。
+直接回应候选人的最新追问，自然延续上轮对话。\n`
+            : '';
+
         const { fullText: finalResponseRaw } = await collectStreamText(model, [
             {
                 role: 'system',
-                content: `你是一位专业的 AI 面试官小面。基于以下收集到的信息，给用户一个完整、专业的回复。
+                content: `你是一位专业的 AI 面试官小面。
+
+${roundContext}
+【用户最新消息】
+${lastMessage}
 
 【用户意图】${state.user_intent}
-【收集到的信息】
+【最近收集到的信息（仅参考，不要复述）】
 ${pastStepsSummary}
 
 【要求】
@@ -123,7 +149,8 @@ ${pastStepsSummary}
 2. 不要用 Markdown 标题或列表
 3. 如果是面试场景，每次只问一个问题
 4. 基于收集到的信息回答，不要编造
-5. 回复要直接面向用户，不要说"根据我收集到的信息..."`,
+5. 回复要直接面向用户，不要说"根据我收集到的信息..."
+6. 不要复述历史 step 的开场白模板，直接从用户最新消息开始回应`,
             },
             { role: 'user', content: lastMessage },
         ], config);
