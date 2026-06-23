@@ -110,7 +110,13 @@ export function HomePage() {
     queryKey: ['tools'],
     queryFn: async () => {
       const r = await fetch('/api/tools');
-      return safeJson(r) as Promise<{ tools: McpToolMeta[]; count: number; enabledCount: number }>;
+      const data: any = safeJson(r);
+      // 防御：safeJson 在 502/HTML 错误时返回 {}，tools 字段可能缺失
+      // 不加防御会 throw "Cannot read properties of undefined (reading 'map')"
+      if (data && Array.isArray(data.tools)) {
+        return data as { tools: McpToolMeta[]; count: number; enabledCount: number };
+      }
+      return { tools: [] as McpToolMeta[], count: 0, enabledCount: 0 };
     },
     refetchInterval: 30000,
   });
@@ -230,7 +236,7 @@ export function HomePage() {
             </div>
           </div>
           <div className="space-y-2 mt-3">
-            {pendingEmpty.map((room) => (
+            {(pendingEmpty ?? []).map((room) => (
               <div
                 key={room.id}
                 className="bg-white rounded-xl border border-amber-200 p-3 flex items-center gap-3"
@@ -311,7 +317,7 @@ export function HomePage() {
               {toolsData?.enabledCount ?? 0} / {toolsData?.count ?? 0} 可用
             </span>
             <div className="flex items-center gap-1.5 overflow-x-auto ml-1 md:ml-2 min-w-0">
-              {toolsData?.tools.map((tool) => (
+              {(toolsData?.tools ?? []).map((tool) => (
                 <span
                   key={tool.name}
                   title={tool.description}
@@ -364,7 +370,7 @@ export function HomePage() {
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {interviews.map((iv: any) => (
+            {(interviews ?? []).map((iv: any) => (
               <InterviewRow key={iv.id} interview={iv} onClick={() => navigate(`/interview/${iv.id}?userId=${userId}`)} />
             ))}
           </div>

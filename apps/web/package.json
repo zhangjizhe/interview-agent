@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "e2e": "node e2e/streaming-flow.spec.mjs"
+    "e2e": "node e2e/streaming-flow.spec.mjs",
+    "e2e:defensive": "node e2e/homepage-defensive.spec.mjs"
   },
   "dependencies": {
     "@interview-agent/shared-types": "workspace:*",
