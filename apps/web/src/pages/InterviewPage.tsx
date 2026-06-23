@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   ThumbsUp,
   ThumbsDown,
+  Lock,
 } from 'lucide-react';
 import { useInterviewStream } from '../hooks/useInterviewStream';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
@@ -44,6 +45,9 @@ export function InterviewPage() {
   const resumeConfirmed = useInterviewStore((s) => s.resumeConfirmed);
   const resumePanelOpen = useInterviewStore((s) => s.resumePanelOpen);
   const ending = useInterviewStore((s) => s.ending);
+  const interviewStatus = useInterviewStore((s) => s.interviewStatus);
+  const setInterviewStatus = useInterviewStore((s) => s.setInterviewStatus);
+  const isReadOnly = interviewStatus === 'COMPLETED';
   const drawerOpen = useInterviewStore((s) => s.drawerOpen);
   const sessionTokens = useInterviewStore((s) => s.sessionTokens);
   const uploading = useInterviewStore((s) => s.uploading);
@@ -123,7 +127,13 @@ export function InterviewPage() {
             })),
           );
         }
-        // 修复 2026-06-22：只展示 status=COMPLETED 的报告，避免 IN_PROGRESS
+        // 2026-06-23 修复：二次进入已结束面试时，禁用输入框 + 发送按钮。
+        // 之前 setReport 显示报告但没禁用消息输入，user 可继续发消息污染数据。
+        // 现在 setInterviewStatus 触发 isReadOnly 派生 → 输入区全禁用。
+        if (data?.status) {
+          setInterviewStatus(data.status);
+        }
+        // 只展示 status=COMPLETED 的报告，避免 IN_PROGRESS
         // interview 进入页面就显示报告（应继续聊天）。与后端 GET /:id 双层防御。
         if (data?.status === 'COMPLETED' && data?.report) {
           setReport(data.report);
@@ -139,7 +149,7 @@ export function InterviewPage() {
         console.error('加载失败:', err);
       }
     })();
-  }, [interviewId, setMessages, setReport, setResume, setResumeConfirmed]);
+  }, [interviewId, setMessages, setReport, setResume, setResumeConfirmed, setInterviewStatus]);
 
   // 把 scrollRef 和 pullRef 指向同一个节点
   useEffect(() => {
@@ -156,6 +166,11 @@ export function InterviewPage() {
   // ========== 业务逻辑 ==========
   const handleSend = async () => {
     if (!input.trim() || streaming || !interviewId) return;
+    // 2026-06-23 修复：已结束面试禁止发消息（双层防御，后端 message 端点也会拒绝）
+    if (isReadOnly) {
+      alert('此面试已结束，请返回首页查看报告');
+      return;
+    }
     if (!resumeConfirmed) {
       alert('请先确认简历信息后再开始面试');
       return;
@@ -179,8 +194,20 @@ export function InterviewPage() {
     if (!interviewId || ending) return;
     setEnding(true);
     setDrawerOpen(false);
+
+    // 2026-06-23 修复：加 AbortController + 60 秒超时，
+    // 避免后端 generateReport 卡住时 ending 永远 true。
+    // 同时记 interviewStatus='COMPLETED'，二次进入不会再发消息。
+    const controller = new AbortController();
+    const END_TIMEOUT_MS = 60_000;
+    const timeoutId = setTimeout(() => controller.abort(), END_TIMEOUT_MS);
+
     try {
-      const res = await fetch(`/api/interview/${interviewId}/end`, { method: 'POST' });
+      const res = await fetch(`/api/interview/${interviewId}/end`, {
+        method: 'POST',
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       const data = await safeJson(res);
       if (data?.deleted) {
         alert(data.reason === 'no_messages' ? '空面试已退出，不保存' : '已退出');
@@ -188,10 +215,16 @@ export function InterviewPage() {
         return;
       }
       setReport(data.report as Report);
-    } catch (err) {
-      alert('生成报告失败：' + err);
+      setInterviewStatus('COMPLETED'); // 标记已结束，二次进入会禁用输入
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        alert('生成报告超时（60 秒）。请检查后端 LLM 状态或重试。');
+      } else {
+        alert('生成报告失败：' + err);
+      }
     } finally {
-      setEnding(false);
+      setEnding(false); // finally 必执行，确保按钮 loading 切回
     }
   };
 
@@ -738,7 +771,16 @@ export function InterviewPage() {
               )}
 
               <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
-                {messages.length === 0 && (
+                {isReadOnly && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-sm text-amber-800">
+                    <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="font-medium">此面试已结束</div>
+                      <div className="text-xs text-amber-700 mt-0.5">报告已生成在左侧栏，消息输入已禁用。如需重新面试，请返回首页创建新面试。</div>
+                    </div>
+                  </div>
+                )}
+                {messages.length === 0 && !isReadOnly && (
                   <div className="text-center text-slate-400 py-12 md:py-20">
                     <Bot className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                     <p>开始你的第一句话吧～</p>
@@ -831,19 +873,21 @@ export function InterviewPage() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder={
-                    !resumeConfirmed
-                      ? '请先确认上方简历信息...'
-                      : resume
-                        ? '简历已上传，开始面试吧...'
-                        : '输入消息...'
+                    isReadOnly
+                      ? '此面试已结束...'
+                      : !resumeConfirmed
+                        ? '请先确认上方简历信息...'
+                        : resume
+                          ? '简历已上传，开始面试吧...'
+                          : '输入消息...'
                   }
                   rows={1}
-                  disabled={streaming || !resumeConfirmed}
+                  disabled={streaming || !resumeConfirmed || isReadOnly}
                   className="flex-1 px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none disabled:bg-slate-50 max-h-32"
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() || streaming || !resumeConfirmed}
+                  disabled={!input.trim() || streaming || !resumeConfirmed || isReadOnly}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-5 rounded-xl font-medium transition disabled:opacity-50 flex items-center gap-2 h-10 md:h-11"
                 >
                   {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

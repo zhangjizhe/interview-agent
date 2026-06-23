@@ -187,6 +187,15 @@ export class InterviewFlowController {
       return;
     }
 
+    // 2026-06-23 修复：双层防御 — 已完成面试禁止再发消息
+    // 前端 isReadOnly 已禁用 UI,但 API 层也要拒绝（防止直接 curl 绕过）
+    if (interview.status === 'COMPLETED') {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: '此面试已结束,不能继续发送消息' })}\n\n`);
+      (res as any).flush?.();
+      res.end();
+      return;
+    }
+
     await this.prisma.message.create({
       data: { interviewId, role: 'user', content: dto.content },
     });

@@ -74,6 +74,11 @@ interface InterviewState {
   error: string | null;
   setError: (e: string | null) => void;
 
+  // ========== 面试状态（控制是否可发消息）==========
+  // PENDING / IN_PROGRESS → 可发消息；COMPLETED → 只读
+  interviewStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'UNKNOWN';
+  setInterviewStatus: (s: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'UNKNOWN') => void;
+
   // ========== HITL 审批状态 ==========
   hitlPending: boolean;
   hitlScore: number | null;
@@ -105,6 +110,7 @@ const initialState = {
   streaming: false,
   reconnecting: false,
   error: null,
+  interviewStatus: 'UNKNOWN',
   hitlPending: false,
   hitlScore: null as number | null,
   hitlIssues: [] as string[],
@@ -202,6 +208,9 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   error: null,
   setError: (error) => set({ error }),
 
+  interviewStatus: 'UNKNOWN',
+  setInterviewStatus: (interviewStatus) => set({ interviewStatus }),
+
   setHitlPending: (pending, data) =>
     set({
       hitlPending: pending,
@@ -212,5 +221,5 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
 
   setHitlResuming: (hitlResuming) => set({ hitlResuming }),
 
-  reset: () => set(initialState),
+  reset: () => set({ ...initialState, interviewStatus: 'UNKNOWN' as const }),
 }));

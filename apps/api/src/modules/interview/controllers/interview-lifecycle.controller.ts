@@ -348,113 +348,149 @@ export class InterviewLifecycleController {
     if (interview.messages.length === 0) {
       await this.prisma.interview.delete({ where: { id: interviewId } });
       this.logger.log(`Deleted empty interview ${interviewId} (no messages)`);
-      return { deleted: true, reason: 'no messages' };
+      return { deleted: true, reason: 'no_messages' };
     }
 
+    // 2026-06-23 修复：try/catch/finally 兜底 status='COMPLETED' 写入
+    // 原 bug：generateReport → upsert report → memory.memorize → update status
+    // 若 generateReport 或 memory 抛错，status 仍是 IN_PROGRESS，
+    // 用户刷新页面看到 report=null + 聊天区 + textarea 可输入 → "二次进入还可点击"
+    // 现在：try 块跑核心流程，catch 兜底生成错误报告，finally 强制 status=COMPLETED
     const conversation: ChatMessage[] = interview.messages.map((m) => ({
       role: m.role as any,
       content: m.content,
     }));
-
-    const report = await this.agent.generateReport(
-      {
-        userId: interview.userId,
-        sessionId: interviewId,
-        position: interview.position,
-        level: interview.level,
-      },
-      conversation,
-    );
-
     const totalTokens = interview.messages.reduce(
       (sum, m) => sum + (m.promptTokens || 0) + (m.completionTokens || 0),
       0,
     );
-
-    const saved = await this.prisma.report.upsert({
-      where: { interviewId },
-      create: {
-        interviewId,
-        overallScore: report.overallScore,
-        scores: report.scores as any,
-        strengths: report.strengths.join('\n'),
-        weaknesses: report.weaknesses.join('\n'),
-        suggestions: report.suggestions.join('\n'),
-      },
-      update: {
-        overallScore: report.overallScore,
-        scores: report.scores as any,
-        strengths: report.strengths.join('\n'),
-        weaknesses: report.weaknesses.join('\n'),
-        suggestions: report.suggestions.join('\n'),
-      },
-    });
-
-    // ===== 结构化归档：工作记忆 + 会话摘要写入长期记忆 =====
-    const workingState = await this.memory.getWorkingState(interviewId);
-
-    // 构建候选人画像（结构化数据）
-    const user = await this.prisma.user.findUnique({ where: { id: interview.userId } });
-    const demoUserId = user?.email?.replace(/@demo\.local$/, '') || '';
-    const resumes = await this.resumeRag.searchByUser(demoUserId, 1).catch(() => []);
-    const resume = resumes[0] || null;
     const endedAt = new Date();
     const durationMs = endedAt.getTime() - interview.startedAt.getTime();
     const durationMin = Math.max(1, Math.round(durationMs / 60000));
-    const messageCount = interview.messages.length;
 
-    // 候选人画像 - 用于写入长期记忆
-    const candidateProfile = {
-      userId: interview.userId,
-      name: resume?.name || user?.name || '匿名',
-      position: interview.position,
-      level: interview.level,
-      skills: [...(workingState.coveredSkills || []), ...(resume?.skills || [])],
-      scoreHistory: workingState.scoreHistory || [],
-      overallScore: report.overallScore,
-      strengths: report.strengths,
-      weaknesses: report.weaknesses,
-      durationMin,
-      messageCount,
-      startedAt: interview.startedAt.toISOString(),
-      endedAt: endedAt.toISOString(),
-    };
+    let report: any;
+    let savedReport: any;
+    let workingState: any = { coveredSkills: [], scoreHistory: [] };
+    let user: any = null;
+    let resume: any = null;
 
-    // 将画像写入长期记忆（语义化存储）
     try {
-      const profileContent = JSON.stringify(candidateProfile, null, 2);
+      report = await this.agent.generateReport(
+        {
+          userId: interview.userId,
+          sessionId: interviewId,
+          position: interview.position,
+          level: interview.level,
+        },
+        conversation,
+      );
+
+      savedReport = await this.prisma.report.upsert({
+        where: { interviewId },
+        create: {
+          interviewId,
+          overallScore: report.overallScore,
+          scores: report.scores as any,
+          strengths: report.strengths.join('\n'),
+          weaknesses: report.weaknesses.join('\n'),
+          suggestions: report.suggestions.join('\n'),
+        },
+        update: {
+          overallScore: report.overallScore,
+          scores: report.scores as any,
+          strengths: report.strengths.join('\n'),
+          weaknesses: report.weaknesses.join('\n'),
+          suggestions: report.suggestions.join('\n'),
+        },
+      });
+
+      // 候选人画像构建（失败不阻塞 status 更新）
+      workingState = await this.memory.getWorkingState(interviewId);
+      user = await this.prisma.user.findUnique({ where: { id: interview.userId } });
+      const demoUserId = user?.email?.replace(/@demo\.local$/, '') || '';
+      const resumes = await this.resumeRag.searchByUser(demoUserId, 1).catch(() => []);
+      resume = resumes[0] || null;
+    } catch (err: any) {
+      // generateReport 失败：fallback 到"评估失败"占位 report，保证 status 仍能切到 COMPLETED
+      this.logger.error(`[end] report generation failed: ${err.message}, fallback to error report`);
+      report = {
+        overallScore: 0,
+        scores: { completeness: 0, correctness: 0, depth: 0 },
+        strengths: [],
+        weaknesses: [`生成报告失败：${err.message}`],
+        suggestions: ['请稍后重试或联系管理员'],
+      };
+      savedReport = await this.prisma.report.upsert({
+        where: { interviewId },
+        create: {
+          interviewId,
+          overallScore: 0,
+          scores: { error: err.message } as any,
+          strengths: '',
+          weaknesses: `生成报告失败：${err.message}`,
+          suggestions: '请稍后重试或联系管理员',
+        },
+        update: {
+          overallScore: 0,
+          scores: { error: err.message } as any,
+          strengths: '',
+          weaknesses: `生成报告失败：${err.message}`,
+          suggestions: '请稍后重试或联系管理员',
+        },
+      });
+    } finally {
+      // 无论 try/catch 结果如何，status 必须切到 COMPLETED
+      // 这是关键：保证二次进入看到 status='COMPLETED'，前端正确显示报告 + 禁用输入
+      await this.prisma.interview.update({
+        where: { id: interviewId },
+        data: {
+          status: 'COMPLETED',
+          endedAt,
+          summary: `总 token: ${totalTokens}, 得分: ${report?.overallScore ?? 0}`,
+        },
+      });
+      this.logger.log(`[end] interview ${interviewId} status=COMPLETED`);
+    }
+
+    // ===== 结构化归档：长期记忆（独立 try/catch，不影响主流程） =====
+    try {
+      const candidateProfile = {
+        userId: interview.userId,
+        name: resume?.name || user?.name || '匿名',
+        position: interview.position,
+        level: interview.level,
+        skills: [...(workingState.coveredSkills || []), ...(resume?.skills || [])],
+        scoreHistory: workingState.scoreHistory || [],
+        overallScore: report.overallScore,
+        strengths: report.strengths,
+        weaknesses: report.weaknesses,
+        durationMin,
+        messageCount: interview.messages.length,
+        startedAt: interview.startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+      };
       await this.memory.memorize(interview.userId, [
-        { role: 'system', content: `【候选人画像】\n${profileContent}` },
-        ...conversation.slice(-10), // 最后 10 条对话作为上下文
+        { role: 'system', content: `【候选人画像】\n${JSON.stringify(candidateProfile, null, 2)}` },
+        ...conversation.slice(-10),
       ]);
       this.logger.log(`Archived candidate profile for ${interview.userId}`);
     } catch (err: any) {
       this.logger.error(`Failed to archive candidate profile: ${err.message}`);
     }
 
-    // 更新面试状态
-    await this.prisma.interview.update({
-      where: { id: interviewId },
-      data: {
-        status: 'COMPLETED',
-        endedAt: endedAt,
-        summary: `总 token: ${totalTokens}, 得分: ${report.overallScore}`,
-      },
-    });
-
     return {
-      report: saved,
+      report: savedReport,
       ...report,
       totalTokens,
       candidate: {
-        userId: demoUserId,
+        userId: interview.userId,
         name: resume?.name || user?.name || '匿名',
         position: interview.position,
         level: interview.level,
         startedAt: interview.startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
         durationMin,
-        messageCount,
+        messageCount: interview.messages.length,
         resumeName: resume?.name || null,
         resumeSkills: resume?.skills || null,
         coveredSkills: workingState.coveredSkills || [],
