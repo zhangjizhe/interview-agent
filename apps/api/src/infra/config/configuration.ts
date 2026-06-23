@@ -103,6 +103,30 @@ export function parseSafeInt(value: string | undefined, fallback: number): numbe
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+/**
+ * URL 格式验证（启动时 fail-fast）
+ * 审查员 2026-06-23 反馈：避免连错数据库 / 错 LLM endpoint 运行时才发现
+ */
+function assertValidUrl(value: string | undefined, name: string, protocols: string[]): string {
+  // demo/dev 模式允许空值（用默认值），但商用模式必须有效
+  if (!value) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(`${name} must be set in production (商用环境必填)`);
+    }
+    return value as string;
+  }
+  try {
+    const u = new URL(value);
+    if (!protocols.includes(u.protocol)) {
+      throw new Error(`${name} protocol must be one of ${protocols.join('/')}, got "${u.protocol}"`);
+    }
+    return value;
+  } catch (err: any) {
+    if (err.message.includes('protocol must be')) throw err;
+    throw new Error(`${name} is not a valid URL: ${value} (${err.message})`);
+  }
+}
+
 export const configuration = (): AppConfig => {
   // R-P2-23 修复：商用未设 LLM API Key 启动时立即报错（fail-fast），
   // 而不是运行时 401/402 才暴露（fail-late）。demo 模式仍可用空 apiKey 启动。
@@ -114,6 +138,14 @@ export const configuration = (): AppConfig => {
     throw new Error(
       '商用环境必须显式设置 QWEN_API_KEY 或 DEEPSEEK_API_KEY（至少一个）',
     );
+  }
+
+  // 审查员 2026-06-23：URL 格式校验（包块语句避免 port: 被误解析为 label）
+  {
+    assertValidUrl(process.env.DATABASE_URL, 'DATABASE_URL', ['postgresql:', 'postgres:']);
+    assertValidUrl(process.env.REDIS_URL, 'REDIS_URL', ['redis:']);
+    assertValidUrl(process.env.QDRANT_URL, 'QDRANT_URL', ['http:', 'https:']);
+    assertValidUrl(process.env.MILVUS_URL, 'MILVUS_URL', ['http:', 'https:']);
   }
   return {
   port: parseSafeInt(process.env.PORT, 3001),
