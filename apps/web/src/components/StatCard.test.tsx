@@ -37,12 +37,13 @@ describe('StatCard', () => {
   });
 
   it('should validate StatCard props structure', () => {
+    // 测试 StatCard props 类型 — 用真实值匹配 StatCard 接受的类型
     const validProps = {
-      label: 'string',
-      value: 'string | number',
-      unit: 'string',
-      trend: 'string',
-      trendUp: 'boolean',
+      label: 'Token 使用量',
+      value: '1234',
+      unit: 'tokens',
+      trend: '+12%',
+      trendUp: true,
     };
 
     expect(typeof validProps.label).toBe('string');

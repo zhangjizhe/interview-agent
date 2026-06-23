@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:  # 手动触发，用于完整 E2E（含 Playwright）
 
 jobs:
   lint-and-test:
@@ -30,8 +31,102 @@ jobs:
       - name: Lint
         run: pnpm -r run lint --if-present
 
-      - name: Test
-        run: pnpm -r run test --if-present
+      - name: Test (API: Jest + node:test)
+        run: pnpm --filter @interview-agent/api test
+
+      - name: Test (Web: Vitest)
+        run: pnpm --filter @interview-agent/web test
 
       - name: Build
         run: pnpm -r run build
+
+  # Playwright 端到端测试（仅手动触发，需要 LLM API key + docker）
+  # 设计说明：
+  # - 需要 QWEN_API_KEY secrets（真实 LLM 调用）
+  # - 需要 docker compose up 起基础设施（postgres/redis/qdrant/milvus/api/web）
+  # - 跑 ~2 分钟（包含 SSE 流式 + end 流程）
+  # - 上传截图到 artifacts 便于排查
+  # - 默认跳过（仅 workflow_dispatch 触发），节省 CI 时间
+  e2e-playwright:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Playwright browser
+        run: |
+          pnpm --filter @interview-agent/web exec playwright install chromium --with-deps
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup .env (from secrets)
+        run: |
+          cat > .env <<EOF
+          POSTGRES_USER=dev
+          POSTGRES_PASSWORD=dev123
+          POSTGRES_DB=interview
+          DATABASE_URL=postgresql://dev:dev123@postgres:5432/interview
+          REDIS_URL=redis://redis:6379
+          REDIS_SESSION_TTL=3600
+          QDRANT_URL=http://qdrant:6333
+          MILVUS_URL=http://milvus:19530
+          QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+          QWEN_MODEL=qwen-plus
+          QWEN_API_KEY=${{ secrets.QWEN_API_KEY }}
+          DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+          DEEPSEEK_MODEL=deepseek-chat
+          DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY || '' }}
+          PORT=3001
+          CORS_ORIGIN=http://localhost:5173
+          NODE_ENV=test
+          EOF
+
+      - name: Start infrastructure (postgres/redis/qdrant/milvus)
+        run: |
+          docker compose up -d postgres redis qdrant milvus milvus-etcd
+          # 等 healthy
+          for i in $(seq 1 60); do
+            if docker compose ps | grep -q "Up.*healthy"; then
+              echo "✅ Infrastructure ready"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Build + Start API + Web
+        run: |
+          pnpm --filter @interview-agent/api prisma generate
+          pnpm --filter @interview-agent/api prisma migrate deploy
+          docker compose up -d --build api web
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:3001/health | grep -q "ok"; then
+              echo "✅ API ready"
+              break
+            fi
+            sleep 5
+          done
+          curl -s http://localhost:5173 | head -5
+
+      - name: Run Playwright E2E
+        run: pnpm --filter @interview-agent/web e2e
+        env:
+          CHROME_PATH: ''  # 用 playwright 自带的 chromium
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: apps/web/e2e/screenshots/
+          retention-days: 7

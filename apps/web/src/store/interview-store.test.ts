@@ -157,40 +157,38 @@ describe('useInterviewStore - Token Streaming', () => {
 
   describe('forceRender - 渲染触发器', () => {
     it('forceRender 递增 _renderCount', () => {
-      const store = useInterviewStore.getState();
-      const initialCount = store._renderCount;
+      const initialCount = useInterviewStore.getState()._renderCount;
 
-      store.forceRender();
-      expect(store._renderCount).toBe(initialCount + 1);
+      useInterviewStore.getState().forceRender();
+      // zustand set() 是 sync 但 store snapshot 是旧引用，必须重新 getState()
+      expect(useInterviewStore.getState()._renderCount).toBe(initialCount + 1);
 
-      store.forceRender();
-      expect(store._renderCount).toBe(initialCount + 2);
+      useInterviewStore.getState().forceRender();
+      expect(useInterviewStore.getState()._renderCount).toBe(initialCount + 2);
     });
   });
 
   describe('streaming 状态', () => {
     it('setStreaming 设置流式状态', () => {
-      const store = useInterviewStore.getState();
-      expect(store.streaming).toBe(false);
+      expect(useInterviewStore.getState().streaming).toBe(false);
 
-      store.setStreaming(true);
-      expect(store.streaming).toBe(true);
+      useInterviewStore.getState().setStreaming(true);
+      expect(useInterviewStore.getState().streaming).toBe(true);
 
-      store.setStreaming(false);
-      expect(store.streaming).toBe(false);
+      useInterviewStore.getState().setStreaming(false);
+      expect(useInterviewStore.getState().streaming).toBe(false);
     });
   });
 
   describe('error 处理', () => {
     it('setError 设置错误信息', () => {
-      const store = useInterviewStore.getState();
-      expect(store.error).toBeNull();
+      expect(useInterviewStore.getState().error).toBeNull();
 
-      store.setError('Network error');
-      expect(store.error).toBe('Network error');
+      useInterviewStore.getState().setError('Network error');
+      expect(useInterviewStore.getState().error).toBe('Network error');
 
-      store.setError(null);
-      expect(store.error).toBeNull();
+      useInterviewStore.getState().setError(null);
+      expect(useInterviewStore.getState().error).toBeNull();
     });
   });
 });
