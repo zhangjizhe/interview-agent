@@ -15,7 +15,11 @@ import { ExternalMcpLoader } from '../modules/mcp/external-mcp-loader';
 import { McpRegistry } from '../modules/interview/services/mcp-registry';
 import { McpClient } from '../modules/interview/services/mcp-client';
 
-// ===== Mock McpClient（避免真实网络 / 进程连接）=====
+// ===== Mock 链污染隔离 =====
+// mcp-client.ts import @modelcontextprotocol/sdk/client/streamableHttp.js，
+// 顶层触发 pkce-challenge native ESM → ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING_FLAG
+// jest 自动 hoist 到顶部，在 mcp-client.ts import 前替换
+jest.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({}));
 jest.mock('../modules/interview/services/mcp-client');
 
 const MockedMcpClient = McpClient as jest.MockedClass<typeof McpClient>;
