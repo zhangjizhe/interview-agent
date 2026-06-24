@@ -1,0 +1,43 @@
+# AI Agent / LLM / RAG / Memory stack（与 NestJS 版对齐）
+langchain==0.3.27
+langgraph==0.5.4
+langgraph-checkpoint-postgres==2.0.0
+langchain-openai==0.3.10
+langchain-community==0.3.27
+mem0ai==0.1.73
+pymilvus==2.6.4
+redis==5.2.1
+psycopg2-binary==2.9.10
+sqlalchemy==2.0.36
+alembic==1.14.0
+
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.5
+pydantic-settings==2.7.1
+python-multipart==0.0.20
+
+# MCP
+mcp==1.9.0
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Observability
+langfuse==2.59.7
+structlog==25.1.0
+
+# Utilities
+httpx==0.28.1
+tenacity==9.0.0
+python-dotenv==1.0.1
+pyyaml==6.0.2
+
+# Dev / Test
+pytest==8.3.4
+pytest-asyncio==0.25.0
+pytest-cov==6.0.0
+mypy==1.14.0
+ruff==0.8.4
