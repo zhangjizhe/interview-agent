@@ -66,6 +66,7 @@ async function main() {
   await page.addInitScript(() => {
     window.__sseEvents = [];
     window.__sseDoneSeen = false;
+    window.__sseFirstEventAt = null;  // TTFT 锚点
     const origFetch = window.fetch;
     window.fetch = async function(...args) {
       const resp = await origFetch.apply(this, args);
@@ -86,9 +87,11 @@ async function main() {
               if (!line.startsWith('data:')) continue;
               const data = line.slice(5).trim();
               if (!data) continue;
-              let info = { raw: data.slice(0, 60), type: 'unknown' };
-              if (data === '[DONE]') info = { raw: '[DONE]', type: '[DONE]' };
-              else { try { const e = JSON.parse(data); info = { raw: data.slice(0, 60), type: e.type, content: (e.content || '').slice(0, 30), error: e.error }; } catch {} }
+              const now = Date.now();
+              if (!window.__sseFirstEventAt) window.__sseFirstEventAt = now;
+              let info = { raw: data.slice(0, 60), type: 'unknown', t: now };
+              if (data === '[DONE]') info = { raw: '[DONE]', type: '[DONE]', t: now };
+              else { try { const e = JSON.parse(data); info = { raw: data.slice(0, 60), type: e.type, content: (e.content || '').slice(0, 30), error: e.error, t: now }; } catch {} }
               window.__sseEvents.push(info);
               if (data === '[DONE]') window.__sseDoneSeen = true;
             }
@@ -161,10 +164,20 @@ async function main() {
   const eventsBeforeReload = await page.evaluate(() => {
     const events = window.__sseEvents || [];
     const byType = {};
-    for (const e of events) byType[e.type] = (byType[e.type] || 0) + 1;
-    return { count: events.length, byType };
+    let firstTokenAt = null;
+    for (const e of events) {
+      byType[e.type] = (byType[e.type] || 0) + 1;
+      // 首字节 = 第一个 SSE event 到达客户端的时间
+      if (e.type === 'token' && firstTokenAt === null) firstTokenAt = e.t;
+    }
+    return { count: events.length, byType, firstEventAt: window.__sseFirstEventAt, firstTokenAt };
   });
+  // TTFT：首字节（第一个 SSE event）从 click 到客户端到达的延迟
+  const ttftMs = eventsBeforeReload.firstEventAt ? eventsBeforeReload.firstEventAt - sendTs : null;
+  // First token latency：第一个 token event（不是 thinking/recalling/meta）
+  const firstTokenMs = eventsBeforeReload.firstTokenAt ? eventsBeforeReload.firstTokenAt - sendTs : null;
   console.log(`  [debug] events before reload: count=${eventsBeforeReload.count}, byType=${JSON.stringify(eventsBeforeReload.byType)}`);
+  console.log(`  [perf] TTFT (first SSE event): ${ttftMs !== null ? ttftMs + 'ms' : 'n/a'}, First token latency: ${firstTokenMs !== null ? firstTokenMs + 'ms' : 'n/a'}, Total: ${doneAt}s`);
   await sleep(2000);
 
   // ===== 阶段 3：loading 切回 =====
