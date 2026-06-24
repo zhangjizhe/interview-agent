@@ -183,11 +183,15 @@ async function main() {
 
   // ===== 阶段 4：SSE 事件序列验证 =====
   console.log('\n[4/5] Verify SSE event sequence');
-  // 等待 events 累积到至少 5 个（避免 LLM 流式启动时序问题）
+  // 等 token 事件出现，最多 30 秒（LLM cold-start 可能慢）
+  // 同时也等 [DONE] 出现，确保流真的走完
   let events = [];
-  for (let i = 0; i < 20; i++) {
+  let tokenSeen = false;
+  for (let i = 0; i < 60; i++) {
     events = await page.evaluate(() => window.__sseEvents || []);
-    if (events.length >= 5) break;
+    tokenSeen = events.some(e => e.type === 'token');
+    const doneSeen = events.some(e => e.type === '[DONE]' || e.type === 'done');
+    if (tokenSeen && doneSeen) break;
     await sleep(500);
   }
   const byType = {};
