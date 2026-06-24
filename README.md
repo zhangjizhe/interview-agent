@@ -37,11 +37,7 @@
 | R4 unrelated | 0/10 = 0.0% | 全 miss（无误判） |
 | R5 edge | 5/10 = 50.0% | 同主题前 5 命中，后 5 实际无关正确 miss |
 
-> **诚实标注**：
-> - 之前 README 写"100% (2/2)"是单点测量误导，已被本次 50 轮实测取代。
-> - **真正可信指标是 Recall（92%）和 FPR（0%）**：召回高、误判零，说明阈值 0.92 在"语义去重"场景是合适的。
-> - 2 个 FN（paraphrase-8/9）是 Qwen embedding 模型对同义但表述差异大的 query 判定相似度 < 0.92，不是阈值配置问题。
-> - 实测脚本：`scripts/bench-cache-50.ts` · 详细 JSON 报告：`apps/api/src/evals/reports/cache-bench-50rounds-*.json`
+> **诚实标注**：真正可信指标是 **Recall 92%** 和 **FPR 0%**——召回高、误判零，说明阈值 0.92 在"语义去重"场景是合适的。2 个 FN（paraphrase-8/9）是 Qwen embedding 对同义但表述差异大的 query 判定相似度 < 0.92，不是阈值配置问题。
 
 ### 50 轮 LLM 调用 A/B 实测（2026-06-21 · 上一次）
 
@@ -73,12 +69,7 @@
 | **Semantic Cache 命中率** | — | **117/156 = 75%** | 累计 session_costs |
 | **Cache 节省 tokens** | — | **19,200**（单 bench interview） | cacheSavedTokens 累计 |
 
-> ⚠️ **诚实标注（2026-06-24 实测数据）**：
-> - **token / cost 来源**：`session_costs` 表（`docker exec interview-postgres psql -U dev -d interview -c "SELECT ..."`），不是估算或 mock。
-> - **总数据**：41 interview（25 with report）/ 179 LLM calls / 105,549 tokens / ¥0.33 / 8 fallbacks / 9 errors / 2 retries。
-> - **TTFT 来源**：e2e streaming-flow 4 次实测（commit `16e65c8` spec 加了 timestamp + firstEventAt 锚点）。
-> - **Cache 命中率**：Semantic 75%（生产高频重复触发）/ Prompt 66%（bench interview 因为高重复 prompt）+ 0%（其他真实场景，Qwen dashscope 不识别 `prompt_cache_key` 是 Provider 硬限制）。
-> - **README 之前数字**（869 tokens / 576,407 tokens / 100% cache / 2 calls）是早期单点测量误导，已被本次 DB 累计实测取代。
+> ⚠️ **诚实标注**：数据来源 `session_costs` 表（Prisma 实测，非估算/mock）。Cache 命中率**分场景**：Semantic 75%（生产高频重复触发）/ Prompt Cache bench interview 66%（高重复 prompt）/ 其他真实场景 0%（Qwen dashscope 不识别 `prompt_cache_key` 是 Provider 硬限制，工程链路完整但底层不支持）。
 
 ---
 
