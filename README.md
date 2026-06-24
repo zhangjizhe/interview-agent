@@ -56,7 +56,7 @@
 ### A/B 对照 · 真实测量（3 组，50 轮）
 
 <p align="center">
-  <img src="./docs/assets/cost-baseline.png" alt="LLM Inference Benchmark · v10 · 每项独立卡片" width="100%">
+  <img src="./docs/assets/cost-baseline.png" alt="LLM Inference Benchmark · v11 · 41 interview 累计 · 每项独立卡片" width="900">
 </p>
 
 | 指标 | 对照组（直接调 Qwen）| 实验组（multi-agent + cache）| 实测节省 |
@@ -685,7 +685,7 @@ curl -X POST "http://localhost:3001/api/knowledge-base/benchmark?limit=5&thresho
 ### Cost & Fallback 基准（50 轮真实 LLM）
 
 <p align="center">
-  <img src="./docs/assets/cost-baseline.png" alt="Cost & Fallback 基准 · v10 · 50 轮真实 LLM 实测 · 每项独立卡片" width="900">
+  <img src="./docs/assets/cost-baseline.png" alt="Cost & Fallback 基准 · v11 · 41 interview 累计 · 每项独立卡片" width="900">
 </p>
 
 ---
