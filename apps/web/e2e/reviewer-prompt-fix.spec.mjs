@@ -49,6 +49,39 @@ async function main() {
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
   const page = await ctx.newPage();
 
+  // 2026-06-24 修复：注入 SSE 抓包 hook（之前漏装，[DONE] 检测永远 false）
+  // 用 [DONE] in raw data 判断，per-round 重置（避免 R1 DONE 残留误判 R2）
+  await page.addInitScript(() => {
+    window.__sseEvents = [];
+    window.__sseDoneSeen = false;
+    window.__sseEventCount = 0;
+    const origFetch = window.fetch;
+    window.fetch = async function(...args) {
+      const resp = await origFetch.apply(this, args);
+      const url = typeof args[0] === 'string' ? args[0] : args[0].url;
+      if (url && url.includes('/message')) {
+        // 新一轮：清空上一轮的 [DONE] 标志
+        window.__sseDoneSeen = false;
+        const clone = resp.clone();
+        const reader = clone.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        (async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            window.__sseEventCount++;
+            window.__sseEvents.push(buf);
+            if (buf.includes('[DONE]')) window.__sseDoneSeen = true;
+            buf = '';
+          }
+        })();
+      }
+      return resp;
+    };
+  });
+
   let pass = 0, fail = 0;
   const ok = (label, cond, detail) => {
     if (cond) { console.log(`  ✅ ${label}${detail ? ` — ${detail}` : ''}`); pass++; }
@@ -107,14 +140,14 @@ async function main() {
     const sendTs = Date.now();
     await sendBtn.click({ force: true });
 
-    // 等 [DONE]
+    // 等 [DONE]（用 [DONE] in raw data 判断，避开 R1 DONE 残留坑）
     for (let i = 0; i < 90; i++) {
       await sleep(1000);
-      const done = await page.evaluate(() => {
-        const msgs = window.__sseEvents || [];
-        return msgs.some(e => e.type === '[DONE]' || e.type === 'done');
-      });
-      if (done) break;
+      const done = await page.evaluate(() => window.__sseDoneSeen);
+      if (done) {
+        console.log(`  [debug] R${round.name} done seen at i=${i}, total events received`);
+        break;
+      }
     }
     const elapsed = Math.round((Date.now() - sendTs) / 1000);
     await sleep(2000);
