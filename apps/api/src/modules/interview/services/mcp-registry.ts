@@ -57,7 +57,7 @@ interface RegistryEntry {
   url?: string;
   env?: Record<string, string>;
   pid?: number;
-  status: 'running' | 'stopped' | 'error' | 'builtin';
+  status: 'running' | 'stopped' | 'error' | 'builtin' | 'unknown';
   lastHealthCheck?: Date;
   errorMessage?: string;
   systemOverride?: boolean;
@@ -262,7 +262,16 @@ class McpRegistryClass {
   }
 
   /**
-   * 健康检查占位：builtin 工具永远 running；stdio/http 留 hook
+   * 健康检查：builtin 工具永远 running；stdio 用 service-level connect；streamable-http 用 TCP 端口探测
+   *
+   * 2026-06-24 升级：补全 streamable-http 健康检查（之前是占位 "not implemented"）。
+   * 实现策略：TCP 端口可达性探测（最稳，比 HTTP HEAD 简单且不依赖 server 响应 HEAD）。
+   * 不发 MCP initialize 消息——那是 service 层异步启动时做（listTools 失败会触发重连）。
+   *
+   * 适用场景：
+   * - builtin: 永远 ok（无外部依赖）
+   * - streamable-http: TCP 端口探测（github_official 走 SaaS endpoint / 自托管 supergateway 都适用）
+   * - stdio: 返回 unknown（不报错），service 层异步 connect 失败会在 listTools 抛错
    */
   async healthCheck(name: string): Promise<{ ok: boolean; latencyMs: number; error?: string }> {
     const e = this.entries.get(name);
@@ -274,16 +283,55 @@ class McpRegistryClass {
         e.lastHealthCheck = new Date();
         return { ok: true, latencyMs: Date.now() - start };
       }
-      // stdio/http 健康检查留 hook（未来可加 ping 进程 / HTTP HEAD）
-      e.status = 'stopped';
+      // streamable-http：TCP 端口探测
+      let host: string | null = null;
+      let port: number | null = null;
+      if (e.transport === 'streamable-http' && e.url) {
+        const u = new URL(e.url);
+        host = u.hostname;
+        port = parseInt(u.port || (u.protocol === 'https:' ? '443' : '80'), 10);
+      }
+      if (host && port) {
+        const ok = await this.tcpProbe(host, port, 2000);
+        e.status = ok ? 'running' : 'error';
+        e.lastHealthCheck = new Date();
+        if (!ok) e.errorMessage = `TCP probe failed: ${host}:${port}`;
+        return { ok, latencyMs: Date.now() - start, error: ok ? undefined : e.errorMessage };
+      }
+      // stdio 或未配置 URL 的：返回 unknown（不报错，service 层负责真实 connect）
+      e.status = 'unknown';
       e.lastHealthCheck = new Date();
-      return { ok: false, latencyMs: Date.now() - start, error: 'health check not implemented for non-builtin yet' };
+      return { ok: true, latencyMs: Date.now() - start, error: 'stdio probe not implemented (use service-level connect)' };
     } catch (err: any) {
       e.status = 'error';
       e.errorMessage = err.message;
       e.lastHealthCheck = new Date();
       return { ok: false, latencyMs: Date.now() - start, error: err.message };
     }
+  }
+
+  /**
+   * TCP 端口可达性探测（用于 streamable-http MCP server 健康检查）
+   * 不发 HTTP 请求，只检测 TCP listen 状态。比 HEAD 请求简单且不依赖 server 响应 HEAD。
+   * 超时 2 秒（默认参数），探测失败返回 false（不抛）。
+   */
+  private async tcpProbe(host: string, port: number, timeoutMs: number): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      const net = require('net');
+      const socket = new net.Socket();
+      let settled = false;
+      const done = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        socket.destroy();
+        resolve(ok);
+      };
+      socket.setTimeout(timeoutMs);
+      socket.once('connect', () => done(true));
+      socket.once('timeout', () => done(false));
+      socket.once('error', () => done(false));
+      socket.connect(port, host);
+    });
   }
 }
 
