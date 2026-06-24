@@ -293,9 +293,31 @@ stub 决策缓存（LRU 1000 条，64-bit djb2 hash）保护 Prompt Prefix Cache
 
 ## 产品截图
 
+### ① 3 层系统架构
+
 <p align="center">
-  <img src="./docs/assets/product-showcase.png" alt="产品截图合集 · 架构 + 对话 + 报告 + Langfuse" width="100%">
+  <img src="./docs/assets/_arch.png" alt="3 层系统架构 · 前端 SPA · NestJS + LangGraph · 10 容器 + 双模型" width="100%">
 </p>
+
+### ② 面试对话 UI（流式输出）
+
+<p align="center">
+  <img src="./docs/assets/_interview.png" alt="面试对话 UI · 流式 token 输出 + 4 级水位线上下文压缩" width="100%">
+</p>
+
+### ③ 面试报告（综合评分 + 技能雷达）
+
+<p align="center">
+  <img src="./docs/assets/_report.png" alt="面试报告 · 综合评分 + 技能雷达 + 改进建议" width="100%">
+</p>
+
+### ④ Langfuse 可观测面板（LLM trace 日志）
+
+<p align="center">
+  <img src="./docs/assets/_langfuse.png" alt="Langfuse 可观测面板 · LLM trace 日志 · 三层确定性采样" width="100%">
+</p>
+
+> 💡 每张子图独立文件，方便在简历 / 邮件 / 文档中单独引用（不再依赖大图 product-showcase.png）。
 
 | 子图 | 内容 | 数据源 |
 |---|---|---|
