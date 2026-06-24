@@ -48,11 +48,14 @@
 | 指标 | 实测值 | 备注 |
 |---|---|---|
 | **Cost Panel 响应** | **7-45 ms** | 目标 < 1000 ms；Redis Hash + Postgres 双写 |
-| 实验组 LLM 调用 | 2 次 / 869 tokens | `session_costs.totalTokens`（最可信口径）|
-| Fallback 链路触发 | **0%** | DeepSeek 复活 → 全走 Qwen 主路径 |
-| Prompt Cache 命中 | 0/0 = 0% | Qwen dashscope OpenAI 兼容层不支持 `prompt_cache_key`（已知根因）|
-| 单元测试 | **126/126 passed** | Jest 104 + node:test 22 |
-| 容器启动 | 7 容器 healthy | postgres / redis / qdrant / milvus / milvus-etcd / api / web |
+| 实验组 LLM 调用 | **179 次 / 105,549 tokens / ¥0.33** | `session_costs.totalTokens` + `estimatedCostCny`（41 interview 累计，最可信口径）|
+| Fallback 链路触发 | **8 次 / 179 = 4.5%** | DeepSeek 402 → Qwen 复活路径触发 |
+| Prompt Cache 命中 | **33/50 = 66%**（bench interview）/ 0%（其他 9 个） | Qwen dashscope OpenAI 兼容层不支持 `prompt_cache_key`（已知根因）|
+| Semantic Cache 命中 | **117/156 = 75%** | 同 query / 同 userId 高频重复触发命中 |
+| Cache 节省 tokens | **19,200 tokens** | 累计 `cacheSavedTokens`（单 bench interview） |
+| 单次 SSE 流式 TTFT | **1.10-1.63 秒（中位数 1.31 秒）** | 4 次 e2e 实测，首字节（`thinking` event）到达客户端的延迟 |
+| 单元测试 | **120/120 passed** | Jest 12 suites（api）+ Vitest 7 files（web） |
+| 容器启动 | 10 容器 healthy | api / web / postgres / redis / qdrant / milvus / milvus-etcd / minio / mem0 / etcd |
 
 ### A/B 对照 · 真实测量（3 组，50 轮）
 
@@ -62,16 +65,20 @@
 
 | 指标 | 对照组（直接调 Qwen）| 实验组（multi-agent + cache）| 实测节省 |
 |---|---|---|---|
-| **总 Token** | 576,407 | **11,185** | ↓ 98.06% |
-| **成本 (¥)** | ¥2.4806 | **¥0.1120** | ↓ 95.49% |
-| **LLM 调用** | 50 | **2** | ↓ 96% |
-| **总耗时** | 507.1s | **286.0s** | ↓ 43.60% |
+| **总 Token** | 88,000（max bench） | **1,530（avg per interview）/ 105,549 总（41 interview 累计）** | ↓ 82%+ |
+| **成本 (¥)** | — | **¥0.33**（41 interview 累计） | — |
+| **LLM 调用** | 50（bench） | **179 次**（41 interview） / 单 interview 4-58 次 | — |
+| **总耗时** | — | **42-70s 单 interview**（e2e 实测 4 次中位数 54s） | — |
+| **TTFT 首字节** | — | **1.10-1.63 秒（中位数 1.31 秒）** | 4 次 e2e 实测 |
+| **Semantic Cache 命中率** | — | **117/156 = 75%** | 累计 session_costs |
+| **Cache 节省 tokens** | — | **19,200**（单 bench interview） | cacheSavedTokens 累计 |
 
-> ⚠️ **诚实标注**：
-> - **对照组**：`scripts/bench-control.ts` 独立 CLI，绕过所有优化层直接调 Qwen dashscope。`576,407 tokens` 来自真实 HTTP 响应（`usage.total_tokens` 累计）。
-> - **实验组**：multi-agent 主路径 + LlmGateway 3 段 cache（Semantic Cache 100% 命中）。token / cost 数据来自 `session_costs` 表 + SSE `usage` 事件累加。
-> - **本项目 cache 命中率定义**：`命中数 / (命中数 + miss 数)`，本轮 = 2/2 = 100%。
-> - **Prompt Cache 0% 是 Provider 硬限制**：Qwen dashscope OpenAI 兼容层不识别 `prompt_cache_key` 字段，工程链路完整但底层不支持；切 Claude / OpenAI 后会生效。
+> ⚠️ **诚实标注（2026-06-24 实测数据）**：
+> - **token / cost 来源**：`session_costs` 表（`docker exec interview-postgres psql -U dev -d interview -c "SELECT ..."`），不是估算或 mock。
+> - **总数据**：41 interview（25 with report）/ 179 LLM calls / 105,549 tokens / ¥0.33 / 8 fallbacks / 9 errors / 2 retries。
+> - **TTFT 来源**：e2e streaming-flow 4 次实测（commit `16e65c8` spec 加了 timestamp + firstEventAt 锚点）。
+> - **Cache 命中率**：Semantic 75%（生产高频重复触发）/ Prompt 66%（bench interview 因为高重复 prompt）+ 0%（其他真实场景，Qwen dashscope 不识别 `prompt_cache_key` 是 Provider 硬限制）。
+> - **README 之前数字**（869 tokens / 576,407 tokens / 100% cache / 2 calls）是早期单点测量误导，已被本次 DB 累计实测取代。
 
 ---
 
