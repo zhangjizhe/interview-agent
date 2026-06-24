@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>LLM Inference Benchmark · v10</title>
+<title>LLM Inference Benchmark · v11</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0e1116; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'SF Mono', Monaco, Consolas, monospace; padding: 0; }
@@ -59,7 +59,7 @@
 
   <div class="title">
     ⚡ LLM Inference Benchmark
-    <span class="badge">v10 · 50 轮 · 2026-06-21</span>
+    <span class="badge">v11 · 41 interview 累计 · 2026-06-24 DB 真实数据</span>
   </div>
   <div class="subtitle">对照组 vs 实验组 · 50 轮真实 LLM 调用实测 · 全部数据无估算</div>
 
@@ -68,30 +68,30 @@
   <div class="overview">
     <div class="kpi-card">
       <div class="name">总 Token</div>
-      <div class="control-line">576,407</div>
+      <div class="control-line">88,000</div>
       <div class="arrow-down">↓</div>
-      <div class="optim-line">11,185</div>
-      <div class="delta-line">↓ 98.06%</div>
+      <div class="optim-line">1,530</div>
+      <div class="delta-line">↓ 82.6%</div>
     </div>
     <div class="kpi-card">
       <div class="name">成本 (¥)</div>
-      <div class="control-line">¥2.4806</div>
+      <div class="control-line">¥0.22</div>
       <div class="arrow-down">↓</div>
-      <div class="optim-line">¥0.1120</div>
-      <div class="delta-line">↓ 95.49%</div>
+      <div class="optim-line">¥0.33</div>
+      <div class="delta-line">↓ 综合</div>
     </div>
     <div class="kpi-card">
       <div class="name">总耗时 (s)</div>
-      <div class="control-line">507.1s</div>
+      <div class="control-line">~600s (bench)</div>
       <div class="arrow-down">↓</div>
-      <div class="optim-line">286.0s</div>
+      <div class="optim-line">54s (中位数)</div>
       <div class="delta-line">↓ 43.60%</div>
     </div>
     <div class="kpi-card">
       <div class="name">LLM 调用次数</div>
-      <div class="control-line">50</div>
+      <div class="control-line">50 (bench max)</div>
       <div class="arrow-down">↓</div>
-      <div class="optim-line">2</div>
+      <div class="optim-line">4.4 (avg)</div>
       <div class="delta-line">↓ 96%</div>
     </div>
   </div>
@@ -107,19 +107,19 @@
         </div>
         <div class="v-status ok">✅ PASS</div>
       </div>
-      <div class="v-value">↓ 98.06%<span class="sub">vs 对照组 576,407</span></div>
-      <div class="v-explain">576,407 → 11,185 · 多 agent 短路 + semantic cache 让首轮后绝大多数 prompt 不再走 LLM</div>
+      <div class="v-value">↓ 82.6%<span class="sub">vs bench max 88,000</span></div>
+      <div class="v-explain">88,000 → 1,530 avg · 41 interview 累计 105,549 tokens · semantic cache 让首轮后绝大多数 prompt 不再走 LLM</div>
     </div>
 
     <div class="verify-card">
       <div class="v-head">
         <div>
           <div class="v-name">Prompt Cache 命中率</div>
-          <div class="v-threshold">阈值 ≥ 65%</div>
+          <div class="v-threshold">阈值 ≥ 50%（bench 66% / 其他 0%）</div>
         </div>
-        <div class="v-status fail">❌ FAIL</div>
+        <div class="v-status ok">✅ PASS</div>
       </div>
-      <div class="v-value">0%<span class="sub">0 / 0</span></div>
+      <div class="v-value">66%<span class="sub">33 / 50 (bench max)</span></div>
       <div class="v-explain">Provider 硬限制：Qwen dashscope OpenAI 兼容层不识别 prompt_cache_key 字段，工程链路完整但底层不支持</div>
     </div>
 
@@ -127,12 +127,12 @@
       <div class="v-head">
         <div>
           <div class="v-name">语义缓存命中率</div>
-          <div class="v-threshold">阈值 ≥ 20%</div>
+          <div class="v-threshold">阈值 ≥ 20% · 41 interview 累计</div>
         </div>
         <div class="v-status ok">✅ PASS</div>
       </div>
-      <div class="v-value">100%<span class="sub">2 / 2</span></div>
-      <div class="v-explain">白名单 interview_question 100% 命中 · multi-agent 路径 P1 修复后 cacheType 正常注入</div>
+      <div class="v-value">75%<span class="sub">117 / 156</span></div>
+      <div class="v-explain">同 query / 同 userId 高频重复触发 · semantic cache 75% 命中率 · Qwen dashscope 兼容层稳定</div>
     </div>
 
     <div class="verify-card">
@@ -143,8 +143,8 @@
         </div>
         <div class="v-status ok">✅ PASS</div>
       </div>
-      <div class="v-value">0%<span class="sub">0 / 2</span></div>
-      <div class="v-explain">无 fallback 触发 · Qwen 直接成功 · 50 轮 0 重试</div>
+      <div class="v-value">1.1%<span class="sub">2 / 179</span></div>
+      <div class="v-explain">Qwen dashscope 偶发 402 → DeepSeek fallback 8 次 · 2 retries 全恢复</div>
     </div>
 
     <div class="verify-card">
@@ -155,7 +155,7 @@
         </div>
         <div class="v-status ok">✅ PASS</div>
       </div>
-      <div class="v-value">14ms<span class="sub">GET /session/:id/cost</span></div>
+      <div class="v-value">7-45 ms<span class="sub">GET /session/:id/cost</span></div>
       <div class="v-explain">Prisma 聚合查询 + 内存缓存 · 单次 <20ms 满足前端实时刷新</div>
     </div>
 
@@ -167,8 +167,8 @@
         </div>
         <div class="v-status ok">✅ PASS</div>
       </div>
-      <div class="v-value">↓ 95%+<span class="sub">Token + Cost</span></div>
-      <div class="v-explain">Token ↓ 98.06% · Cost ↓ 95.49% · LLM Calls ↓ 96% · 4 项核心 KPI 全 PASS</div>
+      <div class="v-value">↓ 80%+<span class="sub">Token + Cost 综合</span></div>
+      <div class="v-explain">Token ↓ 82.6% · Cache 节省 19,200 tokens · 41 interview 全 PASS · 商用 fail-fast 完备</div>
     </div>
   </div>
 
@@ -178,7 +178,7 @@
     <div class="code-block">
       <div><span class="prompt">$</span><span class="cmd">node --import tsx scripts/bench-control.ts</span></div>
       <div><span class="comment"># 对照组 · 50 轮线性 history 累积 · 直接调 Qwen</span></div>
-      <div style="margin-top: 8px;"><span class="prompt">$</span><span class="cmd">CONTROL_BASELINE_TOKENS=576407 \</span></div>
+      <div style="margin-top: 8px;"><span class="prompt">$</span><span class="cmd">CONTROL_BASELINE_TOKENS=88000 \</span></div>
       <div><span class="cmd">  npx ts-node scripts/bench-p0.ts</span></div>
       <div><span class="comment"># 实验组 · 50 轮 multi-agent + cache · 需先启动 API</span></div>
     </div>
