@@ -93,7 +93,7 @@ describe('DynamicTaskQueueService Follow-up Generation', () => {
         feedback: '回答不够深入',
       };
 
-      await service.completeTask('session-1', 'task-1', 'Hooks是React的一些函数');
+      await service.completeTask('session-1', 'user-1', 'task-1', 'Hooks是React的一些函数');
 
       // 验证 answerHistory 被创建
       expect(prisma.answerHistory.create).toHaveBeenCalled();

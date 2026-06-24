@@ -65,6 +65,14 @@ export class SessionCostTracker implements OnModuleInit {
    * 写入 Redis counter（实时读）+ 累计 N 次后刷 Prisma
    */
   async recordLlmCall(m: LlmCallMetric): Promise<void> {
+    // 2026-06-24 防御性修复：interviewId='unknown' / 空值直接 skip
+    // （不写 Redis、不累计 buffer、不触发 FK flush）。
+    // 调用方已修（dynamic-task-queue / generateReport 显式传 ctx.sessionId），
+    // 这层兜底防止将来再有漏传。
+    if (!m.interviewId || m.interviewId === 'unknown' || m.interviewId === 'anonymous') {
+      this.logger.warn(`[recordLlmCall] skip invalid interviewId=${m.interviewId} (cost tracking only)`);
+      return;
+    }
     const key = this.redisKey(m.interviewId);
     const redis = this.redis.getClient();
 
@@ -113,6 +121,15 @@ export class SessionCostTracker implements OnModuleInit {
   /** 强刷：用于 GET endpoint 调用时拿到最新值 */
   async flushToDb(interviewId: string): Promise<void> {
     this.logger.warn(`[FLUSH] start interviewId=${interviewId}`);
+    // 2026-06-24 防御性修复：interviewId='unknown' 或空值直接 return，
+    // 避免对 session_costs 表触发 FK 违反 + 抛错中断主流程。
+    // 这是兜底：调用方（dynamic-task-queue / generateReport）现在已修，
+    // 不会漏传 interviewId；但如果将来又有调用方漏传，不至于把整个 end
+    // 流程炸成"生成报告失败"占位报告。
+    if (!interviewId || interviewId === 'unknown' || interviewId === 'anonymous') {
+      this.logger.warn(`[FLUSH] skip invalid interviewId=${interviewId} (cost tracking only)`);
+      return;
+    }
     const key = this.redisKey(interviewId);
     const raw = await this.redis.getClient().hgetall(key);
     if (!raw || Object.keys(raw).length === 0) return;

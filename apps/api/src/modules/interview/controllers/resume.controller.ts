@@ -65,7 +65,7 @@ export class ResumeController {
     const bank: BankKey = matchBank(position);
 
     // 4. 基于简历生成个性化补充题
-    const personalizedQuestions = await this.generateQuestionsFromResume(parsed, position, bank);
+    const personalizedQuestions = await this.generateQuestionsFromResume(parsed, position, bank, userId);
 
     return {
       parsed,
@@ -117,6 +117,7 @@ export class ResumeController {
     parsed: ParsedResume,
     position: string,
     bank: BankKey,
+    userId?: string,
   ): Promise<Array<{ question: string; reason: string }>> {
     const prompt = `你是一位资深面试官。请基于候选人的简历，为【${position}】岗位设计 3 道**个性化追问题**。
 
@@ -142,6 +143,10 @@ export class ResumeController {
 
     try {
       const res = await this.llm.chat({
+        // 2026-06-24 修复：传 userId 给 llm.chat
+        // interviewId 此时还没有（resume 上传先于 interview 创建），
+        // 走 SessionCostTracker 防御性 guard 直接 skip cost tracking
+        userId: userId || 'anonymous',
         messages: [
           { role: 'system', content: '你是一个严格的面试官。' },
           { role: 'user', content: prompt },

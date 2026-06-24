@@ -368,6 +368,10 @@ export class InterviewAgentService {
         try {
           await this.taskQueue.completeTask(
             ctx.sessionId,
+            // 2026-06-24 修复：传 userId 给 completeTask，让 agentDecide 内部
+            // llm.chat 走 LlmGatewayService 时能落对 session_costs row
+            // （之前漏传 → cost tracker 用 'unknown' 兜底 → FK 违反）
+            ctx.userId,
             currentTask.id,
             userInput,
           );
@@ -467,6 +471,11 @@ export class InterviewAgentService {
       `【重要】只输出一个 JSON object,不要其他解释文字。`;
 
     const response = await this.llm.chat({
+      // 2026-06-24 修复：传 interviewId + userId 给 llm.chat
+      // 之前漏传 → 5 次累积触发 flushToDb('unknown') → FK 违反 → endInterview
+      // catch 兜底成"生成报告失败"占位报告，totalScore=0
+      interviewId: ctx.sessionId,
+      userId: ctx.userId,
       messages: [
         { role: 'system', content: '你是一个严格的面试评估 AI。' },
         { role: 'user', content: prompt },

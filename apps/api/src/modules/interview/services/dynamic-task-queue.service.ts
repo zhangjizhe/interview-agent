@@ -205,12 +205,12 @@ export class DynamicTaskQueueService {
    *   LLM 看完候选人回答 → 自己判断该不该追问 / 追什么 / 是否进阶
    *   不再用硬编码阈值，而是让 LLM 基于语义理解做决策
    */
-  async completeTask(interviewId: string, taskId: string, answer: string): Promise<void> {
+  async completeTask(interviewId: string, userId: string, taskId: string, answer: string): Promise<void> {
     const task = await this.prisma.interviewTask.findUnique({ where: { id: taskId } });
     if (!task) return;
 
     // Agent 一次决策：评分 + 是否追问 + 追问内容 + 是否进阶 + 进阶内容
-    const decision = await this.agentDecide(task.question, answer, task.category, task.difficulty);
+    const decision = await this.agentDecide(interviewId, userId, task.question, answer, task.category, task.difficulty);
 
     // 写入评分记录
     await this.prisma.answerHistory.create({
@@ -245,6 +245,9 @@ export class DynamicTaskQueueService {
    * 也可以在 score=0.3 时决定不追问（比如回答太离谱不值得追问）。
    */
   private async agentDecide(
+    interviewId: string,  // 2026-06-24 修复：必须传 interviewId 给 llm.chat，
+                          // 否则 cost tracker 用 'unknown' 触发 session_costs FK 违反
+    userId: string,
     question: string,
     answer: string,
     category: string,
@@ -252,6 +255,10 @@ export class DynamicTaskQueueService {
   ): Promise<AgentDecision> {
     try {
       const response = await this.llm.chat({
+        // 2026-06-24 修复：传 interviewId + userId 给 llm.chat，让 cost 统计落对 session_costs row
+        // （之前漏传 → LlmGatewayService 用 'unknown' 兜底 → 累计 5 次触发 flushToDb → FK 违反）
+        interviewId,
+        userId,
         messages: [
           {
             role: 'system',

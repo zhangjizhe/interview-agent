@@ -213,12 +213,29 @@ async function main() {
   await endBtn.click({ force: true });
 
   let reportShown = false;
+  let reportContent = '';
   for (let i = 0; i < 30; i++) {
     await sleep(1000);
-    const hasReport = await page.evaluate(() => !!document.querySelector('h2.text-2xl'));
-    if (hasReport) { reportShown = true; break; }
+    const reportState = await page.evaluate(() => {
+      const h2 = document.querySelector('h2.text-2xl');
+      if (!h2) return { shown: false, content: '' };
+      return { shown: true, content: document.body.textContent || '' };
+    });
+    if (reportState.shown) {
+      reportShown = true;
+      reportContent = reportState.content;
+      break;
+    }
   }
   ok('report shown after end', reportShown);
+
+  // 2026-06-24 修复：报告不应是 session_costs FK 违反的兜底占位报告
+  // 兜底报告显示"Invalid `prisma.sessionCost.upsert()` invocation"
+  // 之前漏传 interviewId → 5 次累计 flushToDb('unknown') → FK 违反
+  // → endInterview catch 兜底成"生成报告失败"占位报告
+  ok('report is not the FK violation fallback',
+     !reportContent.includes('prisma.sessionCost.upsert()') && !reportContent.includes('生成报告失败'),
+     reportContent.includes('prisma.sessionCost.upsert()') ? 'FK 违反兜底报告被触发' : '正常报告');
 
   await page.reload({ waitUntil: 'networkidle' });
   await sleep(2500);
