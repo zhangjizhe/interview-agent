@@ -444,6 +444,73 @@ CRAG-lite 架构，启发式硬事实检测 + 引用溯源：
 
 ---
 
+## 双后端架构（2026-06-25 新增）
+
+> 在原 NestJS 主后端基础上，新增 **Python FastAPI 版后端**，可在三种模式间切换启动。
+
+### 三种启动模式
+
+| 模式 | 命令 | 端口 | 后端栈 | 适用场景 |
+|---|---|---|---|---|
+| **NestJS 单栈** | `make up-nest` | 3001 | TypeScript + LangGraph 1.x | 简历主项目 / 主流用户 |
+| **Python 单栈** | `make up-py` | 3002 | Python + LangGraph 0.5 | AI 圈主流 / Python 简历加分 |
+| **双后端并行** | `make up-both` | 3001+3002 | 两者并行 | 演示 / 简历"双栈"叙事 |
+
+### 架构图
+
+```
+                    ┌──────────────────────────────────┐
+                    │  共享数据层（postgres/redis/milvus/qdrant）│
+                    └──────────────────────────────────┘
+                              ▲              ▲
+                              │              │
+                ┌─────────────┴──┐       ┌────┴────────────┐
+                │ NestJS API      │       │ Python FastAPI   │
+                │ apps/api/       │       │ apps/py-api/     │
+                │ :3001           │       │ :3002            │
+                │ LangGraph 1.x   │       │ LangGraph 0.5    │
+                │ Prisma + TS     │       │ SQLAlchemy + Py  │
+                └─────────────────┘       └─────────────────┘
+                              ▲              ▲
+                              └──────┬───────┘
+                                     ▼
+                          ┌──────────────────┐
+                          │  React Frontend   │
+                          │  apps/web/ :5173  │
+                          └──────────────────┘
+```
+
+### 关键能力
+
+- **同一份 LangGraph 5 节点拓扑** + **同一份 4 层记忆架构**
+- **共享** postgres / redis / milvus / qdrant
+- **独立端口** + **独立 Dockerfile** + **独立路由**
+- **互不依赖**：可单独跑任一后端
+
+### Makefile 一键命令
+
+```bash
+make help          # 查看所有命令
+make up-nest       # 只跑 NestJS
+make up-py         # 只跑 Python
+make up-both       # 两个都跑（默认）
+make down          # 全部停掉
+make logs-py       # Python 日志
+make rebuild-py    # 强制重建 Python 镜像
+make health        # 三个端口健康检查
+make push-branch   # 推送到 feat/dual-backend-2026-06
+```
+
+### docker-compose profiles（底层机制）
+
+```bash
+docker compose --profile nest up -d   # 只起 NestJS
+docker compose --profile py up -d     # 只起 Python
+docker compose --profile both up -d   # 都起
+```
+
+---
+
 ## 快速开始
 
 ### 前置条件
