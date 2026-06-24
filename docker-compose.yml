@@ -97,6 +97,7 @@ services:
       start_period: 90s
 
   api:
+    profiles: ["nest", "both"]
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -137,6 +138,7 @@ services:
     restart: unless-stopped
 
   web:
+    profiles: ["nest", "py", "both"]
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -146,6 +148,49 @@ services:
     depends_on:
       api:
         condition: service_healthy
+        required: false
+      py-api:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+
+  # Python 版后端（FastAPI + LangGraph）
+  # 与 NestJS 版并行，可独立部署，共享 postgres/redis/milvus/qdrant
+  py-api:
+    profiles: ["py", "both"]
+    build:
+      context: .
+      dockerfile: apps/py-api/Dockerfile
+    container_name: interview-py-api
+    ports:
+      - '3002:3002'
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev123}@postgres:5432/interview
+      REDIS_URL: redis://redis:6379
+      QDRANT_URL: http://qdrant:6333
+      MILVUS_URL: http://milvus:19530
+      QWEN_BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v1
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      MEM0_API_KEY: ${MEM0_API_KEY:-}
+      MEM0_HOST: ${MEM0_HOST:-}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      PORT: 3002
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      milvus:
+        condition: service_healthy
+    healthcheck:
+      # python 内置 urllib，不依赖 curl
+      test: ['CMD-SHELL', 'python -c "import urllib.request; urllib.request.urlopen(\"http://localhost:3002/api/health\").read()"']
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 90s
     restart: unless-stopped
 
 volumes:
