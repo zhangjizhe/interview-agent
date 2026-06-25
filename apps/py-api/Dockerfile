@@ -14,8 +14,6 @@ RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
 
 # 拷贝源码
 COPY apps/py-api /app/apps/py-api
-COPY packages/shared-types /app/packages/shared-types 2>/dev/null || true
-COPY config /app/apps/py-api/config
 
 WORKDIR /app/apps/py-api
 

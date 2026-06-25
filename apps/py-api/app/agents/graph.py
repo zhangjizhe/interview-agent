@@ -54,21 +54,22 @@ async def build_interview_graph(
         model_name="qwen-plus",
     )
 
-    # 注入记忆到各节点的闭包
-    def _supervisor(state, config=None):
-        return supervisor_node(state, llm, config, redis_mem)
+    # 注入记忆到各节点的闭包（LangGraph 节点必须是 async）
+    async def _supervisor(state, config=None):
+        return await supervisor_node(state, llm, config, redis_mem)
 
-    def _planner(state, config=None):
-        return planner_node(state, llm, config, redis_mem)
+    async def _planner(state, config=None):
+        return await planner_node(state, llm, config, redis_mem)
 
-    def _executor(state, config=None):
-        return executor_node(state, llm, config, milvus_mem, mem0_mem)
+    async def _executor(state, config=None):
+        return await executor_node(state, llm, config, milvus_mem, mem0_mem)
 
+    # replanner 是纯路由函数，不调 LLM，直接同步返回
     def _replanner(state, config=None):
         return replanner_node(state, config)
 
-    def _reviewer(state, config=None):
-        return reviewer_node(state, llm, config, redis_mem)
+    async def _reviewer(state, config=None):
+        return await reviewer_node(state, llm, config, redis_mem)
 
     # respond_directly 旁路：general_qa 直接 LLM 回复
     async def respond_directly_node(state):

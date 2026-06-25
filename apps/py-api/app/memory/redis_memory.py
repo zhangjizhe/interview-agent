@@ -17,11 +17,12 @@ class RedisMemory:
 
     async def connect(self):
         """建立连接（lifespan 钩子调用）"""
+        # redis-py 5.x 兼容：max_retries_per_request 改为 retry_on_timeout
         self.client = redis.from_url(
             self.url,
             decode_responses=True,
             socket_connect_timeout=5,
-            max_retries_per_request=3,
+            retry_on_timeout=True,
         )
 
     async def close(self):

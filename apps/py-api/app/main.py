@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
+from app.config import settings
 from app.api.routes import interview, auth, health
 from app.agents.graph import build_interview_graph
 from app.memory.redis_memory import RedisMemory
@@ -28,16 +29,16 @@ from app.memory.mem0_memory import Mem0Memory
 async def lifespan(app: FastAPI):
     """启动 / 关闭钩子：初始化 4 层记忆 + 编译 LangGraph"""
     # L1/L2: Redis 工作记忆 + 会话
-    redis_mem = RedisMemory(url=app.state.settings.REDIS_URL)
+    redis_mem = RedisMemory(url=settings.REDIS_URL)
     await redis_mem.connect()
 
     # L3: Milvus + Mem0 长期记忆
-    milvus_mem = MilvusMemory(url=app.state.settings.MILVUS_URL)
+    milvus_mem = MilvusMemory(url=settings.MILVUS_URL)
     await milvus_mem.connect()
 
     mem0_mem = Mem0Memory(
-        api_key=app.state.settings.MEM0_API_KEY,
-        host=app.state.settings.MEM0_HOST,
+        api_key=settings.MEM0_API_KEY,
+        host=settings.MEM0_HOST,
     )
 
     # 编译 5 节点 LangGraph
@@ -45,9 +46,10 @@ async def lifespan(app: FastAPI):
         redis_mem=redis_mem,
         milvus_mem=milvus_mem,
         mem0_mem=mem0_mem,
-        settings=app.state.settings,
+        settings=settings,
     )
 
+    app.state.settings = settings
     app.state.redis_mem = redis_mem
     app.state.milvus_mem = milvus_mem
     app.state.mem0_mem = mem0_mem
@@ -59,7 +61,7 @@ async def lifespan(app: FastAPI):
     await milvus_mem.close()
 
 
-def create_app(settings=None) -> FastAPI:
+def create_app() -> FastAPI:
     app = FastAPI(
         title="interview-agent-2 Python API",
         version="0.1.0",

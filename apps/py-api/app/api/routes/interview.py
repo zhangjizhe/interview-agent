@@ -35,6 +35,17 @@ async def start_interview(req: InterviewStartRequest, request: Request):
     initial = create_initial_state(req.user_message)
     config = {"configurable": {"thread_id": req.thread_id or req.user_id}}
 
+    # L1 工作记忆：写入当前 user_intent + session 元信息
+    if redis_mem:
+        await redis_mem.set_working_state(
+            req.user_id or "default",
+            {
+                "last_message_at": str(__import__("datetime").datetime.utcnow().isoformat()),
+                "thread_id": req.thread_id or req.user_id or "",
+                "status": "running",
+            },
+        )
+
     # L2 写入消息
     if redis_mem:
         await redis_mem.append_message(
@@ -53,6 +64,12 @@ async def start_interview(req: InterviewStartRequest, request: Request):
         await redis_mem.append_message(
             req.user_id or "default",
             {"role": "assistant", "content": final},
+        )
+        # L1 标记完成
+        await redis_mem.update_working_field(
+            req.user_id or "default",
+            "status",
+            "completed",
         )
 
     return {
