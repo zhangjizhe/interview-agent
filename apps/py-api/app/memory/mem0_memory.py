@@ -2,9 +2,17 @@
 4 层记忆架构 L3 下半：Mem0 云服务 / OSS 自托管
 
 对齐 NestJS Mem0CloudMemory（云 + OSS 双模式）
+
+P0-1 修复：
+- 错误时 raise 而非 silent return（让上游知道失败，可观测）
+- 加 structlog 上报 error
+- 兜底用空字符串（cloud 强依赖 OSS 字段）
 """
 from typing import List, Optional, Dict, Any
 import httpx
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 class Mem0Memory:
@@ -50,42 +58,92 @@ class Mem0Memory:
         return self.mode in ("cloud", "oss")
 
     async def memorize(self, user_id: str, messages: List[Dict[str, str]]) -> bool:
-        """写入记忆"""
+        """写入记忆
+
+        P0-1 修复：错误时 raise 而非 silent return，让上游能感知失败。
+        返回 bool 仅表示"是否成功 200"。
+        """
         if not self.is_enabled() or not messages:
             return False
+
+        # Mem0 v3 API 格式（cloud）+ v1 API 格式（oss）payload
+        if self.mode == "cloud":
+            # cloud v3: {"user_id":..., "messages":[{"role":..., "content":...}, ...]}
+            payload = {"user_id": user_id, "messages": messages}
+        else:
+            # oss v1: {"user_id":..., "messages":...} （messages 直接是 list）
+            payload = {"user_id": user_id, "messages": messages}
+
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(
                     f"{self.base_url}{self.paths['add']}",
                     headers=self.headers,
-                    json={
-                        "user_id": user_id,
-                        "messages": messages,
-                    },
+                    json=payload,
                 )
-                return resp.status_code == 200
-        except Exception as e:
-            print(f"[Mem0] memorize failed: {e}")
-            return False
+                if resp.status_code == 200:
+                    logger.info("mem0_memorize_ok", user_id=user_id, count=len(messages))
+                    return True
+
+                # P0-1 修复：失败时 raise（不再 silent return）
+                error_text = resp.text[:500]
+                logger.error(
+                    "mem0_memorize_failed",
+                    user_id=user_id,
+                    status_code=resp.status_code,
+                    error=error_text,
+                    mode=self.mode,
+                )
+                raise Mem0APIError(
+                    f"Mem0 memorize failed: HTTP {resp.status_code} mode={self.mode} body={error_text}"
+                )
+        except httpx.HTTPError as e:
+            logger.error("mem0_memorize_http_error", user_id=user_id, error=str(e))
+            raise Mem0APIError(f"Mem0 memorize network error: {e}") from e
 
     async def search(self, user_id: str, query: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """语义检索记忆"""
+        """语义检索记忆
+
+        P0-1 修复：错误时 raise 而非 silent return，让上游能感知失败。
+        """
         if not self.is_enabled():
             return []
+
+        payload = {
+            "query": query,
+            "filters": {"user_id": user_id},
+            "top_k": limit,
+        }
+
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(
                     f"{self.base_url}{self.paths['search']}",
                     headers=self.headers,
-                    json={
-                        "query": query,
-                        "filters": {"user_id": user_id},
-                        "top_k": limit,
-                    },
+                    json=payload,
                 )
                 if resp.status_code == 200:
-                    return resp.json().get("results", [])
-                return []
-        except Exception as e:
-            print(f"[Mem0] search failed: {e}")
-            return []
+                    results = resp.json().get("results", [])
+                    logger.info("mem0_search_ok", user_id=user_id, hits=len(results))
+                    return results
+
+                # P0-1 修复：失败时 raise
+                error_text = resp.text[:500]
+                logger.error(
+                    "mem0_search_failed",
+                    user_id=user_id,
+                    status_code=resp.status_code,
+                    error=error_text,
+                    mode=self.mode,
+                )
+                raise Mem0APIError(
+                    f"Mem0 search failed: HTTP {resp.status_code} mode={self.mode} body={error_text}"
+                )
+        except httpx.HTTPError as e:
+            logger.error("mem0_search_http_error", user_id=user_id, error=str(e))
+            raise Mem0APIError(f"Mem0 search network error: {e}") from e
+
+
+class Mem0APIError(Exception):
+    """Mem0 API 调用失败（HTTP 4xx/5xx 或网络错误）"""
+    pass
