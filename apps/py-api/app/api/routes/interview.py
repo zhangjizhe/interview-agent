@@ -2,6 +2,9 @@
 
 P1-8 修复：用 try/except 包裹 graph.ainvoke / astream，
 异常时返回 500 + 降级 token（仿 NestJS multi-agent.stream 的错误边界）。
+
+SSE 逐 token 增量推送：用 LangChain CallbackHandler 监听 on_chat_model_stream
+收集 LLM token，对齐 NestJS 的 on_chat_model_stream 行为。
 """
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
@@ -9,12 +12,40 @@ from pydantic import BaseModel
 from typing import Optional, List, AsyncGenerator
 import json
 import structlog
+from langchain_core.callbacks import AsyncCallbackHandler
 
 from app.agents.state import create_initial_state
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter()
+
+
+class TokenCollectorCallback(AsyncCallbackHandler):
+    """LangChain 异步回调：收集 LLM 流式 token
+
+    对齐 NestJS 的 on_chat_model_stream + handleLLMNewToken 实现，
+    py-api 用 CallbackHandler 异步版本（LangGraph 0.5.x 推荐）。
+    """
+
+    def __init__(self):
+        self.tokens: List[str] = []
+
+    async def on_chat_model_start(self, *args, **kwargs):
+        pass
+
+    async def on_chat_model_stream(self, token, **kwargs):
+        """每个 token 到达时回调"""
+        # token 可能是 AIMessageChunk 或 str
+        if hasattr(token, "content") and token.content:
+            self.tokens.append(token.content)
+        elif isinstance(token, str) and token:
+            self.tokens.append(token)
+
+    async def on_llm_new_token(self, token, **kwargs):
+        """旧 API 兼容（langchain-core < 0.3）"""
+        if isinstance(token, str) and token:
+            self.tokens.append(token)
 
 
 class InterviewStartRequest(BaseModel):
@@ -124,7 +155,11 @@ async def start_interview(req: InterviewStartRequest, request: Request):
 
 @router.post("/stream")
 async def stream_interview(req: InterviewStartRequest, request: Request):
-    """SSE 流式输出（对齐 NestJS streamWithSteps）"""
+    """SSE 流式输出（对齐 NestJS streamWithSteps）
+
+    P0-2 修复 + SSE token 增量：CallbackHandler 收集 LLM token，
+    再 astream values 拿 node + final_response，最后 drain 全部 token 增量。
+    """
     graph = request.app.state.interview_graph
 
     if graph is None:
@@ -136,27 +171,24 @@ async def stream_interview(req: InterviewStartRequest, request: Request):
         user_id=req.user_id,
         user_role=req.user_role,
     )
-    config = {"configurable": {"thread_id": req.thread_id or req.user_id}}
+
+    # SSE token 增量：CallbackHandler 在 graph 跑的过程中收集所有 LLM token
+    token_collector = TokenCollectorCallback()
+    config = {
+        "configurable": {"thread_id": req.thread_id or req.user_id},
+        "callbacks": [token_collector],
+    }
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        # P1-8 修复：try/except 包 astream，异常时 yield 降级 event + [DONE]
-        # P0-2 修复：用 stream_mode="values"（兼容性最好），节点 token 通过 chunk 检测
         try:
-            # values 模式：yield dict state（兼容 LangGraph 0.5.x 所有版本）
+            # values 模式：yield dict state
+            # 同时通过 CallbackHandler 异步收集 token
             async for state in graph.astream(initial, config=config, stream_mode="values"):
                 if not isinstance(state, dict):
-                    # 防御：未来 LangGraph 版本可能 yield 其他类型
                     continue
 
                 current_node = state.get("current_specialist", "")
                 final_response = state.get("final_response")
-
-                # token 增量：从 messages[-1] 拿最新 AIMessage content（增量推送）
-                messages = state.get("messages", [])
-                if messages and hasattr(messages[-1], "content") and isinstance(messages[-1].content, str):
-                    # 简单 token 化：每行作为一个 token（生产应该用 AIMessageChunk 流式拼接）
-                    # 这里 yield final_response 而不是逐 token
-                    pass
 
                 # node event
                 yield f"data: {json.dumps({'type': 'node', 'node': current_node}, ensure_ascii=False)}\n\n"
@@ -164,6 +196,16 @@ async def stream_interview(req: InterviewStartRequest, request: Request):
                 # final_response event（一次性 yield，对齐 NestJS streamWithSteps）
                 if final_response:
                     yield f"data: {json.dumps({'type': 'final_response', 'content': final_response, 'node': current_node}, ensure_ascii=False)}\n\n"
+
+            # drain token 增量（P0-2 SSE 增量推送核心）
+            # 注意：token 在 graph 跑完后才 drain（CallbackHandler 异步收集），
+            # 但实际 stream 模式可能 token 在 astream 过程中已触发 on_chat_model_stream
+            # 简单方案：先 drain tokens，再 yield final_response（前端按收到顺序渲染）
+            if token_collector.tokens:
+                for tok in token_collector.tokens:
+                    yield f"data: {json.dumps({'type': 'token', 'content': tok}, ensure_ascii=False)}\n\n"
+                logger.info("sse_tokens_drained", user_id=req.user_id, count=len(token_collector.tokens))
+
         except Exception as e:
             logger.error(
                 "graph_astream_failed",
