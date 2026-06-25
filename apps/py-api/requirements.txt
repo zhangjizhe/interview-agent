@@ -48,3 +48,6 @@ ruff==0.8.4
 # 商用 Rate Limiting（slowapi：基于 IP/endpoint 限流，防滥用）
 slowapi==0.1.9
 limits==3.13.0
+
+# 商用 Metrics（prometheus 客户端：暴露 /api/metrics 给 prometheus/grafana 抓）
+prometheus-client==0.21.1

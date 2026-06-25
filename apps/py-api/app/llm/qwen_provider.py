@@ -8,6 +8,7 @@
 """
 import asyncio
 import structlog
+import time
 from openai import AsyncOpenAI, APIError, APITimeoutError, RateLimitError
 from tenacity import (
     retry,
@@ -19,6 +20,7 @@ from tenacity import (
 from typing import List, Dict, Optional
 
 from app.core.exceptions import ExternalServiceError
+from app.core.metrics import record_llm_call
 
 logger = structlog.get_logger(__name__)
 
@@ -88,6 +90,7 @@ class QwenProvider:
         - 结构化日志：每次调用 + 每次重试都记录
         """
         attempt_count = {"n": 0}
+        call_start = time.perf_counter()
 
         @retry(
             stop=stop_after_attempt(self.max_retries),
@@ -116,19 +119,36 @@ class QwenProvider:
                     timeout=self.timeout,
                 )
                 content = response.choices[0].message.content or ""
+                prompt_tokens = response.usage.prompt_tokens if response.usage else None
+                completion_tokens = response.usage.completion_tokens if response.usage else None
+                # Prometheus metrics（成功调用）
+                record_llm_call(
+                    provider="qwen",
+                    model=self.model_name,
+                    status="success",
+                    duration_seconds=time.perf_counter() - call_start,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                )
                 if attempt_count["n"] > 1:
                     logger.info("qwen_chat_recovered", attempt=attempt_count["n"])
                 else:
                     logger.debug(
                         "qwen_chat_ok",
                         model=self.model_name,
-                        prompt_tokens=response.usage.prompt_tokens if response.usage else None,
-                        completion_tokens=response.usage.completion_tokens if response.usage else None,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
                     )
                 return content
             except Exception as e:
-                # 把所有异常统一成 ExternalServiceError 让 handler 渲染
                 if not self._should_retry(e):
+                    # Prometheus metrics（非可重试错误）
+                    record_llm_call(
+                        provider="qwen",
+                        model=self.model_name,
+                        status="error",
+                        duration_seconds=time.perf_counter() - call_start,
+                    )
                     logger.error("qwen_chat_non_retryable", error=str(e), error_type=type(e).__name__)
                     raise ExternalServiceError(
                         f"Qwen API error: {e}",
@@ -140,6 +160,13 @@ class QwenProvider:
         try:
             return await _do_chat()
         except (RateLimitError, APITimeoutError, APIError, asyncio.TimeoutError, ConnectionError) as e:
+            # Prometheus metrics（重试耗尽）
+            record_llm_call(
+                provider="qwen",
+                model=self.model_name,
+                status="timeout" if isinstance(e, (APITimeoutError, asyncio.TimeoutError)) else "error",
+                duration_seconds=time.perf_counter() - call_start,
+            )
             logger.error("qwen_chat_exhausted_retries", attempts=attempt_count["n"], error=str(e))
             raise ExternalServiceError(
                 f"Qwen API failed after {attempt_count['n']} retries: {e}",

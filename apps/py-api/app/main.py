@@ -25,7 +25,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.config import settings
-from app.api.routes import interview, auth, health
+from app.api.routes import interview, auth, health, metrics as metrics_route
 from app.agents.graph import build_interview_graph
 from app.memory.redis_memory import RedisMemory
 from app.memory.milvus_memory import MilvusMemory
@@ -39,6 +39,7 @@ from app.core.rate_limit import (
     HEALTH_LIMIT,
     AUTH_LIMIT,
 )
+from app.core.metrics import prometheus_middleware
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
@@ -104,7 +105,8 @@ def create_app() -> FastAPI:
     # Middleware 顺序：后注册的先执行（最外层）
     # 1. CORS（最外层，处理 OPTIONS preflight）
     # 2. SlowAPI（Rate Limiting 集成）
-    # 3. RequestIDMiddleware（每个请求分配 trace_id）
+    # 3. Prometheus（采集 request_total / request_duration）
+    # 4. RequestIDMiddleware（每个请求分配 trace_id，最内层）
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -121,6 +123,9 @@ def create_app() -> FastAPI:
     # Rate Limiting state
     app.state.limiter = limiter
     app.add_middleware(SlowAPIMiddleware)
+
+    # Prometheus HTTP 指标收集中间件
+    app.middleware("http")(prometheus_middleware)
 
     # RequestIDMiddleware 最后加（最内层，所有请求都过）
     app.add_middleware(RequestIDMiddleware)
@@ -155,6 +160,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api/health", tags=["health"])
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(interview.router, prefix="/api/interview", tags=["interview"])
+    app.include_router(metrics_route.router, prefix="/api", tags=["metrics"])
 
     return app
 
