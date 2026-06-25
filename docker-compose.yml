@@ -1,11 +1,21 @@
-# ✅ 纯 Docker 化：一条命令起全部服务
-# docker compose up -d --build
+# ✅ 纯 Docker 化：真·一键部署（2026-06-26 简化）
+#
+# 一键启动（git clone 后只跑这一条）：
+#   docker compose up -d --build
+#
 # 启动后：
 #   - 前端: http://localhost:5173
-#   - 后端: http://localhost:3001
+#   - 后端: http://localhost:3002
+#   - 文档: http://localhost:3002/docs（FastAPI 自动 OpenAPI）
 #
 # 容器清单（7 容器）：
-#   postgres / redis / qdrant / milvus / milvus-etcd / api / web
+#   postgres / redis / qdrant / milvus / milvus-etcd / py-api / web
+#
+# 必备前置（首次）：
+#   cp .env.example .env  ← 自动生成（deploy.sh 会做）
+#   在 .env 填 QWEN_API_KEY（必须）+ JWT_SECRET（自动生成占位）
+#
+# NestJS api 已移到 apps/api-legacy/（保留作参考，不被启动）
 
 services:
   postgres:
@@ -16,8 +26,7 @@ services:
     environment:
       POSTGRES_DB: interview
       POSTGRES_USER: ${POSTGRES_USER:-dev}
-      # P1-11 修复（审查员发现）：商用必须从 .env 显式注入密码，未设置则用 dev 默认值（仅本地开发）
-      # .env.example 已说明 POSTGRES_PASSWORD 配置项
+      # P1-11 修复：商用必须从 .env 显式注入密码，未设置则用 dev 默认值（仅本地开发）
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev123}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -46,8 +55,7 @@ services:
       - '6334:6334'
     volumes:
       - qdrant_data:/qdrant/storage
-    # qdrant 镜像里没装 curl/wget，且 Rust binary 不便外部 health probe
-    # 用 wget 在 aliyun/apt 镜像里也未必有，最稳妥是 TCP 端口探测
+    # qdrant 镜像里没装 curl/wget，TCP 端口探测最稳
     healthcheck:
       test: ['CMD-SHELL', 'timeout 2 bash -c "</dev/tcp/localhost/6333" || exit 1']
       interval: 10s
@@ -96,68 +104,8 @@ services:
       retries: 8
       start_period: 90s
 
-  api:
-    profiles: ["nest", "both"]
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    container_name: interview-api
-    ports:
-      - '3001:3001'
-    environment:
-      # compose 内部用 service name；密码从 .env 注入（dev 默认 dev123，仅本地开发）
-      DATABASE_URL: postgresql://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev123}@postgres:5432/interview
-      REDIS_URL: redis://redis:6379
-      QDRANT_URL: http://qdrant:6333
-      MILVUS_URL: http://milvus:19530
-      NODE_ENV: production
-      # 修复 2026-06-22：docker compose 启动时 fail-fast，提示必须设 JWT_SECRET
-      # 之前隐式依赖 .env，存在但配置漏写时容器要跑 3s 后 API 进程才报错（用户体验差）
-      # 用 docker compose 的 ${VAR:?msg} 语法，VAR 未设置时 docker compose 立即报错
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (商用必填，dev 占位见 .env.example)}
-      PORT: 3001
-      PRISMA_LOG: '1'
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      milvus:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-    healthcheck:
-      # 用 node 内置 http 模块，不依赖 curl/wget（alpine 镜像里没装）
-      test: ['CMD-SHELL', 'node -e "require(\"http\").get(\"http://localhost:3001/api/health\",r=>process.exit(r.statusCode===200?0:1)).on(\"error\",()=>process.exit(1))"']
-      interval: 15s
-      timeout: 10s
-      retries: 15
-      start_period: 90s
-    restart: unless-stopped
-
-  web:
-    profiles: ["nest", "py", "both"]
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    container_name: interview-web
-    ports:
-      - '5173:80'
-    depends_on:
-      api:
-        condition: service_healthy
-        required: false
-      py-api:
-        condition: service_healthy
-        required: false
-    restart: unless-stopped
-
-  # Python 版后端（FastAPI + LangGraph）
-  # 与 NestJS 版并行，可独立部署，共享 postgres/redis/milvus/qdrant
+  # Python 后端（唯一后端，2026-06-26 单后端架构简化）
   py-api:
-    profiles: ["py", "both"]
     build:
       context: .
       dockerfile: apps/py-api/Dockerfile
@@ -173,7 +121,8 @@ services:
       QWEN_API_KEY: ${QWEN_API_KEY:-}
       MEM0_API_KEY: ${MEM0_API_KEY:-}
       MEM0_HOST: ${MEM0_HOST:-}
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+      # 商用 fail-fast：JWT_SECRET 未设置时 docker compose 立即报错（容器不启动）
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (deploy.sh 自动生成 dev 占位)}
       PORT: 3002
     env_file:
       - .env
@@ -191,6 +140,19 @@ services:
       timeout: 10s
       retries: 15
       start_period: 90s
+    restart: unless-stopped
+
+  # 前端（自动连后端 3002）
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: interview-web
+    ports:
+      - '5173:80'
+    depends_on:
+      py-api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
