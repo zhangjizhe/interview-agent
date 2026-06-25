@@ -30,9 +30,12 @@ async def executor_node(state, llm, config=None, milvus_mem=None, mem0_mem=None)
 
         elif step_type == "search_knowledge":
             # 从 Milvus/Mem0 召回相关记忆
+            # P1-6 修复：state["user_id"] 由 interview /start 注入，
+            # 不再 fallback "unknown"（否则所有用户记忆混一个 namespace）
             if mem0_mem:
+                user_id = state.get("user_id") or "anonymous"
                 related = await mem0_mem.search(
-                    user_id=state.get("user_id", "unknown"),
+                    user_id=user_id,
                     query=description,
                     limit=3,
                 )

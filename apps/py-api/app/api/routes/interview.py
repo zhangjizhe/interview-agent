@@ -14,6 +14,7 @@ class InterviewStartRequest(BaseModel):
     user_id: str
     user_message: str
     thread_id: Optional[str] = None
+    user_role: Optional[str] = None  # P1-10 修复：候选人岗位，planner fallback 用
 
 
 class InterviewStep(BaseModel):
@@ -32,7 +33,12 @@ async def start_interview(req: InterviewStartRequest, request: Request):
     if graph is None:
         raise HTTPException(status_code=503, detail="Graph not initialized")
 
-    initial = create_initial_state(req.user_message)
+    # P1-6 修复：把 user_id + user_role 注入 state
+    initial = create_initial_state(
+        user_message=req.user_message,
+        user_id=req.user_id,
+        user_role=req.user_role,
+    )
     config = {"configurable": {"thread_id": req.thread_id or req.user_id}}
 
     # L1 工作记忆：写入当前 user_intent + session 元信息
@@ -89,7 +95,12 @@ async def stream_interview(req: InterviewStartRequest, request: Request):
     if graph is None:
         raise HTTPException(status_code=503, detail="Graph not initialized")
 
-    initial = create_initial_state(req.user_message)
+    # P1-6 修复：把 user_id + user_role 注入 state
+    initial = create_initial_state(
+        user_message=req.user_message,
+        user_id=req.user_id,
+        user_role=req.user_role,
+    )
     config = {"configurable": {"thread_id": req.thread_id or req.user_id}}
 
     async def event_generator() -> AsyncGenerator[str, None]:
