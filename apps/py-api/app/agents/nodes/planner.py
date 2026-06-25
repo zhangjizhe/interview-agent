@@ -30,8 +30,10 @@ async def planner_node(state, llm, config=None, redis_mem=None) -> dict:
         if not isinstance(plan, list):
             plan = [plan]
     except Exception:
-        # 兜底：默认出 1 道题
-        plan = [{"step_id": 1, "type": "generate_question", "description": "AI Agent 工程师面试题"}]
+        # P1-10 修复：从 state["user_role"] 取候选人岗位，避免硬编码
+        # 硬编码 "AI Agent 工程师" 会让 P5 后端 / 数据分析候选人拿到不匹配的题
+        user_role = state.get("user_role") or "软件工程师"
+        plan = [{"step_id": 1, "type": "generate_question", "description": f"{user_role} 面试题"}]
 
     return {
         "plan": plan,

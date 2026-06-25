@@ -14,10 +14,14 @@ class MilvusMemory:
     VECTOR_DIM = 1024  # 与 Qwen Embedding 一致
 
     def __init__(self, url: str):
-        # url 格式: http://host:19530
+        # 用 urllib.parse.urlparse 替代 split，避免含密码 / 路径 / query 解析错位
+        # 例：http://user:pass@milvus:19530 → host="milvus"（不是 "user:pass@milvus"）
+        # 例：http://milvus:19530/v1 → port=19530（不是 "19530/v1"）
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
         self.url = url
-        self.host = url.split("://")[1].split(":")[0] if "://" in url else "localhost"
-        self.port = int(url.split(":")[-1]) if ":" in url else 19530
+        self.host = parsed.hostname or "localhost"
+        self.port = parsed.port or 19530
         self.collection: Optional[Collection] = None
         self.connected = False
 
