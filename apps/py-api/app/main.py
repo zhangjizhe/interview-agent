@@ -23,11 +23,12 @@ from app.agents.graph import build_interview_graph
 from app.memory.redis_memory import RedisMemory
 from app.memory.milvus_memory import MilvusMemory
 from app.memory.mem0_memory import Mem0Memory
+from app.db.session import init_db, close_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动 / 关闭钩子：初始化 4 层记忆 + 编译 LangGraph"""
+    """启动 / 关闭钩子：初始化 4 层记忆 + 编译 LangGraph + L4 PostgreSQL"""
     # L1/L2: Redis 工作记忆 + 会话
     redis_mem = RedisMemory(url=settings.REDIS_URL)
     await redis_mem.connect()
@@ -40,6 +41,9 @@ async def lifespan(app: FastAPI):
         api_key=settings.MEM0_API_KEY,
         host=settings.MEM0_HOST,
     )
+
+    # L4: PostgreSQL 长期持久化（P1-9 修复，对齐 NestJS Prisma）
+    init_db(settings.DATABASE_URL)
 
     # 编译 5 节点 LangGraph
     graph = await build_interview_graph(
@@ -59,6 +63,7 @@ async def lifespan(app: FastAPI):
 
     await redis_mem.close()
     await milvus_mem.close()
+    close_db()
 
 
 def create_app() -> FastAPI:
