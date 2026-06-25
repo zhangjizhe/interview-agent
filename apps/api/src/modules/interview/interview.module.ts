@@ -12,10 +12,9 @@ import { TaskQueueModule } from '../agent/task-queue.module';
 import { AuthModule } from '../auth/auth.module';
 import { MemoryModule } from '../memory/memory.module';
 import { LlmModule } from '../llm/llm.module';
+import { PiiModule } from '../pii/pii.module';
 import { ResumeParserService } from './services/resume-parser.service';
 import { ResumeRAGService } from './services/resume-rag.service';
-// RagService 在 2026-06-25 删除（dead code：未被任何 controller 调用 + 使用 Math.random() 生成假 embedding）
-// resume RAG 实际由 ResumeRAGService 提供（基于 Milvus resume_memory collection）
 import { QuestionBankService } from './services/question-bank.service';
 import { QuestionGeneratorService } from './services/question-generator.service';
 import { ScoringService } from './services/scoring.service';
@@ -23,7 +22,7 @@ import { HitlService } from './services/hitl.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
 @Module({
-  imports: [AgentModule, MemoryModule, LlmModule, TaskQueueModule, AuthModule],
+  imports: [AgentModule, MemoryModule, LlmModule, TaskQueueModule, AuthModule, PiiModule],
   // 注册顺序保证：LifecycleController（含 list/stats 等静态路由）必须最先注册，
   // FlowController（含 :interviewId/message 等参数路由）最后注册。
   // NestJS 跨 controller 按注册顺序匹配路由，避免 /interview/list 被

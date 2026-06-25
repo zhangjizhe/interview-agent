@@ -81,6 +81,17 @@ export interface AppConfig {
     ttl: number;
     limit: number;
   };
+  pii: {
+    masterKey: string;
+    retention: {
+      enabled: boolean;
+      messageDays: number;
+      answerDays: number;
+      reflectionDays: number;
+      taskDays: number;
+      abandonedDays: number;
+    };
+  };
 }
 
 /**
@@ -244,6 +255,17 @@ export const configuration = (): AppConfig => {
   throttler: {
     ttl: parseInt(process.env.THROTTLER_TTL || '60', 10),
     limit: parseInt(process.env.THROTTLER_LIMIT || '60', 10),
+  },
+  pii: {
+    masterKey: process.env.PII_MASTER_KEY || '',
+    retention: {
+      enabled: process.env.PII_RETENTION_ENABLED !== 'false',
+      messageDays: parseInt(process.env.PII_RETENTION_MESSAGE_DAYS || '90', 10),
+      answerDays: parseInt(process.env.PII_RETENTION_ANSWER_DAYS || '90', 10),
+      reflectionDays: parseInt(process.env.PII_RETENTION_REFLECTION_DAYS || '90', 10),
+      taskDays: parseInt(process.env.PII_RETENTION_TASK_DAYS || '90', 10),
+      abandonedDays: parseInt(process.env.PII_RETENTION_ABANDONED_DAYS || '30', 10),
+    },
   },
   };
 }

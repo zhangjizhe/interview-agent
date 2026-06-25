@@ -216,3 +216,39 @@ enum TaskStatus {
   COMPLETED
   SKIPPED
 }
+
+model PrivacyConsent {
+  id          String   @id @default(cuid())
+  userId      String
+  consentType String
+  accepted    Boolean  @default(false)
+  version     String   @default("1.0.0")
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, consentType])
+  @@index([userId])
+  @@map("privacy_consents")
+}
+
+model PiiAuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  dataType  String
+  dataId    String?
+  fields    String[]
+  reason    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([dataType, dataId])
+  @@index([action])
+  @@map("pii_audit_logs")
+}

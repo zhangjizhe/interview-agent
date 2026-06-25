@@ -4,18 +4,9 @@ import { MilvusClient, DataType, MetricType, IndexType } from '@zilliz/milvus2-s
 import { ConfigService } from '@nestjs/config';
 import { ParsedResume } from './resume-parser.service';
 import { scrubPdfStructureNoise, isPdfStructureToken } from '../../../common/pdf-noise';
+import { EncryptionService } from '../../pii/encryption.service';
+import { escapeMilvusString } from './escape-milvus.util';
 
-/**
- * 简历 RAG 服务（lazy init）
- *
- * Milvus collection 在首次使用时初始化，而非启动时。
- * 这样即使 Milvus 启动稍慢，也不会阻塞 API 启动。
- *
- * 流程：
- * 1. 简历解析 → 结构化字段
- * 2. 关键字段 embedding → 存 Milvus（按 userId 隔离）
- * 3. 面试开始时 → 检索相似历史简历 → 作为 Agent 上下文
- */
 @Injectable()
 export class ResumeRAGService {
   private readonly logger = new Logger(ResumeRAGService.name);
@@ -25,7 +16,10 @@ export class ResumeRAGService {
   private readonly VECTOR_DIM = 1024;
   private initialized = false;
 
-  constructor(private config: ConfigService) {
+  constructor(
+    private config: ConfigService,
+    private encryption: EncryptionService,
+  ) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
     const qwenKey = this.config.get<string>('qwen.apiKey');
     const qwenBase = this.config.get<string>('qwen.baseUrl');
@@ -52,10 +46,12 @@ export class ResumeRAGService {
               { name: 'vector', data_type: DataType.FloatVector, dim: this.VECTOR_DIM },
               { name: 'userId', data_type: DataType.VarChar, max_length: 200 },
               { name: 'name', data_type: DataType.VarChar, max_length: 100 },
+              { name: 'nameEncrypted', data_type: DataType.VarChar, max_length: 2000 },
               { name: 'position', data_type: DataType.VarChar, max_length: 100 },
               { name: 'summary', data_type: DataType.VarChar, max_length: 4000 },
               { name: 'skills', data_type: DataType.VarChar, max_length: 2000 },
               { name: 'createdAt', data_type: DataType.VarChar, max_length: 50 },
+              { name: 'expiresAt', data_type: DataType.VarChar, max_length: 50 },
             ],
           });
           await this.client.createIndex({
@@ -94,7 +90,6 @@ export class ResumeRAGService {
   async ingestResume(userId: string, position: string, parsed: ParsedResume): Promise<void> {
     await this.ensureCollection();
     try {
-      // 二次清洗：name / skills / summary 段可能含 PDF 元数据泄漏
       const cleanName = isPdfStructureToken(parsed.name || '')
         ? '未命名候选人'
         : parsed.name || '未命名候选人';
@@ -107,22 +102,27 @@ export class ResumeRAGService {
       const text = `${summary}\n\n${cleanRawText.slice(0, 1500)}`;
       const vector = await this.embedText(text);
 
+      const namePseudonym = this.encryption.hashPseudonym(cleanName, userId);
+      const nameEncrypted = this.encryption.encrypt(cleanName);
+
       await this.client.insert({
         collection_name: this.COLLECTION,
         data: [
           {
             vector,
             userId,
-            name: cleanName,
+            name: namePseudonym,
+            nameEncrypted: JSON.stringify(nameEncrypted),
             position,
             summary,
             skills: cleanSkills.join('、'),
             createdAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           },
         ],
       });
 
-      this.logger.log(`✅ Resume ingested for ${userId} (position=${position})`);
+      this.logger.log(`✅ Resume ingested for ${userId} (position=${position}, PII encrypted)`);
     } catch (err) {
       this.logger.error(`Resume ingest failed: ${err.message}`);
       throw err;
@@ -135,26 +135,38 @@ export class ResumeRAGService {
   ): Promise<Array<{ name?: string; position: string; summary: string; skills: string; createdAt: string; score?: number }>> {
     await this.ensureCollection();
     try {
+      const safeUserId = escapeMilvusString(userId);
       const result = await this.client.query({
         collection_name: this.COLLECTION,
-        filter: `userId == "${userId}"`,
-        output_fields: ['name', 'position', 'summary', 'skills', 'createdAt'],
+        filter: `userId == "${safeUserId}"`,
+        output_fields: ['name', 'nameEncrypted', 'position', 'summary', 'skills', 'createdAt'],
         limit,
       });
       const raw = (result.data as any) || [];
-      // 读取侧清洗：旧数据（修复前上传）可能含 PDF 元数据，
-      // 返回前再洗一次 name/skills/summary，确保前端不会展示 %PDF-1.7 / /ICCBased 等
-      const cleaned = raw.map((r: any) => ({
-        ...r,
-        name: isPdfStructureToken(r.name || '') ? undefined : r.name,
-        position: r.position,
-        summary: scrubPdfStructureNoise(r.summary || ''),
-        skills: (r.skills || '')
-          .split(/[、,，;；\s]+/)
-          .filter((s: string) => s && !isPdfStructureToken(s))
-          .join('、'),
-      }));
-      // 按 createdAt 倒序，取最新（Milvus query 默认不保证顺序）
+      const cleaned = raw.map((r: any) => {
+        let decryptedName: string | undefined;
+        if (r.nameEncrypted) {
+          try {
+            const enc = JSON.parse(r.nameEncrypted);
+            decryptedName = this.encryption.decrypt(enc);
+          } catch {
+            decryptedName = undefined;
+          }
+        }
+        const displayName = decryptedName && !isPdfStructureToken(decryptedName)
+          ? decryptedName
+          : undefined;
+        return {
+          ...r,
+          name: displayName,
+          position: r.position,
+          summary: scrubPdfStructureNoise(r.summary || ''),
+          skills: (r.skills || '')
+            .split(/[、,，;；\s]+/)
+            .filter((s: string) => s && !isPdfStructureToken(s))
+            .join('、'),
+        };
+      });
       cleaned.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       return cleaned;
     } catch (err) {
@@ -170,12 +182,13 @@ export class ResumeRAGService {
   ): Promise<Array<{ userId: string; position: string; summary: string; skills: string; score: number }>> {
     await this.ensureCollection();
     try {
+      const safePosition = escapeMilvusString(position);
       const vector = await this.embedText(query);
       const result = await this.client.search({
         collection_name: this.COLLECTION,
         vector,
         limit,
-        filter: `position == "${position}"`,
+        filter: `position == "${safePosition}"`,
         output_fields: ['userId', 'position', 'summary', 'skills'],
       });
       return result.results.map((r: any) => ({
@@ -188,6 +201,40 @@ export class ResumeRAGService {
     } catch (err) {
       this.logger.error(`Resume similar search failed: ${err.message}`);
       throw err;
+    }
+  }
+
+  async cleanExpiredResumes(): Promise<number> {
+    try {
+      await this.ensureCollection();
+      const now = new Date().toISOString();
+      const result = await this.client.delete({
+        collection_name: this.COLLECTION,
+        filter: `expiresAt < "${now}"`,
+      });
+      const deleted = (result as any)?.deleteCount || 0;
+      this.logger.log(`🧹 Expired resumes cleaned: ${deleted}`);
+      return deleted;
+    } catch (err: any) {
+      this.logger.warn(`Resume cleanup failed (non-critical): ${err.message}`);
+      return 0;
+    }
+  }
+
+  async deleteResumesByUser(userId: string): Promise<number> {
+    try {
+      await this.ensureCollection();
+      const safeUserId = escapeMilvusString(userId);
+      const result = await this.client.delete({
+        collection_name: this.COLLECTION,
+        filter: `userId == "${safeUserId}"`,
+      });
+      const deleted = (result as any)?.deleteCount || 0;
+      this.logger.log(`🧹 Resumes deleted for user ${userId}: ${deleted}`);
+      return deleted;
+    } catch (err: any) {
+      this.logger.warn(`Resume user deletion failed (non-critical): ${err.message}`);
+      return 0;
     }
   }
 
