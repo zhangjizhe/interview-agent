@@ -82,6 +82,30 @@ class MilvusMemory:
         except Exception as e:
             logger.warning("milvus_ensure_collection_failed", collection=self.COLLECTION, error=str(e))
 
+    async def insert_resume(self, user_id: str, position: str, parsed: dict) -> int:
+        """把简历写入 Milvus（让 RAG 能召回）
+
+        2026-06-25 web ↔ py-api 对齐：upload-resume 调用
+        - 简历 summary 作为 content（截断到 2000 字符，避免超限）
+        - source="resume"（区别 conversation）
+        - vector：先调 Qwen embedding API（mock 用 0 向量）
+        """
+        if not self.connected or not self.collection:
+            return -1
+        # 拼简历 content
+        content_parts = [
+            f"Position: {position}",
+            f"Name: {parsed.get('name') or 'Unknown'}",
+            f"Skills: {', '.join(parsed.get('skills') or [])}",
+            f"Experience: {parsed.get('years_of_experience') or 'Unknown'} years",
+            f"Summary: {(parsed.get('summary') or '')[:2000]}",
+        ]
+        content = "\n".join(content_parts)
+        # TODO: 调 Qwen embedding API（暂用 0 向量，生产前接）
+        from app.shared.embeddings import get_embedding
+        vector = await get_embedding(content)
+        return await self.insert(user_id, content, vector, source="resume")
+
     async def insert(self, user_id: str, content: str, vector: List[float], source: str = "conversation") -> int:
         """插入一条记忆
 

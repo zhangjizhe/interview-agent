@@ -99,6 +99,37 @@ class InterviewStep(BaseModel):
     node: Optional[str] = None
 
 
+def _build_state_for_interview(interview, resume, user_id: str, user_message: str) -> dict:
+    """2026-06-25 web ↔ py-api 对齐：构造 LangGraph state
+
+    用于 /api/interview/{id}/message（resume 解析后的 state）
+    """
+    from langchain_core.messages import HumanMessage, AIMessage
+    from app.agents.state import create_initial_state
+
+    state = create_initial_state(
+        user_message=user_message,
+        user_id=user_id,
+        user_role=interview.position,  # 用 Interview.position 作为 role
+    )
+    # 注入 resume context（让 LLM 知道候选人背景）
+    if resume and resume.parsed_json:
+        try:
+            import json
+            parsed = json.loads(resume.parsed_json)
+            resume_context = (
+                f"\n\n【候选人简历】\n"
+                f"- 技能：{', '.join(parsed.get('skills') or [])}\n"
+                f"- 经验：{parsed.get('years_of_experience') or '未知'} 年"
+            )
+            state["user_message"] = user_message + resume_context
+        except Exception:
+            pass
+    state["user_id"] = user_id
+    state["current_specialist"] = interview.position
+    return state
+
+
 @router.post("/start")
 @limiter.limit(INTERVIEW_START_LIMIT)
 async def start_interview(req: InterviewStartRequest, request: Request, response: Response):

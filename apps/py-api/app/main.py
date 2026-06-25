@@ -25,7 +25,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 
 from app.config import settings
-from app.api.routes import interview, auth, health, metrics as metrics_route
+from app.api.routes import interview, interview_more, auth, health, metrics as metrics_route
 from app.agents.graph import build_interview_graph
 from app.memory.redis_memory import RedisMemory
 from app.memory.milvus_memory import MilvusMemory
@@ -160,6 +160,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix="/api/health", tags=["health"])
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(interview.router, prefix="/api/interview", tags=["interview"])
+    app.include_router(interview_more.router, prefix="/api/interview", tags=["interview"])
     app.include_router(metrics_route.router, prefix="/api", tags=["metrics"])
 
     return app

@@ -1,0 +1,2281 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-06-16T07:59:27.606Z",
+  "source": "interview-qa-bank/01-09",
+  "totalQuestions": 142,
+  "topics": [
+    "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+    "RAG 检索增强（切片、Embedding、向量库）",
+    "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+    "LangGraph 状态机（Checkpoint、interrupt）",
+    "系统设计（RAG 系统、客服系统、Code Agent、高并发）",
+    "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+    "八股与算法（Redis、算法题）",
+    "项目深挖（interview-agent 追问）",
+    "软素质与行为面试（自我介绍、挑战、规划）"
+  ],
+  "items": [
+    {
+      "id": "01-Q01",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 1,
+      "title": "什么是 LLM Agent？和单次 LLM 调用有什么本质区别？",
+      "body": "**🎯 考察点**：闭环决策 vs 开环生成；有没有\"思考-行动-观察\"循环\n\n**✅ 答题框架**：\n```\nAgent = LLM(推理核心) + 工具(感知/执行) + 记忆(短期/长期) + 规划(任务分解)\n单次调用：开环，一问一答，无法根据反馈调整\nAgent：闭环，每步依赖 Observation 更新信念，决定下一步行动\n```\n- 关键差异：**是否有\"行动-观察\"循环**，即使无外部工具，能在内部多步 CoT + 自验证，也算\"弱环境 Agent\"\n- 2026 趋势：**Workflow 约束 Agent**（在硬编码路径里给局部决策权），不是纯自主 Agent\n\n**⚠️ 踩坑点**：只背概念不区分\"带插件的 ChatBot\" vs 真正 Agent；关键看是否有\"自主决策闭环\"\n\n**💡 简历挂钩**：你 interview-agent 的 Multi Agent 编排就是 Orchestrator-Workers 模式\n\n---",
+      "tags": [
+        "是否有\"行动-观察\"循环",
+        "Workflow 约束 Agent",
+        "ChatBot",
+        "ReAct",
+        "LLM"
+      ],
+      "preview": "🎯 考察点：闭环决策 vs 开环生成；有没有\"思考-行动-观察\"循环",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "01-Q02",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 2,
+      "title": "Agent 的核心组件有哪些？",
+      "body": "**✅ 答题框架**：\n1. **LLM 核心**：推理和决策中心\n2. **记忆模块**：工作记忆 / 短期记忆 / 长期记忆\n3. **规划模块**：任务分解、计划制定\n4. **工具调用层**：连接外部工具和 API\n5. **观察/反馈模块**：获取环境反馈\n6. **执行模块**：执行具体动作\n\n**💡 简历挂钩**：对应你的 ContextManager（4 级水位线 = 记忆模块），MCP Registry（工具层）\n\n---",
+      "tags": [
+        "LLM 核心",
+        "记忆模块",
+        "规划模块",
+        "工具调用层",
+        "观察/反馈模块"
+      ],
+      "preview": "✅ 答题框架： 1. LLM 核心：推理和决策中心 2. 记忆模块：工作记忆 / 短期记忆 / 长期记忆 3. 规划模块：任务分解、计划制定 4. 工具调用层：连接外部工具和 API 5. 观察/反馈模块：获取环境反馈 6. 执行模块：执行具体动作",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q03",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 3,
+      "title": "Workflow、Agent、Tools 这三个的概念和区别？",
+      "body": "**✅ 答题框架**：\n- **Tools**：单点能力（函数、API、DB query）—— 没有决策\n- **Agent**：能自主决策调哪个 tool + 决定下一步\n- **Workflow**：固定编排的步骤链（节点 A → B → C），每步可能是 LLM 也可能是确定性逻辑\n- **核心区别**：**自主决策权大小**——Tools < Workflow < Agent\n\n**💡 简历挂钩**：你项目里 supervisor 节点是 Agent，state 推进逻辑是 Workflow\n\n---",
+      "tags": [
+        "Tools",
+        "Agent",
+        "Workflow",
+        "核心区别",
+        "自主决策权大小"
+      ],
+      "preview": "✅ 答题框架： - Tools：单点能力（函数、API、DB query）—— 没有决策 - Agent：能自主决策调哪个 tool + 决定下一步 - Workflow：固定编排的步骤链（节点 A → B → C），每步可能是 LLM 也可能是确定性逻辑 - 核心区别：自主决策权大小——Tools...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q04",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 4,
+      "title": "Agent 和 Prompt Chain 有什么本质区别？",
+      "body": "**✅ 答题框架**：\n| 维度 | Prompt Chain | Agent |\n|------|-------------|-------|\n| 拓扑 | 工程侧固定 | 运行时动态选择 |\n| 状态 | 无 | 依赖 Observation 更新信念 |\n| 适用 | 输入确定、流程固定 | 输入不确定、需要灵活分支 |\n\n**💡 简历挂钩**：你 interview-agent 的 \"规划 Agent + 执行 Agent\" 拆分就是 Chain 内嵌 Agent 的混合形态\n\n---",
+      "tags": [
+        "ReAct",
+        "原理",
+        "架构",
+        "存储",
+        "算法"
+      ],
+      "preview": "✅ 答题框架： Prompt Chain 工程侧固定 无 输入确定、流程固定",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "01-Q05",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 5,
+      "title": "ReAct 模式的三个字母代表什么？解决什么问题？",
+      "body": "**🎯 考察点**：推理-行动循环；vs CoT 的差异\n\n**✅ 答题框架**：\n- **Re**asoning + **Act**ing：Thought（推理）→ Action（执行）→ Observation（观察）→ 循环\n- 解决的问题：模型纯\"空想\"容易偏离事实，**用工具反馈把推理锚定到真实环境**\n- vs CoT：CoT 只有推理链无行动，ReAct 推理+行动交替\n\n**⚠️ 踩坑点**：把 ReAct 和 CoT 混着说；忘说\"显式推理 + 工具反馈\"\n\n---",
+      "tags": [
+        "Re",
+        "Act",
+        "用工具反馈把推理锚定到真实环境",
+        "ReAct",
+        "架构"
+      ],
+      "preview": "🎯 考察点：推理-行动循环；vs CoT 的差异",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q06",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 6,
+      "title": "ReAct、Plan-and-Execute、Reflection 三种范式的核心区别？",
+      "body": "**✅ 答题框架**：\n| 范式 | 流程 | 适用 |\n|---|---|---|\n| **ReAct** | 边想边做，循环 Thought→Action→Observation | 不确定任务、需要动态调整 |\n| **Plan-and-Execute** | 先出完整 Plan，再逐步执行 | 任务结构清晰、可分解 |\n| **Reflection** | 执行后自评，差就重做 | 质量敏感、需要迭代优化 |\n\n**2026 选型**：**Plan-and-Execute + Reflection 组合**最稳（**你项目用的就是这套**）。\n\n---",
+      "tags": [
+        "ReAct",
+        "Plan-and-Execute",
+        "Reflection",
+        "2026 选型",
+        "最稳（"
+      ],
+      "preview": "✅ 答题框架： 流程 边想边做，循环 Thought→Action→Observation 先出完整 Plan，再逐步执行 执行后自评，差就重做",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q07",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 7,
+      "title": "Agent 推理模式有哪些？",
+      "body": "**✅ 答题框架**：\n- **ReAct**：推理-行动循环\n- **CoT（Chain of Thought）**：思维链\n- **ToT（Tree of Thought）**：思维树，多路径评估\n- **Plan-and-Execute**：先规划再执行\n- **Reflection**：自反思\n- **Self-Ask**：自问自答\n\n---",
+      "tags": [
+        "ReAct",
+        "CoT（Chain of Thought）",
+        "ToT（Tree of Thought）",
+        "Plan-and-Execute",
+        "Reflection"
+      ],
+      "preview": "✅ 答题框架： - ReAct：推理-行动循环 - CoT（Chain of Thought）：思维链 - ToT（Tree of Thought）：思维树，多路径评估 - Plan-and-Execute：先规划再执行 - Reflection：自反思 - Self-Ask：自问自答",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q08",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 8,
+      "title": "复杂任务怎么做的任务拆分？为什么要拆分？",
+      "body": "**✅ 答题框架**：\n- **拆的原因**：单 Agent 处理跨领域长任务 → \"注意力漂移\" + \"推理链断裂\"\n- **三种模式**：\n  - **中心化 (Boss-Worker)**：主 Agent 拆分任务分发给子 Agent\n  - **流水线 (Pipeline)**：A 输出 → B 输入（如代码生成 → 审查 → 修复）\n  - **民主协作 (Joint Discussion)**：多个 Agent 共同讨论得出结论\n- **难点**：任务分解粒度（太细通信成本高，太粗 Worker 幻觉）\n\n**💡 简历挂钩**：你 interview-agent 5 节点 LangGraph 就是 Boss-Worker 模式\n\n---",
+      "tags": [
+        "拆的原因",
+        "三种模式",
+        "中心化 (Boss-Worker)",
+        "流水线 (Pipeline)",
+        "民主协作 (Joint Discussion)"
+      ],
+      "preview": "✅ 答题框架： - 拆的原因：单 Agent 处理跨领域长任务 → \"注意力漂移\" + \"推理链断裂\" - 三种模式： - 中心化 (Boss-Worker)：主 Agent 拆分任务分发给子 Agent - 流水线 (Pipeline)：A 输出 → B 输入（如代码生成 → 审查 → 修复） -...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "01-Q09",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 9,
+      "title": "什么是 Multi-Agent？",
+      "body": "**✅ 答题框架**：**多个 LLM 协同工作**——每个 Agent 有自己的角色 / 工具 / 上下文，通过**消息传递或共享状态**协作。区别于单 Agent 把所有事塞进一个 LLM 上下文。\n\n---",
+      "tags": [
+        "多个 LLM 协同工作",
+        "消息传递或共享状态",
+        "ReAct",
+        "LLM",
+        "架构"
+      ],
+      "preview": "✅ 答题框架：多个 LLM 协同工作——每个 Agent 有自己的角色 / 工具 / 上下文，通过消息传递或共享状态协作。区别于单 Agent 把所有事塞进一个 LLM 上下文。",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "01-Q10",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 10,
+      "title": "说说 Single-Agent 和 Multi-Agent 的设计方案？",
+      "body": "**✅ 答题框架**：\n- **Single-Agent**：一个 LLM + 所有工具 + 完整上下文；适合**任务简单、链路短**\n- **Multi-Agent**：\n  - **Supervisor 模式**：中心节点分发（你项目用）\n  - **Pipeline 模式**：A → B → C\n  - **Collaborative 模式**：多 Agent 共同讨论\n- **何时拆**：单 Agent 注意力漂移 + 推理链断裂时\n- **何时不拆**：任务简单、链路短；拆了通信成本反而高\n\n---",
+      "tags": [
+        "Single-Agent",
+        "任务简单、链路短",
+        "Multi-Agent",
+        "Supervisor 模式",
+        "Pipeline 模式"
+      ],
+      "preview": "✅ 答题框架： - Single-Agent：一个 LLM + 所有工具 + 完整上下文；适合任务简单、链路短 - Multi-Agent： - Supervisor 模式：中心节点分发（你项目用） - Pipeline 模式：A → B → C - Collaborative 模式：多 Agent...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q11",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 11,
+      "title": "怎么处理 Multi-Agent 的\"无限循环\"或\"通信冗余\"？",
+      "body": "**✅ 答题框架**：\n1. **循环检测**：状态机控制流程 + 最大迭代次数\n2. **Token 控制**：Agent 间对话摘要处理\n3. **终止条件 (DoD)**：明确定义任务完成的标准\n4. **通信预算**：限制单次任务的 Agent 调用次数 / Token 数\n\n**💡 简历挂钩**：你项目 supervisor 节点的 reviewer 给\"已完成\"信号就是 DoD\n\n---",
+      "tags": [
+        "循环检测",
+        "Token 控制",
+        "终止条件 (DoD)",
+        "通信预算",
+        "ReAct"
+      ],
+      "preview": "✅ 答题框架： 1. 循环检测：状态机控制流程 + 最大迭代次数 2. Token 控制：Agent 间对话摘要处理 3. 终止条件 (DoD)：明确定义任务完成的标准 4. 通信预算：限制单次任务的 Agent 调用次数 / Token 数",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q12",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 12,
+      "title": "AI Agent 的记忆机制，实际开发怎么设计记忆模块？",
+      "body": "**✅ 答题框架**：\n- **工作记忆**：当前任务轨迹 + 关键结论\n- **短期记忆**：当前会话的对话历史（带滚动摘要）\n- **长期记忆**：跨会话信息（向量库 / 结构化存储）\n- **写入要点**：\n  - 区分\"事实\"与\"推断\"\n  - 附带时间戳和来源\n  - 便于更新和撤销\n\n**💡 简历挂钩**：你的 4 级水位线 + Mem0 = 短 + 长期记忆\n\n---",
+      "tags": [
+        "工作记忆",
+        "短期记忆",
+        "长期记忆",
+        "写入要点",
+        "ReAct"
+      ],
+      "preview": "✅ 答题框架： - 工作记忆：当前任务轨迹 + 关键结论 - 短期记忆：当前会话的对话历史（带滚动摘要） - 长期记忆：跨会话信息（向量库 / 结构化存储） - 写入要点： - 区分\"事实\"与\"推断\" - 附带时间戳和来源 - 便于更新和撤销",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q13",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 13,
+      "title": "Agent 的长短期记忆系统怎么做的？记忆怎么存？粒度？用法？",
+      "body": "**✅ 答题框架**：\n- **存**：短期（Postgres/Redis） + 长期（向量库 Mem0/Qdrant）\n- **粒度**：\n  - 短期：消息级 / 摘要级\n  - 长期：实体级（user preference / fact）/ 事件级（task outcome）\n- **用法**：按相关性检索 + 滑动窗口 + 摘要压缩\n\n---",
+      "tags": [
+        "粒度",
+        "用法",
+        "ReAct",
+        "架构",
+        "存储"
+      ],
+      "preview": "✅ 答题框架： - 存：短期（Postgres/Redis） + 长期（向量库 Mem0/Qdrant） - 粒度： - 短期：消息级 / 摘要级 - 长期：实体级（user preference / fact）/ 事件级（task outcome） - 用法：按相关性检索 + 滑动窗口 + 摘要压...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q14",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 14,
+      "title": "Agent 记忆压缩通常有哪些方法？",
+      "body": "**✅ 答题框架**：\n- **滑动窗口 + 摘要生成**\n- **重要性评分**（区分事实/结论/闲聊）\n- **层级化摘要**（会话级/日级/周级）\n- **冲突更新**：带时间戳的新信息优先；用户修正时标记旧信息为过时\n\n**💡 简历挂钩**：你的 4 级水位线 = 分级压缩策略\n\n---",
+      "tags": [
+        "滑动窗口 + 摘要生成",
+        "重要性评分",
+        "层级化摘要",
+        "冲突更新",
+        "ReAct"
+      ],
+      "preview": "✅ 答题框架： - 滑动窗口 + 摘要生成 - 重要性评分（区分事实/结论/闲聊） - 层级化摘要（会话级/日级/周级） - 冲突更新：带时间戳的新信息优先；用户修正时标记旧信息为过时",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q15",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 15,
+      "title": "为什么有时选择\"手搓\"Agent，不用成熟框架？",
+      "body": "**✅ 答题框架**：\n- **手搓原因**：\n  - 框架不满足特殊业务（自定义 state 结构 / 特殊 routing）\n  - 框架黑盒太重，调试痛苦\n  - 团队已有技术栈（NestJS）有 Agent 框架缺失的能力\n- **不手搓原因**：\n  - 通用能力（tool calling / streaming / 状态管理）框架已经写好\n  - 维护成本高\n\n**实务原则**：**通用部分用框架 + 业务部分自己写**——**你项目 supervisor 用 LangGraph，但 LLM Gateway、MCP Registry、4 级水位线全自己写**。\n\n---",
+      "tags": [
+        "手搓原因",
+        "不手搓原因",
+        "实务原则",
+        "通用部分用框架 + 业务部分自己写",
+        "LangGraph"
+      ],
+      "preview": "✅ 答题框架： - 手搓原因： - 框架不满足特殊业务（自定义 state 结构 / 特殊 routing） - 框架黑盒太重，调试痛苦 - 团队已有技术栈（NestJS）有 Agent 框架缺失的能力 - 不手搓原因： - 通用能力（tool calling / streaming / 状态管理）...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "01-Q16",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 16,
+      "title": "如何赋予 LLM 规划能力？",
+      "body": "**✅ 答题框架**：\n- **Prompt 诱导**：让 LLM 输出\"先做 A、再做 B\"的结构化 plan\n- **专用规划模型**：用 GPT-4 做规划，GPT-3.5 做执行（**模型分级**）\n- **Replanner**：执行中根据反馈调整 plan（**Plan-and-Execute + Replan**）\n- **外部 Planner**：PDDL 等规划算法 + LLM 翻译\n\n**💡 简历挂钩**：你项目有 planner + replanner 两个节点\n\n---",
+      "tags": [
+        "Prompt 诱导",
+        "专用规划模型",
+        "模型分级",
+        "Replanner",
+        "Plan-and-Execute + Replan"
+      ],
+      "preview": "✅ 答题框架： - Prompt 诱导：让 LLM 输出\"先做 A、再做 B\"的结构化 plan - 专用规划模型：用 GPT-4 做规划，GPT-3.5 做执行（模型分级） - Replanner：执行中根据反馈调整 plan（Plan-and-Execute + Replan） - 外部 Pla...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q17",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 17,
+      "title": "讲讲 Agent 的反思机制？为什么要用？怎么实现？",
+      "body": "**✅ 答题框架**：\n- **为什么**：LLM 第一遍输出常有问题，**自检 + 重做**比一次性输出质量高\n- **实现 3 种**：\n  1. **Self-Refine**：LLM 自己给自己反馈\n  2. **External Critic**：另一个 LLM / 规则做评审\n  3. **Human-in-the-Loop**：关键环节人审\n- **成本**：反思 = 额外 LLM 调用，**延迟 + token 都涨**，关键场景用\n\n**💡 简历挂钩**：你项目 reviewer 节点就是 External Critic 模式\n\n---",
+      "tags": [
+        "自检 + 重做",
+        "实现 3 种",
+        "Self-Refine",
+        "External Critic",
+        "Human-in-the-Loop"
+      ],
+      "preview": "✅ 答题框架： - 为什么：LLM 第一遍输出常有问题，自检 + 重做比一次性输出质量高 - 实现 3 种： 1. Self-Refine：LLM 自己给自己反馈 2. External Critic：另一个 LLM / 规则做评审 3. Human-in-the-Loop：关键环节人审 - 成本：...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "01-Q18",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 18,
+      "title": "如何设计多 Agent 的协作与动态切换机制？",
+      "body": "**✅ 答题框架**：\n- **静态编排**：硬编码节点顺序（适合流程固定）\n- **动态切换**：\n  - **Supervisor 决策**：中心节点根据 state 选下一步\n  - **Router 函数**：根据输入类型路由\n  - **LLM-as-Router**：让 LLM 决定调哪个 Agent\n- **难点**：状态一致性 + 循环检测\n\n**💡 简历挂钩**：你项目 supervisor 节点是 Supervisor 模式\n\n---",
+      "tags": [
+        "静态编排",
+        "动态切换",
+        "Supervisor 决策",
+        "Router 函数",
+        "LLM-as-Router"
+      ],
+      "preview": "✅ 答题框架： - 静态编排：硬编码节点顺序（适合流程固定） - 动态切换： - Supervisor 决策：中心节点根据 state 选下一步 - Router 函数：根据输入类型路由 - LLM-as-Router：让 LLM 决定调哪个 Agent - 难点：状态一致性 + 循环检测",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q19",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 19,
+      "title": "怎么处理 Agent 的\"状态爆炸\"和\"上下文溢出\"？",
+      "body": "**🎯 考察点**：上下文工程能力（2026 最重要考点之一）\n\n**✅ 答题框架（4 大策略缺一不可）**：\n1. **State Schema 严格化**：只保留核心变量（如 LangGraph TypedDict）\n2. **Trim Strategy**：按语义重要性保留（System Prompt + 最近 N 轮 + 当前任务目标）\n3. **Summary Buffer**：旧对话摘要化，摘要放上下文头部\n4. **分层**：工作记忆 / 短期记忆 / 长期记忆分桶\n\n**4 种上下文错误**：\n- Context Poisoning（错误信息反复重用）\n- Context Distraction（历史干扰新推理）\n- Context Confusion（不相关工具/文档挤爆）\n- Context Clash（矛盾信息误导）\n\n**💡 简历挂钩**：你的 4 级水位线 ContextManager 直接对应这套策略\n\n---",
+      "tags": [
+        "State Schema 严格化",
+        "Trim Strategy",
+        "Summary Buffer",
+        "分层",
+        "4 种上下文错误"
+      ],
+      "preview": "🎯 考察点：上下文工程能力（2026 最重要考点之一）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q20",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 20,
+      "title": "怎么设计 Agent 的长短期记忆？（详细版）",
+      "body": "**✅ 答题框架**：\n- **工作记忆**：当前任务轨迹 + 关键结论\n- **短期记忆**：摘要滚动，避免上下文过长\n- **长期记忆**：向量检索 / 结构化库存储历史\n- **写入要点**：\n  - 区分\"事实\"与\"推断\"\n  - 附带时间戳和来源\n  - 便于更新和撤销\n\n**压缩策略**：\n- 滑动窗口 + 摘要生成\n- 重要性评分（区分事实/结论/闲聊）\n- 层级化摘要（会话级/日级/周级）\n- **冲突更新**：带时间戳的新信息优先；用户修正时标记旧信息为过时\n\n---",
+      "tags": [
+        "工作记忆",
+        "短期记忆",
+        "长期记忆",
+        "写入要点",
+        "压缩策略"
+      ],
+      "preview": "✅ 答题框架： - 工作记忆：当前任务轨迹 + 关键结论 - 短期记忆：摘要滚动，避免上下文过长 - 长期记忆：向量检索 / 结构化库存储历史 - 写入要点： - 区分\"事实\"与\"推断\" - 附带时间戳和来源 - 便于更新和撤销",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q21",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 21,
+      "title": "怎么量化 Agent 的性能？",
+      "body": "**✅ 答题框架**：\n1. **任务成功率**：核心指标\n2. **平均推理步数**：越少成本越低、响应越快\n3. **工具调用准确率**\n4. **端到端延迟 P50/P95**\n5. **Token 成本 / 单任务**\n6. **影子测试 (Shadow Testing)**：新旧 Agent 并行跑，对比输出差异\n\n---",
+      "tags": [
+        "任务成功率",
+        "平均推理步数",
+        "工具调用准确率",
+        "端到端延迟 P50/P95",
+        "Token 成本 / 单任务"
+      ],
+      "preview": "✅ 答题框架： 1. 任务成功率：核心指标 2. 平均推理步数：越少成本越低、响应越快 3. 工具调用准确率 4. 端到端延迟 P50/P95 5. Token 成本 / 单任务 6. 影子测试 (Shadow Testing)：新旧 Agent 并行跑，对比输出差异",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q22",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 22,
+      "title": "Agent 延迟怎么优化？",
+      "body": "**✅ 答题框架**：\n1. **并行**：独立子任务并行调用\n2. **流式输出**：TTFT (Time To First Token) 优化\n3. **缓存**：高频 Prompt 缓存（Anthropic/OpenAI 都支持）\n4. **模型路由**：简单任务用小模型（Haiku / Qwen-Turbo），复杂任务用大模型\n5. **Rerank 预计算**：离线算好，线上只查\n6. **连接池**：LLM API 连接复用，避免握手开销\n\n---",
+      "tags": [
+        "并行",
+        "流式输出",
+        "缓存",
+        "模型路由",
+        "Rerank 预计算"
+      ],
+      "preview": "✅ 答题框架： 1. 并行：独立子任务并行调用 2. 流式输出：TTFT (Time To First Token) 优化 3. 缓存：高频 Prompt 缓存（Anthropic/OpenAI 都支持） 4. 模型路由：简单任务用小模型（Haiku / Qwen-Turbo），复杂任务用大模型 5...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q23",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 23,
+      "title": "Agent 成本怎么控制？",
+      "body": "**✅ 答题框架**：\n1. **模型分级**：快模型执行 + 强模型规划\n2. **Prompt 压缩**：去除冗余\n3. **上下文裁剪**：只保留必要历史\n4. **Rerank 压缩 Top-K**\n5. **缓存命中**：相同 query 直接复用\n6. **批量推理**：合并多个请求\n\n---",
+      "tags": [
+        "模型分级",
+        "Prompt 压缩",
+        "上下文裁剪",
+        "Rerank 压缩 Top-K",
+        "缓存命中"
+      ],
+      "preview": "✅ 答题框架： 1. 模型分级：快模型执行 + 强模型规划 2. Prompt 压缩：去除冗余 3. 上下文裁剪：只保留必要历史 4. Rerank 压缩 Top-K 5. 缓存命中：相同 query 直接复用 6. 批量推理：合并多个请求",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q24",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 24,
+      "title": "Tool Calling 可靠性怎么保证？（5 层）",
+      "body": "**✅ 答题框架**：\n1. **语法层**：JSON Mode / 强类型约束\n2. **逻辑层**：HITL（高风险操作如删库/转账必须人工确认）\n3. **重试层**：参数不合法 → 把报错信息返回 LLM → 自我修复（Self-heal）\n4. **超时/熔断**：慢请求拖垮连接池\n5. **幂等设计**：避免重复执行副作用\n\n**💡 简历挂钩**：你 MCP 工具调用已经做了 1/2/4/5 几层\n\n---",
+      "tags": [
+        "语法层",
+        "逻辑层",
+        "重试层",
+        "超时/熔断",
+        "幂等设计"
+      ],
+      "preview": "✅ 答题框架： 1. 语法层：JSON Mode / 强类型约束 2. 逻辑层：HITL（高风险操作如删库/转账必须人工确认） 3. 重试层：参数不合法 → 把报错信息返回 LLM → 自我修复（Self-heal） 4. 超时/熔断：慢请求拖垮连接池 5. 幂等设计：避免重复执行副作用",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q25",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 25,
+      "title": "LangGraph StateGraph 怎么传数据？共享 State 怎么做到的？",
+      "body": "**🎯 必答**（2025 频繁问）\n\n**✅ 答题框架**：\n- 节点间**不通过 await 传数据**（不像普通 Python 协程）\n- 节点接收 `state`，返回 dict\n- LangGraph 按 **reducer 规则**把返回的 dict 合并回 state\n- **并行用 asyncio.gather**（Pregel 引擎），不是显式 await\n\n**核心 3 个概念**：\n- **State**：所有节点共享的状态对象（TypedDict）\n- **Reducer**：字段级合并规则（add_messages / operator.add / 自定义）\n- **Channel**：LangGraph 内部对 State 字段的实现\n\n**💡 简历挂钩**：你项目 `multi-agent/state.ts` 里的 Annotation 就是这套\n\n---",
+      "tags": [
+        "🎯 必答",
+        "不通过 await 传数据",
+        "reducer 规则",
+        "并行用 asyncio.gather",
+        "核心 3 个概念"
+      ],
+      "preview": "🎯 必答（2025 频繁问）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "01-Q26",
+      "topic": "Agent 基础架构（ReAct、记忆、Multi-Agent、规划）",
+      "number": 26,
+      "title": "LangGraph 并行边 + 多节点 state 怎么汇总？",
+      "body": "**✅ 答题框架**：\n- 多个并行节点都往同一个字段写\n- **必须指定 reducer**（不然默认 overwrite，后写的覆盖前写）\n- 常用 `add_messages`（按 message_id 去重 + 累加）\n- 或自定义 reducer：`(left, right) => merged`\n\n**💡 简历挂钩**：你项目 `add_messages` reducer 已在用",
+      "tags": [
+        "必须指定 reducer",
+        "LangGraph",
+        "ReAct",
+        "add_messages",
+        "(left, right) => merged"
+      ],
+      "preview": "✅ 答题框架： - 多个并行节点都往同一个字段写 - 必须指定 reducer（不然默认 overwrite，后写的覆盖前写） - 常用 （按 message_id 去重 + 累加） - 或自定义 reducer：",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q01",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 1,
+      "title": "什么是 RAG？详细描述完整 RAG 系统的工作流程？",
+      "body": "**🎯 考察点**：RAG 全链路理解\n\n**✅ 答题框架**：\n\n**离线（建索引）**：\n1. Document Loading（PDF/Word/MD/HTML）\n2. Document Splitting（chunk + overlap）\n3. Embedding（chunk → 向量）\n4. Vector Store（Milvus/Qdrant/PgVector）\n\n**在线（每次查询）**：\n5. Query Embedding\n6. Retrieval（top-k）\n7. Reranking（可选）\n8. Prompt Augmentation（拼 prompt）\n9. LLM Generation（要求引用）\n\n**💡 简历挂钩**：你项目 3 个 RAG 场景（简历 / 长期记忆 / 面试题知识库）\n\n---",
+      "tags": [
+        "离线（建索引）",
+        "在线（每次查询）",
+        "PgVector",
+        "RAG",
+        "PDF"
+      ],
+      "preview": "🎯 考察点：RAG 全链路理解",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "02-Q02",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 2,
+      "title": "大模型的 RAG 主要用来解决什么问题？",
+      "body": "**✅ 答题框架**：\n- **私域知识**：LLM 不知道公司业务、候选人简历\n- **知识截止**：LLM 训练数据之后的事不知道\n- **幻觉**：LLM 编造内容\n- **RAG 解法**：实时查文档 + 强制基于检索回答\n\n---",
+      "tags": [
+        "私域知识",
+        "知识截止",
+        "幻觉",
+        "RAG 解法",
+        "LLM"
+      ],
+      "preview": "✅ 答题框架： - 私域知识：LLM 不知道公司业务、候选人简历 - 知识截止：LLM 训练数据之后的事不知道 - 幻觉：LLM 编造内容 - RAG 解法：实时查文档 + 强制基于检索回答",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q03",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 3,
+      "title": "相比直接微调 LLM，RAG 解决了什么问题？两者优劣势？",
+      "body": "**✅ 答题框架**：\n| 维度 | RAG | 微调 |\n|---|---|---|\n| **数据更新** | 实时（文档更新即可）| 重新训练（贵、慢）|\n| **成本** | 低（向量库 + 检索）| 高（GPU 训练）|\n| **可解释性** | 高（点答案看来源）| 低（黑盒）|\n| **适用** | 知识频繁变 | 模型行为/风格调整 |\n| **数据量要求** | 任意 | 大量标注数据 |\n\n**实务**：**RAG 是主力**，**微调做风格对齐**——**两者不冲突**。\n\n---",
+      "tags": [
+        "数据更新",
+        "成本",
+        "可解释性",
+        "适用",
+        "数据量要求"
+      ],
+      "preview": "✅ 答题框架： RAG 实时（文档更新即可） 低（向量库 + 检索） 高（点答案看来源） 知识频繁变 任意",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q04",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 4,
+      "title": "为什么要对长文档切片？不切片会怎样？",
+      "body": "**🎯 考察点**：检索粒度 + Embedding 模型限制\n\n**✅ 答题框架**：\n- **必须切的原因**：\n  1. Embedding 模型有 max input length（截断 = 丢信息）\n  2. 整文档向量 = 信息稀释，匹配不了具体问题\n  3. 不相关信息会污染检索上下文\n- **不切的后果**：截断丢信息 / 检索不准 / 上下文污染 / 效率低\n\n---",
+      "tags": [
+        "必须切的原因",
+        "不切的后果",
+        "RAG",
+        "原理"
+      ],
+      "preview": "🎯 考察点：检索粒度 + Embedding 模型限制",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "02-Q05",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 5,
+      "title": "RAG 中的文档是怎么存的？粒度是多大？详细说说文档切割策略？",
+      "body": "**✅ 答题框架**：\n- **存**：原文（Postgres）+ 向量（向量库）+ metadata\n- **粒度**：\n  - **小粒度**（128-256 token）：精准召回，但缺上下文\n  - **中粒度**（512 token + 10-20% overlap）：**通用首选**\n  - **大粒度**（1024+ token）：上下文完整，但检索粒度粗\n- **切分策略**：\n  - 固定大小切分（RecursiveCharacterTextSplitter）\n  - 按结构切（MarkdownHeaderTextSplitter）\n  - 语义切（SemanticChunker）\n  - 父子切片（父块完整 + 子块精排）\n\n**💡 简历挂钩**：你项目用 RecursiveCharacterTextSplitter\n\n---",
+      "tags": [
+        "粒度",
+        "小粒度",
+        "中粒度",
+        "通用首选",
+        "大粒度"
+      ],
+      "preview": "✅ 答题框架： - 存：原文（Postgres）+ 向量（向量库）+ metadata - 粒度： - 小粒度（128-256 token）：精准召回，但缺上下文 - 中粒度（512 token + 10-20% overlap）：通用首选 - 大粒度（1024+ token）：上下文完整，但检索粒...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q06",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 6,
+      "title": "切片时重叠区域的作用？怎么定比例？",
+      "body": "**✅ 答题框架**：\n- **作用**：保证跨切片语义连续性 + 提高召回率\n- **比例**：通常 10-20%；语义连贯性要求高的场景可适当增大\n\n**💡 简历挂钩**：你天龙八部 RAG 用过\"按标点+语义\"结合的切片策略\n\n---",
+      "tags": [
+        "作用",
+        "比例",
+        "RAG",
+        "场景"
+      ],
+      "preview": "✅ 答题框架： - 作用：保证跨切片语义连续性 + 提高召回率 - 比例：通常 10-20%；语义连贯性要求高的场景可适当增大",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q07",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 7,
+      "title": "怎么规避语义被切割掉的问题？",
+      "body": "**✅ 答题框架**：\n- **chunk overlap**（10-20%）—— 兜底基础\n- **按结构切**（标题、段落、句子边界）—— 别切在中间\n- **父子切片**（父块完整 + 子块精排）—— 双粒度\n- **特殊处理**：\n  - 表格 → 整表 + 字段级\n  - 代码 → 整函数\n  - 列表 → 整组\n\n---",
+      "tags": [
+        "chunk overlap",
+        "按结构切",
+        "父子切片",
+        "特殊处理",
+        "RAG"
+      ],
+      "preview": "✅ 答题框架： - chunk overlap（10-20%）—— 兜底基础 - 按结构切（标题、段落、句子边界）—— 别切在中间 - 父子切片（父块完整 + 子块精排）—— 双粒度 - 特殊处理： - 表格 → 整表 + 字段级 - 代码 → 整函数 - 列表 → 整组",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "02-Q08",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 8,
+      "title": "在 RAG 中 Embedding 是什么？如何选择和评估？",
+      "body": "**✅ 答题框架**：\n- **是什么**：把文本映射到固定维度的稠密向量（**语义压缩**）\n- **选型 4 个维度**：\n  - **语言**：中文用 BGE-large-zh / M3E，英文用 text-embedding-3\n  - **领域**：通用 vs 垂类（医疗 BGE-medical）\n  - **维度**：768/1024/1536（维度大 → 精度高 + 存储贵）\n  - **成本**：OpenAI vs 开源（BGE）\n- **评估**：\n  - **MTEB 基准**（Massive Text Embedding Benchmark）\n  - **业务评测集**（自己标注 100-500 条问题-答案对）\n  - **Recall@K + MRR**\n\n---",
+      "tags": [
+        "是什么",
+        "语义压缩",
+        "选型 4 个维度",
+        "语言",
+        "领域"
+      ],
+      "preview": "✅ 答题框架： - 是什么：把文本映射到固定维度的稠密向量（语义压缩） - 选型 4 个维度： - 语言：中文用 BGE-large-zh / M3E，英文用 text-embedding-3 - 领域：通用 vs 垂类（医疗 BGE-medical） - 维度：768/1024/1536（维度大 ...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q09",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 9,
+      "title": "Embedding 有哪几种算法你了解过？",
+      "body": "**✅ 答题框架**：\n- **Word2Vec / GloVe**：静态词向量（不 contextual）\n- **BERT 系**：contextual，但句向量取 [CLS] 不一定好\n- **Sentence-BERT（S-BERT）**：专门训句向量，cosine 直接用\n- **BGE（BAAI）**：中文最强开源之一\n- **M3E**：MokaAI 开源，中文友好\n- **OpenAI text-embedding-3**：闭源最强，1536/3072 维\n- **Cohere embed-v3**：英文好\n\n---",
+      "tags": [
+        "Word2Vec / GloVe",
+        "BERT 系",
+        "Sentence-BERT（S-BERT）",
+        "BGE（BAAI）",
+        "M3E"
+      ],
+      "preview": "✅ 答题框架： - Word2Vec / GloVe：静态词向量（不 contextual） - BERT 系：contextual，但句向量取 [CLS] 不一定好 - Sentence-BERT（S-BERT）：专门训句向量，cosine 直接用 - BGE（BAAI）：中文最强开源之一 - M...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q10",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 10,
+      "title": "什么是向量数据库？有没有做过向量数据库的对比选型？",
+      "body": "**✅ 答题框架**：\n- **定义**：专门存 + 检索高维向量的数据库\n- **核心能力**：ANN（近似最近邻）检索\n- **选型对比**：\n  - **Qdrant**：Rust 实现，性能好，过滤强\n  - **Milvus**：分布式生产级，亿级向量\n  - **PgVector**：和 PG 共用一套运维，规模小省事\n  - **Pinecone**：全托管云\n  - **Chroma**：轻量，本地开发\n\n**选型逻辑**：数据规模 + 团队运维 + 是否混合检索 + 延迟要求\n\n**💡 简历挂钩**：你项目用 Qdrant（中等规模 + 强过滤 + Rust 性能）\n\n---",
+      "tags": [
+        "定义",
+        "核心能力",
+        "选型对比",
+        "Qdrant",
+        "Milvus"
+      ],
+      "preview": "✅ 答题框架： - 定义：专门存 + 检索高维向量的数据库 - 核心能力：ANN（近似最近邻）检索 - 选型对比： - Qdrant：Rust 实现，性能好，过滤强 - Milvus：分布式生产级，亿级向量 - PgVector：和 PG 共用一套运维，规模小省事 - Pinecone：全托管云 -...",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "02-Q11",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 11,
+      "title": "讲讲你用的向量数据库？数据量级？性能？瓶颈？",
+      "body": "**✅ 答题框架**：套你的项目——\n- 用 **Qdrant**（**简历亮点**）\n- 数据量级：**面试题库 ~10w-100w**（你项目真实数据）\n- 性能：**p99 延迟 < 50ms**\n- 瓶颈：metadata 过滤复杂时性能下降（Qdrant 仍比 Milvus 好）\n\n---",
+      "tags": [
+        "Qdrant",
+        "简历亮点",
+        "面试题库 ~10w-100w",
+        "p99 延迟 < 50ms",
+        "RAG"
+      ],
+      "preview": "✅ 答题框架：套你的项目—— - 用 Qdrant（简历亮点） - 数据量级：面试题库 ~10w-100w（你项目真实数据） - 性能：p99 延迟 < 50ms - 瓶颈：metadata 过滤复杂时性能下降（Qdrant 仍比 Milvus 好）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q12",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 12,
+      "title": "你使用 RAG 给大模型一个输入，系统是怎样的工作流程？",
+      "body": "**🎯 考察点**：完整流程描述能力\n\n**✅ 答题框架**（按 Q1 那 9 步讲）—— **考察能不能把流程讲顺**\n\n**💡 简历挂钩**：讲你项目 3 个 RAG 场景的具体调用流程\n\n---",
+      "tags": [
+        "考察能不能把流程讲顺",
+        "RAG",
+        "场景"
+      ],
+      "preview": "🎯 考察点：完整流程描述能力",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q13",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 13,
+      "title": "向量检索 vs 关键词检索（BM25）的区别？",
+      "body": "**✅ 答题框架**：\n| 维度 | 向量 | 关键词（BM25）|\n|------|------|---------------|\n| **原理** | 语义相似度 | 词频 + 文档频率 |\n| **擅长** | 同义 / 跨语言 | 精确词面 / 专有名词 |\n| **不擅长** | 专有名词 / 代码 | 同义改写 |\n| **计算** | 慢 | 快 |\n\n**生产实践**：**Hybrid 召回（向量 + BM25）**——**互补**。\n\n---",
+      "tags": [
+        "原理",
+        "擅长",
+        "不擅长",
+        "计算",
+        "生产实践"
+      ],
+      "preview": "✅ 答题框架： 向量 语义相似度 同义 / 跨语言 专有名词 / 代码 慢",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "02-Q14",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 14,
+      "title": "余弦相似度 vs 欧氏距离，各自优劣？",
+      "body": "**✅ 答题框架**：\n| 度量 | 优点 | 缺点 |\n|------|------|------|\n| 余弦 | 不敏感向量长度，关注方向差异 | 不考虑绝对距离 |\n| 欧氏 | 考虑绝对距离，对数值差异敏感 | 受向量长度影响 |\n\n**实战选择**：文本向量归一化后用余弦；如果向量长度包含置信度信息用欧氏\n\n---",
+      "tags": [
+        "实战选择",
+        "RAG",
+        "场景",
+        "对比"
+      ],
+      "preview": "✅ 答题框架： 优点 不敏感向量长度，关注方向差异 考虑绝对距离，对数值差异敏感",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q15",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 15,
+      "title": "Top-K 过大有什么负面影响？",
+      "body": "**✅ 答题框架**：\n- 信息过载、模型被不相关干扰\n- 上下文浪费（占 token）\n- 答案漂移（引入冲突信息）\n- 延迟增加\n\n**实践**：通常 K=5-10，配 Rerank 压到 K=3-5\n\n---",
+      "tags": [
+        "实践",
+        "RAG",
+        "性能"
+      ],
+      "preview": "✅ 答题框架： - 信息过载、模型被不相关干扰 - 上下文浪费（占 token） - 答案漂移（引入冲突信息） - 延迟增加",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q16",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 16,
+      "title": "为什么初筛后还要 Rerank？",
+      "body": "**🎯 考察点**：对向量检索局限性的理解深度\n\n**✅ 答题框架**：\n- **核心原因**：向量相似度 ≠ 语义相关性\n- **解决的局限**：\n  1. 词汇不匹配（语义相似但用词不同）\n  2. 切片粒度不完美\n  3. 多跳推理（需要组合多个片段）\n  4. 时效性（向量搜不到时间因素）\n- **机制**：bi-encoder 召回 → cross-encoder 精排\n\n**💡 简历挂钩**：Cross-Encoder（BGE-Reranker）是你 GenAI 简历的常见技术点\n\n---",
+      "tags": [
+        "核心原因",
+        "解决的局限",
+        "机制",
+        "BGE",
+        "RAG"
+      ],
+      "preview": "🎯 考察点：对向量检索局限性的理解深度",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "02-Q17",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 17,
+      "title": "如何润色用户的 Query（Query Rewrite）？目的是什么？",
+      "body": "**✅ 答题框架**：\n- **目的**：把口语化 query 改成信息密集的标准化表达\n- **方法**：\n  1. **同义词改写**：\"苹果手机\" → \"iPhone\"\n  2. **多角度扩展**：原 query → 3-5 个相关 query\n  3. **子问题拆解**：复杂多面 query → 多个子 query\n  4. **HyDE**：让 LLM 先生成假设性答案再检索\n- **效果**：召回率从 60% 提到 85%\n\n**💡 简历挂钩**：你问数 Agent 已经用 query 改写\n\n---",
+      "tags": [
+        "目的",
+        "方法",
+        "同义词改写",
+        "多角度扩展",
+        "子问题拆解"
+      ],
+      "preview": "✅ 答题框架： - 目的：把口语化 query 改成信息密集的标准化表达 - 方法： 1. 同义词改写：\"苹果手机\" → \"iPhone\" 2. 多角度扩展：原 query → 3-5 个相关 query 3. 子问题拆解：复杂多面 query → 多个子 query 4. HyDE：让 LLM 先...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q18",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 18,
+      "title": "什么是多路召回？具体怎么做？",
+      "body": "**✅ 答题框架**：\n- **定义**：用多种检索方式并行召回，结果融合\n- **常见组合**：\n  - 向量召回（语义）\n  - BM25（关键词）\n  - 全文检索（ES）\n  - 元数据过滤（标签 / 时间 / 作者）\n- **融合算法**：\n  - **RRF**（Reciprocal Rank Fusion）\n  - **加权打分**\n  - **去重后取 top-K**\n\n**💡 简历挂钩**：你项目用 hybrid 召回（向量 + BM25）\n\n---",
+      "tags": [
+        "定义",
+        "常见组合",
+        "融合算法",
+        "RRF",
+        "加权打分"
+      ],
+      "preview": "✅ 答题框架： - 定义：用多种检索方式并行召回，结果融合 - 常见组合： - 向量召回（语义） - BM25（关键词） - 全文检索（ES） - 元数据过滤（标签 / 时间 / 作者） - 融合算法： - RRF（Reciprocal Rank Fusion） - 加权打分 - 去重后取 top-...",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "02-Q19",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 19,
+      "title": "RAG 检索优化策略有哪些？",
+      "body": "**✅ 答题框架**（**4 件套**）：\n1. **Query 改写**（口语 → 标准化）\n2. **混合检索**（向量 + BM25）\n3. **Rerank**（cross-encoder 精排）\n4. **动态 Top-K**（按 query 长度 / 分数阈值）\n\n**进阶**：\n- 父子切片\n- 元数据过滤\n- 查询路由（不同类型 query 走不同索引）\n\n---",
+      "tags": [
+        "4 件套",
+        "Query 改写",
+        "混合检索",
+        "Rerank",
+        "动态 Top-K"
+      ],
+      "preview": "✅ 答题框架（4 件套）： 1. Query 改写（口语 → 标准化） 2. 混合检索（向量 + BM25） 3. Rerank（cross-encoder 精排） 4. 动态 Top-K（按 query 长度 / 分数阈值）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q20",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 20,
+      "title": "了解哪些更复杂的 RAG 范式？",
+      "body": "**✅ 答题框架**：\n- **Agentic RAG**：LLM 决定要不要再查、查什么\n- **Self-RAG**：模型自己评估检索结果质量\n- **GraphRAG**：用图数据库辅助关系检索\n- **HyDE**：假设性文档嵌入\n- **多模态 RAG**：检索图像 / 表格 / 视频\n- **CRAG（Corrective RAG）**：检索后评估，差就改策略\n\n---",
+      "tags": [
+        "Agentic RAG",
+        "Self-RAG",
+        "GraphRAG",
+        "HyDE",
+        "多模态 RAG"
+      ],
+      "preview": "✅ 答题框架： - Agentic RAG：LLM 决定要不要再查、查什么 - Self-RAG：模型自己评估检索结果质量 - GraphRAG：用图数据库辅助关系检索 - HyDE：假设性文档嵌入 - 多模态 RAG：检索图像 / 表格 / 视频 - CRAG（Corrective RAG）：检索...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q21",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 21,
+      "title": "在什么场景下，你会选择用图数据库增强传统向量检索？",
+      "body": "**✅ 答题框架**：\n- **多度关系遍历**：二度人脉、推荐系统的协同过滤\n- **关系多于属性**：知识图谱、社交网络\n- **选型标准**：Neo4j / Memgraph\n- **生产实践**：**关系型 + 图混用**——核心数据在 MySQL，图数据同步\n\n**💡 简历挂钩**：你 MCP Registry 选 PG（关系浅 + MVP 阶段）就是这个判断\n\n---",
+      "tags": [
+        "多度关系遍历",
+        "关系多于属性",
+        "选型标准",
+        "生产实践",
+        "关系型 + 图混用"
+      ],
+      "preview": "✅ 答题框架： - 多度关系遍历：二度人脉、推荐系统的协同过滤 - 关系多于属性：知识图谱、社交网络 - 选型标准：Neo4j / Memgraph - 生产实践：关系型 + 图混用——核心数据在 MySQL，图数据同步",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q22",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 22,
+      "title": "如何规避 RAG 系统中大模型的幻觉？",
+      "body": "**✅ 答题框架（组合拳）**：\n1. **检索增强**：让模型基于检索内容回答\n2. **Prompt 工程**：明确\"基于提供的文档回答\" + 不知道就说不知道\n3. **边界设定**：要求引用来源，标注文档 ID/URL\n4. **多轮验证**：让模型自检\n5. **温度调低**：降低随机性\n6. **结构化输出**：先列证据再给结论\n\n**⚠️ 踩坑点**：只说\"加 Prompt\"不量化效果\n\n---",
+      "tags": [
+        "检索增强",
+        "Prompt 工程",
+        "边界设定",
+        "多轮验证",
+        "温度调低"
+      ],
+      "preview": "✅ 答题框架（组合拳）： 1. 检索增强：让模型基于检索内容回答 2. Prompt 工程：明确\"基于提供的文档回答\" + 不知道就说不知道 3. 边界设定：要求引用来源，标注文档 ID/URL 4. 多轮验证：让模型自检 5. 温度调低：降低随机性 6. 结构化输出：先列证据再给结论",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q23",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 23,
+      "title": "怎么量化你的 RAG 效果？",
+      "body": "**✅ 答题框架（双维度）**：\n- **检索质量**：\n  - **Recall@K**：召回了多少相关文档\n  - **MRR**：第一个相关文档排多前\n  - **NDCG**：考虑排序质量\n- **生成质量**：\n  - **人工评分**（1-5 分）\n  - **Faithfulness**：答案是否忠于原文（RAG Triad）\n  - **Answer Relevance**：答案是否对题\n  - **Context Relevance**：检索内容是否对题\n  - **LLM-as-Judge**：用 LLM 评 LLM\n\n**💡 简历挂钩**：你简历说\"召回率从 60% 提升到 85%\"—— 面试官会问\"怎么算的\"——**必须能讲清楚**。\n\n---",
+      "tags": [
+        "检索质量",
+        "Recall@K",
+        "MRR",
+        "NDCG",
+        "生成质量"
+      ],
+      "preview": "✅ 答题框架（双维度）： - 检索质量： - Recall@K：召回了多少相关文档 - MRR：第一个相关文档排多前 - NDCG：考虑排序质量 - 生成质量： - 人工评分（1-5 分） - Faithfulness：答案是否忠于原文（RAG Triad） - Answer Relevance：答...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q24",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 24,
+      "title": "RAG 知识库如何实现动态与持续更新？",
+      "body": "**✅ 答题框架**：\n- **离线批量**：定时跑全量重建\n- **增量更新**：只对新增 / 修改的文档向量化\n- **混合方案**：\n  - **新增** → 实时向量化 + 入库\n  - **修改** → 删除旧向量 + 入新向量\n  - **删除** → 标记 tombstone\n- **难点**：一致性 + 重建策略\n\n**💡 简历挂钩**：你项目面试题知识库有 POST/batch 端点\n\n---",
+      "tags": [
+        "离线批量",
+        "增量更新",
+        "混合方案",
+        "新增",
+        "修改"
+      ],
+      "preview": "✅ 答题框架： - 离线批量：定时跑全量重建 - 增量更新：只对新增 / 修改的文档向量化 - 混合方案： - 新增 → 实时向量化 + 入库 - 修改 → 删除旧向量 + 入新向量 - 删除 → 标记 tombstone - 难点：一致性 + 重建策略",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q25",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 25,
+      "title": "在实际落地中，RAG 最难的地方是哪里？",
+      "body": "**🎯 考察点**：实战经验深度\n\n**✅ 答题框架**（**必答——问数 Agent / RAG 工程化\"4 层防线\"思想**）：\n- **数据层**：文档质量参差（OCR 错、扫描件、格式乱）\n- **检索层**：召回率 vs 精度的平衡\n- **生成层**：幻觉 + 长上下文丢失\n- **运营层**：badcase 收集 + 评测集维护\n\n**真实工程经验**：\n- **没有\"银弹\"**——每加一个数据源 / 业务，调优工作重来\n- **评测集是关键**——没有评测集，调优靠\"感觉\"\n- **LLM-as-Judge 是工程化利器**——但要小心 LLM 偏见\n- **引用追溯是信任基石**——点答案能看来源\n\n---",
+      "tags": [
+        "）：\n-",
+        "：文档质量参差（OCR 错、扫描件、格式乱）\n-",
+        "：召回率 vs 精度的平衡\n-",
+        "：幻觉 + 长上下文丢失\n-",
+        "：badcase 收集 + 评测集维护"
+      ],
+      "preview": "🎯 考察点：实战经验深度",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q26",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 26,
+      "title": "怎么用 ES 优化 RAG 检索？",
+      "body": "**✅ 答题框架**：\n- ES 负责**全文搜索 + 聚合分析 + 多字段筛选**\n- 向量数据库负责**语义检索**\n- **Hybrid 召回**：ES（BM25）+ 向量库（dense）→ RRF 融合\n- **生产实践**：**互补不是替代**\n\n---",
+      "tags": [
+        "全文搜索 + 聚合分析 + 多字段筛选",
+        "语义检索",
+        "Hybrid 召回",
+        "生产实践",
+        "互补不是替代"
+      ],
+      "preview": "✅ 答题框架： - ES 负责全文搜索 + 聚合分析 + 多字段筛选 - 向量数据库负责语义检索 - Hybrid 召回：ES（BM25）+ 向量库（dense）→ RRF 融合 - 生产实践：互补不是替代",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "02-Q27",
+      "topic": "RAG 检索增强（切片、Embedding、向量库）",
+      "number": 27,
+      "title": "怎么减小 RAG 的延迟？",
+      "body": "**✅ 答题框架**：\n- **流式输出**：TTFT 优化\n- **embedding 缓存**：相同 query 复用\n- **预计算 Rerank**：离线算好候选集\n- **连接池**：ES / 向量库连接复用\n- **并行**：embedding + 检索 + LLM 第一 token 异步",
+      "tags": [
+        "流式输出",
+        "embedding 缓存",
+        "预计算 Rerank",
+        "连接池",
+        "并行"
+      ],
+      "preview": "✅ 答题框架： - 流式输出：TTFT 优化 - embedding 缓存：相同 query 复用 - 预计算 Rerank：离线算好候选集 - 连接池：ES / 向量库连接复用 - 并行：embedding + 检索 + LLM 第一 token 异步",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q01",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 1,
+      "title": "什么是 Function Calling？原理是什么？",
+      "body": "**🎯 考察点**：协议理解深度\n\n**✅ 答题框架**：\n1. 系统 Prompt 中定义工具列表（名称、描述、参数 schema）\n2. LLM 输出结构化 JSON：`{\"tool\": \"search\", \"args\": {...}}`\n3. 应用层解析 JSON 执行真实调用\n4. 工具结果回传 LLM，生成最终答案\n- **本质**：意图识别 + 参数提取\n- **演进**：从 Prompt 诱导 → 原生结构化输出（JSON Mode）\n\n---",
+      "tags": [
+        "本质",
+        "演进",
+        "LLM",
+        "JSON",
+        "MCP"
+      ],
+      "preview": "🎯 考察点：协议理解深度",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "03-Q02",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 2,
+      "title": "Function Calling 和 Tool Calling 是一回事吗？",
+      "body": "**✅ 答题框架**：\n- 不完全一样\n- **Function Calling**：OpenAI 的命名，强调\"函数\"\n- **Tool Calling**：行业通用术语，范围更广（API / 数据库 / 代码执行 / 其他 Agent）\n\n---",
+      "tags": [
+        "Function Calling",
+        "Tool Calling",
+        "API",
+        "MCP",
+        "存储"
+      ],
+      "preview": "✅ 答题框架： - 不完全一样 - Function Calling：OpenAI 的命名，强调\"函数\" - Tool Calling：行业通用术语，范围更广（API / 数据库 / 代码执行 / 其他 Agent）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q03",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 3,
+      "title": "LLM 是如何学会调用外部工具的？",
+      "body": "**✅ 答题框架**：\n- **预训练阶段**：海量文本中见过 function call 模式\n- **指令微调（SFT）**：用 function call 标注数据微调\n- **RLHF / DPO**：让模型偏好\"正确的 function call 格式\"\n- **关键**：模型不是\"学\"了工具，是\"学\"了\"该调工具时输出结构化 JSON\"\n\n---",
+      "tags": [
+        "预训练阶段",
+        "指令微调（SFT）",
+        "RLHF / DPO",
+        "关键",
+        "SFT"
+      ],
+      "preview": "✅ 答题框架： - 预训练阶段：海量文本中见过 function call 模式 - 指令微调（SFT）：用 function call 标注数据微调 - RLHF / DPO：让模型偏好\"正确的 function call 格式\" - 关键：模型不是\"学\"了工具，是\"学\"了\"该调工具时输出结构化 ...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q04",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 4,
+      "title": "大模型的 Function Call 能力是怎么训练出来的？",
+      "body": "**✅ 答题框架**：\n- **SFT 数据**：人工标注\"在 X 场景下，调用 Y 工具，参数是 Z\"\n- **格式约束**：JSON Schema / function tag 强制输出格式\n- **RLHF**：让模型偏好\"调对工具 + 参数对\"的行为\n- **拒答训练**：没把握时输出\"无法调用\"\n\n---",
+      "tags": [
+        "SFT 数据",
+        "格式约束",
+        "RLHF",
+        "拒答训练",
+        "SFT"
+      ],
+      "preview": "✅ 答题框架： - SFT 数据：人工标注\"在 X 场景下，调用 Y 工具，参数是 Z\" - 格式约束：JSON Schema / function tag 强制输出格式 - RLHF：让模型偏好\"调对工具 + 参数对\"的行为 - 拒答训练：没把握时输出\"无法调用\"",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q05",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 5,
+      "title": "什么是 MCP（模型上下文协议）？讲讲它的核心内容？",
+      "body": "**🎯 考察点**：协议理解 + 和传统工具调用的区别\n\n**✅ 答题框架**：\n- **MCP (Model Context Protocol)**：Anthropic 提出的开放协议，标准化 LLM 与外部数据源/工具的连接\n- **核心组件**：\n  - **MCP Server**：服务插件（本地进程或远程部署），暴露 Tools / Resources / Prompts\n  - **MCP Client**：LLM 应用用 Client SDK 创建 Server 会话\n  - **MCP Host**：跑 LLM 的应用（Cursor / Claude Desktop / 你的 NestJS）\n- **vs Function Calling**：FC 是模型能力（输出 JSON），MCP 是传输协议（解决 N×M 适配问题）\n- **核心价值**：把\"工具-LLM 适配\"从 N×M 降到 N+M\n\n**💡 简历挂钩**：你写过 stdio MCP server，**这是你简历亮点**\n\n---",
+      "tags": [
+        "MCP (Model Context Protocol)",
+        "核心组件",
+        "MCP Server",
+        "MCP Client",
+        "MCP Host"
+      ],
+      "preview": "🎯 考察点：协议理解 + 和传统工具调用的区别",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "03-Q06",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 6,
+      "title": "MCP 由哪几部分组成？",
+      "body": "**✅ 答题框架**：\n- **Host**：跑 LLM 的应用（你的 NestJS API）\n- **Client**：Host 内部跟 Server 通信的客户端\n- **Server**：暴露工具/资源/提示的服务\n- **协议层**：JSON-RPC 2.0（应用层）+ stdio/SSE/streamable HTTP（传输层）\n- **能力**：Tools（工具）/ Resources（资源）/ Prompts（提示模板）/ Sampling（让 LLM 反向生成）\n\n---",
+      "tags": [
+        "Host",
+        "Client",
+        "Server",
+        "协议层",
+        "能力"
+      ],
+      "preview": "✅ 答题框架： - Host：跑 LLM 的应用（你的 NestJS API） - Client：Host 内部跟 Server 通信的客户端 - Server：暴露工具/资源/提示的服务 - 协议层：JSON-RPC 2.0（应用层）+ stdio/SSE/streamable HTTP（传输层）...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q07",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 7,
+      "title": "MCP 和 Function Calling 有什么区别？有没有实际跑过 MCP？",
+      "body": "**✅ 答题框架**：\n- **FC**：模型能力，输出结构化 JSON\n- **MCP**：传输协议，标准化\"调外部工具\"的过程\n- **关系**：**MCP 不替代 FC**——MCP 是 FC 之后的\"调用执行层\"\n- **MCP 解决 N×M 问题**：N 个工具 + M 个 LLM，不用写 N×M 适配\n\n**💡 简历挂钩**：你写过 stdio MCP server，**真跑过**\n\n---",
+      "tags": [
+        "FC",
+        "MCP",
+        "关系",
+        "MCP 不替代 FC",
+        "MCP 解决 N×M 问题"
+      ],
+      "preview": "✅ 答题框架： - FC：模型能力，输出结构化 JSON - MCP：传输协议，标准化\"调外部工具\"的过程 - 关系：MCP 不替代 FC——MCP 是 FC 之后的\"调用执行层\" - MCP 解决 N×M 问题：N 个工具 + M 个 LLM，不用写 N×M 适配",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q08",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 8,
+      "title": "Function Calling 什么场景用？MCP 什么场景用？",
+      "body": "**✅ 答题框架**：\n- **FC 适合**：少量工具 + 单一 LLM + 不需要跨框架复用\n- **MCP 适合**：多工具 + 多 LLM + 需要统一接入 + 团队协作\n- **判断标准**：\n  - 1-2 个工具 → FC\n  - 5+ 工具 + 多人协作 → MCP\n  - 跨 LLM 复用 → MCP（核心优势）\n\n---",
+      "tags": [
+        "FC 适合",
+        "MCP 适合",
+        "判断标准",
+        "FC",
+        "LLM"
+      ],
+      "preview": "✅ 答题框架： - FC 适合：少量工具 + 单一 LLM + 不需要跨框架复用 - MCP 适合：多工具 + 多 LLM + 需要统一接入 + 团队协作 - 判断标准： - 1-2 个工具 → FC - 5+ 工具 + 多人协作 → MCP - 跨 LLM 复用 → MCP（核心优势）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q09",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 9,
+      "title": "为什么有些特定的推理模型不支持 MCP 协议？",
+      "body": "**✅ 答题框架**：\n- **推理模型**（如 o1 / DeepSeek-R1）**专注于深度推理**，不擅长\"快速反应 + 多轮工具调用\"\n- **MCP 协议设计**默认\"快速 IO + 多轮\"——**推理模型的 token 速度慢 + 思考 token 算钱**\n- **协议兼容性**：MCP 需要 tool call 能力的原生支持，**部分推理模型只给文本生成**\n- **未来**：MCP 2.0 可能专门适配推理模型\n\n---",
+      "tags": [
+        "推理模型",
+        "专注于深度推理",
+        "MCP 协议设计",
+        "推理模型的 token 速度慢 + 思考 token 算钱",
+        "协议兼容性"
+      ],
+      "preview": "✅ 答题框架： - 推理模型（如 o1 / DeepSeek-R1）专注于深度推理，不擅长\"快速反应 + 多轮工具调用\" - MCP 协议设计默认\"快速 IO + 多轮\"——推理模型的 token 速度慢 + 思考 token 算钱 - 协议兼容性：MCP 需要 tool call 能力的原生支持，...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "03-Q10",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 10,
+      "title": "Skill 是什么？",
+      "body": "**✅ 答题框架**：\n- **Skill = 预定义指令 + 触发机制 + 工具组合**\n- **类比**：\n  - Prompt = 临时口头交代\n  - Skill = 培训手册\n- **特征**：预定义 / 可触发 / 可组合\n\n---",
+      "tags": [
+        "Skill = 预定义指令 + 触发机制 + 工具组合",
+        "类比",
+        "特征",
+        "MCP",
+        "原理"
+      ],
+      "preview": "✅ 答题框架： - Skill = 预定义指令 + 触发机制 + 工具组合 - 类比： - Prompt = 临时口头交代 - Skill = 培训手册 - 特征：预定义 / 可触发 / 可组合",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q11",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 11,
+      "title": "MCP 和 Agent Skill 的区别是什么？",
+      "body": "**✅ 答题框架**：\n| 维度 | MCP | Skills |\n|------|-----|--------|\n| 定位 | 协议，工具连接标准 | 完整功能单元（代码+配置） |\n| 范围 | 专注工具连接 + 上下文 | 包含推理逻辑、工具调用、工作流 |\n| 灵活性 | 通用协议 | 完整应用级 |\n| 抽象层级 | 较低层 | 较高层 |\n\n**一句话**：MCP = \"怎么连工具\"，Skills = \"怎么完成任务\"\n\n---",
+      "tags": [
+        "一句话",
+        "MCP",
+        "工具",
+        "算法",
+        "场景"
+      ],
+      "preview": "✅ 答题框架： MCP 协议，工具连接标准 专注工具连接 + 上下文 通用协议 较低层",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q12",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 12,
+      "title": "Function Calling、Skill、MCP 这三个有什么区别？",
+      "body": "**✅ 答题框架**：\n- **Function Calling**：**模型能力**（输出 JSON）\n- **MCP**：**传输协议**（标准化工具接入）\n- **Skill**：**预定义工作流**（完整的\"怎么用工具完成任务\"封装）\n\n**协作关系**：\n- LLM 用 **FC** 决定调啥\n- **MCP** 协议把\"调啥\"传出去 + 接回结果\n- **Skill** 封装\"完成这个任务需要哪些 MCP 工具 + 怎么组合\"\n\n---",
+      "tags": [
+        "Function Calling",
+        "模型能力",
+        "MCP",
+        "传输协议",
+        "Skill"
+      ],
+      "preview": "✅ 答题框架： - Function Calling：模型能力（输出 JSON） - MCP：传输协议（标准化工具接入） - Skill：预定义工作流（完整的\"怎么用工具完成任务\"封装）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q13",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 13,
+      "title": "什么是 A2A 协议？它和 MCP 的区别是什么？",
+      "body": "**✅ 答题框架**：\n- **A2A (Agent-to-Agent)**：Google 等推动的 **Agent 之间**通信协议\n- **MCP**：**Agent ↔ 工具 / 数据**的协议\n- **核心区别**：\n  - **MCP** = Agent 用工具（**纵向**）\n  - **A2A** = Agent 找 Agent（**横向**）\n- **场景**：\n  - 你的 Agent 不会做 X → **A2A** 找会做的 Agent\n  - 你的 Agent 要查数据库 → **MCP** 连数据库\n- **未来**：两者会共存 + 互补\n\n---",
+      "tags": [
+        "A2A (Agent-to-Agent)",
+        "Agent 之间",
+        "MCP",
+        "Agent ↔ 工具 / 数据",
+        "核心区别"
+      ],
+      "preview": "✅ 答题框架： - A2A (Agent-to-Agent)：Google 等推动的 Agent 之间通信协议 - MCP：Agent ↔ 工具 / 数据的协议 - 核心区别： - MCP = Agent 用工具（纵向） - A2A = Agent 找 Agent（横向） - 场景： - 你的 Ag...",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "03-Q14",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 14,
+      "title": "MCP 协议通常采用什么通信方式？",
+      "body": "**🎯 考察点**：3 种 transport\n\n**✅ 答题框架**：\n- **stdio**：本地子进程，stdin/stdout 通信\n- **SSE**：HTTP 长连接，单向服务器推送（旧版）\n- **Streamable HTTP**：HTTP 双向流（**2025 新标准**）\n- **选型**：\n  - 本地工具 → stdio\n  - 远程生产 → Streamable HTTP\n  - 旧版迁移 → SSE\n\n**💡 简历挂钩**：你项目 stdio → Streamable HTTP 演进\n\n---",
+      "tags": [
+        "stdio",
+        "SSE",
+        "Streamable HTTP",
+        "2025 新标准",
+        "选型"
+      ],
+      "preview": "🎯 考察点：3 种 transport",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q15",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 15,
+      "title": "WebSocket 和 SSE 通信的区别及局限性？",
+      "body": "**✅ 答题框架**：\n| 维度 | WebSocket | SSE |\n|---|---|---|\n| 协议 | WS（HTTP Upgrade）| HTTP |\n| 方向 | **双向** | **单向**（S→C）|\n| 适用 | 双向交互（聊天）| 单向推送（流式响应）|\n| 断线重连 | 自己实现 | 浏览器自动 |\n| 局限 | 协议重，企业代理可能拦 | 单向 |\n\n**AI 对话流**：用 SSE（**LLM 只推流给前端**）+ WebSocket（**前端发消息给 LLM**）\n\n---",
+      "tags": [
+        "双向",
+        "单向",
+        "AI 对话流",
+        "LLM 只推流给前端",
+        "前端发消息给 LLM"
+      ],
+      "preview": "✅ 答题框架： WebSocket WS（HTTP Upgrade） 双向 双向交互（聊天） 自己实现 协议重，企业代理可能拦",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q16",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 16,
+      "title": "为什么要用 WebRTC？它和 WebSocket 在 AI 对话流中的核心差异？",
+      "body": "**✅ 答题框架**：\n- **WebRTC**：P2P 实时通信，**超低延迟**（< 100ms），UDP-based\n- **WebSocket**：TCP-based，延迟 100-500ms\n- **核心差异**：\n  - **WebRTC**：**实时音视频**、**P2P 不经服务器**\n  - **WebSocket**：**标准消息推送**、**可靠传输**\n- **AI 对话流**：\n  - 实时语音对话（数字人）→ WebRTC\n  - 普通流式文字 → WebSocket / SSE 足够\n\n---",
+      "tags": [
+        "WebRTC",
+        "超低延迟",
+        "WebSocket",
+        "核心差异",
+        "实时音视频"
+      ],
+      "preview": "✅ 答题框架： - WebRTC：P2P 实时通信，超低延迟（< 100ms），UDP-based - WebSocket：TCP-based，延迟 100-500ms - 核心差异： - WebRTC：实时音视频、P2P 不经服务器 - WebSocket：标准消息推送、可靠传输 - AI 对话流...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "03-Q17",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 17,
+      "title": "有没有用过大模型的网关框架？网关层解决了什么问题？",
+      "body": "**✅ 答题框架**：\n- **LiteLLM**：最知名的 LLM 网关，统一 OpenAI / Anthropic / Cohere / 自部署模型接口\n- **网关解决 5 件事**：\n  1. **统一协议**（一套代码调所有 LLM）\n  2. **认证 / 限流**（API Key 集中管理）\n  3. **Fallback**（A 模型挂了切 B）\n  4. **成本核算**（按 token 计费）\n  5. **日志 / 监控**（统一 trace）\n- **你项目自研的 LLM Gateway**就是这套思路\n\n**💡 简历挂钩**：你的 LLM Gateway 双模型路由 + fallback 跟 LiteLLM 同思路\n\n---",
+      "tags": [
+        "LiteLLM",
+        "网关解决 5 件事",
+        "统一协议",
+        "认证 / 限流",
+        "Fallback"
+      ],
+      "preview": "✅ 答题框架： - LiteLLM：最知名的 LLM 网关，统一 OpenAI / Anthropic / Cohere / 自部署模型接口 - 网关解决 5 件事： 1. 统一协议（一套代码调所有 LLM） 2. 认证 / 限流（API Key 集中管理） 3. Fallback（A 模型挂了切 ...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q18",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 18,
+      "title": "如果 MCP server 特别多，怎么管理？",
+      "body": "**✅ 答题框架（6 个维度）**：\n1. **分类和标签**：按功能/领域/使用频率\n2. **元数据管理**：描述、参数、示例\n3. **检索机制**：向量数据库建索引，按需检索\n4. **动态加载**：不一次性加载全部\n5. **权限控制**：按场景控制可用范围\n6. **使用统计**：记录调用频率，优化推荐顺序\n\n**💡 简历挂钩**：你 MCP 网关 / Registry 计划就是这个思路\n\n---",
+      "tags": [
+        "分类和标签",
+        "元数据管理",
+        "检索机制",
+        "动态加载",
+        "权限控制"
+      ],
+      "preview": "✅ 答题框架（6 个维度）： 1. 分类和标签：按功能/领域/使用频率 2. 元数据管理：描述、参数、示例 3. 检索机制：向量数据库建索引，按需检索 4. 动态加载：不一次性加载全部 5. 权限控制：按场景控制可用范围 6. 使用统计：记录调用频率，优化推荐顺序",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "03-Q19",
+      "topic": "工具调用 & MCP 协议（Function Call、Skill、A2A）",
+      "number": 19,
+      "title": "怎么设计一个生产级 Tool Schema？（以\"查询用户保单状态\"API 为例）",
+      "body": "**📌 题目**：在生产中设计 LLM 调用的 Tool Schema，需要考虑哪些要素？\n\n**✅ 答题框架（5 层设计原则）**：\n\n### 1. Tool 元信息（决定 LLM 什么时候调）\n\n| 字段 | 错 | 对 | 理由 |\n|------|----|----|------|\n| **name** | `getStatus` | `query_policy_status` | LLM 推理友好（verb + noun） |\n| **name** | `queryPolicyStatus` | `query_policy_status` | OpenAPI 风格 + 跨语言统一 |\n| **description** | \"查询保单\" | 三段式（场景/依赖/返回） | LLM 不知道什么时候用 |\n\n**name + description 三段式**（**P7 核心**）：\n- ✅ **适用场景**——\"用户问'我的保单'、'保单状态'、'保单还有效吗'、'保单什么时候到期'\"\n- ✅ **前置依赖**——\"必须先通过 get_user_id 获取 user_id\"\n- ✅ **返回内容**——\"保单号、保单类型、保单状态、生效时间、到期时间、保额\"\n\n**⚠️ 雷区**：\n- ❌ name 写中文（`查询保单状态`）—— LLM 推理不稳定\n- ❌ description 只写功能 —— 没用\n- ❌ description 写得太长（200 字背景）—— 吃 token + 干扰决策\n- ❌ 没有\"使用前置条件\" —— LLM 乱调\n\n### 2. 参数结构（决定怎么传）\n\n```ts\nparameters: {\n  type: 'object',\n  properties: {\n    user_id: {\n      type: 'string',\n      description: '用户唯一标识，从 get_user_id 工具返回获取',\n      pattern: '^U[0-9]{10}$',\n    },\n    policy_id: {\n      type: 'string',\n      description: '保单号，格式：P+10位数字。如果用户没说，根据对话上下文推断，不允许编造',\n      pattern: '^P[0-9]{10}$',\n    },\n    include_history: {\n      type: 'boolean',\n      description: '是否包含历史状态变更记录。仅在用户问\"保单变更\"时才传 true',\n      default: false,\n    },\n  },\n  required: ['user_id'],\n  additionalProperties: false,\n}\n```\n\n### 3. 必填约束三原则\n\n| 原则 | 案例 |\n|------|------|\n| **能 0 成本推断的 → 必填** | user_id 由鉴权上下文提供 → 必填 |\n| **用户语义上能缺的 → 非必填** | policy_id 用户可能不记得 → 非必填 |\n| **业务默认值能兜底的 → 非必填 + default** | include_history 默认 false → 非必填 |\n\n### 4. 业务语义嵌 Schema（P7 分水岭）\n\n**90% 候选人答不到的部分**：\n\n| 约束 | 实现 | 作用 |\n|------|------|------|\n| **保单号格式** | `pattern: '^P[0-9]{10}$'` | LLM 不会瞎填 |\n| **保单状态枚举** | `enum: ['active', 'expired', 'lapsed', 'pending']` | LLM 知道边界 |\n| **查询时间范围** | `start_date` / `end_date` + `format: 'date'` | 时间合法 |\n| **产品线** | `product_line: enum: ['life', 'health', 'auto', 'property']` | 业务分类 |\n| **数据权限** | 后端 RBAC（schema 不解决） | 防越权 |\n\n**业务语义 description（关键 P7 细节）**：\n- ✅ **\"不允许编造\"**——避免 LLM 幻觉\n- ✅ **\"仅在用户问...时\"**——业务语义绑定到工具\n- ✅ **格式 pattern + 描述双保险**——校验前置\n\n### 5. 错误码设计（让 LLM 自纠错）\n\n```ts\n// 5 个核心错误码\n{\n  success: false,\n  error_code: 'POLICY_NOT_FOUND',\n  error_message: '保单号不存在，请确认保单号是否正确',\n  suggestion: '可以通过 query_user_policies 查询用户所有保单',\n}\n```\n\n| error_code | 含义 | LLM 拿到后做什么 |\n|------------|------|----------------|\n| `USER_NOT_AUTHENTICATED` | 未鉴权 | 先调 get_user_id |\n| `POLICY_NOT_FOUND` | 保单号错 | 重新问用户 / 调 list_policies |\n| `INVALID_POLICY_FORMAT` | 格式错 | LLM 自纠（看 pattern 描述） |\n| `PERMISSION_DENIED` | 越权 | 提示用户无权限 |\n| `RATE_LIMIT_EXCEEDED` | 限流 | 降级 + 重试 |\n\n**关键设计点**：\n- **错误码要可枚举** —— LLM 能分类处理\n- **错误信息要\"动作化\"** —— 告诉 LLM 下一步做什么\n- **`suggestion` 字段** —— 给 LLM 一个\"提示词\"（**P7 细节**）\n\n### 6. 完整 JSON Schema 模板\n\n```ts\nconst queryPolicyStatusTool = {\n  type: 'function',\n  function: {\n    name: 'query_policy_status',\n    description: `查询用户保单状态。\n适用场景：用户问\"我的保单\"、\"保单状态\"、\"保单还有效吗\"、\"保单什么时候到期\"。\n前置依赖：必须先通过 get_user_id 获取 user_id。\n返回：保单号、保单类型、保单状态、生效时间、到期时间、保额。`,\n    parameters: {\n      type: 'object',\n      properties: {\n        user_id: { type: 'string', pattern: '^U[0-9]{10}$', description: '用户唯一标识' },\n        policy_id: { type: 'string', pattern: '^P[0-9]{10}$', description: '保单号。如果用户没说，根据上下文推断，不允许编造' },\n        include_history: { type: 'boolean', default: false, description: '是否包含历史状态变更记录。仅在用户问\"保单变更\"时传 true' },\n        product_line: { type: 'string', enum: ['life', 'health', 'auto', 'property'], description: '产品线。如果用户没说，不传表示查所有产品线' },\n      },\n      required: ['user_id'],\n      additionalProperties: false,\n    },\n  },\n};\n```\n\n### 📊 实战效果\n\nv13 MCP Registry 早期工具 schema 写得糙，LLM 经常乱调工具（调错工具 / 漏参数），调用成功率只有 60%。改造后：\n- ✅ **调用成功率 60% → 92%**\n- ✅ **自纠错率 30%**（LLM 自己改对了）\n- ✅ **人工干预 ↓ 70%**\n\n**关键就两个**：\n- **description 决定\"调不调\"**\n- **error_code 决定\"错了怎么办\"**\n\n### 💡 关键判断点（P7 视角）\n\n| 决策 | 为什么这么选 |\n|------|----------|\n| **description 三段式** | 适用场景决定\"调不调\"，前置依赖决定\"顺序\"，返回内容决定\"调不调得动\" |\n| **业务语义嵌 schema** | LLM 看到 enum / pattern 就知道边界（不用每次推断） |\n| **错误码 + suggestion** | 错误是 LLM 的反馈循环（自纠错 = 自学习） |\n| **`additionalProperties: false`** | 防止 LLM 编造不存在的字段（幻觉防御） |\n| **pattern + 描述里写\"不允许编造\"** | 双保险（P7 防御思维） |\n\n### 🎯 STAR 答题节奏（2 分钟版）\n\n> **S**：v13 的 MCP Registry 里有 10+ 工具，早期 tool schema 写得糙，LLM 经常乱调工具，调用成功率只有 60%。\n>\n> **T**：设计一套让 LLM 看了就懂、错了能自纠的 tool schema 规范。\n>\n> **A（90s 核心）**：\n> 1. **name 用 verb + noun 蛇形命名**（`query_policy_status`）—— LLM 推理友好\n> 2. **description 三段式** —— 适用场景 + 前置依赖 + 返回内容（决定\"什么时候调\"）\n> 3. **参数三原则** —— 0 成本推断必填 / 用户语义缺非必填 / 业务默认值兜底\n> 4. **业务语义嵌 schema** —— enum / pattern / format + description 写\"什么时候传\"\n> 5. **错误码可枚举 + suggestion 字段** —— 让 LLM 自纠错（5 个错误码）\n> 6. **`additionalProperties: false`** —— 防止 LLM 编造字段\n>\n> **R**：改造后调用成功率从 60% → 92%，自纠错率 30%，人工干预 ↓ 70%。\n\n### 📝 分版本答题\n\n**P6 版本（1 分钟）**：\n> Tool schema 设计有 4 个要素——name / description / parameters / 业务约束。\n> 1. name 用 snake_case + verb_noun\n> 2. description 三段式（适用场景 + 前置依赖 + 返回内容）\n> 3. parameters 必填 user_id，policy_id 非必填（用户可能不记得）\n> 4. 业务约束嵌 schema —— 保单号 pattern、状态 enum、include_history 加 description 限定触发条件\n> description 一定要包含业务语义（什么时候调、什么时候不调、前置条件），不能让 LLM 靠猜。\n\n**P7 版本（2 分钟）**：\n> P6 的 4 要素 + 错误码 + 校验层。\n> 4 个核心：1) name + description 三段式；2) parameters 必填/非必填三原则；3) 业务语义嵌 schema；4) 错误码可枚举 + suggestion 字段。\n> 实战数据：v13 早期调用成功率 60%，改造后 92%，自纠错 30%。关键就两个——description 决定\"调不调\"，error_code 决定\"错了怎么办\"。\n\n**💡 简历挂钩**：v13 的 MCP Registry 工具 schema 改造是 LLM Agent 工程核心亮点之一，可挂\"工具调用成功率 92%、自纠错率 30%\"作为业务指标。",
+      "tags": [
+        "📌 题目",
+        "name",
+        "description",
+        "name + description 三段式",
+        "P7 核心"
+      ],
+      "preview": "📌 题目：在生产中设计 LLM 调用的 Tool Schema，需要考虑哪些要素？",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "04-Q01",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 1,
+      "title": "LangGraph 的 Checkpoint 机制是什么？",
+      "body": "**🎯 考察点**：生产级 Agent 状态管理（高频追问）\n\n**✅ 答题框架（30 秒版）**：\n- Checkpoint 是 Agent State 在某个时刻的**版本快照**\n- 每个 Node 执行完成后，Graph Engine **自动**触发 Checkpoint 写入\n- 持久化后端：Memory / Redis / PostgreSQL / SQLite\n- 恢复：thread_id 定位会话，checkpoint_id 指定恢复到哪个版本\n\n**深度补充**：\n- **架构级 vs 业务级**：Checkpoint 是框架内置的事务性快照，非业务代码手动保存\n- **关键属性**：版本化（可回溯任意历史）+ 幂等性（同 checkpoint_id 恢复两次结果一致）\n\n**💡 简历挂钩**：你项目正在补 PostgresSaver\n\n---",
+      "tags": [
+        "版本快照",
+        "自动",
+        "深度补充",
+        "架构级 vs 业务级",
+        "关键属性"
+      ],
+      "preview": "🎯 考察点：生产级 Agent 状态管理（高频追问）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "04-Q02",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 2,
+      "title": "生产环境选哪种 Checkpoint 后端？",
+      "body": "**✅ 答题框架（取舍逻辑）**：\n\n| 后端 | 延迟 | 进程重启后 | 适用场景 |\n|------|------|------------|----------|\n| MemorySaver | <1ms | ❌ 丢失 | 本地调试 / PoC |\n| Redis | 1-3ms | ✅ | 生产高并发 |\n| PostgreSQL | 5-15ms | ✅ | 企业多租户/审计 |\n| SQLite | 3-8ms | ✅ | 边缘 / 单实例 |\n\n**默认选 Redis**：延迟低 + 跨进程持久化 + 高并发 + 团队已有 Redis 集群\n**审计合规选 PostgreSQL**：可以 SQL 查询历史 + 事务保证\n**坑**：生产绝对不用 MemorySaver，进程重启整个会话历史丢失\n\n**💡 简历挂钩**：你项目选 PostgresSaver（不引新依赖 + 天然多用户隔离）\n\n---",
+      "tags": [
+        "默认选 Redis",
+        "审计合规选 PostgreSQL",
+        "MemorySaver",
+        "SQLite",
+        "PostgresSaver"
+      ],
+      "preview": "✅ 答题框架（取舍逻辑）：",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "04-Q03",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 3,
+      "title": "thread_id 和 checkpoint_id 怎么用？",
+      "body": "**✅ 答题框架**：\n- **thread_id**：会话级索引，相当于 DB 主键；同 thread_id 多次 invoke 自动续接\n- **checkpoint_id**：精确标记第几次快照，用于回溯到任意版本\n- **核心 API**：\n  ```python\n  config = {\"configurable\": {\"thread_id\": \"user-001\"}}\n  result = app.invoke(state, config)\n  \n  # 回溯到指定版本\n  restore_config = {\"configurable\": {\"thread_id\": \"user-001\", \"checkpoint_id\": \"...\"}}\n  historical_state = app.get_state(restore_config)\n  ```\n\n**业务原则**：每个用户会话必须有稳定的 thread_id，否则 Checkpoint 形同虚设\n\n**💡 简历挂钩**：你项目 interviewId 强关联 thread_id——\"天然支持挂起重连\"\n\n---",
+      "tags": [
+        "thread_id",
+        "checkpoint_id",
+        "核心 API",
+        "业务原则",
+        "LangGraph"
+      ],
+      "preview": "✅ 答题框架： - thread_id：会话级索引，相当于 DB 主键；同 thread_id 多次 invoke 自动续接 - checkpoint_id：精确标记第几次快照，用于回溯到任意版本 - 核心 API：",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "04-Q04",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 4,
+      "title": "Checkpoint 有什么坑？",
+      "body": "**✅ 答题框架（4 个）**：\n1. **并发写入冲突**：多 Pod 同 thread_id 同时写 → 路由 / 分布式锁 / 最终一致\n2. **跨 thread 状态泄露**：全局共享 thread_id → 串话事故\n3. **存储成本**：长会话（50 步+）Checkpoint 数量爆炸，需设置最大版本数 / 定期清理\n4. **降级策略**：Redis 不可用 → 降级到 MemorySaver + 告警（注意降级期间仍会丢）\n\n---",
+      "tags": [
+        "并发写入冲突",
+        "跨 thread 状态泄露",
+        "存储成本",
+        "降级策略",
+        "MemorySaver"
+      ],
+      "preview": "✅ 答题框架（4 个）： 1. 并发写入冲突：多 Pod 同 thread_id 同时写 → 路由 / 分布式锁 / 最终一致 2. 跨 thread 状态泄露：全局共享 thread_id → 串话事故 3. 存储成本：长会话（50 步+）Checkpoint 数量爆炸，需设置最大版本数 / 定期...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "04-Q05",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 5,
+      "title": "LangGraph 如何自定义中间件？中间件如何绑定？",
+      "body": "**✅ 答题框架**：\n- **节点本质是 Runnable**（跟 LangChain 一致）\n- **中间件 = 装饰器模式**：`@with_retry` / `@with_fallbacks` / 自定义 `with_logging`\n- **绑定方式**：\n  ```python\n  # 方式 1：装饰器\n  graph.add_node(\"my_node\", with_logging(my_node))\n  \n  # 方式 2：Runnable 包装\n  from langchain_core.runnables import RunnableLambda\n  logged = RunnableLambda(with_logging(my_node))\n  graph.add_node(\"my_node\", logged)\n  ```\n\n**💡 简历挂钩**：你项目 executor 节点可以加 token-limit 中间件\n\n---",
+      "tags": [
+        "节点本质是 Runnable",
+        "中间件 = 装饰器模式",
+        "绑定方式",
+        "LangChain",
+        "RunnableLambda"
+      ],
+      "preview": "✅ 答题框架： - 节点本质是 Runnable（跟 LangChain 一致） - 中间件 = 装饰器模式： / / 自定义 - 绑定方式：",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "04-Q06",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 6,
+      "title": "LangGraph 如何挂载 tools？底层如何实现？",
+      "body": "**✅ 答题框架**：\n- **挂载方式**：\n  ```python\n  # 方式 1：ToolNode（预制）\n  tool_node = ToolNode([search, get_weather])\n  builder.add_node(\"tools\", tool_node)\n  builder.add_conditional_edges(\"llm\", tools_condition)  # LLM 决定调不调\n  \n  # 方式 2：自定义节点\n  def tool_calling_node(state):\n      llm_with_tools = llm.bind_tools([search])\n      response = llm_with_tools.invoke(state[\"messages\"])\n      return {\"messages\": [response]}\n  ```\n- **底层**：ToolNode 内部用 bind_tools + ToolMessage 回写\n\n**💡 简历挂钩**：你项目 executor.ts 调 MCP tool\n\n---",
+      "tags": [
+        "挂载方式",
+        "底层",
+        "ToolNode",
+        "ToolMessage",
+        "LangGraph"
+      ],
+      "preview": "✅ 答题框架： - 挂载方式： - 底层：ToolNode 内部用 bind_tools + ToolMessage 回写",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "04-Q07",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 7,
+      "title": "LangChain 管道符 `|` 是怎么实现上一步输出作为下一步输入的？",
+      "body": "**✅ 答题框架**：\n- **LCEL 协议**：每个组件都实现 `Runnable` 协议（invoke / stream / ainvoke / batch）\n- **`|` 返回 RunnableSequence**：按顺序 invoke 每一个\n- **同构输入输出**：上一步输出类型必须匹配下一步输入类型\n- **自动支持 stream / batch / async**\n\n```python\nchain = prompt | llm | output_parser\n```\n\n---",
+      "tags": [
+        "LCEL 协议",
+        "`|` 返回 RunnableSequence",
+        "同构输入输出",
+        "自动支持 stream / batch / async",
+        "RunnableSequence"
+      ],
+      "preview": "✅ 答题框架： - LCEL 协议：每个组件都实现 协议（invoke / stream / ainvoke / batch） - 返回 RunnableSequence：按顺序 invoke 每一个 - 同构输入输出：上一步输出类型必须匹配下一步输入类型 - 自动支持 stream / batch...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "04-Q08",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 8,
+      "title": "什么是 Context Engineering？为什么比 Prompt Engineering 重要？",
+      "body": "**🎯 考察点**：2026 最热考点\n\n**✅ 答题框架**：\n- **根本矛盾**：LLM 上下文窗口有限（物理限制），但 Agent 需要处理的信息无限\n- **本质**：为无状态的 LLM 构建状态管理系统\n- **类比操作系统**：\n  - 内存有限 ↔ 上下文窗口有限\n  - 进程状态保存 ↔ Agent 状态保存\n  - 虚拟内存（硬盘当内存）↔ RAG（外部知识当上下文）\n  - 内存换页 ↔ 上下文压缩/删除\n- **Prompt vs Context**：\n  - Prompt = 优化一个函数\n  - Context = 设计整个程序架构\n\n**💡 简历挂钩**：你的 4 级水位线 ContextManager 就是 Context Engineering 的标准实现\n\n---",
+      "tags": [
+        "根本矛盾",
+        "本质",
+        "类比操作系统",
+        "Prompt vs Context",
+        "ContextManager"
+      ],
+      "preview": "🎯 考察点：2026 最热考点",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "04-Q09",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 9,
+      "title": "Context Engineering 的 6 大组件？",
+      "body": "**✅ 答题框架**：\n1. **Agents**（决策大脑）\n2. **Query Augmentation**（查询增强）\n3. **Retrieval**（检索系统）\n4. **Prompting Techniques**（提示技巧）\n5. **Memory**（记忆系统）\n6. **Tools**（工具集成）\n\n**💡 简历挂钩**：你的 interview-agent 完整覆盖这 6 个组件\n\n---",
+      "tags": [
+        "Agents",
+        "Query Augmentation",
+        "Retrieval",
+        "Prompting Techniques",
+        "Memory"
+      ],
+      "preview": "✅ 答题框架： 1. Agents（决策大脑） 2. Query Augmentation（查询增强） 3. Retrieval（检索系统） 4. Prompting Techniques（提示技巧） 5. Memory（记忆系统） 6. Tools（工具集成）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "04-Q10",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 10,
+      "title": "Query Augmentation 的几种方法？",
+      "body": "**✅ 答题框架**：\n1. **Query Rewriting**：模糊问题 → 精确、信息密集的术语\n2. **Query Expansion**：单查询 → 多相关查询\n3. **Query Decomposition**：复杂多面问题 → 多个子查询\n4. **Query Agents**：用 AI Agent 智能处理整个管道（动态分析 → 精准检索 → 评估优化 → 生成反馈）\n\n---",
+      "tags": [
+        "Query Rewriting",
+        "Query Expansion",
+        "Query Decomposition",
+        "Query Agents",
+        "LangGraph"
+      ],
+      "preview": "✅ 答题框架： 1. Query Rewriting：模糊问题 → 精确、信息密集的术语 2. Query Expansion：单查询 → 多相关查询 3. Query Decomposition：复杂多面问题 → 多个子查询 4. Query Agents：用 AI Agent 智能处理整个管道（...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "04-Q11",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 11,
+      "title": "LangGraph Checkpoint 的\"事务性快照\"怎么理解？",
+      "body": "**✅ 答题框架**：\n- **原子性**：一次 Node 完成后整批 state 写入 Checkpoint（不存中间态）\n- **版本化**：每次 invoke 生成新 checkpoint_id\n- **可回放**：`get_state(config)` 拿历史 state\n- **对比数据库事务**：每次 commit 就是一个 Checkpoint，rollback 到任意 commit\n\n**💡 简历挂钩**：你项目 PostgresSaver 用数据库事务保证原子性\n\n---",
+      "tags": [
+        "原子性",
+        "版本化",
+        "可回放",
+        "对比数据库事务",
+        "PostgresSaver"
+      ],
+      "preview": "✅ 答题框架： - 原子性：一次 Node 完成后整批 state 写入 Checkpoint（不存中间态） - 版本化：每次 invoke 生成新 checkpoint_id - 可回放： 拿历史 state - 对比数据库事务：每次 commit 就是一个 Checkpoint，rollback...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "04-Q12",
+      "topic": "LangGraph 状态机（Checkpoint、interrupt）",
+      "number": 12,
+      "title": "LangGraph interrupt（HITL）怎么实现？",
+      "body": "**✅ 答题框架**：\n```python\nfrom langgraph import interrupt\n\nasync def dangerous_node(state):\n    if is_dangerous(state.action):\n        # 触发中断\n        approval = interrupt({\n            \"message\": \"需要人工审批\",\n            \"action\": state.action,\n        })\n        if not approval.approved:\n            return {\"error\": \"用户拒绝\"}\n    # 继续执行\n\nawait graph.invoke(Command(resume=\"approved\"), config)\n```\n\n**完整流程**：\n1. 检测到危险操作 → interrupt\n2. State 自动存到 checkpointer\n3. 前端轮询 / SSE 推\"需要审批\"\n4. 用户点同意 → API 调 `Command(resume=...)`\n5. Agent 从断点恢复继续\n\n**💡 简历挂钩**：你项目删除面试/改数据走 HITL",
+      "tags": [
+        "完整流程",
+        "LangGraph",
+        "SSE",
+        "API",
+        "HITL"
+      ],
+      "preview": "✅ 答题框架： ```python from langgraph import interrupt",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "05-Q01",
+      "topic": "系统设计（RAG 系统、客服系统、Code Agent、高并发）",
+      "number": 1,
+      "title": "设计一个高召回率的商品问答 RAG 系统",
+      "body": "**✅ 答题框架**：\n1. **Embedding 选型**：BAAI/bge-large-zh（中文垂类）\n2. **分块策略**：拆成 标题 / 核心卖点 / 材质参数 / 使用场景 独立向量化\n3. **混合检索**：向量（语义）+ BM25（关键词）\n4. **向量库**：Milvus（亿级 + IVF_FLAT 索引，延迟 < 200ms）\n5. **Rerank**：Cohere rerank 或 BGE-Reranker\n6. **进阶**：递归检索 + HyDE（让 LLM 生成假设性答案再检索）\n\n**量化**：准确率从 70% → 90%\n\n---",
+      "tags": [
+        "Embedding 选型",
+        "分块策略",
+        "混合检索",
+        "向量库",
+        "Rerank"
+      ],
+      "preview": "✅ 答题框架： 1. Embedding 选型：BAAI/bge-large-zh（中文垂类） 2. 分块策略：拆成 标题 / 核心卖点 / 材质参数 / 使用场景 独立向量化 3. 混合检索：向量（语义）+ BM25（关键词） 4. 向量库：Milvus（亿级 + IVF_FLAT 索引，延迟 <...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "05-Q02",
+      "topic": "系统设计（RAG 系统、客服系统、Code Agent、高并发）",
+      "number": 2,
+      "title": "设计一个游戏社区客服助手（结合游戏黑话）",
+      "body": "**✅ 答题框架**：\n1. **知识库分层**：游戏百科 + 社区黑话词典 + 工单历史\n2. **术语识别**：用 LLM 提取黑话，关联到知识库条目\n3. **意图分类**：投诉/咨询/反馈/闲聊\n4. **HITL**：退款/封号等高风险操作人工确认\n5. **情感识别**：识别用户情绪，调整回复语气\n\n---",
+      "tags": [
+        "知识库分层",
+        "术语识别",
+        "意图分类",
+        "HITL",
+        "情感识别"
+      ],
+      "preview": "✅ 答题框架： 1. 知识库分层：游戏百科 + 社区黑话词典 + 工单历史 2. 术语识别：用 LLM 提取黑话，关联到知识库条目 3. 意图分类：投诉/咨询/反馈/闲聊 4. HITL：退款/封号等高风险操作人工确认 5. 情感识别：识别用户情绪，调整回复语气",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "05-Q03",
+      "topic": "系统设计（RAG 系统、客服系统、Code Agent、高并发）",
+      "number": 3,
+      "title": "LLM 服务的高并发怎么处理？",
+      "body": "**🎯 考察点**：连接池关键\n\n**✅ 答题框架**：\n1. **连接池**：按目标站点分组（火山引擎 / 内部 RAG / 不同 LLM provider）\n2. **参数调优**：MaxIdleConnsPerHost + IdleConnTimeout\n3. **超时分级**：连接超时 / 读超时 / 请求级超时\n4. **熔断**：慢请求 / 错误率触发降级\n5. **流式优先**：长答案用 SSE，减少连接占用时间\n\n**踩坑案例**：每次请求都新建 http.Client → 协程 + 连接泄露 → 24h 内存涨 1G\n\n**💡 简历挂钩**：你项目 LLM Gateway 双模型路由已经做了熔断 + fallback\n\n---",
+      "tags": [
+        "连接池",
+        "参数调优",
+        "超时分级",
+        "熔断",
+        "流式优先"
+      ],
+      "preview": "🎯 考察点：连接池关键",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "05-Q04",
+      "topic": "系统设计（RAG 系统、客服系统、Code Agent、高并发）",
+      "number": 4,
+      "title": "设计一个 Agent 系统的延迟优化方案",
+      "body": "**✅ 答题框架**：\n1. **TTFT 优化**：流式 + 缓存预热\n2. **并行调用**：独立子任务并行（multi-agent 的 communication）\n3. **模型分级**：简单任务用小模型（Haiku / Qwen-Turbo），规划用大模型\n4. **KV Cache 复用**：相同 prefix 命中缓存\n5. **Prompt 缓存**：高频模板编译缓存\n6. **Rerank 预计算**：离线算好，线上只查\n\n---",
+      "tags": [
+        "TTFT 优化",
+        "并行调用",
+        "模型分级",
+        "KV Cache 复用",
+        "Prompt 缓存"
+      ],
+      "preview": "✅ 答题框架： 1. TTFT 优化：流式 + 缓存预热 2. 并行调用：独立子任务并行（multi-agent 的 communication） 3. 模型分级：简单任务用小模型（Haiku / Qwen-Turbo），规划用大模型 4. KV Cache 复用：相同 prefix 命中缓存 5....",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "05-Q05",
+      "topic": "系统设计（RAG 系统、客服系统、Code Agent、高并发）",
+      "number": 5,
+      "title": "设计一个 Code Agent",
+      "body": "**✅ 答题框架**：\n1. **项目级理解**：\n   - 文件树 + CLAUDE.md + 关键代码片段 → 上下文\n   - **不用全塞**——按任务动态加载\n2. **工具集**：\n   - 读 / 写 / 搜索 / 执行 shell\n   - 严格白名单 + 危险操作拦截\n3. **规划**：\n   - Plan-and-Execute + Replan\n   - 每步生成代码前先解释\n4. **质量保证**：\n   - 每步跑测试\n   - 完成后人工 review diff\n   - 多模型交叉验证\n\n**💡 简历挂钩**：你用 Mavis / Cursor / ClaudeCode 写代码的\"3 层兜底\"流程\n\n---",
+      "tags": [
+        "项目级理解",
+        "不用全塞",
+        "工具集",
+        "规划",
+        "质量保证"
+      ],
+      "preview": "✅ 答题框架： 1. 项目级理解： - 文件树 + CLAUDE.md + 关键代码片段 → 上下文 - 不用全塞——按任务动态加载 2. 工具集： - 读 / 写 / 搜索 / 执行 shell - 严格白名单 + 危险操作拦截 3. 规划： - Plan-and-Execute + Replan...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "05-Q06",
+      "topic": "系统设计（RAG 系统、客服系统、Code Agent、高并发）",
+      "number": 6,
+      "title": "Agent 系统的可观测性怎么做？",
+      "body": "**✅ 答题框架**：\n1. **Trace**：每个用户会话一条 trace\n2. **Span**：Agent 调用 / Tool 调用 / LLM 调用 各自 span\n3. **关键指标**：\n   - 成功率、延迟 P50/P95\n   - Token 成本\n   - Tool 调用准确率\n4. **Evals**：影子测试新旧 Agent 对比\n5. **工具**：Langfuse / LangSmith / OpenLLMetry\n\n**💡 简历挂钩**：你项目已经用 Langfuse 全链路追踪",
+      "tags": [
+        "Trace",
+        "Span",
+        "关键指标",
+        "Evals",
+        "工具"
+      ],
+      "preview": "✅ 答题框架： 1. Trace：每个用户会话一条 trace 2. Span：Agent 调用 / Tool 调用 / LLM 调用 各自 span 3. 关键指标： - 成功率、延迟 P50/P95 - Token 成本 - Tool 调用准确率 4. Evals：影子测试新旧 Agent 对比...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q01",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 1,
+      "title": "什么是大语言模型？和传统 NLP 模型有什么区别？",
+      "body": "**✅ 答题框架**：\n- **LLM**：基于 Transformer 的大规模预训练语言模型（参数量 10B+）\n- **区别**：\n  - **规模**：参数量大、数据量大、算力大\n  - **涌现能力**：CoT、In-context learning、指令遵循\n  - **通用性**：一个模型做 N 个任务（不需要为每个任务训）\n  - **训练方式**：预训练 + 指令微调（SFT）+ RLHF / DPO\n\n---",
+      "tags": [
+        "LLM",
+        "区别",
+        "规模",
+        "涌现能力",
+        "通用性"
+      ],
+      "preview": "✅ 答题框架： - LLM：基于 Transformer 的大规模预训练语言模型（参数量 10B+） - 区别： - 规模：参数量大、数据量大、算力大 - 涌现能力：CoT、In-context learning、指令遵循 - 通用性：一个模型做 N 个任务（不需要为每个任务训） - 训练方式：预训...",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "06-Q02",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 2,
+      "title": "Transformer 架构基本原理？Encoder 和 Decoder 是什么？",
+      "body": "**✅ 答题框架**：\n- **Self-Attention**：\n  - 每个 token 算 QKV 三个向量\n  - 注意力分数 = softmax(Q·K^T / sqrt(d_k)) · V\n  - 除以 sqrt(d_k) 防止大 d_k 下梯度消失\n- **Multi-Head**：\n  - Q/K/V 切成 h 份并行\n  - 不同子空间关注不同信息\n- **Encoder vs Decoder**：\n  - **Encoder**：双向注意力，理解输入（BERT 路线）\n  - **Decoder**：单向（掩码）注意力，生成输出（GPT 路线）\n  - **Encoder-Decoder**：T5 / BART\n\n---",
+      "tags": [
+        "Self-Attention",
+        "Multi-Head",
+        "Encoder vs Decoder",
+        "Encoder",
+        "Decoder"
+      ],
+      "preview": "✅ 答题框架： - Self-Attention： - 每个 token 算 QKV 三个向量 - 注意力分数 = softmax(Q·K^T / sqrt(d_k)) · V - 除以 sqrt(d_k) 防止大 d_k 下梯度消失 - Multi-Head： - Q/K/V 切成 h 份并行 -...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "06-Q03",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 3,
+      "title": "多头注意力（MHA）有哪些局限？MQA / GQA / Flash Attention 怎么解决？",
+      "body": "**✅ 答题框架**：\n- **MHA 局限**：\n  - KV 缓存占显存大（长上下文 OOM）\n  - 推理时延高（多份 KV 算注意力）\n- **MQA（Multi-Query Attention）**：所有 Q 头共享 1 份 KV\n- **GQA（Grouped Query Attention）**：分组共享 KV（MQA 和 MHA 折中）\n- **Flash Attention**：IO 感知的精确注意力算法（不存中间矩阵，显存省、速度快）\n\n---",
+      "tags": [
+        "MHA 局限",
+        "MQA（Multi-Query Attention）",
+        "GQA（Grouped Query Attention）",
+        "Flash Attention",
+        "MHA"
+      ],
+      "preview": "✅ 答题框架： - MHA 局限： - KV 缓存占显存大（长上下文 OOM） - 推理时延高（多份 KV 算注意力） - MQA（Multi-Query Attention）：所有 Q 头共享 1 份 KV - GQA（Grouped Query Attention）：分组共享 KV（MQA 和 ...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q04",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 4,
+      "title": "大模型的位置编码？sin/cos、RoPE、ALiBi 区别？",
+      "body": "**✅ 答题框架**：\n- **为什么需要**：Self-Attention 是 permutation-invariant，需要位置信息\n- **sin/cos 绝对位置编码**：原始 Transformer 用，外推性差\n- **RoPE（Rotary Position Embedding）**：**相对位置**，通过旋转 Q/K 实现\n  - **优点**：长上下文外推好，**LLaMA / Qwen / DeepSeek 全用**\n- **ALiBi（Attention with Linear Biases）**：在注意力分数上加线性偏置\n  - 简单、训练快、外推好\n\n---",
+      "tags": [
+        "为什么需要",
+        "sin/cos 绝对位置编码",
+        "相对位置",
+        "优点",
+        "LLaMA / Qwen / DeepSeek 全用"
+      ],
+      "preview": "✅ 答题框架： - 为什么需要：Self-Attention 是 permutation-invariant，需要位置信息 - sin/cos 绝对位置编码：原始 Transformer 用，外推性差 - RoPE（Rotary Position Embedding）：相对位置，通过旋转 Q/K 实...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "06-Q05",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 5,
+      "title": "什么是分词器？原理是什么？",
+      "body": "**✅ 答题框架**：\n- **分词器**：把文本切成模型能处理的 token 序列\n- **常见算法**：\n  - **BPE（Byte Pair Encoding）**：GPT 系用\n  - **WordPiece**：BERT 用\n  - **SentencePiece**：LLaMA 用（**不依赖预分词**）\n- **中文分词难点**：BPE 按词频合并，可能切出无语义的子词\n\n---",
+      "tags": [
+        "分词器",
+        "常见算法",
+        "BPE（Byte Pair Encoding）",
+        "WordPiece",
+        "SentencePiece"
+      ],
+      "preview": "✅ 答题框架： - 分词器：把文本切成模型能处理的 token 序列 - 常见算法： - BPE（Byte Pair Encoding）：GPT 系用 - WordPiece：BERT 用 - SentencePiece：LLaMA 用（不依赖预分词） - 中文分词难点：BPE 按词频合并，可能切出...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "06-Q06",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 6,
+      "title": "大模型是怎么训练出来的？",
+      "body": "**✅ 答题框架（4 阶段）**：\n1. **预训练（Pre-training）**：海量无标注文本，next token prediction\n2. **监督微调（SFT）**：人工标注\"指令-回答\"对\n3. **奖励建模（Reward Model）**：人类偏好排序\n4. **RLHF / DPO**：用偏好优化模型\n\n**成本**：千亿参数模型训练一次 = 几百万到几千万美元\n\n---",
+      "tags": [
+        "预训练（Pre-training）",
+        "监督微调（SFT）",
+        "奖励建模（Reward Model）",
+        "RLHF / DPO",
+        "成本"
+      ],
+      "preview": "✅ 答题框架（4 阶段）： 1. 预训练（Pre-training）：海量无标注文本，next token prediction 2. 监督微调（SFT）：人工标注\"指令-回答\"对 3. 奖励建模（Reward Model）：人类偏好排序 4. RLHF / DPO：用偏好优化模型",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q07",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 7,
+      "title": "什么是 Scaling Law？大模型的\"涌现能力\"是怎么回事？",
+      "body": "**✅ 答题框架**：\n- **Scaling Law**：模型性能 vs 参数量 / 数据量 / 算力 呈幂律关系\n- **涌现能力**：小模型没有 / 大模型突然有的能力（CoT、In-context learning、推理）\n- **争议**：也有研究说\"涌现\"是评测指标选择的人为效果\n\n---",
+      "tags": [
+        "Scaling Law",
+        "涌现能力",
+        "争议",
+        "性能",
+        "算法"
+      ],
+      "preview": "✅ 答题框架： - Scaling Law：模型性能 vs 参数量 / 数据量 / 算力 呈幂律关系 - 涌现能力：小模型没有 / 大模型突然有的能力（CoT、In-context learning、推理） - 争议：也有研究说\"涌现\"是评测指标选择的人为效果",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "06-Q08",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 8,
+      "title": "大模型微调的方案有哪些？",
+      "body": "**✅ 答题框架**：\n| 方案 | 参数量 | 成本 | 效果 |\n|---|---|---|---|\n| **全参数微调（FFT）** | 100% | 极高 | 最强 |\n| **LoRA** | <1% | 低 | 接近 FFT |\n| **QLoRA** | 更低 | 极低 | 略低于 LoRA |\n| **Prefix Tuning** | 极少 | 低 | 较弱 |\n| **Adapter** | 5-10% | 中 | 中等 |\n\n---",
+      "tags": [
+        "全参数微调（FFT）",
+        "LoRA",
+        "QLoRA",
+        "Prefix Tuning",
+        "Adapter"
+      ],
+      "preview": "✅ 答题框架： 参数量 效果 | | 100% 最强 | <1% 接近 FFT | 更低 略低于 LoRA | 极少 较弱 | 5-10% 中等 |",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q09",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 9,
+      "title": "LoRA 是什么？除了减少参数量还有哪些优点？",
+      "body": "**✅ 答题框架**：\n- **Low-Rank Adaptation**：在原始权重旁加低秩矩阵 ΔW = BA（B: d×r, A: r×k, r 很小）\n- **优点**：\n  - 参数量降到 1% 以下\n  - **可以多任务切换**（不同 LoRA 权重热插拔）\n  - **训练快、显存省**\n  - **原模型冻结**——不会破坏预训练知识\n\n---",
+      "tags": [
+        "Low-Rank Adaptation",
+        "优点",
+        "可以多任务切换",
+        "训练快、显存省",
+        "原模型冻结"
+      ],
+      "preview": "✅ 答题框架： - Low-Rank Adaptation：在原始权重旁加低秩矩阵 ΔW = BA（B: d×r, A: r×k, r 很小） - 优点： - 参数量降到 1% 以下 - 可以多任务切换（不同 LoRA 权重热插拔） - 训练快、显存省 - 原模型冻结——不会破坏预训练知识",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q10",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 10,
+      "title": "SFT 之后还有哪些 Post-Training？RLHF、DPO、GRPO、拒绝采样什么关系？",
+      "body": "**✅ 答题框架（按时间线）**：\n- **SFT**：监督微调，让模型\"学格式\"\n- **RLHF**：训练 Reward Model + PPO 优化（贵、不稳定）\n- **DPO**：跳过 RM，直接用偏好对优化（便宜、稳定）\n- **GRPO**：DeepSeek 提的，**不需要 critic 模型**，效率比 PPO 高\n- **拒绝采样（Rejection Sampling）**：从模型采样多个答案，挑最好的\n\n**关系**：**SFT 是底座**，**DPO/GRPO/拒绝采样都是后训练对齐**——工业主流 SFT → DPO/GRPO\n\n---",
+      "tags": [
+        "SFT",
+        "RLHF",
+        "DPO",
+        "GRPO",
+        "不需要 critic 模型"
+      ],
+      "preview": "✅ 答题框架（按时间线）： - SFT：监督微调，让模型\"学格式\" - RLHF：训练 Reward Model + PPO 优化（贵、不稳定） - DPO：跳过 RM，直接用偏好对优化（便宜、稳定） - GRPO：DeepSeek 提的，不需要 critic 模型，效率比 PPO 高 - 拒绝采样...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q11",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 11,
+      "title": "DPO 和 PPO 的区别是什么？",
+      "body": "**✅ 答题框架**：\n- **PPO**：\n  - 训 Reward Model（人类偏好）\n  - 用 PPO 算法优化策略（需要 critic 网络）\n  - 训练不稳定、超参敏感、贵\n- **DPO**：\n  - **直接用偏好对**（chosen, rejected）优化\n  - 跳过 RM，**没有 critic 网络**\n  - 训练稳定、便宜、效果接近 PPO\n\n**工业**：**DPO 越来越主流**——RLHF 因为太贵 + 不稳定，**2024 后 PPO 在 SFT 厂商外少用**\n\n---",
+      "tags": [
+        "PPO",
+        "DPO",
+        "直接用偏好对",
+        "没有 critic 网络",
+        "工业"
+      ],
+      "preview": "✅ 答题框架： - PPO： - 训 Reward Model（人类偏好） - 用 PPO 算法优化策略（需要 critic 网络） - 训练不稳定、超参敏感、贵 - DPO： - 直接用偏好对（chosen, rejected）优化 - 跳过 RM，没有 critic 网络 - 训练稳定、便宜、效...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q12",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 12,
+      "title": "大模型生成文本时的解码策略有哪些？贪心 / Beam / 采样 什么时候用？",
+      "body": "**✅ 答题框架**：\n- **Greedy（贪心）**：每步选概率最大的 token；**适合确定性任务**（分类、抽取）\n- **Beam Search**：保留 top-k 路径；**适合翻译、摘要**等需要\"全局最优\"任务\n- **采样（Sampling）**：按概率分布随机抽；**配合 temperature / top-p**；**适合对话、创作**\n\n**实战**：通用对话用 **top-p=0.9, temperature=0.7**\n\n---",
+      "tags": [
+        "Greedy（贪心）",
+        "适合确定性任务",
+        "Beam Search",
+        "适合翻译、摘要",
+        "采样（Sampling）"
+      ],
+      "preview": "✅ 答题框架： - Greedy（贪心）：每步选概率最大的 token；适合确定性任务（分类、抽取） - Beam Search：保留 top-k 路径；适合翻译、摘要等需要\"全局最优\"任务 - 采样（Sampling）：按概率分布随机抽；配合 temperature / top-p；适合对话、创作",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q13",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 13,
+      "title": "大模型参数：温度 / Top-P / Top-K 是什么？最佳设置？",
+      "body": "**✅ 答题框架**：\n- **温度（Temperature）**：控制分布\"陡峭度\"；0 = 贪心，1 = 原分布，>1 = 更随机\n- **Top-K**：只保留概率最大的 K 个 token；K=1 = 贪心\n- **Top-P**：保留累计概率 ≥ P 的 token；动态大小\n- **最佳设置**：\n  - **代码 / 抽取** → temperature=0\n  - **对话 / 总结** → temperature=0.7, top-p=0.9\n  - **创意写作** → temperature=0.9, top-p=0.95\n\n---",
+      "tags": [
+        "温度（Temperature）",
+        "Top-K",
+        "Top-P",
+        "最佳设置",
+        "代码 / 抽取"
+      ],
+      "preview": "✅ 答题框架： - 温度（Temperature）：控制分布\"陡峭度\"；0 = 贪心，1 = 原分布，>1 = 更随机 - Top-K：只保留概率最大的 K 个 token；K=1 = 贪心 - Top-P：保留累计概率 ≥ P 的 token；动态大小 - 最佳设置： - 代码 / 抽取 → te...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q14",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 14,
+      "title": "KV Cache 是什么？Prompt Caching 的原理是什么？",
+      "body": "**✅ 答题框架**：\n- **KV Cache**：Transformer 推理时缓存历史的 K/V，避免每步重算\n  - 加速 ~10x，但占显存（**长上下文 OOM 根源**）\n- **Prompt Caching**：把高频 system prompt 的 KV 缓存到服务端\n  - 同一 prompt 多次调用 → 复用 KV，**省 input cost + 加速**\n\n**Anthropic prompt cache**：5 分钟 TTL，命中后价格降 90%\n\n---",
+      "tags": [
+        "KV Cache",
+        "长上下文 OOM 根源",
+        "Prompt Caching",
+        "省 input cost + 加速",
+        "Anthropic prompt cache"
+      ],
+      "preview": "✅ 答题框架： - KV Cache：Transformer 推理时缓存历史的 K/V，避免每步重算 - 加速 ~10x，但占显存（长上下文 OOM 根源） - Prompt Caching：把高频 system prompt 的 KV 缓存到服务端 - 同一 prompt 多次调用 → 复用 KV...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "06-Q15",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 15,
+      "title": "大模型量化是什么？INT8 / INT4 / AWQ / GPTQ 怎么选？",
+      "body": "**✅ 答题框架**：\n- **量化**：把 FP16/BF16 权重降到 INT8/INT4，**省显存 + 加速**\n- **方案对比**：\n  - **INT8**：几乎无损，**首选**\n  - **INT4**：精度略降，省 4x 显存\n  - **GPTQ**：训练后量化，速度快\n  - **AWQ**：激活感知量化，**精度比 GPTQ 好**\n  - **GGUF（llama.cpp）**：CPU 部署首选\n\n**选型**：GPU 推理 INT8 / AWQ-INT4；CPU 部署 GGUF\n\n---",
+      "tags": [
+        "量化",
+        "省显存 + 加速",
+        "方案对比",
+        "INT8",
+        "首选"
+      ],
+      "preview": "✅ 答题框架： - 量化：把 FP16/BF16 权重降到 INT8/INT4，省显存 + 加速 - 方案对比： - INT8：几乎无损，首选 - INT4：精度略降，省 4x 显存 - GPTQ：训练后量化，速度快 - AWQ：激活感知量化，精度比 GPTQ 好 - GGUF（llama.cpp）...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q16",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 16,
+      "title": "如何写好 Prompt？Prompt 工程实践经验？",
+      "body": "**✅ 答题框架（5 件套）**：\n1. **明确角色**：\"你是 XX 专家\"\n2. **明确任务**：\"请帮我做 X，输出格式 Y\"\n3. **给例子（Few-shot）**：3-5 个示例比 100 字描述有效\n4. **边界设定**：\"不知道就说不知道\"、\"基于以下资料回答\"\n5. **格式约束**：JSON / Markdown / 列表\n\n**进阶**：CoT（让模型先想再答）、ReAct（推理+行动交替）\n\n---",
+      "tags": [
+        "明确角色",
+        "明确任务",
+        "给例子（Few-shot）",
+        "边界设定",
+        "格式约束"
+      ],
+      "preview": "✅ 答题框架（5 件套）： 1. 明确角色：\"你是 XX 专家\" 2. 明确任务：\"请帮我做 X，输出格式 Y\" 3. 给例子（Few-shot）：3-5 个示例比 100 字描述有效 4. 边界设定：\"不知道就说不知道\"、\"基于以下资料回答\" 5. 格式约束：JSON / Markdown / 列...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q17",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 17,
+      "title": "什么是 CoT？为啥效果好？有什么缺点？",
+      "body": "**✅ 答题框架**：\n- **Chain of Thought**：让模型**逐步推理**再给答案\n- **为什么有效**：\n  - 暴露中间步骤，**容易发现错误**\n  - 强制模型\"思考\"，**激活更深层的推理能力**\n- **缺点**：\n  - Token 消耗多（**几倍**）\n  - 推理延迟高\n  - **不是所有任务都适用**（简单问答不需要）\n\n**变体**：Zero-shot CoT（\"Let's think step by step\"）/ Self-Consistency（多次采样投票）\n\n---",
+      "tags": [
+        "Chain of Thought",
+        "逐步推理",
+        "为什么有效",
+        "容易发现错误",
+        "激活更深层的推理能力"
+      ],
+      "preview": "✅ 答题框架： - Chain of Thought：让模型逐步推理再给答案 - 为什么有效： - 暴露中间步骤，容易发现错误 - 强制模型\"思考\"，激活更深层的推理能力 - 缺点： - Token 消耗多（几倍） - 推理延迟高 - 不是所有任务都适用（简单问答不需要）",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "06-Q18",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 18,
+      "title": "大模型为什么会出现幻觉？怎么缓解？",
+      "body": "**✅ 答题框架**：\n- **原因**：\n  - 训练数据有噪声 / 错误\n  - 模型是\"概率生成\"不是\"查数据库\"\n  - 知识截止之后的事不知道\n- **缓解（5 件套）**：\n  1. **RAG**：基于检索回答\n  2. **Prompt 约束**：\"不知道就说不知道\"\n  3. **降低温度**：t=0 更稳\n  4. **后置验证**：用 LLM 检查答案\n  5. **多模型投票**：3 个模型一致才用\n\n---",
+      "tags": [
+        "原因",
+        "缓解（5 件套）",
+        "RAG",
+        "Prompt 约束",
+        "降低温度"
+      ],
+      "preview": "✅ 答题框架： - 原因： - 训练数据有噪声 / 错误 - 模型是\"概率生成\"不是\"查数据库\" - 知识截止之后的事不知道 - 缓解（5 件套）： 1. RAG：基于检索回答 2. Prompt 约束：\"不知道就说不知道\" 3. 降低温度：t=0 更稳 4. 后置验证：用 LLM 检查答案 5. ...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "06-Q19",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 19,
+      "title": "MoE 混合专家模型是什么？DeepSeek V3、Qwen 为什么用 MoE？",
+      "body": "**✅ 答题框架**：\n- **MoE（Mixture of Experts）**：把 FFN 拆成 N 个\"专家\"，每次推理只激活 K 个\n- **优点**：\n  - **总参数大**（知识多），**激活参数小**（推理快）\n  - 性价比高\n- **DeepSeek V3**：671B 总参，激活 37B\n- **Qwen MoE**：Qwen2-57B-A14B 等\n- **挑战**：\n  - 训练难（专家负载均衡）\n  - 部署复杂\n\n---",
+      "tags": [
+        "MoE（Mixture of Experts）",
+        "优点",
+        "总参数大",
+        "激活参数小",
+        "DeepSeek V3"
+      ],
+      "preview": "✅ 答题框架： - MoE（Mixture of Experts）：把 FFN 拆成 N 个\"专家\"，每次推理只激活 K 个 - 优点： - 总参数大（知识多），激活参数小（推理快） - 性价比高 - DeepSeek V3：671B 总参，激活 37B - Qwen MoE：Qwen2-57B-A...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "06-Q20",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 20,
+      "title": "大模型部署方案：vLLM / TGI / llama.cpp / SGLang 怎么选？",
+      "body": "**✅ 答题框架**：\n| 方案 | 适用 | 特点 |\n|---|---|---|\n| **vLLM** | 高吞吐 GPU 推理 | PagedAttention，连续批处理，**业界首选** |\n| **TGI（Text Generation Inference）** | HuggingFace 生态 | Rust 写，多 GPU |\n| **llama.cpp** | CPU / 边缘 / 本地 | GGUF 格式，**笔记本也能跑** |\n| **SGLang** | 复杂 prompt + 多轮 | RadixAttention，结构化生成 |\n| **TensorRT-LLM** | NVIDIA 极致性能 | 编译优化，难调 |\n\n**选型**：高并发 GPU 推理 **vLLM**；本地开发 **llama.cpp**；复杂多轮 **SGLang**\n\n---",
+      "tags": [
+        "vLLM",
+        "业界首选",
+        "TGI（Text Generation Inference）",
+        "llama.cpp",
+        "笔记本也能跑"
+      ],
+      "preview": "✅ 答题框架： 适用 高吞吐 GPU 推理 HuggingFace 生态 CPU / 边缘 / 本地 复杂 prompt + 多轮 NVIDIA 极致性能",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q21",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 21,
+      "title": "大模型能力评测指标有哪些？",
+      "body": "**✅ 答题框架**：\n- **通用能力**：MMLU、C-Eval、GSM8K、HumanEval\n- **中文**：C-Eval、CMMLU\n- **代码**：HumanEval、MBPP、LiveCodeBench\n- **数学**：GSM8K、MATH\n- **推理**：BBH、ARC\n- **Agent**：AgentBench、SWE-bench\n- **幻觉**：TruthfulQA、HaluEval\n- **业务评测**：自己标注 golden set\n\n---",
+      "tags": [
+        "通用能力",
+        "中文",
+        "代码",
+        "数学",
+        "推理"
+      ],
+      "preview": "✅ 答题框架： - 通用能力：MMLU、C-Eval、GSM8K、HumanEval - 中文：C-Eval、CMMLU - 代码：HumanEval、MBPP、LiveCodeBench - 数学：GSM8K、MATH - 推理：BBH、ARC - Agent：AgentBench、SWE-ben...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "06-Q22",
+      "topic": "大模型工程（Transformer、训练、量化、MoE、vLLM）",
+      "number": 22,
+      "title": "对比使用过哪些主流大模型？你们项目最终选用哪个？为什么？",
+      "body": "**✅ 答题框架**：\n- **闭源**：Claude Sonnet 4 / GPT-4.1 / Gemini 2.5\n- **开源**：LLaMA 3 / Qwen 2.5 / DeepSeek V3 / GLM-4\n- **选型标准**：\n  - **任务**：代码 / 推理 / 长上下文 / 中文\n  - **成本**：自部署 vs API\n  - **合规**：数据出境要求\n  - **延迟**：P50/P95\n\n**💡 简历挂钩**：你项目 Qwen 主力 + DeepSeek 兜底，**双模型路由**是亮点",
+      "tags": [
+        "闭源",
+        "开源",
+        "选型标准",
+        "任务",
+        "成本"
+      ],
+      "preview": "✅ 答题框架： - 闭源：Claude Sonnet 4 / GPT-4.1 / Gemini 2.5 - 开源：LLaMA 3 / Qwen 2.5 / DeepSeek V3 / GLM-4 - 选型标准： - 任务：代码 / 推理 / 长上下文 / 中文 - 成本：自部署 vs API - 合...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "07-Q01",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 1,
+      "title": "Redis 数据结构 + Agent 会话状态用哪种？",
+      "body": "**✅ 答题框架**：\n```\nString：计数器（INCR）、缓存对象 JSON、分布式锁\nHash：对象字段级读写（用户资料、Agent 会话状态：HSET session:xxx step 3）\nList：消息队列、操作日志\nSet：去重（已处理 tool_call_id）、标签\nZSet：排行榜、按时间戳排序的事件、延时队列\n\nAgent 会话状态推荐 Hash：\n- 字段级 update 不用读整个对象\n- TTL 整体设在 key 上即可\n- 状态结构复杂 / 需要嵌套 → 序列化成 JSON 存 String\n```\n\n---",
+      "tags": [
+        "INCR",
+        "JSON",
+        "HSET",
+        "TTL",
+        "架构"
+      ],
+      "preview": "✅ 答题框架： ``` String：计数器（INCR）、缓存对象 JSON、分布式锁 Hash：对象字段级读写（用户资料、Agent 会话状态：HSET session:xxx step 3） List：消息队列、操作日志 Set：去重（已处理 tool_call_id）、标签 ZSet：排行榜、...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q02",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 2,
+      "title": "Redis 过期删除 + 内存淘汰",
+      "body": "**✅ 答题框架**：\n```\n过期删除：惰性删除 + 定期删除组合\n- 惰性：下次访问这个 key 才检查\n- 定期：每 100ms 抽样若干个有 TTL 的 key 检查\n\nmaxmemory-policy 8 种：\n- noeviction（默认）\n- allkeys-lru / allkeys-lfu / allkeys-random\n- volatile-lru / volatile-lfu / volatile-random / volatile-ttl\n```\n\n---",
+      "tags": [
+        "TTL",
+        "算法"
+      ],
+      "preview": "✅ 答题框架： ``` 过期删除：惰性删除 + 定期删除组合 - 惰性：下次访问这个 key 才检查 - 定期：每 100ms 抽样若干个有 TTL 的 key 检查",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q03",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 3,
+      "title": "Redis 缓存穿透 / 击穿 / 雪崩",
+      "body": "**✅ 答题框架**：\n```\n穿透：查不存在的 key，每次都打到 DB\n- 解法：缓存空值（短 TTL）+ 布隆过滤器\n\n击穿：一个热点 key 过期瞬间大量并发打到 DB\n- 解法：互斥锁 / 永不过期 + 异步更新\n\n雪崩：大量 key 同时过期 + 突发流量打到 DB\n- 解法：过期时间加随机扰动（base+rand）/ 多级缓存 / 限流降级\n```\n\n---",
+      "tags": [
+        "DB",
+        "TTL",
+        "性能",
+        "存储",
+        "算法"
+      ],
+      "preview": "✅ 答题框架： ``` 穿透：查不存在的 key，每次都打到 DB - 解法：缓存空值（短 TTL）+ 布隆过滤器",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q04",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 4,
+      "title": "Redis Stream vs Kafka",
+      "body": "**✅ 答题框架**：\n```\n- 持久化：Redis 看持久化模式；Kafka 磁盘顺序写 + 副本，更强\n- 吞吐：Redis 单机十万级；Kafka 单机百万级\n- 消费组：两者都有\n- 用场景：中小规模事件、Agent 步骤日志 → Redis Stream；大规模日志、跨系统数据管道 → Kafka\n```\n\n---\n\n## 算法题（按频率）",
+      "tags": [
+        "架构",
+        "性能",
+        "存储",
+        "算法",
+        "场景"
+      ],
+      "preview": "## 算法题（按频率）",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q05",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 5,
+      "title": "合并两个有序链表（LeetCode 21, Easy）",
+      "body": "```python\nclass Solution:\n    def mergeTwoLists(self, l1, l2):\n        dummy = ListNode()\n        cur = dummy\n        while l1 and l2:\n            if l1.val <= l2.val:\n                cur.next = l1\n                l1 = l1.next\n            else:\n                cur.next = l2\n                l2 = l2.next\n            cur = cur.next\n        cur.next = l1 if l1 else l2\n        return dummy.next\n```\n- 时间 O(m+n)，空间 O(1)\n- 用 dummy head 避免\"头节点单独处理\"\n- 比较时用 <= 保证稳定\n- 递归写法 ≤5 行，但面试默认要求迭代\n\n---",
+      "tags": [
+        "ListNode",
+        "LeetCode",
+        "算法",
+        "对比"
+      ],
+      "preview": "- 时间 O(m+n)，空间 O(1) - 用 dummy head 避免\"头节点单独处理\" - 比较时用 <= 保证稳定 - 递归写法 ≤5 行，但面试默认要求迭代",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q06",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 6,
+      "title": "LRU 缓存（LeetCode 146, Medium）",
+      "body": "**核心**：HashMap + 双向链表\n- get O(1)：查 map，节点移到链表头\n- put O(1)：存在则更新并移到头；不存在则插入头，满了删尾\n\n---",
+      "tags": [
+        "核心",
+        "HashMap",
+        "LeetCode",
+        "LRU",
+        "存储"
+      ],
+      "preview": "核心：HashMap + 双向链表 - get O(1)：查 map，节点移到链表头 - put O(1)：存在则更新并移到头；不存在则插入头，满了删尾",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q07",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 7,
+      "title": "岛屿数量（LeetCode 200, Medium）",
+      "body": "**核心**：DFS / BFS 标记连通分量\n```python\ndef numIslands(grid):\n    count = 0\n    for i in range(len(grid)):\n        for j in range(len(grid[0])):\n            if grid[i][j] == '1':\n                dfs(grid, i, j)\n                count += 1\n    return count\n\ndef dfs(grid, i, j):\n    if i<0 or j<0 or i>=len(grid) or j>=len(grid[0]) or grid[i][j] != '1':\n        return\n    grid[i][j] = '0'  # 标记访问\n    dfs(grid, i+1, j)\n    dfs(grid, i-1, j)\n    dfs(grid, i, j+1)\n    dfs(grid, i, j-1)\n```\n\n---",
+      "tags": [
+        "核心",
+        "LeetCode",
+        "DFS",
+        "BFS",
+        "算法"
+      ],
+      "preview": "核心：DFS / BFS 标记连通分量 ```python def numIslands(grid): count = 0 for i in range(len(grid)): for j in range(len(grid[0])): if grid[i][j] == '1': dfs(grid,...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q08",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 8,
+      "title": "数组中的第 K 个最大元素（LeetCode 215, Medium）",
+      "body": "**核心**：堆排序 / 快选\n- **堆**：O(n log k)\n- **快选**：平均 O(n)\n\n---",
+      "tags": [
+        "核心",
+        "：O(n log k)\n-",
+        "LeetCode",
+        "算法"
+      ],
+      "preview": "核心：堆排序 / 快选 - 堆：O(n log k) - 快选：平均 O(n)",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q09",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 9,
+      "title": "二叉树的层序遍历（LeetCode 102, Medium）",
+      "body": "**核心**：BFS + 队列\n- 区分层级：每层循环 size 次\n- 处理空节点：先入队再判 None\n\n---",
+      "tags": [
+        "核心",
+        "LeetCode",
+        "BFS",
+        "算法"
+      ],
+      "preview": "核心：BFS + 队列 - 区分层级：每层循环 size 次 - 处理空节点：先入队再判 None",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q10",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 10,
+      "title": "二叉树最大深度（LeetCode 104, Easy）",
+      "body": "**核心**：DFS\n```python\ndef maxDepth(root):\n    if not root: return 0\n    return 1 + max(maxDepth(root.left), maxDepth(root.right))\n```\n\n---",
+      "tags": [
+        "核心",
+        "LeetCode",
+        "DFS",
+        "算法"
+      ],
+      "preview": "核心：DFS",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "07-Q11",
+      "topic": "八股与算法（Redis、算法题）",
+      "number": 11,
+      "title": "杨辉三角（LeetCode 118, Easy）",
+      "body": "**核心**：动态规划\n- 改空间复杂度到 O(1)：在原数组上从后往前更新",
+      "tags": [
+        "核心",
+        "LeetCode",
+        "算法"
+      ],
+      "preview": "核心：动态规划 - 改空间复杂度到 O(1)：在原数组上从后往前更新",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "08-Q01",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 1,
+      "title": "介绍下你的 interview-agent 项目？（**v13 真实版 STAR**）",
+      "body": "**S (场景)**：候选人需要 AI 模拟面试（出题 / 追问 / 评估），传统 BI 化面试系统链路长 + 缺记忆 + 缺工具调用\n\n**T (任务)**：实现一个有完整生命周期（出题 → 多轮对话 → 评估报告）的 AI 面试系统，含长期记忆 + RAG + 工具调用\n\n**A (行动)**：\n- **架构**：NestJS 后端 + React 前端 + Docker Compose 9 服务\n- **多 Agent**：LangGraph 5+1 节点（supervisor 意图分类 / planner 拆解 / executor 执行 / replanner 决策 / reviewer 审阅）\n- **记忆**：Redis 短期 + Milvus 长期向量 + Mem0 Cloud 语义去重，**3 层各司其职**\n- **MCP**：Registry 聚合工具 + JSON config 驱动 + 用户级 Prisma 偏好，**3 层数据流**\n- **可观测**：Langfuse 全链路 trace + 双模型路由 + fallback 兜底\n- **真实集成**：Qwen + DeepSeek + Mem0 Cloud + Milvus + Langfuse，**全部跑通**\n\n**R (结果)**：\n- 12/12 e2e 全过\n- 4 级水位线 ContextManager 节约 token（具体数字你 6-11 跑过）\n- PDF 简历上传 build 验证通过（6-12 12/12 e2e + 上传 1 页 PDF 全链路通过）\n\n**关键变化（v13 vs v12）**：\n- 6-12 公司电脑补完 PDF 上传（pdfjs-dist v4）\n- 6-12~15 加 MCP 管理 API（admin-mcp controller + AdminMcpPage）\n- 6-15 加 UserToolPreference Prisma 表（`20260615080000_add_user_tool_preferences` migration）\n\n---",
+      "tags": [
+        "S (场景)",
+        "T (任务)",
+        "A (行动)",
+        "架构",
+        "多 Agent"
+      ],
+      "preview": "S (场景)：候选人需要 AI 模拟面试（出题 / 追问 / 评估），传统 BI 化面试系统链路长 + 缺记忆 + 缺工具调用",
+      "difficulty": "P4-P5"
+    },
+    {
+      "id": "08-Q02",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 2,
+      "title": "为什么用 LangGraph Multi-Agent 而不是单 Agent？",
+      "body": "**✅ 答题框架**：\n\n| 单 Agent 痛点 | LangGraph Multi-Agent 解法 |\n|--------------|---------------------------|\n| 提示词长 → 注意力漂移 | 5 节点各管一段，**职责单一** |\n| 工具调用散 → 难定位 bug | 每个 action 走特定节点，**日志可追溯** |\n| 缺反思 → 一次输出易错 | Replanner + Reviewer 两层审视 |\n| 死循环风险 | retry_count 兜底 + DoD（Definition of Done）|\n| 难以中途干预 | LangGraph interrupt（HITL，**v13 没接，6-12 之前要补**）|\n\n**代码证据**：\n- `state.ts` 7 字段 + 4 Zod schema，**结构化设计**\n- `graph.ts` 3 条件边 + 5 节点 + 1 直答节点，**显式控制流**\n- `reviewer.ts` 两阶段（合成 + 审阅）+ retry ≥ 2 强制输出，**不死循环**\n\n---",
+      "tags": [
+        "职责单一",
+        "日志可追溯",
+        "v13 没接，6-12 之前要补",
+        "代码证据",
+        "结构化设计"
+      ],
+      "preview": "LangGraph Multi-Agent 解法 | | 5 节点各管一段，职责单一 | 每个 action 走特定节点，日志可追溯 | Replanner + Reviewer 两层审视 | retry_count 兜底 + DoD（Definition of Done）| LangGraph i...",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "08-Q03",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 3,
+      "title": "你们的 Supervisor 节点怎么设计？为什么不直接让 LLM 自由路由？",
+      "body": "**✅ 真实代码答（supervisor.ts:23-78）**：\n\n```\n意图分类（4 类）：\n- jd_match: 岗位匹配（\"我适合这个岗吗\"）\n- mock_interview: 模拟面试（\"开始面试\"、\"问我一道题\"）\n- resume_review: 简历评估（\"帮我看看简历\"）\n- general_qa: 通用问答（其他）\n\n写 state.user_intent → 条件边 supervisorRouter 决定下一步\n```\n\n**为什么不靠 LLM 自由路由**：\n1. **边界 case 分类不一致** — 同一句话可能走不同分支\n2. **不可观测** — 不知道 LLM 为什么选了这条路\n3. **难以针对优化** — 显式意图分类让特定路径可调试\n\n**代码优势**：用 `withStructuredOutput(z.object({ intent, reason }))` 强制结构化 + 分类理由\n\n---",
+      "tags": [
+        "✅ 真实代码答（supervisor.ts:23-78）",
+        "为什么不靠 LLM 自由路由",
+        "边界 case 分类不一致",
+        "不可观测",
+        "难以针对优化"
+      ],
+      "preview": "✅ 真实代码答（supervisor.ts:23-78）：",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "08-Q04",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 4,
+      "title": "Planner / Executor / Reviewer 三层怎么协作？",
+      "body": "**✅ 真实代码答**：\n\n```\nsupervisor 分类 → user_intent\n  ↓\nplanner 拆解为 2-6 步 plan（PlanStep[] 含 action/tool/args）\n  ↓\nexecutor 逐步执行（current_step_idx 递增）\n  ↓\nreplanner 决策 continue / replan / finish / respond_directly\n  ↓\nreviewer 两阶段：\n  1. 汇总 past_steps → final_response\n  2. 审阅 quality → approved / revise\n  ↓\napproved → END\nrevise + retry < 2 → 回 planner\nretry ≥ 2 → 强制输出（不死循环兜底）\n```\n\n**为什么不直接用 ReAct**：\n- ReAct 每步重新决策，**长链路容易跑偏 + token 浪费**\n- Plan-and-Execute 模式：先规划再执行，每步目标明确\n- 跑偏了 Replanner 能纠正而非从头来\n\n---",
+      "tags": [
+        "✅ 真实代码答",
+        "为什么不直接用 ReAct",
+        "长链路容易跑偏 + token 浪费",
+        "PlanStep",
+        "ReAct"
+      ],
+      "preview": "为什么不直接用 ReAct： - ReAct 每步重新决策，长链路容易跑偏 + token 浪费 - Plan-and-Execute 模式：先规划再执行，每步目标明确 - 跑偏了 Replanner 能纠正而非从头来",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "08-Q05",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 5,
+      "title": "你们的 MCP Registry 怎么设计？（**v13 真实版，比 transfer 描述更细**）",
+      "body": "**✅ 真实代码答（mcp-registry.ts:20-306）**：\n\n**3 层数据流**：\n```\n1. config/mcp-servers.json    ← 启动时加载（git 提交，手动维护）\n2. in-memory systemOverride Map ← 管理员运行时切换（重启后从 config 恢复）\n3. Prisma UserToolPreference   ← 用户级别偏好（持久化）\n```\n\n**设计原则**：\n- 商用项目**不做运行时 add/delete MCP**（避免 token 浪费）\n- 添加新 MCP = 改 json + npm install + 重启 API\n- 保持向后兼容：McpTool 接口 + register() API 不变\n\n**用户故事**：\n- 用户 A 关掉\"联网搜索\" → 面试官不调用该工具\n- 管理员系统级关掉\"题库\" → 所有用户都用不了\n- 面试 agent 创建时调 `getAvailableTools(userId)` 拿过滤后的工具列表\n\n**API 端点**（admin-mcp.controller.ts）：\n- `GET /admin/mcp-servers` — 所有 server + 状态\n- `POST /admin/mcp-servers/toggle` — 系统级启停\n- `GET /admin/mcp-servers/:name/health` — 健康检查\n- `POST /admin/mcp-servers/reload` — 重载 config\n\n---",
+      "tags": [
+        "设计原则",
+        "不做运行时 add/delete MCP",
+        "用户故事",
+        "API 端点",
+        "v13 真实版，比 transfer 描述更细"
+      ],
+      "preview": "✅ 真实代码答（mcp-registry.ts:20-306）：",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "08-Q06",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 6,
+      "title": "你们的三层记忆怎么协作？为什么是 3 层不是 1 层？",
+      "body": "**✅ 真实代码答（memory/）**：\n\n| 层 | 存储 | 生命周期 | 查询模式 |\n|---|------|---------|---------|\n| **短期** | Redis | 会话级 TTL 1h | 顺序读最近 50 条（lpush + ltrim）|\n| **长期向量** | Milvus | 永久 | cosine topK=5，dim=1024 |\n| **长期语义** | Mem0 Cloud | 永久 | 自动去重 / 冲突合并 / 提取画像 |\n\n**为什么不能单层**：\n- Redis 没有语义检索\n- Milvus 没有去重合并\n- Mem0 没有低延迟会话上下文\n\n**双写策略**（memory.service.ts）：\n- `memorize()` 同时写 Milvus + Mem0，`Promise.allSettled` 任一失败不影响另一个\n- `recall()` 同时查两个，结果合并去重（按内容前 50 字符）\n\n**Mem0 双模式**（mem0.store.ts）：\n- Cloud 模式：`api.mem0.ai`，Token 鉴权，路径 `/v3/memories/*`\n- OSS 模式：自托管 Mem0 server，路径 `/memories`、`/search`\n- **绕开 SDK v3 路径硬编码**，原生 fetch 直连\n\n---",
+      "tags": [
+        "✅ 真实代码答（memory/）",
+        "短期",
+        "长期向量",
+        "长期语义",
+        "为什么不能单层"
+      ],
+      "preview": "✅ 真实代码答（memory/）：",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "08-Q07",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 7,
+      "title": "你们的 4 级水位线 ContextManager 怎么设计？",
+      "body": "**✅ 真实代码答（context-manager.service.ts）**：\n\n| Tier | 水位 | 策略 |\n|------|------|------|\n| **Tier 0** | < 60% | 不优化（上下文充足）|\n| **Tier 1** | 60-80% | **Snip** — 截短老工具输出、长 assistant 回复 |\n| **Tier 2** | 80-95% | **Prune** — 替换为占位符 `[已压缩]` |\n| **Tier 3** | ≥ 95% | **增量 LLM 摘要** |\n\n**关键设计**：\n- **保护区**：最近 4000 token 不动（`PROTECT_WINDOW_TOKENS`）\n- **用户消息特权**：只裁代码块，保留纯文本\n- **stub 决策缓存**：`decisionCache` 保证单调推进，保护 Prompt Cache 命中率\n- **Langfuse 埋点**：tier / token 节省 / stub 数\n\n**借鉴来源**：Claude Code / Codex 的 4 级水位线思路\n\n---",
+      "tags": [
+        "Tier 0",
+        "Tier 1",
+        "Snip",
+        "Tier 2",
+        "Prune"
+      ],
+      "preview": "✅ 真实代码答（context-manager.service.ts）：",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "08-Q08",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 8,
+      "title": "LLM Gateway 双模型路由 + fallback 怎么实现的？",
+      "body": "**✅ 真实代码答（llm/）**：\n\n**路由策略**：\n- 代码/技术题 → DeepSeek\n- 通用对话/评估 → Qwen\n- 用户显式指定 → 用指定的\n\n**故障降级**：\n- 主 Provider 失败 → 自动切备用（Qwen ↔ DeepSeek 互为降级）\n- 降级调用记录 `isFallback: true` 到 Langfuse\n\n**Token 计量**：所有调用记录到 Langfuse（含 prompt/completion tokens、耗时、模型）\n\n**统一接口**：`chat()` 同步 / `streamChat()` 流式\n\n---",
+      "tags": [
+        "✅ 真实代码答（llm/）",
+        "路由策略",
+        "故障降级",
+        "Token 计量",
+        "统一接口"
+      ],
+      "preview": "✅ 真实代码答（llm/）：",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "08-Q09",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 9,
+      "title": "你们怎么避免 LLM 幻觉？",
+      "body": "**✅ 4 层防线答**：\n\n| 防线 | 真实实现 |\n|------|---------|\n| **1. Schema 准** | Zod 校验 plan step + Reviewer 审阅（`state.ts` Zod schema + `reviewer.ts` verdict）|\n| **2. 数据对** | Resume RAG 强制 LLM 基于检索 chunk 回答 + Mem0 语义去重 |\n| **3. 执行安全** | MCP 工具白名单 + systemOverride 启停 + 危险操作拦截（v13 没接 HITL，**6-12 之前要补**）|\n| **4. 解读好** | Reviewer 节点两阶段 + retry_count 兜底 |\n\n---",
+      "tags": [
+        "✅ 4 层防线答",
+        "1. Schema 准",
+        "2. 数据对",
+        "3. 执行安全",
+        "6-12 之前要补"
+      ],
+      "preview": "真实实现 | | Zod 校验 plan step + Reviewer 审阅（ Zod schema + verdict）| Resume RAG 强制 LLM 基于检索 chunk 回答 + Mem0 语义去重 | MCP 工具白名单 + systemOverride 启停 + 危险操作拦截（v...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "08-Q10",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 10,
+      "title": "你做的最有挑战的一个技术问题？（**v13 真实坑**）",
+      "body": "**✅ STAR 答（推荐 Mem0/Qdrant 集成踩坑 → v13 改成 Mem0 Cloud 集成）**：\n\n**S**：做简历 RAG 时，要集成 Mem0 + Milvus 做长期记忆\n**T**：预期 1 天完成\n**A**：\n- `mem0ai` SDK 3.0.6 的 v3 路径前缀与实际 API 不一致 → **绕开 SDK，原生 fetch 直连**\n- Docker 镜像版本冲突 → 统一版本\n- 向量维度不一致（Mem0 1536 vs Milvus 1024）→ 统一 1024\n- Cloud vs OSS 模式切换 → 抽象双模式 mem0.store.ts\n**R**：集成稳定，e2e 12/12 全过\n\n---",
+      "tags": [
+        "：预期 1 天完成",
+        "绕开 SDK，原生 fetch 直连",
+        "v13 真实坑",
+        "STAR",
+        "RAG"
+      ],
+      "preview": "✅ STAR 答（推荐 Mem0/Qdrant 集成踩坑 → v13 改成 Mem0 Cloud 集成）：",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "08-Q11",
+      "topic": "项目深挖（interview-agent 追问）",
+      "number": 11,
+      "title": "你的 MCP 网关 / Registry 项目（项目 2 计划中）",
+      "body": "**✅ 答题框架（v13 已有 Registry 雏形 → 项目 2 演进路线）**：\n\n**v13 Registry 已实现**：\n- ✅ JSON config 驱动加载\n- ✅ 3 层数据流（config + systemOverride + UserToolPreference）\n- ✅ admin API（list / toggle / health / reload）\n\n**项目 2 待演进**：\n1. **stdio → streamable HTTP** — 加鉴权 + 跨网络\n2. **Registry 聚合层** — 跨多个 MCP server 统一接入\n3. **接 10+ 开源 MCP server** — bocha-search / github / file-system / postgres\n4. **MCP 市场（marketplace）** — 终极形态\n\n**简历卖点**：\n- \"MCP 网关解决 N×M 的工具-LLM 适配问题，团队接入成本从 N×M 降到 N+M\"\n- \"自建 MCP 网关在国内差异化强，比'调过 MCP'高一档\"\n\n---\n\n## 🎯 v13 vs transfer 描述的关键差异（**面试深挖准备**）\n\n| 维度 | transfer 描述 | v13 真实实现 | 面试回答建议 |\n|------|--------------|-------------|-------------|\n| **Multi-Agent** | 5 节点 LangGraph supervisor | ✅ 5+1 节点（加了 respond_directly）| 说\"5+1 节点\"，更准 |\n| **PostgresSaver** | \"v13 没接，要补\" | ✅ **v13 已经支持**（graph.ts:29, 139）| **直接说\"已经支持\"** |\n| **MCP Registry** | in-code register | ✅ **3 层数据流**（JSON config + systemOverride + Prisma UserPreference）| 强调\"商用级 3 层数据流\" |\n| **Mem0** | SDK 调用 | ✅ **原生 fetch + 双模式**（Cloud + OSS）| 强调\"绕开 SDK bug\" |\n| **PDF 上传** | 待验证 | ✅ **已 build 验证**（6-12 12/12 e2e 通过）| 直接说\"已验证\" |\n| **HITL interrupt** | 待实现 | ❌ **v13 还没接**（**真实缺口**）| 诚实说\"计划中\" + 给实施时间表 |\n\n---\n\n## 🎯 何时算\"真吃透\"\n\n- [ ] 能用 STAR 讲清 v13 项目（5 个亮点 + 真实代码位置）\n- [ ] 能讲 Supervisor 为什么不靠 LLM 自由路由（3 个理由）\n- [ ] 能讲 MCP Registry 3 层数据流（JSON config + systemOverride + Prisma UserPreference）\n- [ ] 能讲 4 级水位线 Tier 0-3 各自的策略（不是只背概念）\n- [ ] 能区分 v13 已实现 vs 待补（**HITL 是真实缺口**）\n- [ ] 能用 file:line 引用真实代码（不是泛泛而谈\"我做了 X\"）\n\n---\n\n## ⚠️ 真实缺口清单（**必须补，否则简历虚高**）\n\n| # | 缺口 | 优先级 | 建议补法 |\n|---|------|--------|---------|\n| 1 | **LangGraph interrupt（HITL）** | 🔴 高 | W2 加 @langchain/langgraph 的 interrupt API |\n| 2 | **MCP 健康检查** | 🟡 中 | `mcp-registry.ts:236` 健康检查是占位，**真正接 ping 进程** |\n| 3 | **stdio MCP server demo** | 🟡 中 | `mcp-servers.json` 的 github_lookup 还是占位 |\n| 4 | **Rerank** | 🟡 中 | 简历 RAG 没用 Rerank，**面试会问为什么** |\n| 5 | **评测集（Evals）** | 🟢 低 | transfer 提到\"影子测试\"，**v13 没接** |\n| 6 | **WIKI 更新** | 🟢 低 | WIKI 描述还是 v12，**跟代码不同步** |\n\n---\n\n## 💡 给项目改造建议（结合 120 题 + 精进自己）\n\n详见同目录的 `09-项目改造建议.md`（**待写**——下一步）",
+      "tags": [
+        "项目 2 待演进",
+        "stdio → streamable HTTP",
+        "Registry 聚合层",
+        "接 10+ 开源 MCP server",
+        "MCP 市场（marketplace）"
+      ],
+      "preview": "✅ 答题框架（v13 已有 Registry 雏形 → 项目 2 演进路线）：",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "09-Q01",
+      "topic": "软素质与行为面试（自我介绍、挑战、规划）",
+      "number": 1,
+      "title": "自我介绍（基础版，2-3 分钟）",
+      "body": "**目标**：让面试官快速了解你，简历的\"口述版\"\n\n**5 段结构**：\n\n| 段 | 时长 | 内容 |\n|---|---|---|\n| 1. 基础信息 | 15s | 姓名 / 经验 / 求职方向 |\n| 2. 项目经验 | 1.5min | 1-2 个核心项目（重点说 interview-agent）|\n| 3. 技术栈 | 30s | 跟 JD 对得上的技术 |\n| 4. 优势 / 差异化 | 30s | 跟别人不一样的点 |\n| 5. 求职动机 | 15s | 为什么看这个机会 |\n\n**模板**：\n\n> \"您好，我叫张继哲，**1 年+ LLM Agent 开发经验**，目标是 **LLM Agent 工程师**岗。\n>\n> **过去一年主要做的一个项目**叫 **interview-agent**——AI 面试智能体，帮候选人做模拟面试并给反馈。\n> - **技术栈**：NestJS + React + LangGraph + Mem0 + Qdrant + Qwen/DeepSeek\n> - **核心亮点**：\n>   - 4 级水位线 ContextManager（自研 token 控制）\n>   - LLM Gateway 双模型路由（Qwen 主力 + DeepSeek 兜底）\n>   - Multi-Agent 编排（LangGraph supervisor 5 节点）\n>   - MCP Registry（工具动态注册）\n>   - 真实集成（Mem0 / Milvus / Qwen API）\n>\n> **熟悉的技术栈**：LangGraph / LangChain / RAG / Embedding / MCP / 多 Agent 编排 / NestJS 后端。\n>\n> **跟同阶段的差异化**：\n> - 真实生产级集成（不是 demo）\n> - 工程化深度（Docker compose / Prisma / SSE 流式 / 30 分钟空面试自动清理）\n> - 新东西跟得快（MCP 2024.11 首发就跟进）\n>\n> **看这个机会的原因**：贵司在 LLM Agent 方向布局深，跟我的方向高度匹配。\"\n\n---",
+      "tags": [
+        "目标",
+        "5 段结构",
+        "模板",
+        "1 年+ LLM Agent 开发经验",
+        "LLM Agent 工程师"
+      ],
+      "preview": "目标：让面试官快速了解你，简历的\"口述版\"",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "09-Q02",
+      "topic": "软素质与行为面试（自我介绍、挑战、规划）",
+      "number": 2,
+      "title": "自我介绍（深挖版，3-4 分钟）【最新项目】",
+      "body": "**目标**：让面试官深挖你最新项目，**简历上写什么讲什么**\n\n**重点在\"最新项目\"**——不是把所有项目讲一遍\n\n**模板**：\n\n> \"我**最新的项目**还是 **interview-agent**（也是我最深的项目）——AI 面试智能体。\n>\n> **项目背景**（30s）：候选人上传简历 → AI 面试官根据岗位/职级动态抽题 → 多轮对话 → 结束给报告。核心问题：LLM 幻觉 / 上下文爆 / 工具调用散 / 缺乏持久化。\n>\n> **架构亮点**（5 个各 1 分钟）：\n>\n> 1. **4 级水位线 ContextManager**（1 分钟）\n>    - L1 系统 prompt / L2 当前任务 / L3 短期记忆 / L4 RAG 召回\n>    - 超 token 上限按优先级降级\n>    - 效果：长对话不丢上下文，节约 30% token\n>\n> 2. **LLM Gateway 双模型路由**（1 分钟）\n>    - Qwen 主力 + DeepSeek 兜底\n>    - Provider 抽象层\n>    - Fallback 触发：超时 / 4xx / 5xx 自动切\n>\n> 3. **Multi-Agent 编排**（1 分钟）\n>    - LangGraph supervisor 5 节点\n>    - 数据流靠共享 State（不是 await 传）\n>    - 并行用 asyncio.gather（Pregel 引擎）\n>    - 正在补 checkpointer + interrupt（简历缺口）\n>\n> 4. **MCP Registry**（30s）\n>    - NestJS 内部工具注册中心\n>    - 统一协议 → 后续演进 MCP 网关\n>    - 白名单 + 错误兜底 + 危险操作拦截\n>\n> 5. **真实集成证据**（30s）\n>    - Mem0 cloud fetch 直连（绕过 SDK v3 路径 bug）\n>    - Milvus 2.6 真实向量库\n>    - 不是 mock，全部跑通\n>\n> **项目当前状态**：正在加 PostgresSaver 持久化 + HITL 危险操作拦截。\n>\n> **想跟您聊**：贵司的 LLM Agent 在生产环境怎么做的 checkpointer 持久化？有没有遇到过 interrupt 续跑 state 不一致的问题？\"\n\n---",
+      "tags": [
+        "目标",
+        "简历上写什么讲什么",
+        "重点在\"最新项目\"",
+        "模板",
+        "最新的项目"
+      ],
+      "preview": "目标：让面试官深挖你最新项目，简历上写什么讲什么",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "09-Q03",
+      "topic": "软素质与行为面试（自我介绍、挑战、规划）",
+      "number": 3,
+      "title": "你怎么看待 AI Agent 的未来 3 年？",
+      "body": "**✅ 答题框架**：\n- **短期（1 年）**：Workflow 约束 Agent + Multi Agent 编排标准化\n- **中期（2 年）**：HITL 成熟 + 自建 MCP 网关/市场成为差异化\n- **长期（3 年）**：从工具调用到目标驱动；Agent 之间的协议标准化\n\n**加分**：**你自己判断哪些会成**——比如\"MCP 网关会成为企业内部工具统一接入的标配\"。\n\n---",
+      "tags": [
+        "短期（1 年）",
+        "中期（2 年）",
+        "长期（3 年）",
+        "加分",
+        "你自己判断哪些会成"
+      ],
+      "preview": "✅ 答题框架： - 短期（1 年）：Workflow 约束 Agent + Multi Agent 编排标准化 - 中期（2 年）：HITL 成熟 + 自建 MCP 网关/市场成为差异化 - 长期（3 年）：从工具调用到目标驱动；Agent 之间的协议标准化",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "09-Q04",
+      "topic": "软素质与行为面试（自我介绍、挑战、规划）",
+      "number": 4,
+      "title": "最有挑战的一个技术问题？",
+      "body": "**✅ STAR 模板**（推荐用 **Mem0/Qdrant 集成踩坑**）：\n- **S**：做简历 RAG 时，要集成 Mem0 + Qdrant\n- **T**：预期 1 天完成，实际卡了 3 天\n- **A**：\n  - Docker 镜像版本冲突\n  - 向量维度不一致（Mem0 用 1536，Qdrant 用 768）\n  - 最终方案：统一维度 + 升级镜像版本\n- **R**：集成稳定，召回率从 60% → 85%\n\n---",
+      "tags": [
+        "✅ STAR 模板",
+        "Mem0/Qdrant 集成踩坑",
+        "：预期 1 天完成，实际卡了 3 天\n-",
+        "STAR",
+        "RAG"
+      ],
+      "preview": "✅ STAR 模板（推荐用 Mem0/Qdrant 集成踩坑）： - S：做简历 RAG 时，要集成 Mem0 + Qdrant - T：预期 1 天完成，实际卡了 3 天 - A： - Docker 镜像版本冲突 - 向量维度不一致（Mem0 用 1536，Qdrant 用 768） - 最终方案...",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "09-Q05",
+      "topic": "软素质与行为面试（自我介绍、挑战、规划）",
+      "number": 5,
+      "title": "你为什么离开当前公司 / 看新机会？",
+      "body": "**✅ 答题框架**（**真话 + 不抱怨老东家**）：\n- 公司业务方向调整 / 个人发展空间受限 / 想深耕 LLM Agent\n- **不要说原公司坏话**——面试官圈子小\n- **聚焦\"想要什么\"**而不是\"逃离什么\"\n\n**模板**：\n> \"京东内部做了半年 joycode + AI 编程工具方向，**学到了大公司怎么把 AI 工具落地**。现在想**深耕 LLM Agent 应用层**——**更接近一线业务 + 自己做决策**，**这跟我 7 月初想做的 MCP 网关项目方向一致**。贵司的 LLM Agent 业务方向跟我的规划非常 match。\"\n\n---",
+      "tags": [
+        "真话 + 不抱怨老东家",
+        "不要说原公司坏话",
+        "聚焦\"想要什么\"",
+        "模板",
+        "学到了大公司怎么把 AI 工具落地"
+      ],
+      "preview": "✅ 答题框架（真话 + 不抱怨老东家）： - 公司业务方向调整 / 个人发展空间受限 / 想深耕 LLM Agent - 不要说原公司坏话——面试官圈子小 - 聚焦\"想要什么\"而不是\"逃离什么\"",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "09-Q06",
+      "topic": "软素质与行为面试（自我介绍、挑战、规划）",
+      "number": 6,
+      "title": "你的优点和缺点？",
+      "body": "**✅ 答题框架**（**缺点必须\"可改进\"**）：\n- **优点**：自驱学习（MCP 一发布就跟进）/ 工程化深度（4 级水位线）\n- **缺点**：Python 底层（yield/await）比 TS 弱，**正在补**——这是真话，面试官会问\n\n**模板**：\n> \"优点是**自驱 + 工程化深度**——MCP 协议一发布我就跟进了，自己写了 stdio server 验证。\n>\n> 缺点是 **Python 底层不够扎实**——项目主要用 TypeScript，async/await 细节、yield 协程这块相对弱，**正在补**。但底层实现原理我理解，**只是手写熟练度还要练**。\"\n\n---",
+      "tags": [
+        "缺点必须\"可改进\"",
+        "优点",
+        "缺点",
+        "正在补",
+        "模板"
+      ],
+      "preview": "✅ 答题框架（缺点必须\"可改进\"）： - 优点：自驱学习（MCP 一发布就跟进）/ 工程化深度（4 级水位线） - 缺点：Python 底层（yield/await）比 TS 弱，正在补——这是真话，面试官会问",
+      "difficulty": "P6-P7"
+    },
+    {
+      "id": "09-Q07",
+      "topic": "软素质与行为面试（自我介绍、挑战、规划）",
+      "number": 7,
+      "title": "期望薪资？",
+      "body": "**✅ 答题框架**（**不要直接报死数字**）：\n- **先问范围**：\"了解到贵司这个岗位薪资范围是 X-Y\"\n- **再说区间**：\"我期望在这个区间内，**具体看能力匹配度**\"\n- **横向对比**：如果你期望薪资比较高，对方说要在等等，**基本凉了**\n\n**你的目标**：P6→P7 过渡（**80-110K/月 上海**）\n- **已有 offer**（如果有）：\"我现在 X，看贵司的 Y 范围，比较有竞争力的是 Y+10%\"\n- **无 offer**（当前）：\"期望在 80-110K 之间，看整体 package\"\n\n---",
+      "tags": [
+        "不要直接报死数字",
+        "先问范围",
+        "再说区间",
+        "具体看能力匹配度",
+        "横向对比"
+      ],
+      "preview": "✅ 答题框架（不要直接报死数字）： - 先问范围：\"了解到贵司这个岗位薪资范围是 X-Y\" - 再说区间：\"我期望在这个区间内，具体看能力匹配度\" - 横向对比：如果你期望薪资比较高，对方说要在等等，基本凉了",
+      "difficulty": "P5-P6"
+    },
+    {
+      "id": "09-Q08",
+      "topic": "软素质与行为面试（自我介绍、挑战、规划）",
+      "number": 8,
+      "title": "你的职业规划？",
+      "body": "**✅ 答题框架**（**3 年 + 1 年颗粒度**）：\n- **1 年内**：在 Agent 应用层深入，做一个有差异化的项目（MCP 网关）\n- **2-3 年**：成为 Agent 架构方向的核心成员\n- **5 年**：往 Agent 平台 / 多 Agent 编排方向走\n\n**模板**：\n> \"1 年内**在 LLM Agent 应用层深耕**——完成 MCP 网关项目（团队接入成本从 N×M 降到 N+M）。\n>\n> 2-3 年**成为 Agent 架构师**——能独立设计多 Agent 协作系统、Context Engineering、RAG 全链路。\n>\n> 5 年往**Agent 平台 / Multi-Agent 编排**方向走，**把单点能力变成可复用的工程体系**。\"",
+      "tags": [
+        "3 年 + 1 年颗粒度",
+        "1 年内",
+        "2-3 年",
+        "5 年",
+        "模板"
+      ],
+      "preview": "✅ 答题框架（3 年 + 1 年颗粒度）： - 1 年内：在 Agent 应用层深入，做一个有差异化的项目（MCP 网关） - 2-3 年：成为 Agent 架构方向的核心成员 - 5 年：往 Agent 平台 / 多 Agent 编排方向走",
+      "difficulty": "P5-P6"
+    }
+  ],
+  "retaggedAt": "2026-06-25T02:08:58.264Z",
+  "tagSchema": {
+    "tags": "关键概念/技术术语（来自 body 中加粗/代码/英文术语）",
+    "preview": "简略内容预览",
+    "difficulty": "难度分级 P4-P7"
+  }
+}
