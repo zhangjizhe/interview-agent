@@ -33,6 +33,14 @@ from app.memory.mem0_memory import Mem0Memory
 from app.db.session import init_db, close_db
 from app.core.middleware import RequestIDMiddleware
 from app.core.exceptions import AppError
+from app.core.rate_limit import (
+    limiter,
+    rate_limit_exceeded_handler,
+    HEALTH_LIMIT,
+    AUTH_LIMIT,
+)
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 logger = structlog.get_logger(__name__)
 
@@ -95,7 +103,8 @@ def create_app() -> FastAPI:
 
     # Middleware 顺序：后注册的先执行（最外层）
     # 1. CORS（最外层，处理 OPTIONS preflight）
-    # 2. RequestIDMiddleware（每个请求分配 trace_id）
+    # 2. SlowAPI（Rate Limiting 集成）
+    # 3. RequestIDMiddleware（每个请求分配 trace_id）
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
@@ -108,6 +117,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         expose_headers=["X-Request-ID"],  # 客户端可读
     )
+
+    # Rate Limiting state
+    app.state.limiter = limiter
+    app.add_middleware(SlowAPIMiddleware)
+
+    # RequestIDMiddleware 最后加（最内层，所有请求都过）
     app.add_middleware(RequestIDMiddleware)
 
     # 异常处理：AppError → 4xx/5xx JSON
@@ -132,6 +147,9 @@ def create_app() -> FastAPI:
             },
             headers={"X-Request-ID": request_id} if request_id else {},
         )
+
+    # 限流超限 → 429 JSON
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
     # 路由
     app.include_router(health.router, prefix="/api/health", tags=["health"])

@@ -8,17 +8,23 @@ SSE 逐 token 增量推送（2026-06-26 真流式）：
 - AsyncCallbackHandler.on_chat_model_stream 把 token put 到 queue
 - event_generator await queue.get() → 立即 yield SSE event
 - 真·流式（不是 graph 跑完才 drain）
+
+2026-06-26 商用 Rate Limiting：
+- /start 限流 10/minute（防并发滥用）
+- /stream 限流 5/minute（SSE 长连接防占用）
 """
 import asyncio
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List, AsyncGenerator
 import json
 import structlog
 from langchain_core.callbacks import AsyncCallbackHandler
+from slowapi import Limiter
 
 from app.agents.state import create_initial_state
+from app.core.rate_limit import limiter, INTERVIEW_START_LIMIT, INTERVIEW_STREAM_LIMIT
 
 logger = structlog.get_logger(__name__)
 
@@ -94,7 +100,8 @@ class InterviewStep(BaseModel):
 
 
 @router.post("/start")
-async def start_interview(req: InterviewStartRequest, request: Request):
+@limiter.limit(INTERVIEW_START_LIMIT)
+async def start_interview(req: InterviewStartRequest, request: Request, response: Response):
     """启动一次多 Agent 面试（同步返回）"""
     graph = request.app.state.interview_graph
     redis_mem = request.app.state.redis_mem
@@ -185,7 +192,8 @@ async def start_interview(req: InterviewStartRequest, request: Request):
 
 
 @router.post("/stream")
-async def stream_interview(req: InterviewStartRequest, request: Request):
+@limiter.limit(INTERVIEW_STREAM_LIMIT)
+async def stream_interview(req: InterviewStartRequest, request: Request, response: Response):
     """SSE 流式输出（对齐 NestJS streamWithSteps）
 
     2026-06-26 真流式：
