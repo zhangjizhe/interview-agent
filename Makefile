@@ -1,126 +1,70 @@
-# interview-agent-2 · 双后端 Makefile
+# interview-agent-2 · 单后端 Makefile（2026-06-26 架构简化）
 #
 # 用法：
 #   make help               # 查看所有命令
-#   make up                 # 默认启动单后端（ACTIVE_BACKEND=nest）
-#   make up-nest            # 显式 NestJS 后端 + 基础设施
-#   make up-py              # 显式 Python 后端 + 基础设施
-#   make up-both            # 同时启动两个后端（⚠️ 资源 ×2，仅 demo 用）
+#   make up                 # 启动 py-api（默认）
 #   make down               # 全部停掉
-#   make logs-nest          # 看 NestJS 日志
-#   make logs-py            # 看 Python 日志
-#   make rebuild-nest       # 强制 rebuild NestJS
-#   make rebuild-py         # 强制 rebuild Python
+#   make logs               # 看后端日志
+#   make rebuild            # 强制 rebuild py-api
+#   make status             # 容器状态
+#   make health             # 健康检查
 #
-# 切换后端（不传 = 用默认 nest）：
-#   make ACTIVE_BACKEND=py up         # 切换 Python
-#   echo "ACTIVE_BACKEND=py" >> .env  # 项目级默认
-#
-# 双后端架构（2026-06-25）：
-#   - NestJS 后端 端口 3001（apps/api/，生产主路径）
-#   - Python 后端 端口 3002（apps/py-api/，双后端 demo）
-#   - 共享 postgres/redis/milvus/qdrant
+# 架构（2026-06-26）：
+#   - 唯一后端：Python FastAPI（apps/py-api/），端口 3002
+#   - NestJS api → apps/api-legacy/（保留作为参考 / 备份，不再被 docker compose 启动）
+#   - 共享基础设施：postgres/redis/milvus/qdrant
+#   - 前端：apps/web/，端口 5173
 
-# 默认单后端 · ACTIVE_BACKEND 可切到 py（demo 友好）
-# 显式目标（up-nest / up-py / up-both）不受 ACTIVE_BACKEND 影响
-ACTIVE_BACKEND ?= nest
-PROFILES_DEFAULT := --profile $(ACTIVE_BACKEND)
-PROFILES_BOTH    := --profile both
-
-.PHONY: help up up-nest up-py up-both down \
-        logs logs-nest logs-py logs-web \
-        rebuild rebuild-nest rebuild-py \
-        status health push-branch clean
+.PHONY: help up down logs rebuild status health clean
 
 help:
-	@echo "📦 interview-agent-2 · 双后端命令清单"
+	@echo "📦 interview-agent-2 · 单后端命令清单（py-api 唯一后端）"
 	@echo ""
-	@echo "启动（默认单后端 = ACTIVE_BACKEND=$(ACTIVE_BACKEND)）："
-	@echo "  make up            启动单后端（默认 nest）"
-	@echo "  make up-nest       显式 NestJS 后端（端口 3001）"
-	@echo "  make up-py         显式 Python 后端（端口 3002）"
-	@echo "  make up-both       ⚠️ 双后端并行（资源 ×2，仅 demo 用）"
-	@echo ""
-	@echo "切换默认后端："
-	@echo "  make ACTIVE_BACKEND=py up   切换 Python"
-	@echo "  echo 'ACTIVE_BACKEND=py' >> .env  项目级默认"
+	@echo "启动："
+	@echo "  make up            启动 py-api + 基础设施（默认）"
 	@echo ""
 	@echo "停止："
 	@echo "  make down          全部停掉"
 	@echo ""
 	@echo "日志："
-	@echo "  make logs-nest     NestJS 日志"
-	@echo "  make logs-py       Python 日志"
+	@echo "  make logs          py-api 日志"
 	@echo "  make logs-web      前端日志"
 	@echo ""
-	@echo "重建（用 ACTIVE_BACKEND）："
-	@echo "  make rebuild-nest  强制 rebuild NestJS"
-	@echo "  make rebuild-py    强制 rebuild Python"
+	@echo "重建："
+	@echo "  make rebuild       强制 rebuild py-api 镜像"
 	@echo ""
 	@echo "其他："
-	@echo "  make status        容器状态（ACTIVE_BACKEND）"
+	@echo "  make status        容器状态"
 	@echo "  make health        健康检查"
-	@echo "  make push-branch   推送到新分支"
 	@echo "  make clean         清理所有容器+卷"
 
 # ============ 启动 ============
 
-up-nest:
-	docker compose $(PROFILES_NEST) up -d
-	@echo ""
-	@echo "✅ NestJS 后端已启动：http://localhost:3001"
-
-up-py:
-	docker compose $(PROFILES_PY) up -d
-	@echo ""
-	@echo "✅ Python 后端已启动：http://localhost:3002"
-
-up-both:
-	docker compose $(PROFILES_BOTH) up -d
-	@echo ""
-	@echo "✅ 双后端已启动："
-	@echo "  - NestJS: http://localhost:3001"
-	@echo "  - Python:  http://localhost:3002"
-
-# 默认 up = 单后端（ACTIVE_BACKEND，默认 nest）
+# 单后端：py-api（2026-06-26 架构简化后唯一后端）
 up:
-	docker compose $(PROFILES_DEFAULT) up -d
+	docker compose --profile py up -d
 	@echo ""
-	@echo "✅ 单后端已启动（ACTIVE_BACKEND=$(ACTIVE_BACKEND)）"
-	@if [ "$(ACTIVE_BACKEND)" = "nest" ]; then echo "  - NestJS: http://localhost:3001"; \
-	elif [ "$(ACTIVE_BACKEND)" = "py" ]; then echo "  - Python:  http://localhost:3002"; \
-	fi
+	@echo "✅ py-api 已启动：http://localhost:3002"
 
 # ============ 停止 ============
 
 down:
-	docker compose --profile nest --profile py --profile both down
+	docker compose down
 	@echo "✅ 全部停止"
 
 # ============ 日志 ============
 
-logs-nest:
-	docker logs -f interview-api
-
-logs-py:
+logs:
 	docker logs -f interview-py-api
 
 logs-web:
 	docker logs -f interview-web
 
-logs: logs-nest logs-py logs-web
-
 # ============ 重建 ============
 
-rebuild-nest:
-	docker compose $(PROFILES_DEFAULT) build --no-cache api
-	docker compose $(PROFILES_DEFAULT) up -d api
-
-rebuild-py:
-	docker compose $(PROFILES_DEFAULT) build --no-cache py-api
-	docker compose $(PROFILES_DEFAULT) up -d py-api
-
-rebuild: rebuild-nest rebuild-py
+rebuild:
+	docker compose --profile py build --no-cache py-api
+	docker compose --profile py up -d py-api
 
 # ============ 状态 ============
 
