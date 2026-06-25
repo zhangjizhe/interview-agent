@@ -119,6 +119,77 @@ def test_stream_fallback_to_values_mode(client):
     assert "[DONE]" in joined
 
 
+def test_stream_yields_tokens_via_callback(client):
+    """SSE token 增量推送（P0-2 完整版）：CallbackHandler 收集 token → SSE drain"""
+    from langchain_core.messages import AIMessageChunk
+    app = client.app
+
+    # mock graph 在 ainvoke 时触发 callback
+    async def fake_astream(initial, config=None, stream_mode="values"):
+        # 模拟 callbacks 中的 on_chat_model_stream
+        callbacks = config.get("callbacks", []) if config else []
+        for cb in callbacks:
+            # token 1
+            if hasattr(cb, "on_chat_model_stream"):
+                await cb.on_chat_model_stream(AIMessageChunk(content="你好"))
+            yield {"current_specialist": "supervisor", "final_response": None}
+            # token 2
+            if hasattr(cb, "on_chat_model_stream"):
+                await cb.on_chat_model_stream(AIMessageChunk(content="，"))
+            # token 3
+            if hasattr(cb, "on_chat_model_stream"):
+                await cb.on_chat_model_stream(AIMessageChunk(content="我是"))
+            yield {"current_specialist": "executor", "final_response": None}
+            # final response
+            yield {"current_specialist": "reviewer", "final_response": "完整回复"}
+
+    app.state.interview_graph.astream = fake_astream
+
+    with client.stream("POST", "/api/interview/stream", json={
+        "user_id": "u",
+        "user_message": "x",
+    }) as resp:
+        assert resp.status_code == 200
+        chunks = list(resp.iter_lines())
+
+    joined = "\n".join(chunks)
+
+    # 必须有 token event（3 个增量 token）
+    token_events = [c for c in chunks if '"type": "token"' in c]
+    assert len(token_events) == 3
+    assert "你好" in token_events[0]
+    assert "，" in token_events[1]
+    assert "我是" in token_events[2]
+
+    # 仍有 node + final_response + DONE
+    assert "node" in joined
+    assert "final_response" in joined
+    assert "完整回复" in joined
+    assert "[DONE]" in joined
+
+
+def test_token_collector_callback_collects_tokens():
+    """TokenCollectorCallback 单测：on_chat_model_stream 真收集 token"""
+    from langchain_core.messages import AIMessageChunk
+    import asyncio
+
+    from app.api.routes.interview import TokenCollectorCallback
+
+    async def run():
+        cb = TokenCollectorCallback()
+        await cb.on_chat_model_stream(AIMessageChunk(content="你好"))
+        await cb.on_chat_model_stream(AIMessageChunk(content="，我是"))
+        await cb.on_chat_model_stream(AIMessageChunk(content=" AI"))
+        # 旧 API 兼容
+        await cb.on_llm_new_token(" 面试官")
+        # 空 token 跳过
+        await cb.on_chat_model_stream(AIMessageChunk(content=""))
+        return cb.tokens
+
+    tokens = asyncio.run(run())
+    assert tokens == ["你好", "，我是", " AI", " 面试官"]
+
+
 def test_stream_yields_error_on_graph_failure(client):
     """/stream graph 抛异常 → error event + [DONE]（P1-8 修复）"""
     app = client.app
