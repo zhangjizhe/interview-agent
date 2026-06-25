@@ -3,12 +3,16 @@
  *
  * 关键设计：
  *  - 独立 Qdrant collection 'interview_knowledge_base',与 semantic_cache 隔离
- *  - 启动时一次性导入 knowledge-base.json（已序列化题库）
+ *  - 启动时一次性导入 knowledge-base.json（或 retagged 优先）
  *  - 走 Qwen text-embedding-v3 embedding（与 semantic-cache 复用 client）
  *  - Point ID 用 kb-{qid}，已存在 upsert 模式（幂等）
  *  - 与 Mem0 / Milvus 长期记忆隔离：知识库是"system knowledge"全局共享
  *
  * 面试 Agent 出题时通过 recallByTopic / recallByQuery 召回相关题
+ *
+ * 2026-06-25 修复：
+ *  - KnowledgeItem 接口补 preview + difficulty（Python retag 脚本生成但被丢弃）
+ *  - 启动优先用 knowledge-base-retagged.json（如存在）
  */
 
 import { Injectable, Logger, OnModuleInit, OnApplicationBootstrap } from '@nestjs/common';
@@ -25,6 +29,10 @@ const DEFAULT_KB_JSON = path.resolve(
   process.cwd(),
   'knowledge-base.json',
 );
+const DEFAULT_KB_RETAGGED = path.resolve(
+  process.cwd(),
+  'knowledge-base-retagged.json',
+);
 
 export interface KnowledgeItem {
   id: string;
@@ -33,6 +41,10 @@ export interface KnowledgeItem {
   title: string;
   body: string;
   tags: string[];
+  /** Python retag 脚本生成：首段预览（去 markdown + 取前 200 字符） */
+  preview?: string;
+  /** Python retag 脚本生成：难度等级（P4-P5 / P5-P6 / P6-P7 范围格式） */
+  difficulty?: string;
 }
 
 export interface KnowledgeSearchHit {
@@ -76,6 +88,25 @@ export class KnowledgeBaseService implements OnModuleInit {
     this.logger.log(`✅ KnowledgeBase ready (enabled=${this.enabled}, json=${this.kbJsonPath})`);
   }
 
+  /**
+   * 优先选 retagged JSON（如存在），否则用默认 JSON
+   * 让 Python retag 脚本的输出真正生效
+   */
+  private resolveKbJsonPath(): string {
+    const configured = this.kbJsonPath;
+    // 优先级：retagged > configured > default
+    if (
+      configured === DEFAULT_KB_JSON &&
+      fs.existsSync(DEFAULT_KB_RETAGGED)
+    ) {
+      this.logger.log(
+        `📌 Found retagged KB at ${DEFAULT_KB_RETAGGED}, using it instead of ${DEFAULT_KB_JSON}`,
+      );
+      return DEFAULT_KB_RETAGGED;
+    }
+    return configured;
+  }
+
   private async ensureCollection() {
     const client = this.qdrant.getClient();
     const cols = await client.getCollections();
@@ -109,7 +140,7 @@ export class KnowledgeBaseService implements OnModuleInit {
       this.logger.log('KB already imported, skip');
       return { total: 0, imported: 0, skipped: 0, failed: 0 };
     }
-    const path_ = jsonPath || this.kbJsonPath;
+    const path_ = jsonPath || this.resolveKbJsonPath();
     if (!fs.existsSync(path_)) {
       this.logger.warn(`KB json not found: ${path_}, skip import`);
       return { total: 0, imported: 0, skipped: 0, failed: 0 };
@@ -165,6 +196,8 @@ export class KnowledgeBaseService implements OnModuleInit {
             title: item.title,
             body: item.body,
             tags: item.tags,
+            preview: item.preview, // 2026-06-25 修复：Python retag 脚本生成的字段
+            difficulty: item.difficulty, // 2026-06-25 修复：难度等级
             source: 'interview-qa-bank',
           },
         }));
@@ -268,6 +301,8 @@ export class KnowledgeBaseService implements OnModuleInit {
           title: p.payload.title,
           body: p.payload.body,
           tags: p.payload.tags || [],
+          preview: p.payload.preview,
+          difficulty: p.payload.difficulty,
         },
       }));
     } catch (err: any) {
@@ -303,6 +338,8 @@ export class KnowledgeBaseService implements OnModuleInit {
         title: p.payload.title,
         body: p.payload.body,
         tags: p.payload.tags || [],
+        preview: p.payload.preview,
+        difficulty: p.payload.difficulty,
       }));
     } catch (err: any) {
       this.logger.warn(`list failed: ${err.message}`);
@@ -331,6 +368,8 @@ export class KnowledgeBaseService implements OnModuleInit {
         title: p.payload.title,
         body: p.payload.body,
         tags: p.payload.tags || [],
+        preview: p.payload.preview,
+        difficulty: p.payload.difficulty,
       }));
     } catch (err: any) {
       this.logger.warn(`listByTopic failed: ${err.message}`);
@@ -377,6 +416,8 @@ export class KnowledgeBaseService implements OnModuleInit {
                 title: item.title,
                 body: item.body,
                 tags: item.tags,
+                preview: item.preview, // 2026-06-25 修复
+                difficulty: item.difficulty, // 2026-06-25 修复
                 source: 'manual',
               },
             },
