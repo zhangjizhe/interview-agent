@@ -2,23 +2,30 @@
 #
 # 用法：
 #   make help               # 查看所有命令
-#   make up-nest            # 只启动 NestJS 后端 + 基础设施
-#   make up-py              # 只启动 Python 后端 + 基础设施
-#   make up-both            # 同时启动两个后端（默认）
+#   make up                 # 默认启动单后端（ACTIVE_BACKEND=nest）
+#   make up-nest            # 显式 NestJS 后端 + 基础设施
+#   make up-py              # 显式 Python 后端 + 基础设施
+#   make up-both            # 同时启动两个后端（⚠️ 资源 ×2，仅 demo 用）
 #   make down               # 全部停掉
 #   make logs-nest          # 看 NestJS 日志
 #   make logs-py            # 看 Python 日志
 #   make rebuild-nest       # 强制 rebuild NestJS
 #   make rebuild-py         # 强制 rebuild Python
 #
+# 切换后端（不传 = 用默认 nest）：
+#   make ACTIVE_BACKEND=py up         # 切换 Python
+#   echo "ACTIVE_BACKEND=py" >> .env  # 项目级默认
+#
 # 双后端架构（2026-06-25）：
-#   - NestJS 后端 端口 3001（apps/api/）
-#   - Python 后端 端口 3002（apps/py-api/）
+#   - NestJS 后端 端口 3001（apps/api/，生产主路径）
+#   - Python 后端 端口 3002（apps/py-api/，双后端 demo）
 #   - 共享 postgres/redis/milvus/qdrant
 
-PROFILES_NEST := --profile nest
-PROFILES_PY   := --profile py
-PROFILES_BOTH := --profile both
+# 默认单后端 · ACTIVE_BACKEND 可切到 py（demo 友好）
+# 显式目标（up-nest / up-py / up-both）不受 ACTIVE_BACKEND 影响
+ACTIVE_BACKEND ?= nest
+PROFILES_DEFAULT := --profile $(ACTIVE_BACKEND)
+PROFILES_BOTH    := --profile both
 
 .PHONY: help up up-nest up-py up-both down \
         logs logs-nest logs-py logs-web \
@@ -28,28 +35,33 @@ PROFILES_BOTH := --profile both
 help:
 	@echo "📦 interview-agent-2 · 双后端命令清单"
 	@echo ""
-	@echo "启动："
-	@echo "  make up-nest      只启动 NestJS 后端（端口 3001）"
-	@echo "  make up-py        只启动 Python 后端（端口 3002）"
-	@echo "  make up-both      双后端并行（默认）"
+	@echo "启动（默认单后端 = ACTIVE_BACKEND=$(ACTIVE_BACKEND)）："
+	@echo "  make up            启动单后端（默认 nest）"
+	@echo "  make up-nest       显式 NestJS 后端（端口 3001）"
+	@echo "  make up-py         显式 Python 后端（端口 3002）"
+	@echo "  make up-both       ⚠️ 双后端并行（资源 ×2，仅 demo 用）"
+	@echo ""
+	@echo "切换默认后端："
+	@echo "  make ACTIVE_BACKEND=py up   切换 Python"
+	@echo "  echo 'ACTIVE_BACKEND=py' >> .env  项目级默认"
 	@echo ""
 	@echo "停止："
-	@echo "  make down         全部停掉"
+	@echo "  make down          全部停掉"
 	@echo ""
 	@echo "日志："
-	@echo "  make logs-nest    NestJS 日志"
-	@echo "  make logs-py      Python 日志"
-	@echo "  make logs-web     前端日志"
+	@echo "  make logs-nest     NestJS 日志"
+	@echo "  make logs-py       Python 日志"
+	@echo "  make logs-web      前端日志"
 	@echo ""
-	@echo "重建："
-	@echo "  make rebuild-nest 强制 rebuild NestJS"
-	@echo "  make rebuild-py   强制 rebuild Python"
+	@echo "重建（用 ACTIVE_BACKEND）："
+	@echo "  make rebuild-nest  强制 rebuild NestJS"
+	@echo "  make rebuild-py    强制 rebuild Python"
 	@echo ""
 	@echo "其他："
-	@echo "  make status       容器状态"
-	@echo "  make health       健康检查"
-	@echo "  make push-branch  推送到新分支"
-	@echo "  make clean        清理所有容器+卷"
+	@echo "  make status        容器状态（ACTIVE_BACKEND）"
+	@echo "  make health        健康检查"
+	@echo "  make push-branch   推送到新分支"
+	@echo "  make clean         清理所有容器+卷"
 
 # ============ 启动 ============
 
@@ -70,8 +82,14 @@ up-both:
 	@echo "  - NestJS: http://localhost:3001"
 	@echo "  - Python:  http://localhost:3002"
 
-# 默认 up = up-both
-up: up-both
+# 默认 up = 单后端（ACTIVE_BACKEND，默认 nest）
+up:
+	docker compose $(PROFILES_DEFAULT) up -d
+	@echo ""
+	@echo "✅ 单后端已启动（ACTIVE_BACKEND=$(ACTIVE_BACKEND)）"
+	@if [ "$(ACTIVE_BACKEND)" = "nest" ]; then echo "  - NestJS: http://localhost:3001"; \
+	elif [ "$(ACTIVE_BACKEND)" = "py" ]; then echo "  - Python:  http://localhost:3002"; \
+	fi
 
 # ============ 停止 ============
 
@@ -95,19 +113,19 @@ logs: logs-nest logs-py logs-web
 # ============ 重建 ============
 
 rebuild-nest:
-	docker compose $(PROFILES_BOTH) build --no-cache api
-	docker compose $(PROFILES_BOTH) up -d api
+	docker compose $(PROFILES_DEFAULT) build --no-cache api
+	docker compose $(PROFILES_DEFAULT) up -d api
 
 rebuild-py:
-	docker compose $(PROFILES_BOTH) build --no-cache py-api
-	docker compose $(PROFILES_BOTH) up -d py-api
+	docker compose $(PROFILES_DEFAULT) build --no-cache py-api
+	docker compose $(PROFILES_DEFAULT) up -d py-api
 
 rebuild: rebuild-nest rebuild-py
 
 # ============ 状态 ============
 
 status:
-	docker compose $(PROFILES_BOTH) ps
+	docker compose $(PROFILES_DEFAULT) ps
 
 health:
 	@echo "🏥 NestJS (3001):"
