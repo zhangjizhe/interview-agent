@@ -117,6 +117,7 @@ def mock_app_state(monkeypatch):
     })
 
     async def fake_astream(initial, config=None, stream_mode="values"):
+        # values 模式（Py API 当前用）：yield dict state
         yield {"current_specialist": "supervisor", "final_response": None}
         yield {"current_specialist": "executor", "final_response": None}
         yield {"current_specialist": "reviewer", "final_response": "Mock final response"}

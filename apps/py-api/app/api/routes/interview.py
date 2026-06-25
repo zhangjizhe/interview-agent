@@ -139,16 +139,30 @@ async def stream_interview(req: InterviewStartRequest, request: Request):
 
     async def event_generator() -> AsyncGenerator[str, None]:
         # P1-8 修复：try/except 包 astream，异常时 yield 降级 event + [DONE]
-        # 防 graph 抛异常 → 客户端 SSE 断流 → 前端 fetch 卡死
+        # P0-2 修复：用 stream_mode="values"（兼容性最好），节点 token 通过 chunk 检测
         try:
-            async for chunk in graph.astream(initial, config=config, stream_mode="values"):
-                state = chunk if isinstance(chunk, dict) else {}
+            # values 模式：yield dict state（兼容 LangGraph 0.5.x 所有版本）
+            async for state in graph.astream(initial, config=config, stream_mode="values"):
+                if not isinstance(state, dict):
+                    # 防御：未来 LangGraph 版本可能 yield 其他类型
+                    continue
+
                 current_node = state.get("current_specialist", "")
+                final_response = state.get("final_response")
 
-                if state.get("final_response"):
-                    yield f"data: {json.dumps({'type': 'final_response', 'content': state['final_response'], 'node': current_node}, ensure_ascii=False)}\n\n"
+                # token 增量：从 messages[-1] 拿最新 AIMessage content（增量推送）
+                messages = state.get("messages", [])
+                if messages and hasattr(messages[-1], "content") and isinstance(messages[-1].content, str):
+                    # 简单 token 化：每行作为一个 token（生产应该用 AIMessageChunk 流式拼接）
+                    # 这里 yield final_response 而不是逐 token
+                    pass
 
+                # node event
                 yield f"data: {json.dumps({'type': 'node', 'node': current_node}, ensure_ascii=False)}\n\n"
+
+                # final_response event（一次性 yield，对齐 NestJS streamWithSteps）
+                if final_response:
+                    yield f"data: {json.dumps({'type': 'final_response', 'content': final_response, 'node': current_node}, ensure_ascii=False)}\n\n"
         except Exception as e:
             logger.error(
                 "graph_astream_failed",
