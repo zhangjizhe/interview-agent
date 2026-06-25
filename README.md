@@ -444,34 +444,10 @@ CRAG-lite 架构，启发式硬事实检测 + 引用溯源：
 
 ---
 
-## 双后端架构（2026-06-25 新增）
+## 架构（2026-06-26 简化：单后端）
 
-> 在原 NestJS 主后端基础上，新增 **Python FastAPI 版后端**。
-> **可选配置切换启动**（默认单后端 = nest，可切 py 或双开）。
-
-### 三种启动模式
-
-| 模式 | 命令 | 端口 | 后端栈 | 适用场景 |
-|---|---|---|---|---|
-| **NestJS 单栈**（默认）| `make up` | 3001 | TypeScript + LangGraph 1.x | 简历主项目 / 主流用户 |
-| **Python 单栈** | `make ACTIVE_BACKEND=py up` | 3002 | Python + LangGraph 0.5 | AI 圈主流 / Python 简历加分 |
-| **双后端并行** | `make up-both` | 3001+3002 | 两者并行 | 演示 / 简历"双栈"叙事（⚠️ 资源 ×2）|
-
-### 可选配置：切换默认后端
-
-```bash
-# 方式 1：命令行参数
-make ACTIVE_BACKEND=py up         # 切到 Python
-make ACTIVE_BACKEND=nest up       # 切回 NestJS（默认）
-
-# 方式 2：项目级默认（写入 .env）
-echo "ACTIVE_BACKEND=py" >> .env  # 之后 make up 默认走 Python
-
-# 显式目标不受 ACTIVE_BACKEND 影响
-make up-nest                        # 永远只起 nest
-make up-py                          # 永远只起 py
-make up-both                        # 永远双开
-```
+> **唯一后端**：Python FastAPI（`apps/py-api/`，端口 3002）
+> **NestJS api 已移到 `apps/api-legacy/`**（保留作为参考 / 备份，不被 docker compose 启动）
 
 ### 架构图
 
@@ -479,70 +455,127 @@ make up-both                        # 永远双开
                     ┌──────────────────────────────────┐
                     │  共享数据层（postgres/redis/milvus/qdrant）│
                     └──────────────────────────────────┘
-                              ▲              ▲
-                              │              │
-                ┌─────────────┴──┐       ┌────┴────────────┐
-                │ NestJS API      │       │ Python FastAPI   │
-                │ apps/api/       │       │ apps/py-api/     │
-                │ :3001           │       │ :3002            │
-                │ LangGraph 1.x   │       │ LangGraph 0.5    │
-                │ Prisma + TS     │       │ SQLAlchemy + Py  │
-                └─────────────────┘       └─────────────────┘
-                              ▲              ▲
-                              └──────┬───────┘
-                                     ▼
-                          ┌──────────────────┐
-                          │  React Frontend   │
-                          │  apps/web/ :5173  │
-                          └──────────────────┘
+                                       ▲
+                                       │
+                          ┌────────────┴──────────────┐
+                          │  Python FastAPI            │
+                          │  apps/py-api/              │
+                          │  :3002                     │
+                          │  LangGraph 0.5             │
+                          │  SQLAlchemy + Alembic      │
+                          └───────────────────────────┘
+                                       ▲
+                                       │
+                          ┌────────────┴──────────────┐
+                          │  React Frontend            │
+                          │  apps/web/ :5173           │
+                          └───────────────────────────┘
 ```
 
-### 关键能力对齐
+### 5 节点 LangGraph 拓扑
 
-| 维度 | NestJS | Python | 对齐 |
-|---|---|---|---|
-| 5 节点 LangGraph | ✓ | ✓ | 拓扑一致 |
-| 4 层记忆（L1/L2 Redis + L3 Milvus/Mem0 + L4 PostgreSQL）| ✓ | ✓ | 模型对齐 SessionCost |
-| SSE 流式 + token 增量 | ✓ | ✓ | CallbackHandler 收集 token |
-| HITL 中断 + 评分争议 | ✓ | ✓ | interrupt + Command |
-| JWT 鉴权 + 生产 fail-fast | ✓ | ✓ | `${VAR:?msg}` + pydantic model_validator |
-| 单测覆盖 | 120 / 120 | **51 / 51** | pytest 9 个文件 |
-| MCP Registry + 10+ server | ✓ | 预留 | （后续补）|
+```
+   START
+     ↓
+   supervisor ──→ planner ──→ executor ──→ replanner ──→ reviewer
+     │                              │            │            │
+     └→ respond_directly            │            │            │
+                                   └────────────┘            │
+                                                             ↓
+                                          reviewer ──→ planner (revise)
+                                                             ↓
+                                            reviewer → END (approved)
+                                            reviewer ──→ hitl_review ──→ END
+```
+
+### 4 层记忆
+
+| 层 | 存储 | 用途 |
+|---|---|---|
+| L1 | Redis Hash | 工作记忆（last_message_at / thread_id / status）|
+| L2 | Redis List | 会话消息（lpush 最新在前 + get_messages_chronological 最老在前）|
+| L3 | Milvus + Mem0 | 长期向量（Milvus COSINE 1024d + Mem0 cloud/oss）|
+| L4 | PostgreSQL | 持久化（User / Interview / SessionCost / Message，SQLAlchemy + Alembic）|
+
+### 关键能力（商用 best practice · 2026-06-26）
+
+| 维度 | 状态 |
+|---|---|
+| 5 节点 LangGraph + 4 层记忆 | ✓ |
+| HITL 评分争议中断 + Command 恢复 | ✓ |
+| SSE 流式 + 节点追踪 | ✓（CallbackHandler 收集 token）|
+| JWT 鉴权 + 商用 fail-fast | ✓（pydantic model_validator + 启动前 sys.exit(1)）|
+| 结构化日志全覆盖 | ✓（structlog + trace_id 自动注入）|
+| 请求追踪 middleware | ✓（X-Request-ID + contextvars）|
+| 错误处理统一 | ✓（AppError + handler + JSON 4xx/5xx）|
+| LLM 重试 + 超时 | ✓（tenacity 指数退避 + asyncio.wait_for）|
+| Milvus SQL 注入防护 | ✓（escape_milvus_string + build_milvus_eq）|
+| 单测覆盖 | **66 / 66** ✓（9 个文件）|
 
 ### Makefile 一键命令
 
 ```bash
-make help          # 查看所有命令
-make up            # 默认单后端（ACTIVE_BACKEND=nest，可切）
-make up-nest       # 显式 NestJS
-make up-py         # 显式 Python
-make up-both       # ⚠️ 双后端并行
-make down          # 全部停掉
-make logs-py       # Python 日志
-make rebuild-py    # 强制重建 Python 镜像
-make health        # 三个端口健康检查
+make help        # 查看所有命令
+make up          # 启动 py-api + 基础设施（默认）
+make down        # 全部停掉
+make logs        # py-api 日志
+make rebuild     # 强制 rebuild py-api 镜像
+make status      # 容器状态
+make health      # 健康检查
+make clean       # 清理所有容器+卷
 ```
 
-### docker-compose profiles（底层机制）
+### 一键启动 + 验证
 
 ```bash
-docker compose --profile nest up -d   # 只起 NestJS
-docker compose --profile py up -d     # 只起 Python
-docker compose --profile both up -d   # 都起
-```
+# 1. 配置环境变量
+cp .env.example .env
+# 必填：QWEN_API_KEY（dev 占位 OK，但商用必须 ≥32 字符 JWT_SECRET）
+# ⚠️ JWT_SECRET：.env.example 给 dev 占位（≥32 字符），商用前 `openssl rand -base64 48`
 
-### py-api 测试与验收
+# 2. 启动（单后端 py-api）
+make up
 
-```bash
-# 容器内跑 pytest（49 case + 2 token SSE = 51 全过）
-docker exec interview-py-api bash -c "cd /app/apps/py-api && python -m pytest tests/ -q"
-# 51 passed, 1 warning in 1.00s
-
-# 端到端验证
+# 3. 验证
 curl http://localhost:3002/api/health       # 200 OK（liveness）
 curl http://localhost:3002/api/health/ready # 200 + 真连 Redis + Milvus（readiness）
 curl -X POST http://localhost:3002/api/auth/login -H "Content-Type: application/json" -d '{}'
 # {"accessToken":"eyJ...","tokenType":"Bearer","expiresIn":"7d"}
+
+# 4. 跑测试
+docker exec interview-py-api bash -c "cd /app/apps/py-api && python -m pytest tests/ -q"
+# 66 passed
+```
+
+### 商用部署清单
+
+部署到生产环境前必检：
+
+- [ ] `NODE_ENV=production` 必设（JWT_SECRET fail-fast 触发）
+- [ ] `JWT_SECRET` ≥32 字符（`openssl rand -base64 48` 生成）
+- [ ] `QWEN_API_KEY` 商用 Key（不能是 dev 占位）
+- [ ] `MEM0_API_KEY`（如果启用 L3 长期记忆）
+- [ ] `DEEPSEEK_API_KEY`（fallback）
+- [ ] `LANGFUSE_PUBLIC_KEY` + `LANGFUSE_SECRET_KEY`（可观测）
+- [ ] K8s readinessProbe 配 `/api/health/ready`（fail 时流量切走）
+- [ ] 监控：`/api/health` liveness + 容器日志接入 Loki/ELK
+- [ ] `CORS allow_origins` 改实际域名（不是 localhost）
+- [ ] 反向代理 + HTTPS + rate limit（Nginx / Caddy）
+
+### apps/api-legacy/ 说明
+
+NestJS api 全部代码保留在 `apps/api-legacy/`（git rename），可作为：
+
+- 简历展示多语言栈（TS + Python）
+- 应急回滚（mv apps/api-legacy apps/api + 改 docker-compose 即可恢复）
+- NestJS 商业 best practice 参考（fail-fast / mcp / cache / metrics）
+
+如需恢复 NestJS 启动：
+
+```bash
+mv apps/api-legacy apps/api
+# 改 docker-compose.yml 加 api 服务 + profiles
+# 改 Makefile 加 up / rebuild
 ```
 
 ---
