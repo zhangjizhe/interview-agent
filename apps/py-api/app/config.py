@@ -6,9 +6,12 @@ fail-fast 策略（仿 NestJS ${VAR:?msg}）：
 - DATABASE_URL / REDIS_URL：必须是合法 URL
 - LLM API Key：商用 fail-fast（dev 占位 OK）
 """
-from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsValidationError
-from pydantic import field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator, model_validator, ValidationError
 import sys
+
+# Pydantic v2: ValidationError 在 pydantic 包，pydantic_settings 没有 SettingsValidationError
+SettingsValidationError = ValidationError
 
 
 class Settings(BaseSettings):
