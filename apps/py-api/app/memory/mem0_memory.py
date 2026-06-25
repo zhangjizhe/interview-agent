@@ -147,3 +147,8 @@ class Mem0Memory:
 class Mem0APIError(Exception):
     """Mem0 API 调用失败（HTTP 4xx/5xx 或网络错误）"""
     pass
+
+
+class Mem0APIError(Exception):
+    """Mem0 API 调用失败（HTTP 4xx/5xx 或网络错误）"""
+    pass

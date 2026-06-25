@@ -3,11 +3,18 @@
 
 对齐 NestJS MilvusMemory（@zilliz/milvus2-sdk-node 的 Python 版）
 
-2026-06-26 P0-1 修复：search 用 build_milvus_eq 转义字符串（之前 f-string 直接拼注入风险）
+2026-06-26 商用 best practice：
+- 结构化日志（structlog）替换 print
+- 用 ExternalServiceError 包装错误
 """
 from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
 from typing import List, Optional
+import structlog
+
 from app.shared.escape_milvus import build_milvus_eq, build_milvus_in
+from app.core.exceptions import ExternalServiceError
+
+logger = structlog.get_logger(__name__)
 
 
 class MilvusMemory:
@@ -35,7 +42,7 @@ class MilvusMemory:
             self.connected = True
             await self.ensure_collection()
         except Exception as e:
-            print(f"[Milvus] Connect failed (will run in degraded mode): {e}")
+            logger.warning("milvus_connect_failed", host=self.host, port=self.port, error=str(e))
             self.connected = False
 
     async def close(self):
@@ -73,7 +80,7 @@ class MilvusMemory:
                 self.collection = Collection(self.COLLECTION)
                 self.collection.load()
         except Exception as e:
-            print(f"[Milvus] ensure_collection failed: {e}")
+            logger.warning("milvus_ensure_collection_failed", collection=self.COLLECTION, error=str(e))
 
     async def insert(self, user_id: str, content: str, vector: List[float], source: str = "conversation") -> int:
         """插入一条记忆
@@ -95,9 +102,10 @@ class MilvusMemory:
             ]
             result = self.collection.insert(data)
             self.collection.flush()
+            logger.info("milvus_insert_ok", user_id=user_id, source=source, content_len=len(content))
             return result.primary_keys[0] if result.primary_keys else -1
         except Exception as e:
-            print(f"[Milvus] insert failed: {e}")
+            logger.error("milvus_insert_failed", user_id=user_id, error=str(e), error_type=type(e).__name__)
             return -1
 
     async def search(self, vector: List[float], user_id: str, top_k: int = 5):
@@ -126,7 +134,8 @@ class MilvusMemory:
                         "source": hit.entity.get("source"),
                         "created_at": hit.entity.get("created_at"),
                     })
+            logger.info("milvus_search_ok", user_id=user_id, top_k=top_k, hits=len(hits))
             return hits
         except Exception as e:
-            print(f"[Milvus] search failed: {e}")
+            logger.error("milvus_search_failed", user_id=user_id, top_k=top_k, error=str(e))
             return []
