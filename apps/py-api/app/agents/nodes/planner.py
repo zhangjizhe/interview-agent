@@ -1,4 +1,7 @@
-"""Planner 节点：拆解任务步骤（出题 + 评分策略）"""
+"""Planner 节点：拆解任务步骤（出题 + 评分策略）
+
+P2 修复：去掉 dead code（redis_mem 参数从未使用）
+"""
 import json
 
 
@@ -14,8 +17,11 @@ PLANNER_PROMPT = """你是面试规划员。规划下一步要做的步骤：
 """
 
 
-async def planner_node(state, llm, config=None, redis_mem=None) -> dict:
-    """根据 user_intent 和历史 steps，规划下一批 steps"""
+async def planner_node(state, llm, config=None) -> dict:
+    """根据 user_intent 和历史 steps，规划下一批 steps
+
+    P2 修复：去掉 redis_mem 参数（原签名有但函数体内未使用）
+    """
     messages_str = "\n".join(
         [f"{m.type}: {m.content}" for m in state["messages"][-5:] if hasattr(m, "type")]
     )

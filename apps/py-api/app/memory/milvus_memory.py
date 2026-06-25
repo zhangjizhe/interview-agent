@@ -72,13 +72,13 @@ class MilvusMemory:
         if not self.connected or not self.collection:
             return -1
         try:
-            from datetime import datetime
+            from datetime import datetime, timezone
             data = [
                 [vector],
                 [user_id],
                 [content[:8000]],
                 [source],
-                [datetime.utcnow().isoformat()],
+                [datetime.now(timezone.utc).isoformat()],
             ]
             result = self.collection.insert(data)
             self.collection.flush()

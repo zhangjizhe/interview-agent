@@ -50,10 +50,11 @@ async def start_interview(req: InterviewStartRequest, request: Request):
 
     # L1 工作记忆：写入当前 user_intent + session 元信息
     if redis_mem:
+        from datetime import datetime, timezone
         await redis_mem.set_working_state(
             req.user_id or "default",
             {
-                "last_message_at": str(__import__("datetime").datetime.utcnow().isoformat()),
+                "last_message_at": datetime.now(timezone.utc).isoformat(),
                 "thread_id": req.thread_id or req.user_id or "",
                 "status": "running",
             },

@@ -59,7 +59,7 @@ async def build_interview_graph(
         return await supervisor_node(state, llm, config, redis_mem)
 
     async def _planner(state, config=None):
-        return await planner_node(state, llm, config, redis_mem)
+        return await planner_node(state, llm, config)
 
     async def _executor(state, config=None):
         return await executor_node(state, llm, config, milvus_mem, mem0_mem)
