@@ -14,10 +14,11 @@ import { MemoryModule } from '../memory/memory.module';
 import { LlmModule } from '../llm/llm.module';
 import { ResumeParserService } from './services/resume-parser.service';
 import { ResumeRAGService } from './services/resume-rag.service';
+// RagService 在 2026-06-25 删除（dead code：未被任何 controller 调用 + 使用 Math.random() 生成假 embedding）
+// resume RAG 实际由 ResumeRAGService 提供（基于 Milvus resume_memory collection）
 import { QuestionBankService } from './services/question-bank.service';
 import { QuestionGeneratorService } from './services/question-generator.service';
 import { ScoringService } from './services/scoring.service';
-import { RagService } from './services/rag.service';
 import { HitlService } from './services/hitl.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
@@ -43,7 +44,7 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
     QuestionBankService,
     QuestionGeneratorService,
     ScoringService,
-    RagService,
+    // RagService 已删除（2026-06-25 dead code 清理）
     HitlService,
     PrismaService,
   ],
