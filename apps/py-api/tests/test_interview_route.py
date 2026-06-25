@@ -97,8 +97,12 @@ def test_start_writes_redis_l1_and_l2(client):
     assert any(m["role"] == "assistant" for m in parsed)
 
 
-def test_stream_yields_node_and_final_response_and_done(client):
-    """/stream SSE 包含 node + final_response + [DONE]"""
+def test_stream_fallback_to_values_mode(client):
+    """/stream SSE 包含 node + final_response + [DONE]
+
+    P0-2 修复：用 stream_mode='values'，yield dict state
+    事件类型：node + final_response + [DONE]（对齐 NestJS streamWithSteps）
+    """
     with client.stream("POST", "/api/interview/stream", json={
         "user_id": "u",
         "user_message": "x",
@@ -108,7 +112,6 @@ def test_stream_yields_node_and_final_response_and_done(client):
         for line in resp.iter_lines():
             chunks.append(line)
 
-    # 至少含 node + final_response + [DONE]
     joined = "\n".join(chunks)
     assert "node" in joined
     assert "final_response" in joined
