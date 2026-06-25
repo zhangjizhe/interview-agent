@@ -446,15 +446,32 @@ CRAG-lite 架构，启发式硬事实检测 + 引用溯源：
 
 ## 双后端架构（2026-06-25 新增）
 
-> 在原 NestJS 主后端基础上，新增 **Python FastAPI 版后端**，可在三种模式间切换启动。
+> 在原 NestJS 主后端基础上，新增 **Python FastAPI 版后端**。
+> **可选配置切换启动**（默认单后端 = nest，可切 py 或双开）。
 
 ### 三种启动模式
 
 | 模式 | 命令 | 端口 | 后端栈 | 适用场景 |
 |---|---|---|---|---|
-| **NestJS 单栈** | `make up-nest` | 3001 | TypeScript + LangGraph 1.x | 简历主项目 / 主流用户 |
-| **Python 单栈** | `make up-py` | 3002 | Python + LangGraph 0.5 | AI 圈主流 / Python 简历加分 |
-| **双后端并行** | `make up-both` | 3001+3002 | 两者并行 | 演示 / 简历"双栈"叙事 |
+| **NestJS 单栈**（默认）| `make up` | 3001 | TypeScript + LangGraph 1.x | 简历主项目 / 主流用户 |
+| **Python 单栈** | `make ACTIVE_BACKEND=py up` | 3002 | Python + LangGraph 0.5 | AI 圈主流 / Python 简历加分 |
+| **双后端并行** | `make up-both` | 3001+3002 | 两者并行 | 演示 / 简历"双栈"叙事（⚠️ 资源 ×2）|
+
+### 可选配置：切换默认后端
+
+```bash
+# 方式 1：命令行参数
+make ACTIVE_BACKEND=py up         # 切到 Python
+make ACTIVE_BACKEND=nest up       # 切回 NestJS（默认）
+
+# 方式 2：项目级默认（写入 .env）
+echo "ACTIVE_BACKEND=py" >> .env  # 之后 make up 默认走 Python
+
+# 显式目标不受 ACTIVE_BACKEND 影响
+make up-nest                        # 永远只起 nest
+make up-py                          # 永远只起 py
+make up-both                        # 永远双开
+```
 
 ### 架构图
 
@@ -480,25 +497,30 @@ CRAG-lite 架构，启发式硬事实检测 + 引用溯源：
                           └──────────────────┘
 ```
 
-### 关键能力
+### 关键能力对齐
 
-- **同一份 LangGraph 5 节点拓扑** + **同一份 4 层记忆架构**
-- **共享** postgres / redis / milvus / qdrant
-- **独立端口** + **独立 Dockerfile** + **独立路由**
-- **互不依赖**：可单独跑任一后端
+| 维度 | NestJS | Python | 对齐 |
+|---|---|---|---|
+| 5 节点 LangGraph | ✓ | ✓ | 拓扑一致 |
+| 4 层记忆（L1/L2 Redis + L3 Milvus/Mem0 + L4 PostgreSQL）| ✓ | ✓ | 模型对齐 SessionCost |
+| SSE 流式 + token 增量 | ✓ | ✓ | CallbackHandler 收集 token |
+| HITL 中断 + 评分争议 | ✓ | ✓ | interrupt + Command |
+| JWT 鉴权 + 生产 fail-fast | ✓ | ✓ | `${VAR:?msg}` + pydantic model_validator |
+| 单测覆盖 | 120 / 120 | **51 / 51** | pytest 9 个文件 |
+| MCP Registry + 10+ server | ✓ | 预留 | （后续补）|
 
 ### Makefile 一键命令
 
 ```bash
 make help          # 查看所有命令
-make up-nest       # 只跑 NestJS
-make up-py         # 只跑 Python
-make up-both       # 两个都跑（默认）
+make up            # 默认单后端（ACTIVE_BACKEND=nest，可切）
+make up-nest       # 显式 NestJS
+make up-py         # 显式 Python
+make up-both       # ⚠️ 双后端并行
 make down          # 全部停掉
 make logs-py       # Python 日志
 make rebuild-py    # 强制重建 Python 镜像
 make health        # 三个端口健康检查
-make push-branch   # 推送到 feat/dual-backend-2026-06
 ```
 
 ### docker-compose profiles（底层机制）
@@ -507,6 +529,20 @@ make push-branch   # 推送到 feat/dual-backend-2026-06
 docker compose --profile nest up -d   # 只起 NestJS
 docker compose --profile py up -d     # 只起 Python
 docker compose --profile both up -d   # 都起
+```
+
+### py-api 测试与验收
+
+```bash
+# 容器内跑 pytest（49 case + 2 token SSE = 51 全过）
+docker exec interview-py-api bash -c "cd /app/apps/py-api && python -m pytest tests/ -q"
+# 51 passed, 1 warning in 1.00s
+
+# 端到端验证
+curl http://localhost:3002/api/health       # 200 OK（liveness）
+curl http://localhost:3002/api/health/ready # 200 + 真连 Redis + Milvus（readiness）
+curl -X POST http://localhost:3002/api/auth/login -H "Content-Type: application/json" -d '{}'
+# {"accessToken":"eyJ...","tokenType":"Bearer","expiresIn":"7d"}
 ```
 
 ---
