@@ -602,15 +602,24 @@ cp .env.example .env
 #    fail-fast），JWT_SECRET 必须显式设。未设时 docker compose 启动时立即报错：
 #      "JWT_SECRET must be set in .env (商用必填，dev 占位见 .env.example)"
 
-# 2. 一键启动 7 个容器
-docker compose up -d --build
+# 2. 一键启动（推荐 · 自动 .env + JWT_SECRET + 等 healthy + 端到端验证）
+bash deploy.sh
 
-# 3. 等待服务就绪（~30s，KB 导入约 2min 异步完成）
-docker logs -f interview-api
-# 看到 4 个 ✅ + 🚀 API server running on http://localhost:3001 即就绪
+#   deploy.sh 自动做：
+#   - 检查 .env（缺则自动 cp .env.example）
+#   - 自动 `openssl rand -base64 48` 写入 JWT_SECRET（如未设）
+#   - docker compose up -d --build（7 容器）
+#   - 等 py-api healthy（最久 60s）
+#   - 端到端 curl /api/health + /api/health/ready
+#   - 打印容器状态 + 总结
 
-# 4. 访问前端
+# 3. 访问前端
 open http://localhost:5173
+
+# 4. 手动验证
+curl http://localhost:3002/api/health       # 200 OK（liveness）
+curl http://localhost:3002/api/health/ready # 200 + 真连 Redis + Milvus（readiness）
+curl http://localhost:3002/api/metrics      # Prometheus 指标
 ```
 
 ### 方式 B：基础设施 Docker + 后端本地（开发推荐）
