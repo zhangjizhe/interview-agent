@@ -2,9 +2,12 @@
 4 层记忆架构 L3 上半：Milvus 向量数据库
 
 对齐 NestJS MilvusMemory（@zilliz/milvus2-sdk-node 的 Python 版）
+
+2026-06-26 P0-1 修复：search 用 build_milvus_eq 转义字符串（之前 f-string 直接拼注入风险）
 """
 from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
 from typing import List, Optional
+from app.shared.escape_milvus import build_milvus_eq, build_milvus_in
 
 
 class MilvusMemory:
@@ -40,11 +43,16 @@ class MilvusMemory:
             connections.disconnect("default")
 
     async def ensure_collection(self):
-        """确保 collection 存在"""
+        """确保 collection 存在
+
+        字段顺序必须与 insert() 调用严格一致（pymilvus 按列插入）：
+        [id(auto), vector, user_id, content, source, created_at]
+        """
         if not self.connected:
             return
         try:
             if not utility.has_collection(self.COLLECTION):
+                # 2026-06-26 P1-3 修复：字段顺序显式标注，避免 schema 与 insert 错位
                 fields = [
                     FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
                     FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=self.VECTOR_DIM),
@@ -68,17 +76,22 @@ class MilvusMemory:
             print(f"[Milvus] ensure_collection failed: {e}")
 
     async def insert(self, user_id: str, content: str, vector: List[float], source: str = "conversation") -> int:
-        """插入一条记忆"""
+        """插入一条记忆
+
+        2026-06-26 P1-3 修复：data 列顺序必须与 schema 严格一致：
+        schema = [id(auto_id, 不传), vector, user_id, content, source, created_at]
+        pymilvus 按列顺序插入，错位会导致 vector 存到 user_id 列等
+        """
         if not self.connected or not self.collection:
             return -1
         try:
             from datetime import datetime, timezone
             data = [
-                [vector],
-                [user_id],
-                [content[:8000]],
-                [source],
-                [datetime.now(timezone.utc).isoformat()],
+                [vector],                                       # vector（schema[1]）
+                [user_id],                                      # user_id（schema[2]）
+                [content[:8000]],                               # content（schema[3]）
+                [source],                                       # source（schema[4]）
+                [datetime.now(timezone.utc).isoformat()],      # created_at（schema[5]）
             ]
             result = self.collection.insert(data)
             self.collection.flush()
@@ -88,7 +101,10 @@ class MilvusMemory:
             return -1
 
     async def search(self, vector: List[float], user_id: str, top_k: int = 5):
-        """向量检索"""
+        """向量检索
+
+        2026-06-26 P0-1 修复：用 build_milvus_eq 转义 user_id，防止 Milvus filter 表达式注入
+        """
         if not self.connected or not self.collection:
             return []
         try:
@@ -97,7 +113,7 @@ class MilvusMemory:
                 anns_field="vector",
                 param={"metric_type": "COSINE"},
                 limit=top_k,
-                expr=f'user_id == "{user_id}"',
+                expr=build_milvus_eq("user_id", user_id),
                 output_fields=["content", "source", "created_at"],
             )
             hits = []

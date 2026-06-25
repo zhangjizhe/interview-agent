@@ -19,7 +19,10 @@ REVIEWER_PROMPT = """你是面试响应评审员。评估执行结果质量：
 
 
 async def reviewer_node(state, llm, config=None, redis_mem=None) -> dict:
-    """评审 final_response，返回 verdict + score"""
+    """评审 final_response，返回 verdict + score
+
+    2026-06-26 P1-4 修复：在 state 写入 verdict 字段，reviewer_router 据此三分支
+    """
     final_response = state.get("final_response") or ""
     past_steps = state.get("past_steps") or []
 
@@ -49,6 +52,7 @@ async def reviewer_node(state, llm, config=None, redis_mem=None) -> dict:
         "review_issues": result.get("issues", []),
         "review_suggestion": result.get("suggestion", ""),
         "current_specialist": "reviewer",
+        "verdict": verdict,  # 2026-06-26 修复：reviewer_router 据此路由
     }
 
     if verdict == "approved":
@@ -64,24 +68,34 @@ async def reviewer_node(state, llm, config=None, redis_mem=None) -> dict:
 
 
 def reviewer_router(state) -> str:
-    """路由：approved → end；rejected → planner；needs_hitl → hitl_review
+    """路由：基于 reviewer_node 写入的 verdict 字段三分支（对齐 NestJS 版）
 
-    Bug 修复（P1-4）：原代码 `not state.get("retry_count", 0) > 0` 因 Python 运算符优先级
-    = `not (state.get(...) > 0)`，意图应是 `state.get(...) == 0`。
-    原行为：retry_count=0 且 final_response 空 → 跳 END（静默失败，不打回）。
-    修复：用显式 == 比较，避免优先级陷阱。
+    2026-06-26 P1-4 修复：原代码只看 retry_count + final_response 是否存在，
+    完全忽略 reviewer 写入的 verdict（approved / rejected / needs_hitl）。
+    修复：用 verdict 做三分支：
+    - approved → end
+    - rejected → planner（重做）
+    - needs_hitl → hitl_review（人工审批）
+
+    同时保留 hitl_pending 短路（highest priority）。
     """
+    # 优先短路：hitl_pending 已设 → hitl_review
     if state.get("hitl_pending"):
         return "hitl_review"
-    retry_count = state.get("retry_count", 0)
-    has_final_response = bool(state.get("final_response"))
 
-    # hitl_pending 已处理（上面 return）→ 剩下按 verdict 路由
-    if retry_count == 0 and has_final_response:
-        # 正常通过
-        return "end"
-    if retry_count > 0:
-        # reviewer 打回 → planner 重做
+    verdict = state.get("verdict")
+
+    # 用 verdict 字段三分支（reviewer_node 写入）
+    if verdict == "rejected":
         return "planner"
-    # retry_count=0 且 final_response 空 → reviewer 拒绝 / 没产出 → planner 重做
+    if verdict == "needs_hitl":
+        return "hitl_review"
+    if verdict == "approved":
+        # approved 必须 final_response 有才算真通过（否则 reviewer_node 还没跑完）
+        if state.get("final_response"):
+            return "end"
+        # approved 但没 final_response：走 planner 让 executor 再产出
+        return "planner"
+
+    # 兜底：verdict 未设（reviewer_node 没跑完）→ planner 重做
     return "planner"

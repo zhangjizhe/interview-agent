@@ -32,6 +32,8 @@ class InterviewAgentState(TypedDict):
     review_score: Optional[float]
     review_issues: Optional[List[str]]
     review_suggestion: Optional[str]
+    # 2026-06-26 P1-4 修复：reviewer 三分支 verdict（reviewer_router 据此路由）
+    verdict: Optional[Literal["approved", "rejected", "needs_hitl"]]
 
     # HITL 状态
     hitl_pending: bool
@@ -65,6 +67,7 @@ def create_initial_state(user_message: str, user_id: Optional[str] = None, user_
         "review_score": None,
         "review_issues": None,
         "review_suggestion": None,
+        "verdict": None,
         "hitl_pending": False,
         "hitl_verdict": None,
         "current_specialist": None,

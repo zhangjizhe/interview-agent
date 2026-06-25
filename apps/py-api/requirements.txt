@@ -36,7 +36,7 @@ python-dotenv==1.0.1
 pyyaml==6.0.2
 
 # P1-9 L4 PostgreSQL（SQLAlchemy + alembic 对齐 NestJS Prisma）
-alembic==1.14.0
+# alembic 已在 L12 定义，此处不重复
 
 # Dev / Test
 pytest==8.3.4
