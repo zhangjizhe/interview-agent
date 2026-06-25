@@ -2,12 +2,10 @@
 
 
 def replanner_node(state, config=None) -> dict:
-    """根据 past_steps 决定下一步：再执行一轮还是跳到 reviewer"""
-    past_steps = state.get("past_steps") or []
-    plan = state.get("plan") or []
+    """根据 past_steps 决定下一步：再执行一轮还是跳到 reviewer
 
-    # 简化逻辑：past_steps 已经有结果就跳 reviewer
-    all_done = all(s.get("success") for s in past_steps)
+    P2 修复：去掉 dead code（all_done 计算但未用）
+    """
     return {
         "current_specialist": "replanner",
     }

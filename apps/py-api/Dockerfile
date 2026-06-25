@@ -17,6 +17,10 @@ COPY apps/py-api /app/apps/py-api
 
 WORKDIR /app/apps/py-api
 
+# P2 修复：非 root 用户运行（容器安全）
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 3002
 
 # 健康检查（用 python -c 跑 urllib，不依赖 curl 业务包）
