@@ -4,10 +4,12 @@
 - 提取 markdown 中的关键概念作为 tags（去重、去停用词）
 - 提取简略内容 preview（首段或考察点）
 - 保持原有 body 完整
+- 与原 tags 字段做并集合并，避免覆盖历史人工标签
 """
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # 停用词：markdown 标题标记 + 通用废话词
@@ -72,9 +74,13 @@ def extract_preview(body: str, max_len: int = 150) -> str:
         return text[:max_len] + ('...' if len(text) > max_len else '')
     return ''
 
+def _normalize_tag(tag: str) -> str:
+    """标签归一化：去首尾空白、统一内部空白，便于大小写不敏感的去重"""
+    return re.sub(r'\s+', ' ', tag).strip()
+
 def extract_key_concepts(body: str, title: str, topic: str, max_tags: int = 5) -> list:
     """从 body 中提取关键概念作为标签"""
-    concepts = set()
+    raw_concepts = []  # 用 list 保序，set 去重
     text = body + ' ' + title + ' ' + topic
 
     # 1. 提取 **加粗** 内容（通常是关键概念）
@@ -87,35 +93,42 @@ def extract_key_concepts(body: str, title: str, topic: str, max_tags: int = 5) -
         # 跳过包含"挂钩"等标记
         if any(marker in item for marker in ['考察点', '答题框架', '踩坑点', '简历挂钩']):
             continue
-        concepts.add(item)
+        raw_concepts.append(item)
 
     # 2. 提取英文术语（驼峰/全大写）
     english_terms = re.findall(r'\b([A-Z][a-zA-Z]+(?:[A-Z][a-z]+)+)\b', text)
     english_terms += re.findall(r'\b([A-Z]{2,}s?)\b', text)  # MCP, API, A2A, RAG
+    # 过滤常见全大写噪声（不在知识库语境里有意义）
+    ENGLISH_NOISE = {'ID', 'OK', 'YES', 'NO', 'TBC', 'TODO', 'TBD', 'FAQ', 'PS', 'VS', 'OKR'}
     for term in english_terms:
+        if term in ENGLISH_NOISE:
+            continue
         if term not in STOPWORDS and len(term) >= 2:
-            concepts.add(term)
+            raw_concepts.append(term)
 
     # 3. 提取反引号内的代码/术语
     code_terms = re.findall(r'`([^`]{2,30})`', text)
     for term in code_terms:
         if term not in STOPWORDS:
-            concepts.add(term)
+            raw_concepts.append(term)
 
     # 4. 维度推断
     for dim, keywords in DIMENSION_KEYWORDS.items():
         for kw in keywords:
             if kw in text:
-                concepts.add(dim)
+                raw_concepts.append(dim)
                 break
 
-    # 5. 清理和排序
+    # 5. 清理、去重（大小写不敏感）、排序保留
+    seen = set()
     result = []
-    for c in concepts:
+    for c in raw_concepts:
         if c in STOPWORDS or len(c) < 2:
             continue
-        if c in result:
+        norm = _normalize_tag(c).lower()
+        if norm in seen:
             continue
+        seen.add(norm)
         result.append(c)
         if len(result) >= max_tags:
             break
@@ -134,9 +147,16 @@ def infer_difficulty(body: str, title: str) -> str:
         return 'P4-P5'
     return 'P5-P6'
 
-def retag_knowledge_base(input_path: str, output_path: str):
-    with open(input_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+def retag_knowledge_base(input_path: str, output_path: str, max_tags: int = 5):
+    try:
+        with open(input_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f'❌ Input file not found: {input_path}')
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f'❌ Invalid JSON in {input_path}: {e}')
+        sys.exit(1)
 
     items = data.get('items', [])
     new_items = []
@@ -147,7 +167,23 @@ def retag_knowledge_base(input_path: str, output_path: str):
         topic = item.get('topic', '')
 
         # 提取关键概念作为标签
-        key_concepts = extract_key_concepts(body, title, topic)
+        key_concepts = extract_key_concepts(body, title, topic, max_tags=max_tags)
+
+        # 合并历史 tags（如有），按归一化去重，新标签优先，且受 max_tags 约束
+        existing_tags = item.get('tags') or []
+        if not isinstance(existing_tags, list):
+            existing_tags = []
+        seen_norm = {_normalize_tag(t).lower() for t in key_concepts}
+        merged_tags = list(key_concepts)
+        for t in existing_tags:
+            if len(merged_tags) >= max_tags:
+                break
+            if not isinstance(t, str):
+                continue
+            norm = _normalize_tag(t).lower()
+            if norm and norm not in seen_norm:
+                seen_norm.add(norm)
+                merged_tags.append(t)
 
         # 提取简略内容
         preview = extract_preview(body)
@@ -157,26 +193,35 @@ def retag_knowledge_base(input_path: str, output_path: str):
 
         new_item = {
             **item,
-            'tags': key_concepts,           # 关键概念标签
+            'tags': merged_tags,            # 关键概念标签 + 历史标签合并
             'preview': preview,              # 简略内容
             'difficulty': difficulty,        # 难度
         }
         new_items.append(new_item)
 
     data['items'] = new_items
-    data['retaggedAt'] = '2026-06-16T10:00:00.000Z'
+    data['retaggedAt'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
     data['tagSchema'] = {
         'tags': '关键概念/技术术语（来自 body 中加粗/代码/英文术语）',
         'preview': '简略内容预览',
         'difficulty': '难度分级 P4-P7',
     }
 
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        print(f'❌ Failed to write {output_path}: {e}')
+        sys.exit(1)
 
     print(f'✅ Retagged {len(new_items)} items')
-    print(f'   样例: {new_items[0]["id"]} -> tags={new_items[0]["tags"]}')
-    print(f'   样例: {new_items[1]["id"]} -> tags={new_items[1]["tags"]}')
+    if len(new_items) >= 2:
+        print(f'   样例: {new_items[0]["id"]} -> tags={new_items[0]["tags"]}')
+        print(f'   样例: {new_items[1]["id"]} -> tags={new_items[1]["tags"]}')
+    elif len(new_items) == 1:
+        print(f'   样例: {new_items[0]["id"]} -> tags={new_items[0]["tags"]}')
+    else:
+        print('   ⚠️ 输入 items 为空，输出文件中无内容')
 
 if __name__ == '__main__':
     base = Path(__file__).parent.parent  # scripts -> apps/api
