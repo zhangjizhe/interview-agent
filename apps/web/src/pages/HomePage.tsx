@@ -49,6 +49,7 @@ export function HomePage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [resumeUploaded, setResumeUploaded] = useState(false);
+  const [uploadedInterviewId, setUploadedInterviewId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleResumePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,11 +65,14 @@ export function HomePage() {
       fd.append('userId', userId);
       const res = await fetch('/api/interview/upload-resume', { method: 'POST', body: fd });
       const data = await safeJson(res);
-      if (data?._error || !data?.ragIngested) {
+      if (data?._error || (data?.ragIngested === false && !data?.interviewId)) {
+        // 上传失败（_error 显式错 或 既没 ingest 也没生成 interview）
         alert('简历上传失败：' + (data?.message || JSON.stringify(data)));
         return;
       }
+      // 成功：ragIngested 可能是 true/false（dev 模式 0 embedding），但有 interviewId 就是成功
       setResumeUploaded(true);
+      setUploadedInterviewId(data.interviewId);
     } catch (err: any) {
       alert('上传出错：' + err.message);
     } finally {
@@ -199,10 +203,21 @@ export function HomePage() {
   const startInterview = async () => {
     setLoading(true);
     try {
+      // 如果 upload-resume 已经创建了 interview，直接 navigate（不调 /start）
+      if (uploadedInterviewId) {
+        setShowForm(false);
+        navigate(`/interview/${uploadedInterviewId}?userId=${userId}`);
+        return;
+      }
       const res = await fetch('/api/interview/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, position, level }),
+        body: JSON.stringify({
+          user_id: userId,
+          user_message: `开始 ${position} ${level} 面试`,
+          user_role: position,
+          thread_id: undefined,
+        }),
       });
       const data = await safeJson(res);
       if (data?._error) {
