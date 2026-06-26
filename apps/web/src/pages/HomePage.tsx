@@ -110,19 +110,20 @@ export function HomePage() {
   });
 
   // 工具列表（首页技能市场）
+  // 2026-06-26 修：queryKey 改 'tools-count' 跟 App.tsx 头部共享 React Query cache
+  // 之前 queryKey='tools' 独立，App.tsx 拿到 2/3 但 HomePage 拿到 0/0（cache 错位）
   const { data: toolsData } = useQuery({
-    queryKey: ['tools'],
+    queryKey: ['tools-count'],
     queryFn: async () => {
       const r = await fetch('/api/tools');
       const data: any = safeJson(r);
-      // 防御：safeJson 在 502/HTML 错误时返回 {}，tools 字段可能缺失
-      // 不加防御会 throw "Cannot read properties of undefined (reading 'map')"
       if (data && Array.isArray(data.tools)) {
         return data as { tools: McpToolMeta[]; count: number; enabledCount: number };
       }
       return { tools: [] as McpToolMeta[], count: 0, enabledCount: 0 };
     },
     refetchInterval: 30000,
+    staleTime: 0,  // 强制每次 mount 重取（防 stale cache）
   });
 
   // 空面试（30min 无对话）：首页弹窗提醒

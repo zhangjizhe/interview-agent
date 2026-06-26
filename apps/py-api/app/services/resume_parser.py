@@ -20,8 +20,10 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# 中文姓名模式（2-4 字 + 姓在前）
-_NAME_PATTERN = re.compile(r"姓名[::\s]*([\u4e00-\u9fa5]{2,4})")
+# 姓名模式：兼容中英文
+# 中文：姓名: 张三 / 姓名：张三
+# 英文：Name: Mavis Test / Name: Mavis / Name:Mavis
+_NAME_PATTERN = re.compile(r"(?:姓名|Name)\s*[:：]\s*([^\n\r]+)")
 _EMAIL_PATTERN = re.compile(r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})")
 _YEARS_PATTERN = re.compile(r"(\d+)\s*年(?:以上)?(?:.*?经验|工作经验|开发经验)?")
 
@@ -62,9 +64,16 @@ def parse_resume_text(text: str) -> Dict[str, Any]:
     if len(text) < 50:
         raise ValueError(f"简历内容过短（{len(text)} 字符），请提供更完整的简历")
 
-    # 1. name
+    # 1. name（2026-06-26 改：兼容英文，截到第一个换行或标点）
     name_match = _NAME_PATTERN.search(text)
-    name = name_match.group(1) if name_match else None
+    name = None
+    if name_match:
+        raw_name = name_match.group(1).strip()
+        # 截到第一个空白/标点（避免 "Mavis Test Email:..." 这种匹配过头）
+        # 中文姓名：第一个空白前
+        # 英文姓名：第一个空白前（first name）
+        match = re.match(r"([^\s,，、]+)", raw_name)
+        name = match.group(1) if match else raw_name[:20]
 
     # 2. email
     email_match = _EMAIL_PATTERN.search(text)
