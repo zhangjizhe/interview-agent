@@ -118,6 +118,17 @@ jobs:
             sleep 2
           done
 
+      - name: Build NestJS api
+        # lint-type-test 只跑 jest（ts-jest 转译），不输出 dist/
+        # E2E 跑 node dist/main.js 需要先 nest build
+        working-directory: apps/api
+        run: npx nest build
+
+      - name: Prisma generate
+        # nest build 后 prisma client 需要 generate（runtime @prisma/client 要这个）
+        working-directory: apps/api
+        run: npx prisma generate
+
       - name: Start NestJS api (in runner, not container)
         # GH service container（postgres / redis）在 runner 上 listen localhost:5432 / 6379
         # 直接 node dist/main.js 跑（用 lint-type-test 已 build 的 dist 复用 + install 的 node_modules）
