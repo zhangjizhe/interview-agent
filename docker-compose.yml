@@ -144,7 +144,8 @@ services:
         condition: service_healthy
     healthcheck:
       # node 18+ 内置 fetch，不依赖 curl
-      test: ['CMD-SHELL', "node -e \"fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      # NestJS 用 setGlobalPrefix('api')，所以路径是 /api/health 不是 /health
+      test: ['CMD-SHELL', "node -e \"fetch('http://localhost:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
       timeout: 10s
       retries: 15

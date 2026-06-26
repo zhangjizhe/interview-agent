@@ -185,16 +185,16 @@ fi
 log "4. 端到端验证"
 sleep 2
 
-if curl -s -f http://localhost:3001/health >/dev/null 2>&1; then
-    log "  ✅ NestJS /health OK"
+if curl -s -f http://localhost:3001/api/health >/dev/null 2>&1; then
+    log "  ✅ NestJS /api/health OK"
 else
-    warn "  ⚠️ /health 失败"
+    warn "  ⚠️ /api/health 失败"
 fi
 
 if curl -s -f http://localhost:3001/api/health/ready >/dev/null 2>&1; then
     log "  ✅ NestJS /api/health/ready OK（依赖都连上）"
 else
-    warn "  ⚠️ /api/health/ready 失败"
+    warn "  ⚠️ /api/health/ready 失败（NestJS 无 readiness 端点，跳过）"
 fi
 
 if [ "$PY_PROFILE" = "1" ]; then
