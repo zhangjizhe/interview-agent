@@ -444,31 +444,35 @@ CRAG-lite 架构，启发式硬事实检测 + 引用溯源：
 
 ---
 
-## 架构（2026-06-26 简化：单后端）
+## 架构（2026-06-26 双后端并存：NestJS 默认 + py-api 选配）
 
-> **唯一后端**：Python FastAPI（`apps/py-api/`，端口 3002）
-> **NestJS api 已移到 `apps/api-legacy/`**（保留作为参考 / 备份，不被 docker compose 启动）
+> **默认后端**：NestJS（`apps/api/`，端口 3001）— docker compose 一键启动
+> **选配后端**：Python FastAPI（`apps/py-api/`，端口 3002）— `bash deploy.sh --py` 启
+> **共享数据**：postgres / redis / milvus / qdrant / mem0 两个后端共用
+> **py-api 薄壳版**：保留 8 项商用 best practice（结构化日志 / 错误处理 / Rate Limit / 真流式 / Metrics / 重试+超时 / Docker fail-fast / 一键部署），可作技术选型对比
 
 ### 架构图
 
 ```
                     ┌──────────────────────────────────┐
-                    │  共享数据层（postgres/redis/milvus/qdrant）│
+                    │  共享数据层（postgres/redis/milvus/qdrant/mem0）│
                     └──────────────────────────────────┘
-                                       ▲
-                                       │
-                          ┌────────────┴──────────────┐
-                          │  Python FastAPI            │
-                          │  apps/py-api/              │
-                          │  :3002                     │
-                          │  LangGraph 0.5             │
-                          │  SQLAlchemy + Alembic      │
-                          └───────────────────────────┘
-                                       ▲
-                                       │
+                            ▲                       ▲
+                            │                       │
+              ┌─────────────┴──────┐    ┌───────────┴────────┐
+              │  NestJS api         │    │  Python FastAPI    │
+              │  apps/api/          │    │  apps/py-api/      │
+              │  :3001（默认）       │    │  :3002（选配）      │
+              │  LangGraph 1.3 + TS  │    │  LangGraph 0.5     │
+              │  Prisma + Postgres  │    │  SQLAlchemy        │
+              └─────────────────────┘    └────────────────────┘
+                            ▲                       ▲
+                            └───────────┬───────────┘
+                                        │
                           ┌────────────┴──────────────┐
                           │  React Frontend            │
                           │  apps/web/ :5173           │
+                          │  反代 → api:3001（默认）     │
                           └───────────────────────────┘
 ```
 
@@ -516,10 +520,11 @@ CRAG-lite 架构，启发式硬事实检测 + 引用溯源：
 
 ```bash
 make help        # 查看所有命令
-make up          # 启动 py-api + 基础设施（默认）
+make up          # 启动 NestJS + 基础设施（默认 · 8 容器）
+make up-py       # 启动 NestJS + py-api（双后端 · 9 容器）
 make down        # 全部停掉
-make logs        # py-api 日志
-make rebuild     # 强制 rebuild py-api 镜像
+make logs        # api 日志
+make rebuild     # 强制 rebuild api 镜像
 make status      # 容器状态
 make health      # 健康检查
 make clean       # 清理所有容器+卷
@@ -533,18 +538,18 @@ cp .env.example .env
 # 必填：QWEN_API_KEY（dev 占位 OK，但商用必须 ≥32 字符 JWT_SECRET）
 # ⚠️ JWT_SECRET：.env.example 给 dev 占位（≥32 字符），商用前 `openssl rand -base64 48`
 
-# 2. 启动（单后端 py-api）
+# 2. 启动（NestJS 默认）
 make up
 
 # 3. 验证
-curl http://localhost:3002/api/health       # 200 OK（liveness）
-curl http://localhost:3002/api/health/ready # 200 + 真连 Redis + Milvus（readiness）
-curl -X POST http://localhost:3002/api/auth/login -H "Content-Type: application/json" -d '{}'
-# {"accessToken":"eyJ...","tokenType":"Bearer","expiresIn":"7d"}
+curl http://localhost:3001/health           # 200 OK（liveness）
+curl http://localhost:3001/api/health/ready # 200 + 真连 Redis + Milvus（readiness）
+curl -X POST http://localhost:3001/api/auth/login -H "Content-Type: application/json" -d '{}'
+# {"access_token":"eyJ...","token_type":"Bearer","expires_in":"7d"}
 
 # 4. 跑测试
-docker exec interview-py-api bash -c "cd /app/apps/py-api && python -m pytest tests/ -q"
-# 66 passed
+docker exec interview-api bash -c "cd /app/apps/api && npx jest --ci"
+# 203 passed
 ```
 
 ### 商用部署清单
@@ -608,18 +613,20 @@ bash deploy.sh
 #   deploy.sh 自动做：
 #   - 检查 .env（缺则自动 cp .env.example）
 #   - 自动 `openssl rand -base64 48` 写入 JWT_SECRET（如未设）
-#   - docker compose up -d --build（7 容器）
-#   - 等 py-api healthy（最久 60s）
-#   - 端到端 curl /api/health + /api/health/ready
+#   - docker compose up -d --build（8 容器 · NestJS 默认 + 共享 postgres/redis/milvus）
+#   - 等 api healthy（最久 60s）
+#   - 端到端 curl /health + /api/health/ready
 #   - 打印容器状态 + 总结
+#
+#   选配启 py-api（薄壳版 · 端口 3002）：
+#   bash deploy.sh --py
 
 # 3. 访问前端
 open http://localhost:5173
 
 # 4. 手动验证
-curl http://localhost:3002/api/health       # 200 OK（liveness）
-curl http://localhost:3002/api/health/ready # 200 + 真连 Redis + Milvus（readiness）
-curl http://localhost:3002/api/metrics      # Prometheus 指标
+curl http://localhost:3001/health           # 200 OK（NestJS liveness）
+curl http://localhost:3001/api/health/ready # 200 + 真连 Redis + Milvus（readiness）
 ```
 
 ### 方式 B：基础设施 Docker + 后端本地（开发推荐）

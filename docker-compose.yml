@@ -1,21 +1,24 @@
-# ✅ 纯 Docker 化：真·一键部署（2026-06-26 简化）
+# ✅ 纯 Docker 化：真·一键部署（2026-06-26 NestJS 默认）
 #
 # 一键启动（git clone 后只跑这一条）：
 #   docker compose up -d --build
 #
 # 启动后：
 #   - 前端: http://localhost:5173
-#   - 后端: http://localhost:3002
-#   - 文档: http://localhost:3002/docs（FastAPI 自动 OpenAPI）
+#   - 后端: http://localhost:3001（NestJS · 默认）
+#   - 文档: http://localhost:3001/api/docs
 #
-# 容器清单（7 容器）：
-#   postgres / redis / qdrant / milvus / milvus-etcd / py-api / web
+# 容器清单（8 容器 · 2026-06-26 架构回退到 NestJS 默认）：
+#   postgres / redis / qdrant / milvus / milvus-etcd / api (NestJS) / web
+#   + py-api（默认不启，profile 选配）
+#
+# 选配启 py-api（薄壳版商用 best practice 后端）：
+#   docker compose --profile py up -d
+#   然后改 web/nginx.conf set $backend "http://py-api:3002" + 重 build web
 #
 # 必备前置（首次）：
 #   cp .env.example .env  ← 自动生成（deploy.sh 会做）
 #   在 .env 填 QWEN_API_KEY（必须）+ JWT_SECRET（自动生成占位）
-#
-# NestJS api 已移到 apps/api-legacy/（保留作参考，不被启动）
 
 services:
   postgres:
@@ -104,12 +107,59 @@ services:
       retries: 8
       start_period: 90s
 
-  # Python 后端（唯一后端，2026-06-26 单后端架构简化）
+  # NestJS 后端（2026-06-26 恢复为默认后端，端口 3001）
+  # apps/api/（之前 apps/api-legacy/）git rename 回原路径
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: interview-api
+    ports:
+      - '3001:3001'
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev123}@postgres:5432/interview
+      REDIS_URL: redis://redis:6379
+      QDRANT_URL: http://qdrant:6333
+      MILVUS_URL: http://milvus:19530
+      QWEN_BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v1
+      QWEN_API_KEY: ${QWEN_API_KEY:-}
+      QWEN_MODEL: ${QWEN_MODEL:-qwen-plus}
+      DEEPSEEK_BASE_URL: https://api.deepseek.com/v1
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      MEM0_API_KEY: ${MEM0_API_KEY:-}
+      MEM0_HOST: ${MEM0_HOST:-}
+      # 商用 fail-fast：JWT_SECRET 未设置时 docker compose 立即报错（容器不启动）
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (deploy.sh 自动生成 dev 占位)}
+      PORT: 3001
+      NODE_ENV: production
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      milvus:
+        condition: service_healthy
+    healthcheck:
+      # node 18+ 内置 fetch，不依赖 curl
+      test: ['CMD-SHELL', "node -e \"fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 90s
+    restart: unless-stopped
+
+  # Python 后端（选配 · 2026-06-26 改：默认不启，profile 启）
+  # 用法：docker compose --profile py up -d
+  # 之前是单后端，改为双后端并存：NestJS 默认 + py-api 选配
   py-api:
     build:
       context: .
       dockerfile: apps/py-api/Dockerfile
     container_name: interview-py-api
+    profiles: ["py"]  # 只在 --profile py 时启动
     ports:
       - '3002:3002'
     environment:
@@ -134,7 +184,6 @@ services:
       milvus:
         condition: service_healthy
     healthcheck:
-      # python 内置 urllib，不依赖 curl
       test: ['CMD-SHELL', 'python -c "import urllib.request; urllib.request.urlopen(\"http://localhost:3002/api/health\").read()"']
       interval: 15s
       timeout: 10s
@@ -142,7 +191,7 @@ services:
       start_period: 90s
     restart: unless-stopped
 
-  # 前端（自动连后端 3002）
+  # 前端（自动连 NestJS api:3001，py-api profile 启时改为 py-api:3002）
   web:
     build:
       context: .
@@ -151,7 +200,7 @@ services:
     ports:
       - '5173:80'
     depends_on:
-      py-api:
+      api:
         condition: service_healthy
     restart: unless-stopped
 
