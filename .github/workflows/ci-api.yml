@@ -37,7 +37,9 @@ jobs:
           cache-dependency-path: 'apps/api/package-lock.json'
 
       - name: Install dependencies (npm)
-        run: npm ci
+        # --legacy-peer-deps: @nestjs/testing@11 要 NestJS 11，但项目用 NestJS 10
+        # 本地 pnpm install 不报错（pnpm 锁版本不锁 ^ 范围）；npm ci 严格 peer 必须加
+        run: npm ci --legacy-peer-deps
 
       - name: ESLint
         run: npm run lint --if-present || echo "⚠️ lint not configured, skipping"
