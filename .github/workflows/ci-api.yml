@@ -118,7 +118,10 @@ jobs:
             sleep 2
           done
 
-      - name: Start NestJS api container
+      - name: Start NestJS api (in runner, not container)
+        # GH service container（postgres / redis）在 runner 上 listen localhost:5432 / 6379
+        # 直接 node dist/main.js 跑（用 lint-type-test 已 build 的 dist 复用 + install 的 node_modules）
+        # 比 docker run 容器内 + host.docker.internal 简单且 Linux runner 兼容
         env:
           DATABASE_URL: postgresql://dev:dev123@localhost:5432/interview
           REDIS_URL: redis://localhost:6379
@@ -134,19 +137,10 @@ jobs:
           PORT: 3001
           NODE_ENV: production
         run: |
-          docker run -d \
-            --name api-e2e \
-            -p 3001:3001 \
-            -e DATABASE_URL=postgresql://dev:dev123@host.docker.internal:5432/interview \
-            -e REDIS_URL=redis://host.docker.internal:6379 \
-            -e QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1 \
-            -e QWEN_MODEL=qwen-plus \
-            -e QWEN_API_KEY=sk-test-placeholder \
-            -e DEEPSEEK_API_KEY=sk-test-placeholder \
-            -e JWT_SECRET=ci_test_secret_at_least_32_characters_long_xxxxxxxx \
-            -e PORT=3001 \
-            -e NODE_ENV=production \
-            interview-api:test
+          cd apps/api
+          nohup node dist/main.js > api-e2e.log 2>&1 &
+          echo $! > /tmp/api-e2e.pid
+          echo "✓ api started, pid=$(cat /tmp/api-e2e.pid)"
 
       - name: Wait for api healthy
         run: |
@@ -173,7 +167,8 @@ jobs:
             echo "✓ readiness OK"
           else
             echo "✗ readiness FAIL"
-            docker logs api-e2e | tail -30
+            docker logs api-e2e 2>&1 | tail -30 || true
+            cat api-e2e.log 2>&1 | tail -50 || true
             exit 1
           fi
 
@@ -221,14 +216,17 @@ jobs:
       - name: E2E summary
         if: always()
         run: |
-          echo "=== api container logs (last 30) ==="
-          docker logs api-e2e 2>&1 | tail -30 || true
+          echo "=== api process logs (last 50) ==="
+          cat api-e2e.log 2>&1 | tail -50 || true
 
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f api-e2e 2>/dev/null || true
-          rm -f /tmp/ci-resume.pdf /tmp/upload-response.json
+          # 杀 NestJS 进程（之前用 docker run 现在改 nohup node）
+          if [ -f /tmp/api-e2e.pid ]; then
+            kill $(cat /tmp/api-e2e.pid) 2>/dev/null || true
+          fi
+          rm -f /tmp/ci-resume.pdf /tmp/upload-response.json /tmp/api-e2e.pid
 
   ci-summary:
     runs-on: ubuntu-latest
