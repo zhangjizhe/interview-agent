@@ -118,6 +118,13 @@ jobs:
             sleep 2
           done
 
+      - name: Cache prisma binaries
+        # Prisma binary engine（~50MB）首次拉很慢，缓存复用
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/prisma
+          key: ${{ runner.os }}-prisma-${{ hashFiles('apps/api/prisma/schema.prisma') }}
+
       - name: Prisma generate
         # nest build 需要 @prisma/client type 定义（来自 .prisma/client/）
         # npm ci 装 @prisma/client 但不自动 generate
