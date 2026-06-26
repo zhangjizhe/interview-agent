@@ -130,7 +130,22 @@ jobs:
         # npm ci 装 @prisma/client 但不自动 generate
         # 顺序：prisma generate 必须在 nest build 前
         working-directory: apps/api
-        run: npx prisma generate
+        run: |
+          echo "=== prisma --version ==="
+          npx prisma --version 2>&1 || echo "prisma --version fail"
+          echo "=== ls node_modules/.bin/prisma ==="
+          ls -la node_modules/.bin/prisma 2>&1 || echo "no prisma bin"
+          echo "=== ls prisma/ ==="
+          ls -la prisma/ 2>&1
+          echo "=== pwd ==="
+          pwd
+          echo "=== prisma generate ==="
+          npx prisma generate 2>&1 | tee prisma-generate.log
+          if grep -q "Error\|error" prisma-generate.log; then
+            echo "::error::prisma generate reported error"
+            cat prisma-generate.log
+            exit 1
+          fi
 
       - name: Build NestJS api
         # lint-type-test 只跑 jest（ts-jest 转译），不输出 dist/
