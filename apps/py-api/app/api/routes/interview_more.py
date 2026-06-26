@@ -109,9 +109,12 @@ async def upload_resume(
     try:
         with get_session() as session:
             # 找/建 user
+            actual_user_id = None
             if userId:
-                user = session.query(User).filter_by(id=userId).first()
-                if not user:
+                user = session.query(User).filter_by(email=f"{userId}@demo.local").first()
+                if user:
+                    actual_user_id = user.id
+                else:
                     user = User(
                         id=userId,
                         email=f"{userId}@demo.local",
@@ -119,12 +122,13 @@ async def upload_resume(
                     )
                     session.add(user)
                     session.flush()
+                    actual_user_id = user.id
 
-            # 建 interview
+            # 建 interview（用真实 user id，FK 约束要 cuid）
             interview_id = f"iv_{uuid.uuid4().hex[:12]}"
             interview = Interview(
                 id=interview_id,
-                userId=userId or "demo-user",
+                userId=actual_user_id or userId or "demo-user",
                 position=position,
                 level="P5",
                 status="IN_PROGRESS",
@@ -135,7 +139,7 @@ async def upload_resume(
             resume = Resume(
                 id=f"re_{uuid.uuid4().hex[:12]}",
                 interviewId=interview_id,
-                userId=userId or "demo-user",
+                userId=actual_user_id or userId or "demo-user",
                 fileName=file.filename,
                 fileType=file.filename.split(".")[-1] if file.filename else None,
                 rawText=parsed["raw_text"],
