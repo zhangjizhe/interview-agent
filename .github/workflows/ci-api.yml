@@ -118,16 +118,18 @@ jobs:
             sleep 2
           done
 
+      - name: Prisma generate
+        # nest build 需要 @prisma/client type 定义（来自 .prisma/client/）
+        # npm ci 装 @prisma/client 但不自动 generate
+        # 顺序：prisma generate 必须在 nest build 前
+        working-directory: apps/api
+        run: npx prisma generate
+
       - name: Build NestJS api
         # lint-type-test 只跑 jest（ts-jest 转译），不输出 dist/
         # E2E 跑 node dist/main.js 需要先 nest build
         working-directory: apps/api
         run: npx nest build
-
-      - name: Prisma generate
-        # nest build 后 prisma client 需要 generate（runtime @prisma/client 要这个）
-        working-directory: apps/api
-        run: npx prisma generate
 
       - name: Start NestJS api (in runner, not container)
         # GH service container（postgres / redis）在 runner 上 listen localhost:5432 / 6379
