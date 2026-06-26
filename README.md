@@ -8,6 +8,9 @@
 [![NestJS](https://img.shields.io/badge/NestJS-10-red)](https://nestjs.com/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-1.3.6-green)](https://langchain-ai.github.io/langgraphjs/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+[![CI api](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml/badge.svg)](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml)
+[![CI py-api](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-py-api.yml/badge.svg)](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-py-api.yml)
+[![CI web](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-py-api.yml/badge.svg?job=web-test)](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-py-api.yml)
 
 ---
 

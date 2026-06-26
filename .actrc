@@ -1,0 +1,5 @@
+# act 配置（nektos/act · GitHub Actions 本地模拟）
+# 用法：act -j lint-type-test
+# 项目级配置优先于 ~/.act/actrc，避免改用户全局
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+--container-architecture linux/amd64

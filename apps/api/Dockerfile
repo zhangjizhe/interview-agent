@@ -32,8 +32,11 @@ COPY packages/shared-types ./packages/shared-types
 WORKDIR /app/apps/api
 RUN ./node_modules/.bin/nest build
 
-# Prisma schema（运行时需要）
+# Prisma：先 copy schema，再 generate 生成 client（runtime 需要）
+# 2026-06-26 修：之前只 copy prisma 目录但没 generate，导致 runtime
+# @prisma/client did not initialize yet
 COPY apps/api/prisma ./prisma
+RUN ./node_modules/.bin/prisma generate
 
 # entrypoint
 COPY apps/api/docker-entrypoint.sh /usr/local/bin/
