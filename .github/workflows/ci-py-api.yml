@@ -121,24 +121,9 @@ jobs:
         if: always()
         run: docker rm -f py-api-smoke 2>/dev/null || true
 
-  api-legacy-test:
-    # NestJS apps/api-legacy/ 保留代码（git rename），跑 jest 验证不回归
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api-legacy
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci || npm install
-
-      - name: Jest (203 case)
-        run: npx jest --ci
+  # api-legacy-test 已在 ci-api.yml 替代（apps/api 是 NestJS 默认）
+  # 2026-06-26 架构回退后，apps/api-legacy/ 已重命名为 apps/api/
+  # NestJS 测试 + E2E 接口验证见 .github/workflows/ci-api.yml
 
   web-test:
     runs-on: ubuntu-latest

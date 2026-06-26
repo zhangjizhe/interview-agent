@@ -190,7 +190,9 @@ services:
       timeout: 10s
       retries: 15
       start_period: 90s
-    restart: unless-stopped
+    # 2026-06-26 改：profile 启动后不自动重启
+    # unless-stopped 会让 docker compose down 之后还会试图拉起
+    restart: "no"
 
   # 前端（自动连 NestJS api:3001，py-api profile 启时改为 py-api:3002）
   web:

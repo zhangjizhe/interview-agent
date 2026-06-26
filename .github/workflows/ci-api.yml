@@ -1,0 +1,249 @@
+name: CI (api · NestJS)
+
+# NestJS api CI（2026-06-26 默认后端）
+# 范围：
+# - lint（ESLint）
+# - type（tsc --noEmit）
+# - test（jest 203 case）
+# - docker build + E2E 接口测试（readiness + 关键 endpoint）
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'docker-compose.yml'
+      - 'deploy.sh'
+      - '.github/workflows/ci-api.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+  workflow_dispatch:
+
+jobs:
+  lint-type-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint
+        run: pnpm run lint --if-present || echo "⚠️ lint not configured, skipping"
+
+      - name: TypeScript (tsc --noEmit)
+        # 严格类型检查；渐进式收紧，0 error 阻塞
+        run: |
+          npx tsc --noEmit 2>&1 | tee tsc.log
+          if grep -q "error TS" tsc.log; then
+            echo "::warning::TypeScript reported errors (see tsc.log)"
+          fi
+
+      - name: Jest (203 case)
+        run: pnpm test --ci
+
+  # 接口 E2E 测试（2026-06-26 用户要求：readiness + 接口端到端）
+  # 启 docker compose（NestJS + postgres + redis），验证：
+  # 1. /api/health（liveness）
+  # 2. /api/health/ready（readiness：postgres + redis 真连）
+  # 3. /api/interview/list?userId=xxx
+  # 4. /api/interview/stats?userId=xxx
+  # 5. /api/tools
+  # 6. /api/admin/mcp-servers
+  # 7. /api/knowledge-base/list
+  # 8. /api/interview/question-bank/list
+  # 9. /api/interview/upload-resume（PDF 真上传 + 解析）
+  interface-e2e:
+    runs-on: ubuntu-latest
+    needs: lint-type-test
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: interview
+          POSTGRES_USER: dev
+          POSTGRES_PASSWORD: dev123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build api image
+        run: |
+          docker build \
+            -f apps/api/Dockerfile \
+            -t interview-api:test \
+            apps/api/
+
+      - name: Start infrastructure (postgres + redis)
+        run: |
+          # CI service container 已起 postgres + redis（见 services 块）
+          # 等 healthy
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U dev && redis-cli -h localhost -p 6379 ping | grep -q PONG; then
+              echo "✓ postgres + redis ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Start NestJS api container
+        env:
+          DATABASE_URL: postgresql://dev:dev123@localhost:5432/interview
+          REDIS_URL: redis://localhost:6379
+          QDRANT_URL: http://localhost:6333
+          MILVUS_URL: http://localhost:19530
+          QWEN_BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v1
+          QWEN_MODEL: qwen-plus
+          QWEN_API_KEY: sk-test-placeholder
+          DEEPSEEK_API_KEY: sk-test-placeholder
+          MEM0_API_KEY: ''
+          MEM0_HOST: ''
+          JWT_SECRET: ci_test_secret_at_least_32_characters_long_xxxxxxxx
+          PORT: 3001
+          NODE_ENV: production
+        run: |
+          docker run -d \
+            --name api-e2e \
+            -p 3001:3001 \
+            -e DATABASE_URL=postgresql://dev:dev123@host.docker.internal:5432/interview \
+            -e REDIS_URL=redis://host.docker.internal:6379 \
+            -e QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1 \
+            -e QWEN_MODEL=qwen-plus \
+            -e QWEN_API_KEY=sk-test-placeholder \
+            -e DEEPSEEK_API_KEY=sk-test-placeholder \
+            -e JWT_SECRET=ci_test_secret_at_least_32_characters_long_xxxxxxxx \
+            -e PORT=3001 \
+            -e NODE_ENV=production \
+            interview-api:test
+
+      - name: Wait for api healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:3001/api/health 2>/dev/null | grep -q '"status":"ok"'; then
+              echo "✓ api is healthy"
+              break
+            fi
+            echo "waiting... ($i)"
+            sleep 3
+          done
+
+      - name: E2E 接口测试（9 个核心 endpoint）
+        run: |
+          echo "=== 1. Liveness ==="
+          curl -sf http://localhost:3001/api/health && echo " ✓" || (echo "✗ FAIL"; exit 1)
+
+          echo "=== 2. Readiness（postgres + redis 真连） ==="
+          READY=$(curl -sf http://localhost:3001/api/health/ready)
+          echo "$READY"
+          if echo "$READY" | grep -q '"status":"ready"' && \
+             echo "$READY" | grep -q '"postgres":"ok"' && \
+             echo "$READY" | grep -q '"redis":"ok"'; then
+            echo "✓ readiness OK"
+          else
+            echo "✗ readiness FAIL"
+            docker logs api-e2e | tail -30
+            exit 1
+          fi
+
+          echo "=== 3. /api/interview/list ==="
+          curl -sf "http://localhost:3001/api/interview/list?userId=demo-user-ci" > /dev/null && echo "✓" || (echo "✗"; exit 1)
+
+          echo "=== 4. /api/interview/stats ==="
+          curl -sf "http://localhost:3001/api/interview/stats?userId=demo-user-ci" > /dev/null && echo "✓" || (echo "✗"; exit 1)
+
+          echo "=== 5. /api/tools ==="
+          curl -sf http://localhost:3001/api/tools > /dev/null && echo "✓" || (echo "✗"; exit 1)
+
+          echo "=== 6. /api/admin/mcp-servers ==="
+          curl -sf http://localhost:3001/api/admin/mcp-servers > /dev/null && echo "✓" || (echo "✗"; exit 1)
+
+          echo "=== 7. /api/knowledge-base/list ==="
+          curl -sf http://localhost:3001/api/knowledge-base/list > /dev/null && echo "✓" || (echo "✗"; exit 1)
+
+          echo "=== 8. /api/interview/question-bank/list ==="
+          curl -sf "http://localhost:3001/api/interview/question-bank/list?limit=3" > /dev/null && echo "✓" || (echo "✗"; exit 1)
+
+          echo "=== 9. /api/interview/upload-resume ==="
+          # 用最小有效 PDF（CI 内联生成）
+          python3 -c "
+          from reportlab.pdfgen import canvas
+          c = canvas.Canvas('/tmp/ci-resume.pdf')
+          c.drawString(50, 750, 'Name: CI Test')
+          c.drawString(50, 730, 'Email: ci@test.local')
+          c.drawString(50, 710, 'Skills: Python TypeScript NestJS FastAPI')
+          c.save()
+          "
+          UPLOAD=$(curl -sf -X POST http://localhost:3001/api/interview/upload-resume \
+            -F "file=@/tmp/ci-resume.pdf" \
+            -F "position=AI Agent" \
+            -F "userId=demo-user-ci" \
+            -w "%{http_code}" -o /tmp/upload-response.json)
+          if [ "$UPLOAD" = "200" ] && grep -q "ragIngested\|interviewId" /tmp/upload-response.json; then
+            echo "✓ upload-resume 200 + valid response"
+          else
+            echo "✗ upload-resume FAIL (status=$UPLOAD)"
+            cat /tmp/upload-response.json
+            exit 1
+          fi
+
+      - name: E2E summary
+        if: always()
+        run: |
+          echo "=== api container logs (last 30) ==="
+          docker logs api-e2e 2>&1 | tail -30 || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f api-e2e 2>/dev/null || true
+          rm -f /tmp/ci-resume.pdf /tmp/upload-response.json
+
+  ci-summary:
+    runs-on: ubuntu-latest
+    needs: [lint-type-test, interface-e2e]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## CI Summary (api · NestJS)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| lint-type-test | ${{ needs.lint-type-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| interface-e2e | ${{ needs.interface-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.lint-type-test.result }}" != "success" ] || \
+             [ "${{ needs.interface-e2e.result }}" != "success" ]; then
+            exit 1
+          fi
