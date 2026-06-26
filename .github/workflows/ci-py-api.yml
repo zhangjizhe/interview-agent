@@ -127,9 +127,8 @@ jobs:
 
   web-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
+    # pnpm workspace 在 monorepo 根，working-directory 不能切到 apps/web
+    # （否则 pnpm install --frozen-lockfile 找不到 root pnpm-lock.yaml）
     steps:
       - uses: actions/checkout@v4
 
@@ -137,16 +136,17 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - uses: pnpm/action-setup@v3
         with:
-          version: 8
+          version: 9
 
-      - name: Install dependencies
+      - name: Install dependencies (monorepo root)
         run: pnpm install --frozen-lockfile
 
-      - name: Vitest (59 case)
-        run: pnpm exec vitest run --reporter=verbose
+      - name: Vitest (59 case, @interview-agent/web)
+        run: pnpm --filter @interview-agent/web exec vitest run --reporter=verbose
 
   ci-summary:
     runs-on: ubuntu-latest

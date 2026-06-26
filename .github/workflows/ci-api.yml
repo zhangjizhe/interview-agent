@@ -33,17 +33,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: 'npm'
+          cache-dependency-path: 'apps/api/package-lock.json'
 
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 9
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install dependencies (npm)
+        run: npm ci
 
       - name: ESLint
-        run: pnpm run lint --if-present || echo "⚠️ lint not configured, skipping"
+        run: npm run lint --if-present || echo "⚠️ lint not configured, skipping"
 
       - name: TypeScript (tsc --noEmit)
         # 严格类型检查；渐进式收紧，0 error 阻塞
@@ -54,7 +51,7 @@ jobs:
           fi
 
       - name: Jest (203 case)
-        run: pnpm test --ci
+        run: npx jest --ci
 
   # 接口 E2E 测试（2026-06-26 用户要求：readiness + 接口端到端）
   # 启 docker compose（NestJS + postgres + redis），验证：
