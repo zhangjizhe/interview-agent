@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
-def _make_oss_mem0() -> "Mem0Memory":  # type: ignore
+def _make_oss_mem0() -> "Mem0Memory":  # type: ignore  # noqa: F821
     """构造 OSS mode Mem0Memory 实例（host only，无 api_key）"""
     from app.memory.mem0_memory import Mem0Memory
     m = Mem0Memory(api_key="", host="http://localhost:8888")

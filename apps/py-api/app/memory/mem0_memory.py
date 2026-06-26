@@ -8,7 +8,7 @@ P0-1 修复：
 - 加 structlog 上报 error
 - 兜底用空字符串（cloud 强依赖 OSS 字段）
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 import httpx
 import structlog
 
@@ -142,11 +142,6 @@ class Mem0Memory:
         except httpx.HTTPError as e:
             logger.error("mem0_search_http_error", user_id=user_id, error=str(e))
             raise Mem0APIError(f"Mem0 search network error: {e}") from e
-
-
-class Mem0APIError(Exception):
-    """Mem0 API 调用失败（HTTP 4xx/5xx 或网络错误）"""
-    pass
 
 
 class Mem0APIError(Exception):

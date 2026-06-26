@@ -13,7 +13,6 @@ Milvus filter 表达式支持的特殊字符：
 对齐 NestJS 版 apps/api/src/shared/escape-milvus.util.ts。
 """
 
-import re
 
 
 def escape_milvus_string(value: str) -> str:

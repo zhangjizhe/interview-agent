@@ -1,5 +1,4 @@
 """Supervisor 节点：意图分类（interview vs general_qa）"""
-from langchain_core.messages import SystemMessage, HumanMessage
 
 
 SUPERVISOR_PROMPT = """你是面试 Agent 调度员。判断用户意图：

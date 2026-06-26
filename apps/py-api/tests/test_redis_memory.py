@@ -6,7 +6,6 @@
 - L2 message 累积顺序
 """
 import pytest
-import json
 
 
 @pytest.mark.asyncio

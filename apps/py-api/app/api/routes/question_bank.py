@@ -20,7 +20,7 @@ Knowledge Base（本地 KB 文件，142 items）：
 import json
 import uuid
 from pathlib import Path
-from typing import Optional, List
+from typing import List
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 import structlog

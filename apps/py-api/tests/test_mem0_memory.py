@@ -66,7 +66,7 @@ async def test_mem0_search_payload_format():
 
     with patch.object(httpx.AsyncClient, "post", new_callable=AsyncMock) as mock_post:
         mock_post.return_value = mock_resp
-        results = await m.search(user_id="user-123", query="LangGraph", limit=3)
+        await m.search(user_id="user-123", query="LangGraph", limit=3)
         # 检查 payload
         call_kwargs = mock_post.call_args.kwargs
         assert "json" in call_kwargs

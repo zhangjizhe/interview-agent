@@ -1,5 +1,4 @@
 """test_auth.py · /api/auth/login JWT 登录"""
-import pytest
 
 
 def test_login_returns_valid_jwt(client):

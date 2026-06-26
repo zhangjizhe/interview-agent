@@ -19,8 +19,7 @@ Vitals + HITL + Empty-rooms（3 个）：
 10. GET  /api/interview/empty-rooms?userId&idleMinutes → {emptyRooms, count}
 """
 import time
-from datetime import datetime, timezone
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 import structlog

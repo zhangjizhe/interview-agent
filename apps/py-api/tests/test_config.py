@@ -10,7 +10,6 @@
 - SettingsValidationError 启动前 sys.exit(1)
 """
 import pytest
-import os
 
 
 def test_dev_default_ok(monkeypatch):

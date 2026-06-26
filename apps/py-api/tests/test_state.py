@@ -1,5 +1,4 @@
 """test_state.py · create_initial_state user_id + user_role 注入（P1-6 + P1-10 修复）"""
-import pytest
 
 
 def test_create_initial_state_with_user_id():

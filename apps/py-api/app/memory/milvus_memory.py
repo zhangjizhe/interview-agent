@@ -11,8 +11,7 @@ from pymilvus import connections, Collection, FieldSchema, CollectionSchema, Dat
 from typing import List, Optional
 import structlog
 
-from app.shared.escape_milvus import build_milvus_eq, build_milvus_in
-from app.core.exceptions import ExternalServiceError
+from app.shared.escape_milvus import build_milvus_eq
 
 logger = structlog.get_logger(__name__)
 

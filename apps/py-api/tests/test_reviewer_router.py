@@ -7,7 +7,6 @@ verdict 字段由 reviewer_node 写入：
 
 hitl_pending 仍是最短路径（最高优先级）。
 """
-import pytest
 
 
 def test_reviewer_router_hitl_pending_goes_to_hitl():

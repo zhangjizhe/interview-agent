@@ -16,9 +16,8 @@ import json
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File, Form
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 import structlog
 
 from app.db.session import get_db as get_session
@@ -78,7 +77,6 @@ async def upload_resume(
     rag_ingested = False
     if userId:
         try:
-            from app.memory.milvus_memory import MilvusMemory
             milvus = request.app.state.milvus_mem
             if milvus and milvus.connected:
                 await milvus.insert_resume(

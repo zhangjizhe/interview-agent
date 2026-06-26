@@ -8,8 +8,7 @@
 - /stream graph 异常 → error event + [DONE]
 - /start graph not initialized → 503
 """
-from unittest.mock import AsyncMock, MagicMock
-import pytest
+from unittest.mock import AsyncMock
 import json
 
 

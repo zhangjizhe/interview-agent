@@ -1,5 +1,5 @@
 """Auth 路由（JWT，对齐 NestJS AuthModule）"""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from jose import jwt

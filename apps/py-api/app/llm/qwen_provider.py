@@ -15,9 +15,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
-    before_sleep_log,
 )
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 from app.core.exceptions import ExternalServiceError
 from app.core.metrics import record_llm_call

@@ -36,8 +36,6 @@ from app.core.exceptions import AppError
 from app.core.rate_limit import (
     limiter,
     rate_limit_exceeded_handler,
-    HEALTH_LIMIT,
-    AUTH_LIMIT,
 )
 from app.core.metrics import prometheus_middleware
 from slowapi.errors import RateLimitExceeded

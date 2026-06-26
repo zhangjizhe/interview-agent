@@ -21,7 +21,6 @@ from typing import Optional, List, AsyncGenerator
 import json
 import structlog
 from langchain_core.callbacks import AsyncCallbackHandler
-from slowapi import Limiter
 
 from app.agents.state import create_initial_state
 from app.core.rate_limit import limiter, INTERVIEW_START_LIMIT, INTERVIEW_STREAM_LIMIT
@@ -104,7 +103,6 @@ def _build_state_for_interview(interview, resume, user_id: str, user_message: st
 
     用于 /api/interview/{id}/message（resume 解析后的 state）
     """
-    from langchain_core.messages import HumanMessage, AIMessage
     from app.agents.state import create_initial_state
 
     state = create_initial_state(

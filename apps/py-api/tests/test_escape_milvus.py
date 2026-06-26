@@ -155,7 +155,6 @@ def test_redis_get_messages_chronological():
     async def get_chrono():
         return await rm.get_messages_chronological("s1", limit=10)
 
-    import asyncio
     messages = asyncio.run(get_chrono())
     # 应该反转：oldest first
     assert messages[0]["content"] == "msg1-oldest"

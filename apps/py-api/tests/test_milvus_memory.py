@@ -6,7 +6,6 @@
 - 默认 port 19530
 - collection 字段定义
 """
-import pytest
 
 
 def test_milvus_urlparse_standard():

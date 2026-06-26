@@ -6,8 +6,7 @@
 - /api/health/ready 503（Redis ping 失败）
 - /api/health/ready 503（Milvus 未连）
 """
-import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 
 def test_health_liveness_always_ok(client):

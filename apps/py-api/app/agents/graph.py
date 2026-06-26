@@ -17,7 +17,7 @@ LangGraph v0.5 多 Agent 拓扑（对齐 NestJS graph.ts）
 from typing import Literal
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.types import interrupt, Command
+from langgraph.types import interrupt
 
 from app.agents.state import InterviewAgentState
 from app.agents.nodes.supervisor import supervisor_node, supervisor_router
