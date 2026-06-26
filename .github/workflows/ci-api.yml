@@ -99,11 +99,12 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build api image
+        # context 必须是 monorepo 根（apps/api/Dockerfile 假设能 COPY pnpm-workspace.yaml + monorepo 文件）
         run: |
           docker build \
             -f apps/api/Dockerfile \
             -t interview-api:test \
-            apps/api/
+            .
 
       - name: Start infrastructure (postgres + redis)
         run: |
