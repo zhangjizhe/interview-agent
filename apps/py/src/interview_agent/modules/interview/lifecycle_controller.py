@@ -394,6 +394,180 @@ async def delete_interview(
 metrics_router = APIRouter(prefix="/metrics", tags=["metrics"])
 
 
+# ============================================================
+# Admin MCP Servers — 与 NestJS admin-mcp.controller.ts 对齐
+# ============================================================
+
+admin_mcp_router = APIRouter(prefix="/admin/mcp-servers", tags=["admin-mcp"])
+
+
+@admin_mcp_router.get("")
+async def list_mcp_servers() -> dict:
+    """列出所有 MCP server + 状态（admin 工具页用）。
+
+    对齐 NestJS AdminMcpController.list：
+    - servers: [{name, status: running|builtin|stopped, ...}]
+    - count: int
+    - runningCount: servers 中 status 为 running 或 builtin 的数量
+    """
+    from interview_agent.modules.mcp.mcp_registry import McpRegistry, register_builtin_tools
+    register_builtin_tools()
+    registry = McpRegistry.instance()
+    tools = registry.list_tools()
+    # 转换 schema：NestJS 返回 {name, status: 'builtin'/'running', enabled, description, ...}
+    # Python list_tools 返回 {name, description, enabled}，无 status 字段 → 全部标 builtin
+    servers = [
+        {
+            "name": t["name"],
+            "description": t["description"],
+            "enabled": t["enabled"],
+            "status": "builtin",  # Python 端所有工具都是 builtin
+            "transport": "builtin",
+        }
+        for t in tools
+    ]
+    return {
+        "servers": servers,
+        "count": len(servers),
+        "runningCount": len(servers),  # 全 builtin = 全 running
+    }
+
+
+@admin_mcp_router.post("/toggle")
+async def toggle_mcp_server(body: dict) -> dict:
+    """切换 MCP 工具系统级启停。
+
+    Body: {toolName: str, enabled: bool}
+    """
+    from interview_agent.modules.mcp.mcp_registry import McpRegistry, register_builtin_tools
+    tool_name = body.get("toolName")
+    enabled = body.get("enabled")
+    if not tool_name or not isinstance(enabled, bool):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="toolName, enabled required")
+    register_builtin_tools()
+    registry = McpRegistry.instance()
+    tool = registry.get_tool(tool_name)
+    if not tool:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=f"Unknown tool: {tool_name}")
+    if enabled:
+        registry.enable(tool_name)
+    else:
+        registry.disable(tool_name)
+    return {"ok": True, "toolName": tool_name, "enabled": enabled}
+
+
+@admin_mcp_router.get("/{name}/health")
+async def mcp_server_health(name: str) -> dict:
+    """单个 MCP server 健康检查。
+
+    对齐 NestJS McpRegistry.healthCheck(name)：
+    - 找到 tool → 检查 enabled + 跑测试 ping
+    - 找不到 → {status: 'unknown'}
+    """
+    from interview_agent.modules.mcp.mcp_registry import McpRegistry, register_builtin_tools
+    register_builtin_tools()
+    registry = McpRegistry.instance()
+    tool = registry.get_tool(name)
+    if not tool:
+        return {"name": name, "status": "unknown", "message": "tool not found"}
+    if not tool.enabled:
+        return {"name": name, "status": "stopped", "enabled": False}
+    # Python 端无法真正"健康检查"（不连外部 MCP），仅返 enabled 状态
+    return {"name": name, "status": "builtin", "enabled": True, "message": "always available"}
+
+
+@admin_mcp_router.post("/reload")
+async def reload_mcp_config() -> dict:
+    """重新加载 MCP config（无需重启 API）。
+
+    Python 端无外部 MCP config，always return ok。
+    """
+    return {"ok": True, "loaded": 0, "errors": []}
+
+
+# ============================================================
+# Question Bank — 与 NestJS question-bank.controller.ts 对齐
+# ============================================================
+
+question_bank_router = APIRouter(prefix="/interview", tags=["question-bank"])
+
+
+@question_bank_router.get("/question-bank/list")
+async def question_bank_list(
+    position: str | None = Query(default=None),
+    limit: str | None = Query(default=None),
+) -> dict:
+    """题库列表（前端 /question-bank 页用）。
+
+    对齐 NestJS QuestionBankController.listQuestionBank。
+    返回所有内置题库（5 领域 14 题），可按 position 过滤。
+    """
+    from interview_agent.modules.knowledge_base.knowledge_banks import (
+        get_question_bank,
+        list_all_domains,
+    )
+    domains = list_all_domains()
+    all_questions = []
+    for d in domains:
+        for q in get_question_bank(d):
+            item = {
+                "id": q["id"],
+                "position": d,
+                "level": "P5",
+                "category": q["category"],
+                "question": q["question"],
+                "answer": "",  # 内置题库不存答案
+                "tags": q.get("tags", []),
+                "difficulty": q["difficulty"],
+            }
+            if position is None or item["position"] == position:
+                all_questions.append(item)
+
+    limit_int = int(limit) if limit else 20
+    results = all_questions[:limit_int]
+    return {"position": position, "results": results, "count": len(results)}
+
+
+# ============================================================
+# Knowledge Base List — 与 NestJS knowledge-base.controller.ts 对齐
+# ============================================================
+
+kb_list_router = APIRouter(prefix="/knowledge-base", tags=["knowledge-base"])
+
+
+@kb_list_router.get("/list")
+async def knowledge_base_list(
+    limit: str | None = Query(default=None),
+    topic: str | None = Query(default=None),
+) -> dict:
+    """知识库列表（前端 QuestionBank 页用）。
+
+    对齐 NestJS KnowledgeBaseController.listAll。
+    """
+    from interview_agent.modules.knowledge_base.knowledge_banks import (
+        get_question_bank,
+        list_all_domains,
+    )
+    domains = list_all_domains()
+    items = []
+    for d in domains:
+        if topic and d != topic:
+            continue
+        for q in get_question_bank(d):
+            items.append({
+                "id": q["id"],
+                "topic": d,
+                "title": q["question"][:50],
+                "body": q["question"],
+                "tags": q.get("tags", []),
+                "category": q["category"],
+            })
+    limit_int = int(limit) if limit else 50
+    return {"items": items[:limit_int], "total": len(items)}
+
+
 class VitalMetric(BaseModel):
     name: str
     value: float
