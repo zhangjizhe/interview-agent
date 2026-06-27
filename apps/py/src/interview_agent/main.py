@@ -36,11 +36,15 @@ from interview_agent.modules.interview.interview_controller import (
     router as interview_router,
 )
 from interview_agent.modules.interview.lifecycle_controller import (
-    admin_mcp_router,
     kb_list_router,
     lifecycle_router,
     metrics_router,
     question_bank_router,
+)
+from interview_agent.modules.mcp.mcp_controller import (
+    admin_mcp_servers_router,
+    mcp_admin_router,
+    tools_router,
 )
 from interview_agent.modules.knowledge_base.knowledge_base_controller import (
     router as kb_router,
@@ -140,7 +144,7 @@ app.include_router(interview_router, prefix="/api/interview", tags=["interview"]
 # Lifecycle 静态路由（list/stats/empty-rooms/memories）必须在动态 :id 之前注册
 app.include_router(lifecycle_router, prefix="/api", tags=["interview-lifecycle"])
 app.include_router(metrics_router, prefix="/api", tags=["metrics"])
-app.include_router(admin_mcp_router, prefix="/api", tags=["admin-mcp"])
+app.include_router(admin_mcp_servers_router, prefix="/api", tags=["admin-mcp-servers"])
 # question-bank 静态路由必须在前（与 NestJS 路由顺序保证一致）
 app.include_router(question_bank_router, prefix="/api", tags=["question-bank"])
 app.include_router(kb_list_router, prefix="/api", tags=["knowledge-base"])
