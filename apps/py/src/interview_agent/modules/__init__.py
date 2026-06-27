@@ -1,0 +1,1 @@
+"""Modules package — 业务模块（与 NestJS modules/ 1:1 对齐）。"""

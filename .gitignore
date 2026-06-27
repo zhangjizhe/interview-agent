@@ -65,3 +65,19 @@ scripts/clean-ebook.py
 
 # 第三方 vendor 源码（不随仓库分发，改用 image 拉取）
 docker/mem0/
+
+# Python 后端（apps/py/）
+apps/py/__pycache__/
+apps/py/**/__pycache__/
+apps/py/.venv/
+apps/py/venv/
+apps/py/.pytest_cache/
+apps/py/.mypy_cache/
+apps/py/*.egg-info/
+apps/py/dist/
+apps/py/build/
+apps/py/.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

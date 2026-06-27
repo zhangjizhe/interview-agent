@@ -1,0 +1,1 @@
+"""Common package — 跨模块公共工具。"""
