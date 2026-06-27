@@ -25,9 +25,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # 先装依赖（利用 Docker layer cache）
 COPY apps/py/pyproject.toml apps/py/README.md ./
+# 创建空 src/ 让 setuptools egg_info 跑通
+RUN mkdir -p src/interview_agent && touch src/interview_agent/__init__.py
 RUN pip install --upgrade pip && pip install .
 
-# 拷贝源码
+# 拷贝源码（覆盖 setuptools 安装的 stub）
 COPY apps/py/src ./src
 COPY apps/py/alembic ./alembic
 COPY apps/py/alembic.ini ./

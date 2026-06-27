@@ -35,6 +35,10 @@ from interview_agent.modules.interview.interview_controller import (
     hitl_router,
     router as interview_router,
 )
+from interview_agent.modules.interview.lifecycle_controller import (
+    lifecycle_router,
+    metrics_router,
+)
 from interview_agent.modules.knowledge_base.knowledge_base_controller import (
     router as kb_router,
 )
@@ -109,10 +113,30 @@ async def rate_limit_handler(request, exc):
 # /health + /health/ready 不在 /api 下
 app.include_router(health_router)
 
+
+# /api/health + /api/health/ready — 与 NestJS setGlobalPrefix('api') 像素级对齐
+# NestJS HealthController 路径是 /health，前端 nginx 反代后会变 /api/health。
+# 前端代码可能直接调 /api/health，所以同时暴露这两条路径。
+@app.get("/api/health")
+async def api_health() -> dict:
+    """Alias for /health（与 NestJS setGlobalPrefix('api') 等价）。"""
+    from datetime import datetime, timezone
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/api/health/ready")
+async def api_health_ready():
+    """Alias for /health/ready。"""
+    from interview_agent.api.health import readiness
+    return await readiness()
+
 # 业务路由统一 /api 前缀
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(user_router, prefix="/api/user", tags=["user"])
 app.include_router(interview_router, prefix="/api/interview", tags=["interview"])
+# Lifecycle 静态路由（list/stats/empty-rooms/memories）必须在动态 :id 之前注册
+app.include_router(lifecycle_router, prefix="/api", tags=["interview-lifecycle"])
+app.include_router(metrics_router, prefix="/api", tags=["metrics"])
 app.include_router(hitl_router, prefix="/api/hitl", tags=["hitl"])
 app.include_router(cost_router, prefix="/api", tags=["cost"])
 app.include_router(tools_router, prefix="/api/tools", tags=["tools"])
