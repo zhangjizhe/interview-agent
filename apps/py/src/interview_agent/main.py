@@ -80,7 +80,9 @@ async def lifespan(app: FastAPI):
     # 初始化 MCP 内置工具
     from interview_agent.modules.mcp.mcp_registry import register_builtin_tools
     register_builtin_tools()
-    logger.info("✅ MCP 3 builtin tools registered (bocha_search / memory_recall / knowledge_bank)")
+    from interview_agent.modules.mcp.mcp_registry import McpRegistry
+    n_tools = len(McpRegistry.instance().list())
+    logger.info(f"✅ MCP {n_tools} builtin tools registered (bocha_search / memory_recall / knowledge_bank + 6 mcp)")
 
     yield
 
