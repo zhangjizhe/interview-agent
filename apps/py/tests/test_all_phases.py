@@ -53,10 +53,12 @@ class TestP1Health:
         assert r.status_code == 200
         assert r.json()["name"] == "interview-agent-py"
 
-    def test_api_health_404(self, client):
-        """Pixel-level alignment: /health 不在 /api 下。"""
+    def test_api_health_alias(self, client):
+        """Pixel-level alignment: /api/health 是 /health 的 alias（NestJS setGlobalPrefix('api') 把 health 也加前缀）。"""
         r = client.get("/api/health")
-        assert r.status_code == 404
+        assert r.status_code == 200
+        assert r.json()["status"] == "ok"
+        assert "timestamp" in r.json()
 
 
 # ============================================================
