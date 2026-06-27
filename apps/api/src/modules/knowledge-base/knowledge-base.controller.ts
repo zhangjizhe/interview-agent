@@ -9,7 +9,16 @@
  *  - POST /api/knowledge-base/benchmark （跑召回率 benchmark）
  */
 
-import { Controller, Get, Post, Query, Param, Logger, Body } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Param,
+  Logger,
+  Body,
+} from '@nestjs/common';
 import { KnowledgeBaseService, KnowledgeSearchHit } from './knowledge-base.service';
 
 interface DebugInfo {
@@ -110,8 +119,10 @@ export class KnowledgeBaseController {
     tags?: string[];
     number?: number;
   }) {
+    // 2026-06-28 fix：原代码 return {success:false} (HTTP 200) 违反 REST 约定。
+    // 改成 BadRequestException 让客户端能正确处理 4xx 错误。
     if (!body.title || !body.body) {
-      return { success: false, message: 'title 和 body 必填' };
+      throw new BadRequestException('title 和 body 必填');
     }
     const id = `manual-${Date.now()}`;
     const item = {
