@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { Clock, FileText, ChevronRight, Plus, BarChart3, X, Cpu, Sparkles, Upload, CheckCircle2, Loader2 } from 'lucide-react';
 import type { McpToolMeta } from '@interview-agent/shared-types';
 import { safeJson } from '../utils/safeJson';
 import { useAuth } from '../hooks/useAuth';
+import { InterviewRowSkeleton } from '../components/ui/Skeleton';
 
 // 默认岗位改为「前端开发工程师」—— 更符合通用 demo 直觉
 // （之前默认是 AI Agent 工程师，会让用户误以为选了"前端"但实际是 agent）
@@ -67,7 +68,7 @@ export function HomePage() {
     }
   };
 
-  const { data: interviews = [] } = useQuery({
+  const { data: interviews = [], isLoading: interviewsLoading, isFetching: interviewsFetching } = useQuery({
     queryKey: ['interviews', userId ?? 'guest'],
     queryFn: async () => {
       const r = await fetch(`/api/interview/list?userId=${userId}`);
@@ -78,6 +79,7 @@ export function HomePage() {
     retry: 3,
     staleTime: 0,
     refetchOnMount: 'always',
+    placeholderData: keepPreviousData,  // R-AUTH-6: 切回路由时保留旧数据，避免闪空
     enabled: !!userId,
   });
 
@@ -95,6 +97,7 @@ export function HomePage() {
     retry: 3,
     staleTime: 0,
     refetchOnMount: 'always',
+    placeholderData: keepPreviousData,  // R-AUTH-6: 切回路由时保留旧数据
     enabled: !!userId,
   });
 
@@ -113,6 +116,7 @@ export function HomePage() {
     },
     refetchInterval: 30000,
     staleTime: 0,  // 强制每次 mount 重取（防 stale cache）
+    placeholderData: keepPreviousData,  // R-AUTH-6
   });
 
   // 空面试（30min 无对话）：首页弹窗提醒
@@ -124,6 +128,7 @@ export function HomePage() {
       return safeJson(r) as Promise<{ emptyRooms: EmptyRoom[]; count: number }>;
     },
     refetchInterval: 60000, // 每分钟查一次
+    placeholderData: keepPreviousData,  // R-AUTH-6
     enabled: !!userId,
   });
   const [dismissedEmpty, setDismissedEmpty] = useState<Set<string>>(new Set());
@@ -365,7 +370,19 @@ export function HomePage() {
           </button>
         </div>
 
-        {interviews.length === 0 ? (
+        {/* R-AUTH-6 fix (2026-06-29): 修复"stats 显示 13 但列表空态"的 bug
+            原因：useQuery refetch 是异步的，从 /interview/:id 切回 / 时，
+                  React Query 用 cache 中的旧数据（空数组）立即渲染空态，
+                  而 /api/interview/list 还在 fetch 中。
+            修复：loading/fetching + 空数据 → 显示骨架（不是空态）
+                  只有 fetch 完成且真的为空 → 才显示"还没有面试记录" */}
+        {interviewsLoading || (interviewsFetching && interviews.length === 0) ? (
+          <div className="divide-y divide-slate-100">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <InterviewRowSkeleton key={i} />
+            ))}
+          </div>
+        ) : interviews.length === 0 ? (
           <div className="px-6 py-12 md:py-16 text-center">
             <div className="text-5xl mb-3">🤖</div>
             <p className="text-slate-600 mb-4">还没有面试记录，开始你的第一场吧</p>
