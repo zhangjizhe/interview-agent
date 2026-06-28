@@ -131,8 +131,14 @@ class TestP3LLMGateway:
         status = gateway.list_status()
         assert "qwen" in status
         assert "deepseek" in status
-        # 占位 key → mock
-        assert status["qwen"]["isMock"] is True
+        # 商用部署 → 真 LLM（2026-06-28：QWEN_API_KEY 是真 key，不再 mock）
+        # 旧断言（placeholder 时代）：assert status["qwen"]["isMock"] is True
+        # 新断言：真 key 时必须 isMock=False，商用 fail-fast 设计
+        assert status["qwen"]["isMock"] is False, (
+            "QWEN_API_KEY is real key (35 chars) but gateway reports mock. "
+            "Check _is_placeholder_key() threshold or .env loading."
+        )
+        assert status["deepseek"]["isMock"] is False
 
     @pytest.mark.asyncio
     async def test_chat_mock(self):
@@ -661,15 +667,26 @@ class TestP10MCP:
         assert names == expected, f"got {names}"
 
     @pytest.mark.asyncio
-    async def test_bocha_mock(self):
-        """无 BOCHA_API_KEY → mock。"""
+    async def test_bocha_mock(self, monkeypatch):
+        """BOCHA 工具 mock 降级路径（2026-06-28：monkeypatch settings 测 mock 降级）。
+
+        bocha_search_handler 直接读 settings.BOCHA_API_KEY，要 patch settings instance。
+        Settings 是 @lru_cache 单例，monkeypatch.setattr 在单例 instance 上即可。
+        """
+        from interview_agent.config import get_settings
         from interview_agent.modules.mcp.mcp_registry import (
             register_builtin_tools,
             McpRegistry,
         )
+
+        settings = get_settings()
+        # 清空 BOCHA_API_KEY + BASE_URL 触发 mock 降级（monkeypatch 退出时自动还原）
+        monkeypatch.setattr(settings, "BOCHA_API_KEY", "")
+        monkeypatch.setattr(settings, "BOCHA_BASE_URL", "")
+
         register_builtin_tools()
         result = await McpRegistry.instance().call("bocha_search", query="test")
-        assert result["mock"] is True
+        assert result.get("mock") is True, f"expected mock fallback, got {result}"
 
     @pytest.mark.asyncio
     async def test_memory_recall(self):

@@ -43,6 +43,11 @@ async def supervisor_node(
     """Supervisor：分类用户意图，决定路由到 planner 还是 respond_directly。
 
     简化实现：基于关键词的快速分类（真 NestJS 用 LLM withStructuredOutput）。
+
+    关键改进（2026-06-28）：
+    - state.messages 只有 1 条 user 消息 + 简历已确认 → 必然是 mock_interview 第一题
+      （用户面试时第一句"开始吧"/"你好"等都是开场触发）
+    - 用 previous_user_messages 数判断 first turn
     """
     last_user_msg = next(
         (m for m in reversed(state.messages) if m.get("role") == "user"),
@@ -50,8 +55,15 @@ async def supervisor_node(
     )
     content = (last_user_msg or {}).get("content", "").lower()
 
-    # 关键词快速分类
-    if any(kw in content for kw in ["面试", "interview", "mock"]):
+    # 数用户消息数（排除第一句开场）
+    user_msg_count = sum(1 for m in state.messages if m.get("role") == "user")
+
+    # First turn：用户第一条消息（"开始吧"/"你好"/"开始面试"等）必然是 mock_interview
+    # 因为前端确认完简历后才调 /message，第一句就是面试开场
+    if user_msg_count == 1:
+        intent = "mock_interview"
+        next_node = "planner"
+    elif any(kw in content for kw in ["面试", "interview", "mock"]):
         intent = "mock_interview"
         next_node = "planner"
     elif any(kw in content for kw in ["简历", "resume"]):
@@ -64,7 +76,7 @@ async def supervisor_node(
         intent = "general_qa"
         next_node = "respond_directly"
 
-    logger.info(f"supervisor: intent={intent}, next={next_node}")
+    logger.info(f"supervisor: intent={intent}, next={next_node}, user_msg_count={user_msg_count}")
     return {"user_intent": intent, "_next": next_node}
 
 
@@ -433,12 +445,18 @@ async def run_graph_streaming(
     """
     # 这里简化：yield step 事件 + final_response
     yield {"type": "step", "node": "supervisor"}
+    yield {"type": "thinking", "content": "正在分析你的意图（supervisor 节点）..."}
     r = await supervisor_node(state, user_id)
     state.user_intent = r["user_intent"]
     next_node = r["_next"]
+    yield {
+        "type": "thinking",
+        "content": f"意图分类结果：{state.user_intent} → 路由到 {next_node}",
+    }
 
     if next_node == "respond_directly":
         yield {"type": "step", "node": "respond_directly"}
+        yield {"type": "thinking", "content": "直接调用 LLM 回复（不走 plan 流程）..."}
         r = await respond_directly_node(state, interview_id, user_id)
         # 流式 yield response token
         for char in (r["final_response"] or ""):
@@ -448,15 +466,22 @@ async def run_graph_streaming(
         return
 
     yield {"type": "step", "node": "planner"}
+    yield {"type": "thinking", "content": "规划面试流程：从知识库抽题 + 匹配简历技能..."}
     r = await planner_node(state, interview_id, user_id)
     state.plan = r["plan"]
     state.current_step_idx = r["current_step_idx"]
+    yield {
+        "type": "thinking",
+        "content": f"已规划 {len(state.plan or [])} 步计划",
+    }
 
     yield {"type": "step", "node": "executor"}
+    yield {"type": "thinking", "content": "执行中：调用 LLM 生成追问 / 调 MCP 工具查资料..."}
     r = await executor_node(state, interview_id, user_id)
     state.current_step_idx = r["current_step_idx"]
 
     yield {"type": "step", "node": "replanner"}
+    yield {"type": "thinking", "content": "评估是否需要调整计划..."}
     r = await replanner_node(state)
     if "final_response" in r:
         state.final_response = r["final_response"]
@@ -464,6 +489,7 @@ async def run_graph_streaming(
         state.retry_count = r["retry_count"]
 
     yield {"type": "step", "node": "reviewer"}
+    yield {"type": "thinking", "content": "审核回答质量 + 决定是否需要 HITL 人工审批..."}
     r = await reviewer_node(state, interview_id)
     state.issue_tags = r.get("issue_tags", [])
     if r["_next"] == "hitl_review":

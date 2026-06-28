@@ -308,6 +308,9 @@ async def interview_message(
                     final_response += event.get("content", "")
                 elif evt_type == "step":
                     yield f"data: {json.dumps({'type': 'step', 'step': event.get('node')})}\n\n"
+                elif evt_type == "thinking":
+                    # 思考过程事件 — 前端 InterviewPage 会显示在 CoT 面板
+                    yield f"data: {json.dumps({'type': 'thinking', 'content': event.get('content', '')})}\n\n"
                 elif evt_type == "final_response":
                     payload = {
                         "type": "final_response",

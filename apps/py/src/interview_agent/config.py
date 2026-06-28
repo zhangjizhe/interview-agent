@@ -1,16 +1,50 @@
 """统一配置 — pydantic-settings 读 .env，与 NestJS @nestjs/config 像素级对齐。
 
 字段命名与 .env.example 完全一致（大小写不敏感，pydantic 会自动归一）。
+
+.env 查找顺序（2026-06-28 fix）：
+  1. $ENV_FILE env var（如显式指定则用它）
+  2. ./apps/py/.env（uvicorn cwd 在 apps/py/ 时用）
+  3. ./.env（项目根，docker compose / 顶层调用时用）
+找到第一个存在的文件就用它；都找不到时 pydantic-settings 走 OS env。
 """
+import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _resolve_env_file() -> str | None:
+    """按优先级解析 .env 路径，返回第一个存在的。
+
+    优先级：
+      1. $ENV_FILE（CI / 显式覆盖用）
+      2. apps/py/.env（uvicorn cwd 习惯）
+      3. .env（项目根）
+
+    ⚠️ 之前只写 env_file=".env" 相对路径，导致 uvicorn 在 apps/py 启动时
+    读不到项目根 .env。改成本函数显式解析 cwd 上下多个候选。
+    """
+    explicit = os.getenv("ENV_FILE")
+    if explicit:
+        return explicit if Path(explicit).exists() else None
+
+    candidates = [
+        Path("apps/py/.env"),  # 嵌套 cwd
+        Path(".env"),          # 项目根
+        Path("../.env"),       # apps/py cwd 看上一层
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c.resolve())
+    return None
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_resolve_env_file(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

@@ -74,6 +74,36 @@ async def lifespan(app: FastAPI):
     logger.info(f"   NODE_ENV: {settings.NODE_ENV}")
     logger.info(f"   AGENT_ENGINE: {settings.AGENT_ENGINE}")
 
+    # ===== Startup fail-fast checks（2026-06-28：防止漏装 / placeholder）=====
+    # 1. openai 包必须可导入（真 LLM 路径需要）
+    try:
+        import openai  # noqa: F401
+        logger.info("✅ openai SDK present")
+    except ImportError:
+        logger.error(
+            "❌ openai SDK missing! Run: cd apps/py && pip install -e .\n"
+            "   (pyproject.toml 已经声明 openai>=1.50.0，但 venv 可能没 sync)"
+        )
+        raise RuntimeError("openai SDK missing — run `pip install -e apps/py`") from None
+
+    # 2. LLM API key 校验（商用 fail-fast）
+    qwen_len = len(settings.QWEN_API_KEY or "")
+    deepseek_len = len(settings.DEEPSEEK_API_KEY or "")
+    if qwen_len < 30 and deepseek_len < 30:
+        logger.error(
+            f"❌ Both QWEN_API_KEY (len={qwen_len}) and DEEPSEEK_API_KEY "
+            f"(len={deepseek_len}) look like placeholders!\n"
+            "   Commercial deploy needs REAL keys (>= 30 chars).\n"
+            "   Edit .env and replace sk-placeholder with real keys from provider console."
+        )
+        raise RuntimeError(
+            "No real LLM API key configured. Set QWEN_API_KEY (>= 30 chars) in .env"
+        )
+    if qwen_len < 30:
+        logger.warning(f"⚠️  QWEN_API_KEY looks like placeholder (len={qwen_len})")
+    if deepseek_len < 30:
+        logger.warning(f"⚠️  DEEPSEEK_API_KEY looks like placeholder (len={deepseek_len})")
+
     # 连接基础设施（fail-fast）
     await init_db()
     logger.info("✅ Postgres connected")
