@@ -17,6 +17,7 @@ import json
 import logging
 import secrets
 from datetime import datetime, timezone
+from json import JSONDecodeError
 from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -32,6 +33,7 @@ from interview_agent.infra.models import (
     AnswerHistory,
     Interview,
     InterviewStatus,
+    Message,
     Report,
 )
 from interview_agent.infra.redis_client import RedisDep
@@ -371,6 +373,18 @@ async def end_interview(
 
     对齐 NestJS：NestJS `@Post(':interviewId/end') endInterview(@Param() string)`
     完全不接 body，行为对齐"前端空 body"。
+
+    ⚠️ 2026-06-28 第二次修复：报告内容改成调真 LLM 生成，不再 hardcoded 编造。
+    之前代码：strengths="候选人在算法和系统设计方面..." 全是占位字符串，
+    违反"严禁编造数据"原则，且用户体验差（每次报告都一样）。
+
+    设计：
+    1. 查 messages 表（按 created_at 升序）拿对话历史
+    2. 拼 prompt（参考 NestJS generateReport 但简化：Python 端没 KB 评分细则工具）
+    3. 调 LlmGateway.chat()（同步版，temperature=0.3 严格评估）
+    4. safe parse JSON（try/except 容错）
+    5. try/catch 兜底：LLM 失败 → fallback 到"评估失败"占位 report，
+       保证 status 仍能切到 COMPLETED（NestJS 同款 try/catch/finally 模式）
     """
     if req is None:
         req = EndInterviewRequest()
@@ -379,7 +393,7 @@ async def end_interview(
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
 
-    # 标记 completed
+    # 标记 completed（先标记，LLM 失败也能保证状态正确，对齐 NestJS）
     interview.status = InterviewStatus.COMPLETED
     # ORM TIMESTAMP WITHOUT TIME ZONE 收到 aware datetime 会报
     # "can't subtract offset-naive and offset-aware" — 转 naive
@@ -387,23 +401,12 @@ async def end_interview(
     if req.summary:
         interview.summary = req.summary
 
-    # 生成 Report
-    report = Report(
-        id=f"r{secrets.token_hex(12)}",
-        interview_id=interview_id,
-        overall_score=req.finalScore or 75,
-        scores={
-            "technical": 80,
-            "communication": 75,
-            "logic": 78,
-        },
-        strengths="候选人在算法和系统设计方面展现扎实基础，回答结构清晰。",
-        weaknesses="边界条件考虑需加强，错误处理可更细致。",
-        suggestions="建议多刷 LeetCode Hard 题 + 学习分布式系统实战案例。",
+    # 调真 LLM 生成报告（带 try/catch 兜底）
+    report = await _generate_report_with_llm(
+        session=session,
+        interview=interview,
+        override_final_score=req.finalScore,
     )
-    session.add(report)
-    await session.commit()
-    await session.refresh(report)
 
     # 关闭 SessionCost
     await get_cost_tracker().end_session(interview_id)
@@ -421,6 +424,211 @@ async def end_interview(
             "suggestions": report.suggestions,
         },
     }
+
+
+async def _generate_report_with_llm(
+    session: AsyncSession,
+    interview: Interview,
+    override_final_score: int | None,
+) -> Report:
+    """调真 LLM 生成面试报告，失败时 fallback 到占位报告。
+
+    设计：
+    1. 查 messages 表（按 created_at 升序）拿对话历史
+    2. 拼 prompt：position + level + conversation + 4 维度 + JSON 格式
+    3. 调 LlmGateway.chat()（同步版，temperature=0.3 严格评估）
+    4. safe parse JSON（try/except 容错）
+    5. LLM 失败 → 写占位 report（保证 status 仍能切到 COMPLETED）
+
+    对齐 NestJS interview-agent.service.ts:435 generateReport + lifecycle.controller.ts:412
+    fallback 模式（保证 report.status=COMPLETED 一致性）。
+    """
+    # 1. 查对话历史
+    msgs_result = await session.execute(
+        select(Message)
+        .where(Message.interview_id == interview.id)
+        .order_by(Message.created_at.asc())
+    )
+    msgs = list(msgs_result.scalars().all())
+
+    if not msgs:
+        # 空对话：直接 fallback（NestJS 同款逻辑 — interview-lifecycle.controller.ts:343
+        # 空 messages 直接删 interview，Python 端先写 fallback report 让 status 落地）
+        logger.warning(
+            f"[end] interview {interview.id} has no messages, using empty report"
+        )
+        return await _build_report(
+            session=session,
+            interview=interview,
+            overall_score=override_final_score or 0,
+            scores={"technical": 0, "communication": 0, "logic": 0, "learning": 0},
+            strengths="（面试无对话记录，无法评估）",
+            weaknesses="（无对话记录）",
+            suggestions="（无对话记录）",
+        )
+
+    # 2. 拼对话历史（截断防止超 token：每条 max 500 chars，总 max 8000 chars）
+    conversation_lines = []
+    total_chars = 0
+    MAX_TOTAL_CHARS = 8000
+    for m in msgs:
+        content = (m.content or "")[:500]
+        line = f"{m.role}: {content}"
+        if total_chars + len(line) > MAX_TOTAL_CHARS:
+            conversation_lines.append("... (对话过长，已截断)")
+            break
+        conversation_lines.append(line)
+        total_chars += len(line)
+    conversation_text = "\n".join(conversation_lines)
+
+    # 3. 拼 prompt
+    prompt = (
+        f"你是一位严格的面试评估 AI。请基于候选人对话评估其表现。\n\n"
+        f"【岗位】{interview.position}（{interview.level}）\n\n"
+        f"【候选人对话】\n{conversation_text}\n\n"
+        f"【评估维度】（每项 0-100）\n"
+        f"1. technical（技术深度）：候选人回答的技术准确性 + 深度\n"
+        f"2. communication（沟通表达）：思路是否清晰、表达是否有条理\n"
+        f"3. logic（逻辑思维）：分析问题是否有层次、推理是否严密\n"
+        f"4. learning（学习能力）：面对追问的反应 + 自我修正能力\n\n"
+        f"【输出格式】严格 JSON，只用 double quotes，无注释，无尾逗号：\n"
+        f"```json\n"
+        f"{{\n"
+        f'  "overallScore": <总分 0-100>,\n'
+        f'  "scores": {{ "technical": <0-100>, "communication": <0-100>, "logic": <0-100>, "learning": <0-100> }},\n'
+        f'  "strengths": ["优点1", "优点2", "优点3"],\n'
+        f'  "weaknesses": ["不足1", "不足2"],\n'
+        f'  "suggestions": ["建议1", "建议2", "建议3"]\n'
+        f"}}\n"
+        f"```\n\n"
+        f"【重要】只输出一个 JSON object，不要其他解释文字。"
+    )
+
+    # 4. 调 LLM（同步版，temperature=0.3 严格）
+    try:
+        gateway = get_gateway()
+        chat_resp = await gateway.chat(
+            params=ChatParams(
+                messages=[
+                    ChatMessage(role="system", content="你是一个严格的面试评估 AI。"),
+                    ChatMessage(role="user", content=prompt),
+                ],
+                temperature=0.3,
+            )
+        )
+
+        # 5. safe parse JSON
+        import re
+
+        content = chat_resp.content or ""
+        # 兼容 ```json ... ``` 包裹
+        m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+        json_str = m.group(1) if m else content
+
+        parsed = json.loads(json_str)
+        overall_score = int(parsed.get("overallScore", 0))
+        scores = parsed.get("scores", {})
+        # 校验 scores 必填字段
+        for k in ("technical", "communication", "logic", "learning"):
+            scores.setdefault(k, 0)
+            scores[k] = max(0, min(100, int(scores[k])))
+        overall_score = max(0, min(100, overall_score))
+
+        strengths_list = parsed.get("strengths", [])
+        weaknesses_list = parsed.get("weaknesses", [])
+        suggestions_list = parsed.get("suggestions", [])
+
+        # 防御：如果某个 list 是空，fill 占位（保证前端展示不报错）
+        if not strengths_list:
+            strengths_list = ["（未生成）"]
+        if not weaknesses_list:
+            weaknesses_list = ["（未生成）"]
+        if not suggestions_list:
+            suggestions_list = ["（未生成）"]
+
+        # 用户可能前端传了 finalScore override
+        if override_final_score is not None:
+            overall_score = override_final_score
+
+        logger.info(
+            f"[end] interview {interview.id} LLM report generated: "
+            f"score={overall_score}, tokens={chat_resp.usage}"
+        )
+
+        return await _build_report(
+            session=session,
+            interview=interview,
+            overall_score=overall_score,
+            scores=scores,
+            strengths="\n".join(f"• {s}" for s in strengths_list),
+            weaknesses="\n".join(f"• {w}" for w in weaknesses_list),
+            suggestions="\n".join(f"• {s}" for s in suggestions_list),
+        )
+
+    except (JSONDecodeError, KeyError, ValueError) as parse_err:
+        logger.error(
+            f"[end] interview {interview.id} LLM response parse failed: {parse_err}. "
+            f"Raw (first 500): {(chat_resp.content if chat_resp else '')[:500]}"
+        )
+        return await _build_report(
+            session=session,
+            interview=interview,
+            overall_score=override_final_score or 50,
+            scores={"technical": 50, "communication": 50, "logic": 50, "learning": 50},
+            strengths=f"（LLM 响应解析失败：{type(parse_err).__name__}）",
+            weaknesses="（LLM 响应非预期 JSON）",
+            suggestions="建议手动查看对话历史重新评估",
+            error=True,
+        )
+    except Exception as e:
+        # 其他错误（LLM 全失败 / 网络 / 超时） — fallback 占位 report
+        logger.error(
+            f"[end] interview {interview.id} LLM report generation failed: {e}"
+        )
+        return await _build_report(
+            session=session,
+            interview=interview,
+            overall_score=override_final_score or 50,
+            scores={"technical": 50, "communication": 50, "logic": 50, "learning": 50},
+            strengths=f"（评估生成失败：{type(e).__name__}）",
+            weaknesses="（LLM 调用失败）",
+            suggestions="请检查 QWEN_API_KEY 余额或重试",
+            error=True,
+        )
+
+
+async def _build_report(
+    session: AsyncSession,
+    interview: Interview,
+    overall_score: int,
+    scores: dict,
+    strengths: str,
+    weaknesses: str,
+    suggestions: str,
+    error: bool = False,
+) -> Report:
+    """构造 Report 对象 + session.commit + return refreshed Report。
+
+    抽出来因为 LLM 成功 + fallback 两条路径都要做这件事。
+    """
+    report = Report(
+        id=f"r{secrets.token_hex(12)}",
+        interview_id=interview.id,
+        overall_score=overall_score,
+        scores=scores,
+        strengths=strengths,
+        weaknesses=weaknesses,
+        suggestions=suggestions,
+    )
+    session.add(report)
+    await session.commit()
+    await session.refresh(report)
+    if error:
+        logger.warning(
+            f"[end] interview {interview.id} 写入 fallback report "
+            f"(score={overall_score})"
+        )
+    return report
 
 
 # ============================================================
