@@ -275,7 +275,12 @@ async def get_interview(interview_id: str, session: SessionDep) -> dict | None:
 
     user_result = await session.execute(select(User).where(User.id == iv.user_id))
     user = user_result.scalar_one_or_none()
-    demo_user_id = user.email.replace("@demo.local", "") if user and user.email else iv.user_id
+    # R-AUTH-5 fix (2026-06-28): 直接用 iv.user_id 查简历，不再用 user.email 派生。
+    # 旧实现：demo_user_id = user.email.replace("@demo.local", "")
+    # 原因：rag_service.py:336 写入 email 用的是 "@local" 后缀（不是 "@demo.local"），
+    # 派生出来的 demo_user_id 永远不匹配 iv.user_id → 简历查不到 → 前端 resume=null → 用户看到「请先上传简历」CTA
+    # 修复：直接用 iv.user_id，与 upload-resume endpoint 写入时的 userId 一致
+    demo_user_id = iv.user_id
 
     # ResumeRAG 查最新简历
     resume_svc = ResumeRAGService()

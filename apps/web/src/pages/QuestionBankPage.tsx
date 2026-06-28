@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Upload, Search, Trash2, Plus, Sparkles, Loader2, Database, BookOpen, Layers, X, Tag, FileText, Clock, Hash } from 'lucide-react';
+import { EmptyState, ErrorState } from '../components/ui/EmptyState';
+import { QuestionCardSkeleton } from '../components/ui/Skeleton';
+import { useToast } from '../components/ui/Toast';
 
 // R-AUTH-3 fix (2026-06-28): 删"产品经理"，后端 domain 没有这个。
 // 之前 POSITIONS 含"产品经理"会让用户选了但返 0 结果，UI 误以为"筛选坏了"。
@@ -128,10 +131,12 @@ interface Question {
 }
 
 export function QuestionBankPage() {
+  const toast = useToast();
   const [view, setView] = useState<'list' | 'add' | 'search' | 'import'>('list');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [searchResults, setSearchResults] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [importing, setImporting] = useState<null | 'file' | 'url'>(null);
   const [importResult, setImportResult] = useState<{
     count: number;
@@ -200,6 +205,7 @@ const loadListAbortRef = useRef<AbortController | null>(null);
 
 const loadList = async () => {
     setLoading(true);
+    setLoadError(null);
     // R-AUTH-3 fix: 取消上一轮未完成的 fetch，避免慢到达的旧数据覆盖新结果
     if (loadListAbortRef.current) {
       loadListAbortRef.current.abort();
@@ -217,6 +223,19 @@ const loadList = async () => {
 
       const milvusData = await safeJson(milvusRes);
       const qdrantData = await safeJson(qdrantRes);
+
+      // R-AUTH-4 UI: 区分「全失败」vs「部分失败」并 toast 提示
+      const milvusFail = !!milvusData?._error;
+      const qdrantFail = !!qdrantData?._error;
+      if (milvusFail && qdrantFail) {
+        const msg = `题库与知识库均不可用（HTTP ${milvusData._status || '?'} / ${qdrantData._status || '?'}）`;
+        setLoadError(msg);
+        toast.error('题目加载失败', msg);
+        return;
+      }
+      if (qdrantFail) {
+        toast.warning('知识库暂不可用', '仅显示题库数据');
+      }
 
       const milvusQuestions: Question[] = (milvusData.results || []).map((q: any) => ({
         ...q,
@@ -248,6 +267,8 @@ const loadList = async () => {
     } catch (err: any) {
       if (err?.name === 'AbortError') return; // 主动取消，忽略
       console.error(err);
+      toast.error('网络错误', err?.message || '请检查网络后重试');
+      setLoadError(err?.message || '网络错误');
     } finally {
       if (!abortCtrl.signal.aborted) setLoading(false);
     }
@@ -259,7 +280,7 @@ const loadList = async () => {
 
   const submitOne = async () => {
     if (!form.question.trim() || !form.answer.trim()) {
-      alert('题目和答案不能为空');
+      toast.warning('题目和答案不能为空', '请填写题干和参考答案');
       return;
     }
     setLoading(true);
@@ -288,13 +309,15 @@ const loadList = async () => {
       }
       const data = await safeJson(r);
       if (!data._error) {
-        alert('已添加');
+        toast.success('已添加', `${form.question.slice(0, 30)}${form.question.length > 30 ? '...' : ''}`);
         setForm({ ...form, question: '', answer: '', tags: '' });
         setView('list');
         loadList();
       } else {
-        alert('失败：' + (data.message || JSON.stringify(data)));
+        toast.error('添加失败', data.message || JSON.stringify(data));
       }
+    } catch (err: any) {
+      toast.error('添加出错', err?.message || '未知错误');
     } finally {
       setLoading(false);
     }
@@ -302,7 +325,7 @@ const loadList = async () => {
 
   const submitSearch = async () => {
     if (!searchForm.query.trim()) {
-      alert('请输入搜索词');
+      toast.warning('请输入搜索词');
       return;
     }
     setLoading(true);
@@ -372,16 +395,17 @@ const loadList = async () => {
       });
       const data = await safeJson(r);
       if (data._error) {
-        alert('导入失败：' + (data.message || JSON.stringify(data)));
+        toast.error('导入失败', data.message || JSON.stringify(data));
       } else {
         setImportResult({
           count: data.count || 0,
           source: `file:${data.filename || file.name}`,
           questionIds: data.questionIds || [],
         });
+        toast.success(`导入 ${data.count || 0} 道题`, file.name);
       }
     } catch (err: any) {
-      alert('导入失败：' + err.message);
+      toast.error('导入失败', err?.message || '未知错误');
     } finally {
       setImporting(null);
       if (importFileEl) importFileEl.value = '';
@@ -486,17 +510,36 @@ const loadList = async () => {
             </span>
           </div>
 
-          {questions.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
-              <Database className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p>知识库还是空的</p>
-              <button
-                onClick={() => setView('add')}
-                className="mt-3 text-blue-600 hover:underline text-sm"
-              >
-                添加第一道题
-              </button>
+          {loadError ? (
+            <ErrorState
+              title="题目加载失败"
+              message={loadError}
+              onRetry={loadList}
+            />
+          ) : loading && questions.length === 0 ? (
+            // R-AUTH-4 UI: 加载骨架（首次加载时显示）
+            <div className="divide-y divide-slate-100">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <QuestionCardSkeleton key={i} />
+              ))}
             </div>
+          ) : questions.length === 0 ? (
+            <EmptyState
+              variant="no-data"
+              title={filter.position ? `${filter.position} 暂无题目` : '知识库还是空的'}
+              description={filter.position
+                ? '试试切换其他岗位，或批量导入题目'
+                : '把你的面试题库沉淀到这里，AI 面试官会基于它生成针对性问题'}
+              primaryAction={{
+                label: '添加第一道题',
+                onClick: () => setView('add'),
+                icon: <Plus className="w-4 h-4" />,
+              }}
+              secondaryAction={filter.position ? undefined : {
+                label: '批量导入',
+                onClick: () => setView('import'),
+              }}
+            />
           ) : (
             <div className="divide-y divide-slate-100">
               {questions.map((q) => {
