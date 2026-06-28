@@ -2,7 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Upload, Search, Trash2, Plus, Sparkles, Loader2, Database, BookOpen, Layers, X, Tag, FileText, Clock, Hash } from 'lucide-react';
 
-const POSITIONS = ['后端开发工程师', '前端开发工程师', 'AI Agent 工程师', '算法工程师', '产品经理'];
+// R-AUTH-3 fix (2026-06-28): 删"产品经理"，后端 domain 没有这个。
+// 之前 POSITIONS 含"产品经理"会让用户选了但返 0 结果，UI 误以为"筛选坏了"。
+// 现在 POSITIONS 对齐后端 _QUESTION_BANKS 的 5 个真实 domain。
+// 同时前端 fetch /knowledge-base/list 时也传 position（之前没传，
+// 永远返全部 14 条 qdrant 知识库，让用户感觉"无论选什么都一样"）。
+const POSITIONS = ['后端开发工程师', '前端开发工程师', 'AI Agent 工程师', '算法工程师', '测试工程师'];
 
 // 安全 JSON 解析：API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
 async function safeJson(res: Response): Promise<any> {
@@ -186,14 +191,30 @@ export function QuestionBankPage() {
     return tags.split(/[,，、\s]+/).filter(Boolean);
   };
 
-  const loadList = async () => {
+  // R-AUTH-3 fix (2026-06-28): 用 AbortController 取消上一轮 fetch，
+// 防止快速切换 filter 时旧的"全 14 条"覆盖新的"前端 6 条"。
+// 之前实测：默认 loadList（28 条） + select frontend（6 条）后，
+// DOM 显示 20 条（旧 14 + 新 6）— 前一轮 fetch 慢到达，setQuestions(28)
+// 在 setQuestions(6) 之后触发，last-wins 导致 React 用旧数据。
+const loadListAbortRef = useRef<AbortController | null>(null);
+
+const loadList = async () => {
     setLoading(true);
+    // R-AUTH-3 fix: 取消上一轮未完成的 fetch，避免慢到达的旧数据覆盖新结果
+    if (loadListAbortRef.current) {
+      loadListAbortRef.current.abort();
+    }
+    const abortCtrl = new AbortController();
+    loadListAbortRef.current = abortCtrl;
+
+    setQuestions([]);
     try {
       const [milvusRes, qdrantRes] = await Promise.all([
-        fetch(`/api/interview/question-bank/list?position=${encodeURIComponent(filter.position)}&limit=${filter.limit}`),
-        fetch('/api/knowledge-base/list'),
+        fetch(`/api/interview/question-bank/list?position=${encodeURIComponent(filter.position)}&limit=${filter.limit}`, { signal: abortCtrl.signal }),
+        // R-AUTH-3 fix: qdrant 也传 position，之前漏传导致永远返全部 14 条
+        fetch(`/api/knowledge-base/list?position=${encodeURIComponent(filter.position)}&limit=${filter.limit}`, { signal: abortCtrl.signal }),
       ]);
-      
+
       const milvusData = await safeJson(milvusRes);
       const qdrantData = await safeJson(qdrantRes);
 
@@ -203,8 +224,10 @@ export function QuestionBankPage() {
       }));
 
       const qdrantQuestions: Question[] = (qdrantData.items || []).map((item: any) => ({
-        id: item.id,
-        questionId: item.id,
+        // R-AUTH-3 fix: 知识库 id 加 "kb-" 前缀避免与题库 id 冲突（之前都是 frontend-001 等），
+        // 冲突的 id 会被 React 当作"同一个"不重新渲染，导致旧 DOM 残留。
+        id: `kb-${item.id}`,
+        questionId: `kb-${item.id}`,
         position: item.topic,
         level: '',
         category: '',
@@ -217,11 +240,16 @@ export function QuestionBankPage() {
         source: 'qdrant' as const,
       }));
 
-      setQuestions([...milvusQuestions, ...qdrantQuestions]);
-    } catch (err) {
+      // 如果这一轮已被 abort（用户在等待时又切了 filter），直接丢弃
+      if (abortCtrl.signal.aborted) return;
+      const merged = [...milvusQuestions, ...qdrantQuestions];
+      console.log(`[loadList] pos=${filter.position} milvus=${milvusQuestions.length} qdrant=${qdrantQuestions.length} merged=${merged.length} ids=[${merged.map(q => q.id).join(',')}]`);
+      setQuestions(merged);
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return; // 主动取消，忽略
       console.error(err);
     } finally {
-      setLoading(false);
+      if (!abortCtrl.signal.aborted) setLoading(false);
     }
   };
 

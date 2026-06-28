@@ -339,60 +339,88 @@ export function InterviewPage() {
       className="flex h-[calc(100vh-65px)] relative"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      {/* 简历确认面板（未确认时全屏覆盖） */}
-      {!resumeConfirmed && resume && (
+      {/* 简历确认面板（未确认时全屏覆盖）
+          R-AUTH-3 fix (2026-06-28): 移除 `&& resume` 条件，
+          改为只要未确认就显示。resume=null 时显示"上传简历"CTA；
+          resume=truthy 时显示"确认简历信息"。修复之前 resume=null 用户
+          进页面看到 placeholder 提示但上方空白。 */}
+      {!resumeConfirmed && (
         <div className="absolute inset-0 z-40 bg-white/95 backdrop-blur-sm flex items-center justify-center p-4 md:p-8">
           <div className="max-w-2xl w-full bg-white border-2 border-blue-200 rounded-2xl shadow-xl p-5 md:p-8 space-y-4">
             <div className="flex items-center gap-2">
               <FileText className="w-6 h-6 text-blue-600" />
               <h2 className="text-lg md:text-xl font-semibold text-slate-900">
-                请先确认简历信息
+                {resume ? '请先确认简历信息' : '请先上传简历'}
               </h2>
             </div>
             <div className="text-sm text-slate-600">
-              系统已根据你上传的简历自动生成以下信息，
-              <span className="font-medium text-slate-900">确认无误后</span>
-              再开始面试。如需修改，请重新上传。
+              {resume ? (
+                <>
+                  系统已根据你上传的简历自动生成以下信息，
+                  <span className="font-medium text-slate-900">确认无误后</span>
+                  再开始面试。如需修改，请重新上传。
+                </>
+              ) : (
+                <>
+                  系统将根据你的简历生成针对性问题。
+                  <span className="font-medium text-slate-900">支持 PDF / Markdown / TXT</span>，
+                  上传后 AI 自动解析岗位、技能、项目经验。
+                </>
+              )}
             </div>
 
-            <div className="bg-slate-50 rounded-xl p-4 space-y-3">
-              {resume.name && (
+            {resume ? (
+              <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                {resume.name && (
+                  <div className="flex">
+                    <div className="w-16 text-xs text-slate-500 flex-shrink-0">姓名</div>
+                    <div className="text-sm text-slate-900 font-medium">{resume.name}</div>
+                  </div>
+                )}
                 <div className="flex">
-                  <div className="w-16 text-xs text-slate-500 flex-shrink-0">姓名</div>
-                  <div className="text-sm text-slate-900 font-medium">{resume.name}</div>
+                  <div className="w-16 text-xs text-slate-500 flex-shrink-0">岗位</div>
+                  <div className="text-sm text-slate-900">{resume.position}</div>
                 </div>
-              )}
-              <div className="flex">
-                <div className="w-16 text-xs text-slate-500 flex-shrink-0">岗位</div>
-                <div className="text-sm text-slate-900">{resume.position}</div>
+                {resume.summary && (
+                  <div className="flex">
+                    <div className="w-16 text-xs text-slate-500 flex-shrink-0">摘要</div>
+                    <div className="text-sm text-slate-700 line-clamp-3">{resume.summary}</div>
+                  </div>
+                )}
+                {resume.skills && (
+                  <div className="flex">
+                    <div className="w-16 text-xs text-slate-500 flex-shrink-0">技能</div>
+                    <div className="text-sm text-slate-700 flex flex-wrap gap-1">
+                      {resume.skills.split(/[、,，]/).filter(Boolean).slice(0, 12).map((s, i) => (
+                        <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
+                          {s.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {resume.createdAt && (
+                  <div className="flex">
+                    <div className="w-16 text-xs text-slate-500 flex-shrink-0">上传</div>
+                    <div className="text-xs text-slate-500">
+                      {new Date(resume.createdAt).toLocaleString('zh-CN')}
+                    </div>
+                  </div>
+                )}
               </div>
-              {resume.summary && (
-                <div className="flex">
-                  <div className="w-16 text-xs text-slate-500 flex-shrink-0">摘要</div>
-                  <div className="text-sm text-slate-700 line-clamp-3">{resume.summary}</div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-900">
+                  <div className="font-medium mb-1">为什么必须先上传简历？</div>
+                  <ul className="text-xs space-y-1 list-disc list-inside text-amber-800">
+                    <li>AI 面试官需要根据你的技能栈生成针对性问题</li>
+                    <li>项目经验会进入 RAG 知识库，实时辅助答题评估</li>
+                    <li>报告评分会基于简历声称的能力校准，避免题目过偏</li>
+                  </ul>
                 </div>
-              )}
-              {resume.skills && (
-                <div className="flex">
-                  <div className="w-16 text-xs text-slate-500 flex-shrink-0">技能</div>
-                  <div className="text-sm text-slate-700 flex flex-wrap gap-1">
-                    {resume.skills.split(/[、,，]/).filter(Boolean).slice(0, 12).map((s, i) => (
-                      <span key={i} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">
-                        {s.trim()}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {resume.createdAt && (
-                <div className="flex">
-                  <div className="w-16 text-xs text-slate-500 flex-shrink-0">上传</div>
-                  <div className="text-xs text-slate-500">
-                    {new Date(resume.createdAt).toLocaleString('zh-CN')}
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             <div>
               <input
@@ -407,18 +435,24 @@ export function InterviewPage() {
                 disabled={uploading}
                 className="text-sm text-slate-600 hover:text-blue-600 underline disabled:opacity-50"
               >
-                {uploading ? '上传中...' : '重新上传简历'}
+                {uploading ? '上传中...' : resume ? '重新上传简历' : '选择简历文件'}
               </button>
+              {uploading && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  正在解析简历...
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3 pt-2">
               <button
                 onClick={confirmResumeStart}
-                disabled={confirming}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                disabled={confirming || !resume}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {confirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                确认无误，开始面试
+                {resume ? '确认无误，开始面试' : '请先上传简历'}
               </button>
             </div>
           </div>

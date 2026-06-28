@@ -99,7 +99,15 @@ const initialState = {
   input: '',
   report: null,
   resume: null,
-  resumeConfirmed: true,
+  // R-AUTH-3 fix (2026-06-28): 默认 false 而不是 true。
+  // 旧默认 true 导致：用户进 InterviewPage 时，store 误以为简历已确认，
+  // 即使后端返 resumeConfirmed=false + resume=null，
+  // UI 因 `!resumeConfirmed && resume` 条件不会渲染确认卡片，
+  // 用户看到 placeholder "请先确认上方简历信息..." 但上方空白。
+  // 改为 false 后，store 行为对齐后端 source of truth：
+  //   - 新进页面 → false → 显示确认/上传卡片
+  //   - 用户点确认 → confirmResumeStart() → setResumeConfirmed(true)
+  resumeConfirmed: false,
   resumePanelOpen: false,
   ending: false,
   drawerOpen: false,

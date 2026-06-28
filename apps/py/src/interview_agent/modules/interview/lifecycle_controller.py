@@ -418,6 +418,8 @@ def _match_position(domain: str, query: str) -> bool:
     - _match_position("frontend", "前端") = True（中文 in "frontend"，且
       'frontend' 含 'front'，'前端' 是 'front-end' 的中文表述 — 双向 contains）
     - _match_position("frontend", "frontend") = True
+    - _match_position("frontend", "前端开发工程师") = True
+      （R-AUTH-3 fix: 完整岗位名 → 短词 → 关键词 → domain 三级 fallback）
     - _match_position("backend", "后端") = True（"backend" 含 "back"；"后端" 含 "端"）
       注意：backend 不包含"前端"，反向也不匹配 — 模糊但不乱匹配
     - _match_position("agent", "前端") = False
@@ -437,6 +439,18 @@ def _match_position(domain: str, query: str) -> bool:
     mapped = keyword_map.get(q)
     if mapped and (mapped == d or mapped in d):
         return True
+    # R-AUTH-3 fix (2026-06-28): 前端 POSITIONS 用完整岗位名（"前端开发工程师"），
+    # 旧 keyword_map 只有短词（"前端"），导致完整名查不到。补完整岗位名 → 短词映射。
+    full_position_map = {
+        "前端开发工程师": "前端", "后端开发工程师": "后端",
+        "ai agent 工程师": "智能体", "算法工程师": "算法",
+        "测试工程师": "测试",
+    }
+    q_short = full_position_map.get(q)
+    if q_short:
+        mapped = keyword_map.get(q_short)
+        if mapped and (mapped == d or mapped in d):
+            return True
     return False
 
 
@@ -493,10 +507,16 @@ kb_list_router = APIRouter(prefix="/knowledge-base", tags=["knowledge-base"])
 async def knowledge_base_list(
     limit: str | None = Query(default=None),
     topic: str | None = Query(default=None),
+    # R-AUTH-3 fix (2026-06-28): 接受 position 参数走 _match_position 模糊匹配。
+    # 旧实现只接受 topic（== 精确匹配），前端 POSITIONS 是中文岗位
+    # （"前端开发工程师"），永远不匹配 "frontend" 等英文 domain。
+    # 修复后 position / topic 任一传都生效，与 /question-bank/list 行为对齐。
+    position: str | None = Query(default=None),
 ) -> dict:
     """知识库列表（前端 QuestionBank 页用）。
 
     对齐 NestJS KnowledgeBaseController.listAll。
+    支持 topic（== 精确）和 position（_match_position 模糊）两种过滤方式。
     """
     from interview_agent.modules.knowledge_base.knowledge_banks import (
         get_question_bank,
@@ -505,14 +525,17 @@ async def knowledge_base_list(
     domains = list_all_domains()
     items = []
     for d in domains:
+        # topic 用 == 精确（NestJS 兼容路径）；position 用模糊匹配（前端中文岗位）
         if topic and d != topic:
+            continue
+        if position and not _match_position(d, position):
             continue
         for q in get_question_bank(d):
             items.append({
                 "id": q["id"],
                 "topic": d,
                 "title": q["question"][:50],
-                "body": q["question"],
+                "body": q.get("answer", ""),  # R-AUTH-3 fix: body = answer，不是 question
                 "tags": q.get("tags", []),
                 "category": q["category"],
             })

@@ -131,7 +131,11 @@ export function ToolsPage() {
       return safeJson(r);
     },
     onSuccess: () => {
+      // R-AUTH-4 fix: ToolsPage 系统级切换也要刷 mcp-status + tools-count，
+      // 否则顶部「MCP 运行」统计会 stale，HomePage「技能市场」enabledCount 也不更新
       queryClient.invalidateQueries({ queryKey: ['tools', userId] });
+      queryClient.invalidateQueries({ queryKey: ['tools-count'] });
+      queryClient.invalidateQueries({ queryKey: ['mcp-status'] });
     },
   });
 
