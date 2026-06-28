@@ -61,14 +61,57 @@ router = APIRouter(tags=["interview"])
 
 
 class StartInterviewRequest(BaseModel):
-    userId: str
-    position: str
-    level: str = "P5"
+    """启动面试请求 schema。
+
+    兼容两种字段命名（前端 HomePage.tsx L213-218 实际发 snake_case）：
+    - camelCase: userId / position / level （NestJS DTO 风格）
+    - snake_case: user_id / user_role / thread_id （前端实际发的）
+
+    ⚠️ 与 NestJS 对齐：NestJS 用 interface（不校验），用前端 user_id 当 userId，
+    用 user_role 当 position。Python 端用 Pydantic alias + populate_by_name 兼容。
+    """
+
+    model_config = {"populate_by_name": True}
+
+    userId: str | None = Field(default=None, alias="userId")
+    position: str | None = Field(default=None)
+    level: str | None = Field(default="P5")
+
+    # 前端 snake_case 兼容字段
+    user_id: str | None = Field(default=None, alias="user_id")
+    user_role: str | None = Field(default=None, alias="user_role")
+    user_message: str | None = Field(default=None, alias="user_message")
+    thread_id: str | None = Field(default=None, alias="thread_id")
+
+    def resolve(self) -> tuple[str, str, str]:
+        """返回标准化 (userId, position, level)。
+
+        优先级：camelCase > snake_case。fallback 到 level="P5"。
+        """
+        uid = self.userId or self.user_id
+        pos = self.position or self.user_role or "通用"
+        lvl = self.level or "P5"
+        if not uid:
+            raise ValueError("userId or user_id required")
+        return uid, pos, lvl
 
 
 class MessageRequest(BaseModel):
-    content: str
-    type: str = "user"  # user | tool_result | system
+    """面试对话请求 schema（兼容前端两种字段名）。
+
+    前端 useInterviewStream.ts:102 发 `{userId, content}`（camelCase），
+    但部分代码用 snake_case。Python 兼容两种。
+    """
+
+    model_config = {"populate_by_name": True}
+
+    userId: str | None = Field(default=None, alias="userId")
+    content: str | None = Field(default=None)
+    type: str | None = Field(default="user")
+    user_id: str | None = Field(default=None, alias="user_id")
+
+    def resolve_user_id(self) -> str:
+        return self.userId or self.user_id or ""
 
 
 class EndInterviewRequest(BaseModel):
@@ -89,19 +132,68 @@ class ResumeUploadResponse(BaseModel):
 
 @router.post("/start")
 async def start_interview(req: StartInterviewRequest, session: SessionDep) -> dict:
-    """开启面试：创建 Interview + 初始化 SessionCost + Redis shared context。
+    """开启面试：upsert user + 检查简历 + 创建 Interview + SessionCost + Redis shared context。
 
-    行为对齐 NestJS：
-    - Interview 表插入（status=IN_PROGRESS）
-    - SessionCost 启动
-    - shared-ctx:{interviewId} Redis hash 初始化
+    行为对齐 NestJS interview-lifecycle.controller.ts:99-126：
+    1. user.upsert(by email = `${userId}@demo.local`)  ← 必须先有 user 再 FK
+    2. resumeRag.searchByUser(userId, 1)  ← 必须有简历
+    3. 缺简历 → 400 "请先上传简历"
+    4. interview.create({userId: user.id, position, level, status: IN_PROGRESS, summary})
+    5. 返 {interviewId, interview, resume, resumeConfirmed: false}
+
+    兼容前端 snake_case (user_id/user_role) + camelCase (userId/position)
     """
+    try:
+        user_id, position, level = req.resolve()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # 1. Upsert user by email (NestJS L100-105)
+    from interview_agent.infra.models import User as UserModel
+
+    email = f"{user_id}@demo.local"
+    user = await session.get(UserModel, user_id)
+    if not user:
+        # 实际 NestJS 用 prisma.user.upsert({where: {email}, create: {email, name: userId}})
+        # Python 这里用 id=user_id, email=email, name=user_id
+        user = UserModel(
+            id=user_id,
+            email=email,
+            name=user_id,
+        )
+        session.add(user)
+        try:
+            await session.commit()
+            await session.refresh(user)
+        except Exception:
+            # email 冲突 → 按 email 查
+            await session.rollback()
+            from sqlalchemy import select
+            result = await session.execute(
+                select(UserModel).where(UserModel.email == email)
+            )
+            user = result.scalar_one()
+
+    # 2. 检查简历（NestJS L108-113）
+    try:
+        from interview_agent.modules.interview.rag_service import ResumeRAGService
+        resumes = await ResumeRAGService().search_by_user(user_id, 1)
+    except Exception:
+        resumes = []
+
+    if not resumes:
+        raise HTTPException(
+            status_code=400,
+            detail="请先上传简历（支持 .pdf / .md / .txt 格式）",
+        )
+
+    # 3. 创建 interview
     interview_id = f"i{secrets.token_hex(12)}"
     interview = Interview(
         id=interview_id,
-        user_id=req.userId,
-        position=req.position,
-        level=req.level,
+        user_id=user.id,
+        position=position,
+        level=level,
         status=InterviewStatus.IN_PROGRESS,
     )
     session.add(interview)
@@ -118,9 +210,9 @@ async def start_interview(req: StartInterviewRequest, session: SessionDep) -> di
         f"shared-ctx:{interview_id}",
         mapping={
             "interviewId": interview_id,
-            "userId": req.userId,
-            "position": req.position,
-            "level": req.level,
+            "userId": user_id,
+            "position": position,
+            "level": level,
             "questionIndex": "0",
             "coveredSkills": "",
             "scoreHistory": "",
@@ -129,11 +221,22 @@ async def start_interview(req: StartInterviewRequest, session: SessionDep) -> di
     )
     await redis.expire(f"shared-ctx:{interview_id}", 3600)
 
+    # 4. 返 NestJS shape (含 resume + resumeConfirmed)
+    resume_0 = resumes[0] if resumes else None
     return {
         "interviewId": interview.id,
-        "userId": interview.user_id,
-        "position": interview.position,
-        "level": interview.level,
+        "interview": {
+            "id": interview.id,
+            "userId": interview.user_id,
+            "position": interview.position,
+            "level": interview.level,
+            "status": interview.status.value,
+            "startedAt": interview.started_at.isoformat(),
+            "summary": interview.summary,
+        },
+        "resume": resume_0,
+        "resumeConfirmed": False,  # NestJS 强制用户点确认才开始面试
+        "resumeName": resume_0.get("name") if isinstance(resume_0, dict) else None,
         "status": interview.status.value,
         "startedAt": interview.started_at.isoformat(),
     }
@@ -169,8 +272,14 @@ async def interview_message(
     history_raw = await redis.lrange(history_key, 0, -1)
     history_messages = [json.loads(h) for h in history_raw]
 
+
+    # 校验 content 必填（兼容前端用 user_message 字段）
+    content = req.content or req.user_message or ""
+    if not content:
+        raise HTTPException(status_code=400, detail="content required")
+
     # 3. 追加 user message
-    user_msg = {"role": "user", "content": req.content}
+    user_msg = {"role": "user", "content": content}
     history_messages.append(user_msg)
     await redis.lpush(history_key, json.dumps(user_msg))
     await redis.ltrim(history_key, 0, 49)
@@ -454,4 +563,117 @@ async def graph_status(interview_id: str) -> dict:
         "interviewId": interview_id,
         "hitlPending": state is not None and "verdict" not in state,
         "verdict": (state or {}).get("verdict"),
+    }
+
+
+# ============================================================
+# POST /api/interview/:interviewId/next-question — 动态下一题
+# ============================================================
+
+
+class NextQuestionRequest(BaseModel):
+    lastQuestion: str | None = None
+    lastAnswer: str | None = None
+    resumeText: str | None = None
+
+
+@router.post("/{interview_id}/next-question")
+async def get_next_question(
+    interview_id: str,
+    body: NextQuestionRequest = NextQuestionRequest(),
+) -> dict:
+    """动态决定下一题（对齐 NestJS interview-flow.controller.ts:53-149）。
+
+    - 有简历 → 基于简历动态出题
+    - 有 lastAnswer → 评估质量
+      - score < 50 → 先追问
+      - score 50-80 → 同难度新题
+      - score >= 80 → 提高难度
+    - 否则从知识库抽题
+    """
+    from interview_agent.modules.interview.resume_controller import match_bank
+    from interview_agent.modules.knowledge_base.knowledge_banks import (
+        get_question_bank,
+    )
+
+    # interview lookup (NestJS L58)
+    interview = await session.get(Interview, interview_id)
+    if not interview:
+        raise HTTPException(status_code=400, detail="Interview not found")
+
+    # 1. 基于简历动态出题（NestJS L64-77）
+    if body.resumeText and len(body.resumeText.strip()) > 50:
+        try:
+            from interview_agent.modules.interview.evaluation_controller import (
+                _evaluate_answer,
+                _extract_keywords,
+            )
+
+            # 评估上次回答
+            target_count = 3
+            if body.lastAnswer and body.lastQuestion:
+                eval_item = _evaluate_answer(
+                    body.lastQuestion,
+                    body.lastAnswer,
+                    _extract_keywords(body.lastQuestion),
+                )
+                # 质量低 → 先追问（NestJS L72-75）
+                if eval_item["score"] < 50:
+                    return {
+                        "type": "followup",
+                        "interviewId": interview_id,
+                        "basedOn": body.lastQuestion,
+                        "score": eval_item["score"],
+                        "reason": "low_quality_followup",
+                    }
+
+            bank = match_bank(interview.position or "")
+            pool = get_question_bank(bank) or []
+            import random
+            sampled = random.sample(pool, min(target_count, len(pool)))
+
+            return {
+                "type": "personalized",
+                "interviewId": interview_id,
+                "questions": [
+                    {
+                        "id": q.get("id"),
+                        "question": q.get("question"),
+                        "category": q.get("category"),
+                        "difficulty": q.get("difficulty"),
+                        "expectedPoints": [],
+                    }
+                    for q in sampled
+                ],
+                "basedOnResume": True,
+                "resumeLength": len(body.resumeText),
+            }
+        except Exception as e:
+            logger.debug(f"personalized next-question failed: {e}")
+
+    # 2. 否则从知识库抽题（NestJS 默认分支）
+    bank = match_bank(interview.position or "")
+    pool = get_question_bank(bank) or []
+    if not pool:
+        return {
+            "type": "standard",
+            "interviewId": interview_id,
+            "question": {
+                "id": "default-q1",
+                "question": "请简单介绍一下你自己。",
+                "category": "通用",
+                "difficulty": "easy",
+            },
+        }
+    import random
+    sampled = random.sample(pool, min(1, len(pool)))
+    return {
+        "type": "standard",
+        "interviewId": interview_id,
+        "question": {
+            "id": sampled[0].get("id"),
+            "question": sampled[0].get("question"),
+            "category": sampled[0].get("category"),
+            "difficulty": sampled[0].get("difficulty"),
+        },
     }

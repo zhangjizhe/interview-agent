@@ -41,6 +41,12 @@ from interview_agent.modules.interview.lifecycle_controller import (
     metrics_router,
     question_bank_router,
 )
+from interview_agent.modules.interview.question_bank_controller import (
+    router as question_bank_router_v2,
+)
+from interview_agent.modules.interview.evaluation_controller import (
+    router as evaluation_router,
+)
 from interview_agent.modules.interview.resume_controller import (
     router as resume_router,
 )
@@ -146,9 +152,10 @@ async def api_health_ready():
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(user_router, prefix="/api/user", tags=["user"])
 app.include_router(interview_router, prefix="/api/interview", tags=["interview"])
-# resume 静态路由（upload-resume/resumes/parse-resume）必须在动态 :id 之前注册
-# 否则 FastAPI 会把 "upload-resume" 当作 :id 处理 → 405
+# 静态路由（必须先于动态 :id 注册，否则 FastAPI 会把 "upload-resume" 当 :id → 405）
 app.include_router(resume_router, prefix="/api/interview", tags=["resume"])
+app.include_router(question_bank_router_v2, prefix="/api/interview", tags=["question-bank-v2"])
+app.include_router(evaluation_router, prefix="/api/interview", tags=["evaluation"])
 # Lifecycle 静态路由（list/stats/empty-rooms/memories）必须在动态 :id 之前注册
 app.include_router(lifecycle_router, prefix="/api", tags=["interview-lifecycle"])
 app.include_router(metrics_router, prefix="/api", tags=["metrics"])

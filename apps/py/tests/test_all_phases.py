@@ -816,13 +816,36 @@ class TestE2EInterviewFlow:
         r = client.post("/api/user", json={"email": "e2e-p12@test.com", "name": "E2E"})
         user_id = r.json()["id"]
 
-        # 2. 开启面试
+        # 2. 先上传简历（start 现在强制要求简历存在，对齐 NestJS）
+        # NestJS L100-113 + Python start: 1) upsert user 2) search resume 3) 缺简历 → 400
+        import io
+        # 最小有效 PDF（pypdf 能解析）+ 包含技能关键词让 extractor 找到
+        pdf_bytes = (
+            b"%PDF-1.4\n"
+            b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+            b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+            b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n"
+            b"xref\n0 4\n0000000000 65535 f\n"
+            b"0000000010 00000 n\n0000000053 00000 n\n0000000100 00000 n\n"
+            b"trailer<</Size 4/Root 1 0 R>>\nstartxref\n150\n%%EOF\n"
+        ).replace(b"\n", b"\r\n")
+        r = client.post(
+            "/api/interview/upload-resume",
+            data={
+                "userId": user_id,
+                "position": "frontend",
+            },
+            files={"file": ("resume.pdf", io.BytesIO(pdf_bytes), "application/pdf")},
+        )
+        assert r.status_code == 200, f"upload-resume failed: {r.text}"
+
+        # 3. 开启面试
         r = client.post("/api/interview/start", json={
             "userId": user_id,
             "position": "frontend",
             "level": "P6",
         })
-        assert r.status_code == 200
+        assert r.status_code == 200, f"start failed: {r.text}"
         interview_id = r.json()["interviewId"]
 
         # 3. 发消息（SSE 流式）

@@ -219,11 +219,15 @@ async def upload_resume(
     parsed = _to_parsed_resume(parsed_pdf, position)
 
     # 3. 入 Milvus / Mem0（失败不阻塞）
+    # ⚠️ skills 必须存 string (用"、"分隔) 而不是 array — 对齐 NestJS resume-rag.service.ts:
+    #   skills: cleanSkills.join('、')
+    # 前端 InterviewPage.tsx L379 用 resume.skills.split(/[、,，]/) 解析 string。
     rag_ingested = False
     if userId:
         try:
             rag = ResumeRAGService()
             ingested_at = datetime.now(timezone.utc).isoformat()
+            skills_str = "、".join(parsed.get("skills") or [])
             # 简化：写 L3 memory（NestJS 写 Milvus resumes collection + Mem0）
             from interview_agent.modules.memory.memory import l3_write
             await l3_write(
@@ -231,7 +235,7 @@ async def upload_resume(
                 key=f"resume:{ingested_at}",
                 value={
                     "name": parsed.get("name"),
-                    "skills": parsed.get("skills"),
+                    "skills": skills_str,  # string, not array
                     "summary": parsed.get("summary"),
                     "position": position,
                     "createdAt": ingested_at,
