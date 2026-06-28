@@ -94,7 +94,16 @@ export function AdminMcpPage() {
       return safeJson(r);
     },
     onSuccess: () => {
+      // R-AUTH-4 fix (2026-06-28): 同时 invalidate 其他依赖 /api/tools 的 queryKey，
+      // 否则 admin 切换系统级启停回首页/HomePage/ToolsPage 看到 stale data。
+      // - ['admin-mcp-servers'] AdminMcpPage 自身
+      // - ['tools', userId]    ToolsPage 工具列表（用户级合并）
+      // - ['tools-count']      HomePage 技能市场统计
+      // - ['mcp-status']       ToolsPage 顶部 MCP 运行状态条
       queryClient.invalidateQueries({ queryKey: ['admin-mcp-servers'] });
+      queryClient.invalidateQueries({ queryKey: ['tools'] });
+      queryClient.invalidateQueries({ queryKey: ['tools-count'] });
+      queryClient.invalidateQueries({ queryKey: ['mcp-status'] });
     },
   });
 
@@ -104,7 +113,11 @@ export function AdminMcpPage() {
       return safeJson(r);
     },
     onSuccess: () => {
+      // R-AUTH-4 fix: reload 后同样要刷全部依赖 queryKey
       queryClient.invalidateQueries({ queryKey: ['admin-mcp-servers'] });
+      queryClient.invalidateQueries({ queryKey: ['tools'] });
+      queryClient.invalidateQueries({ queryKey: ['tools-count'] });
+      queryClient.invalidateQueries({ queryKey: ['mcp-status'] });
     },
   });
 
