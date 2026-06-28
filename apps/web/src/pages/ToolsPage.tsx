@@ -211,7 +211,7 @@ export function ToolsPage() {
             <span className="text-[10px] text-slate-400">每 30s 刷新 · 改 config 后调 POST /api/admin/mcp-servers/reload</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {mcpStatus.servers.map((s) => (
+            {(mcpStatus?.servers ?? []).map((s) => (
               <span
                 key={s.name}
                 title={`${s.name} · ${s.status} · ${s.transport}`}

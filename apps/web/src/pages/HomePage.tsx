@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Clock, FileText, ChevronRight, Plus, BarChart3, X, Cpu, Sparkles, Upload, CheckCircle2, Loader2 } from 'lucide-react';
 import type { McpToolMeta } from '@interview-agent/shared-types';
 import { safeJson } from '../utils/safeJson';
+import { useAuth } from '../hooks/useAuth';
 
 // 默认岗位改为「前端开发工程师」—— 更符合通用 demo 直觉
 // （之前默认是 AI Agent 工程师，会让用户误以为选了"前端"但实际是 agent）
@@ -16,23 +17,8 @@ export function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const showNew = searchParams.get('new') === '1';
 
-  const [userId, setUserId] = useState(() => {
-    const stored = localStorage.getItem('ia_userId');
-    if (stored) return stored;
-    // R-P2-18 修复：原 Math.random().toString(36).slice(2,8) 仅 6 字符 (~36^6=2B)，
-    // 生日攻击约 4 万次开始 50% 碰撞风险。改用 timestamp + crypto randomUUID 后缀
-    // （~24 字符 base36，碰撞概率可忽略）。
-    const id = `demo-user-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
-    localStorage.setItem('ia_userId', id);
-    return id;
-  });
-
-  // 切换用户（清空记忆 + 生成新 userId）
-  const switchUser = () => {
-    const id = `demo-user-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
-    localStorage.setItem('ia_userId', id);
-    setUserId(id);
-  };
+  // R-AUTH-1: 从 useAuth 读稳定 userId（不再 Date.now+randomUUID 每次刷新换 ID）
+  const { userId } = useAuth();
 
   const [showForm, setShowForm] = useState(showNew);
   const [position, setPosition] = useState(() => {
@@ -55,6 +41,7 @@ export function HomePage() {
   const handleResumePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!userId) return; // R-AUTH-1: 未登录不允许上传（理论上不会到这里，RequireAuth 已拦截）
     setResumeFile(file);
     setUploading(true);
     setResumeUploaded(false);
@@ -81,7 +68,7 @@ export function HomePage() {
   };
 
   const { data: interviews = [] } = useQuery({
-    queryKey: ['interviews', userId],
+    queryKey: ['interviews', userId ?? 'guest'],
     queryFn: async () => {
       const r = await fetch(`/api/interview/list?userId=${userId}`);
       if (!r.ok) throw new Error(`List API ${r.status}`);
@@ -91,12 +78,13 @@ export function HomePage() {
     retry: 3,
     staleTime: 0,
     refetchOnMount: 'always',
+    enabled: !!userId,
   });
 
   const { data: stats } = useQuery({
-    queryKey: ['token-stats', userId],
+    queryKey: ['token-stats', userId ?? 'guest'],
     queryFn: async () => {
-      const url = `/api/interview/stats?userId=${encodeURIComponent(userId)}`;
+      const url = `/api/interview/stats?userId=${encodeURIComponent(userId ?? '')}`;
       const r = await fetch(url);
       if (!r.ok) {
         throw new Error(`Stats API ${r.status}`);
@@ -107,6 +95,7 @@ export function HomePage() {
     retry: 3,
     staleTime: 0,
     refetchOnMount: 'always',
+    enabled: !!userId,
   });
 
   // 工具列表（首页技能市场）
@@ -129,12 +118,13 @@ export function HomePage() {
   // 空面试（30min 无对话）：首页弹窗提醒
   interface EmptyRoom { id: string; position: string; level: string | null; createdAt: string; idleMinutes: number }
   const { data: emptyRoomsData, refetch: refetchEmpty } = useQuery({
-    queryKey: ['empty-rooms', userId],
+    queryKey: ['empty-rooms', userId ?? 'guest'],
     queryFn: async () => {
-      const r = await fetch(`/api/interview/empty-rooms?userId=${userId}&idleMinutes=30`);
+      const r = await fetch(`/api/interview/empty-rooms?userId=${userId ?? ''}&idleMinutes=30`);
       return safeJson(r) as Promise<{ emptyRooms: EmptyRoom[]; count: number }>;
     },
     refetchInterval: 60000, // 每分钟查一次
+    enabled: !!userId,
   });
   const [dismissedEmpty, setDismissedEmpty] = useState<Set<string>>(new Set());
   const [deletingEmpty, setDeletingEmpty] = useState<string | null>(null);
@@ -149,6 +139,7 @@ export function HomePage() {
   };
 
   const deleteEmpty = async (id: string) => {
+    if (!userId) return;
     setDeletingEmpty(id);
     try {
       await fetch(`/api/interview/${id}?userId=${userId}`, { method: 'DELETE' });
@@ -202,6 +193,7 @@ export function HomePage() {
   }, [showForm]);
 
   const startInterview = async () => {
+    if (!userId) return;
     setLoading(true);
     try {
       // 如果 upload-resume 已经创建了 interview，直接 navigate（不调 /start）
@@ -309,17 +301,17 @@ export function HomePage() {
       {/* 候选人身份 */}
       <div className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2.5 text-sm">
         <div className="flex items-center gap-2 text-slate-600">
-          <span className="text-slate-400">👤 当前用户</span>
+          <span className="text-slate-400">👤 当前身份</span>
           <code className="font-mono text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
             {userId}
           </code>
         </div>
         <button
-          onClick={switchUser}
+          onClick={() => navigate('/login')}
           className="text-xs text-blue-600 hover:text-blue-700 font-medium px-2 py-1 hover:bg-blue-50 rounded"
-          title="切换用户后，记忆会重新累积（旧 userId 的记忆保留在 Qdrant 里）"
+          title="切换或退出当前身份（记忆保留在 Qdrant 里）"
         >
-          切换用户
+          切换身份
         </button>
       </div>
 
@@ -387,7 +379,7 @@ export function HomePage() {
         ) : (
           <div className="divide-y divide-slate-100">
             {(interviews ?? []).map((iv: any) => (
-              <InterviewRow key={iv.id} interview={iv} onClick={() => navigate(`/interview/${iv.id}?userId=${userId}`)} />
+              <InterviewRow key={iv.id} interview={iv} onClick={() => navigate(`/interview/${iv.id}?userId=${userId ?? ''}`)} />
             ))}
           </div>
         )}

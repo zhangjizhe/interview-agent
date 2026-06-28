@@ -1,9 +1,11 @@
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useState, lazy, Suspense, useEffect } from 'react';
-import { Cpu, Database } from 'lucide-react';
+import { useState, lazy, Suspense, useEffect, useRef } from 'react';
+import { Cpu, Database, User, LogOut, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
+import { useAuth } from './hooks/useAuth';
 import { initWebVitals } from './utils/web-vitals';
 
 // 安全 JSON 解析：当 API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
@@ -72,12 +74,27 @@ function WallEIcon({ className = 'w-8 h-8' }: { className?: string }) {
 
 function TopBar() {
   const navigate = useNavigate();
-  const userId = localStorage.getItem('ia_userId') || 'demo-user';
+  const { userId, profile, switchUser } = useAuth();
   const [showStart, setShowStart] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭 user menu
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    window.addEventListener('mousedown', handler);
+    return () => window.removeEventListener('mousedown', handler);
+  }, [showUserMenu]);
 
   const { data: stats } = useQuery({
     queryKey: ['token-stats', userId],
     queryFn: async () => {
+      if (!userId) return null;
       const r = await fetch(`/api/interview/stats?userId=${userId}`);
       if (!r.ok) throw new Error(`Stats API ${r.status}`);
       return safeJson(r);
@@ -86,6 +103,7 @@ function TopBar() {
     retry: 3,
     staleTime: 0,
     refetchOnMount: 'always',
+    enabled: !!userId,
   });
 
   return (
@@ -102,6 +120,47 @@ function TopBar() {
         <div className="flex items-center gap-2 md:gap-4">
           {/* 工具/MCP 状态指示 */}
           <ToolsIndicator />
+
+          {/* 我的身份（R-AUTH-1）— 点击弹出切换/退出菜单 */}
+          {userId && (
+            <div className="relative" ref={userMenuRef}>
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-1.5 text-xs md:text-sm text-slate-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg transition"
+                title="我的面试身份"
+              >
+                <User className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="font-mono font-medium text-slate-900 max-w-[120px] truncate">
+                  {userId}
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-3 z-30">
+                  <div className="px-2 py-2 border-b border-slate-100">
+                    <div className="text-xs text-slate-400">当前身份</div>
+                    <div className="font-mono font-semibold text-slate-900 truncate">
+                      {userId}
+                    </div>
+                    {profile?.email && (
+                      <div className="text-xs text-slate-500 truncate mt-0.5">{profile.email}</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      switchUser();
+                      setShowUserMenu(false);
+                      navigate('/login');
+                    }}
+                    className="w-full mt-1 text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg flex items-center gap-2"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    切换 / 退出身份
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 面试题知识库入口 */}
           <Link
@@ -210,15 +269,31 @@ export default function App() {
         <ErrorBoundary>
           <Suspense fallback={<PageSpinner />}>
             <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/interview/:id" element={<InterviewPage />} />
-              <Route path="/question-bank" element={<QuestionBankPage />} />
-              <Route path="/tools" element={<ToolsPage />} />
-              <Route path="/admin/mcp" element={<AdminMcpPage />} />
+              {/* R-AUTH-1: /login 公开访问 */}
+              <Route path="/login" element={<LoginPage />} />
+              {/* 其他路由需要登录 */}
+              <Route path="/" element={<RequireAuth><HomePage /></RequireAuth>} />
+              <Route path="/interview/:id" element={<RequireAuth><InterviewPage /></RequireAuth>} />
+              <Route path="/question-bank" element={<RequireAuth><QuestionBankPage /></RequireAuth>} />
+              <Route path="/tools" element={<RequireAuth><ToolsPage /></RequireAuth>} />
+              <Route path="/admin/mcp" element={<RequireAuth><AdminMcpPage /></RequireAuth>} />
             </Routes>
           </Suspense>
         </ErrorBoundary>
       </main>
     </div>
   );
+}
+
+/**
+ * R-AUTH-1 路由保护组件
+ * 未登录 → 重定向到 /login（带 from state 让登录后跳回）
+ */
+function RequireAuth({ children }: { children: React.ReactElement }) {
+  const { isLoggedIn } = useAuth();
+  const location = useLocation();
+  if (!isLoggedIn) {
+    return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
+  }
+  return children;
 }
