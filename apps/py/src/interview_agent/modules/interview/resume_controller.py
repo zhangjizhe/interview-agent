@@ -15,7 +15,10 @@ from typing import Any
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from interview_agent.modules.interview.rag_service import ResumeRAGService
+from interview_agent.modules.interview.rag_service import (
+    ResumeRAGService,
+    insert_resume_to_pg,
+)
 from interview_agent.modules.interview.resume_parser import (
     parse_resume_pdf,
 )
@@ -29,6 +32,62 @@ router = APIRouter(tags=["resume"])
 
 # 10MB 限制，对齐 NestJS FileInterceptor limits: { fileSize: 10 * 1024 * 1024 }
 MAX_FILE_SIZE = 10 * 1024 * 1024
+
+# R7-fix / R-AUTH-2 B6 (2026-06-28)：upload-resume 校验 MIME 白名单
+# 拒绝 text/plain 假装 PDF、application/octet-stream、image/* 等
+# 与 NestJS FileFilter (resume.controller.ts:32) 行为对齐
+#
+# 设计：content_type 必须与文件后缀一致（防 EC-8 假 PDF 通过）
+# - .pdf          → application/pdf
+# - .md/.markdown → text/markdown / text/x-markdown
+# - .txt          → text/plain
+ALLOWED_CONTENT_TYPES: set[str] = {
+    "application/pdf",
+    "text/plain",
+    "text/markdown",
+    "text/x-markdown",
+}
+
+# 文件后缀白名单（与 content_type 互为冗余校验 — NestJS 同款）
+ALLOWED_EXTENSIONS: set[str] = {".pdf", ".md", ".markdown", ".txt"}
+
+
+def _validate_content_type_and_ext(content_type: str, ext: str) -> None:
+    """B6 严格校验：content_type 与 ext 必须配对，mime 必须在白名单内。
+
+    Raises:
+        HTTPException(415): MIME/Ext 不合法或 mime 与 ext 不匹配
+    """
+    # 1. 后缀必须在白名单内
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file extension: {ext!r}. "
+            f"Only {sorted(ALLOWED_EXTENSIONS)} are supported.",
+        )
+
+    # 2. MIME 必须在白名单内
+    if content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported content_type: {content_type!r}. "
+            f"Only {sorted(ALLOWED_CONTENT_TYPES)} are supported.",
+        )
+
+    # 3. MIME 与 ext 必须配对（防 fake.pdf + text/plain 通过）
+    expected_mimes: dict[str, set[str]] = {
+        ".pdf": {"application/pdf"},
+        ".md": {"text/markdown", "text/x-markdown"},
+        ".markdown": {"text/markdown", "text/x-markdown"},
+        ".txt": {"text/plain"},
+    }
+    expected = expected_mimes.get(ext, set())
+    if content_type not in expected:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Content-Type {content_type!r} does not match extension "
+            f"{ext!r}. Expected one of {sorted(expected)}.",
+        )
 
 
 # ============================================================
@@ -192,6 +251,14 @@ async def upload_resume(
     if not position:
         raise HTTPException(status_code=400, detail="position is required")
 
+    # R7-fix / R-AUTH-2 B6 (2026-06-28)：校验 MIME 白名单 + ext 一致性
+    # 之前只检查文件后缀 .endswith(".pdf")，text/plain 假 PDF 通过污染 RAG
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    fname = file.filename or ""
+    ext = "." + fname.rsplit(".", 1)[-1].lower() if "." in fname else ""
+
+    _validate_content_type_and_ext(content_type, ext)
+
     # 1. 读文件 + 大小校验
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
@@ -200,8 +267,7 @@ async def upload_resume(
         raise HTTPException(status_code=400, detail="Empty file")
 
     # 2. 解析简历（按文件类型）
-    fname = file.filename or ""
-    if fname.lower().endswith(".pdf"):
+    if fname.lower().endswith(".pdf") or content_type == "application/pdf":
         parsed_pdf = parse_resume_pdf(content)
     else:
         # TXT/MD/DOC/DOCX: 简化按文本处理（NestJS 用 pdfjs + mammoth 处理其他格式）
@@ -218,17 +284,36 @@ async def upload_resume(
 
     parsed = _to_parsed_resume(parsed_pdf, position)
 
-    # 3. 入 Milvus / Mem0（失败不阻塞）
-    # ⚠️ skills 必须存 string (用"、"分隔) 而不是 array — 对齐 NestJS resume-rag.service.ts:
-    #   skills: cleanSkills.join('、')
-    # 前端 InterviewPage.tsx L379 用 resume.skills.split(/[、,，]/) 解析 string。
+    # 3. 写 PG resumes 表（source of truth） — R7-fix / R-AUTH-2 治本方案 B
+    # PG 写成功 = 上传成功；Mem0 失败只 warn log，不阻塞响应
     rag_ingested = False
+    resume_id: str | None = None
     if userId:
         try:
-            rag = ResumeRAGService()
+            # 简化存储路径（demo / 本地）：直接用 userId + 文件名（生产用 S3 URL）
+            storage_path = f"uploads/{userId}/{fname}"
+            resume_id = await insert_resume_to_pg(
+                user_id=userId,
+                position=position,
+                file_name=fname,
+                file_path=storage_path,
+                file_size=len(content),
+                content_type=content_type or "application/pdf",
+                parsed_text=parsed_pdf.get("text"),
+                parsed_skills=parsed.get("skills") or [],
+                parsed_json=parsed,
+            )
+            rag_ingested = True
+        except Exception as e:
+            logger.error(f"[resume] PG insert failed: {e}")
+            # PG 失败时继续尝试 Mem0 兜底，但 frontend 会拿到 ragIngested=false
+            rag_ingested = False
+
+        # 4. 备选：写 Mem0 / L3 长期记忆（语义检索备用，PG 是 source of truth）
+        # ⚠️ 失败不阻塞：Mem0 quota 1000/1000 时常见失败，PG 已写就算成功
+        try:
             ingested_at = datetime.now(timezone.utc).isoformat()
             skills_str = "、".join(parsed.get("skills") or [])
-            # 简化：写 L3 memory（NestJS 写 Milvus resumes collection + Mem0）
             from interview_agent.modules.memory.memory import l3_write
             await l3_write(
                 userId,
@@ -241,9 +326,8 @@ async def upload_resume(
                     "createdAt": ingested_at,
                 },
             )
-            rag_ingested = True
         except Exception as e:
-            logger.warning(f"Resume RAG ingest failed: {e}")
+            logger.warning(f"[resume] Mem0/L3 backup write skipped: {e}")
 
     # 4. 匹配知识库
     bank = match_bank(position)
@@ -275,6 +359,7 @@ async def upload_resume(
         "personalizedQuestions": personalized_questions,
         "totalQuestions": len(standard_questions) + len(personalized_questions),
         "ragIngested": rag_ingested,
+        "resumeId": resume_id,  # R7-fix: 返 PG resume id，前端可用
     }
 
 

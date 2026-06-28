@@ -246,6 +246,51 @@ class AnswerHistory(Base):
     __table_args__ = (Index("ix_answer_histories_interviewId", "interviewId"),)
 
 
+class Resume(Base):
+    """简历持久化（R7-fix / R-AUTH-2 治本方案 B，2026-06-28）。
+
+    PG `resumes` 表作为 resume 业务链路 source of truth，
+    Mem0 只做语义检索（不可靠/有 quota 限制）。
+
+    字段对齐 NestJS ParsedResume 接口（name/email/position/yearsOfExperience/
+    skills/education/experience/projects/keywords/seniority/summary）。
+    NestJS prisma schema 当前没有 Resume 模型（我们先建，未来 NestJS 可同步建）。
+
+    Alembic migration: 2026_06_28_003_add_resumes_table.py
+    """
+
+    __tablename__ = "resumes"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # cuid
+    user_id: Mapped[str] = mapped_column(
+        "userId", String, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    position: Mapped[str] = mapped_column(String)  # 岗位
+    file_name: Mapped[str] = mapped_column("fileName", String)  # 上传文件名
+    file_path: Mapped[str] = mapped_column("filePath", String)  # 存储路径
+    file_size: Mapped[int] = mapped_column("fileSize", Integer)  # 字节
+    content_type: Mapped[str] = mapped_column(
+        "contentType", String, default="application/pdf"
+    )  # MIME
+    parsed_text: Mapped[str | None] = mapped_column("parsedText", Text, nullable=True)
+    parsed_skills: Mapped[list[str] | None] = mapped_column(
+        "parsedSkills", ARRAY(String), nullable=True
+    )
+    parsed_json: Mapped[dict | None] = mapped_column("parsedJson", JSONB, nullable=True)
+    qdrant_point_id: Mapped[str | None] = mapped_column("qdrantPointId", String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        "createdAt", DateTime, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updatedAt", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_resumes_userId", "userId"),
+        Index("ix_resumes_userId_createdAt_desc", "userId", "createdAt"),
+    )
+
+
 class ReflectionLog(Base):
     __tablename__ = "reflection_logs"
 

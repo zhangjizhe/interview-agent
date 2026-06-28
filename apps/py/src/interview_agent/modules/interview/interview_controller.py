@@ -159,6 +159,18 @@ async def start_interview(req: StartInterviewRequest, session: SessionDep) -> di
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    # R7-fix / R-AUTH-2 B5 (2026-06-28)：start endpoint 入口校验 user_id 格式
+    # 之前没校验，特殊字符（如 u@a / a/b / u+a）会撞 DB CHECK 约束 → 500
+    # 对齐 auth/register 的行为：InvalidUserIdError → HTTP 400
+    try:
+        from interview_agent.modules.auth.auth_service import (
+            InvalidUserIdError,
+            validate_user_id,
+        )
+        validate_user_id(user_id)
+    except InvalidUserIdError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
     # 1. Upsert user by email (NestJS L100-105)
     from interview_agent.infra.models import User as UserModel
 

@@ -178,6 +178,8 @@ class RAGService:
 
 # ============================================================
 # ResumeRAGService — 简历历史 RAG（按 createdAt 倒序）
+# R7-fix / R-AUTH-2 治本方案 B (2026-06-28)：
+#   PG `resumes` 表作为 source of truth，Mem0 只做备选语义检索
 # ============================================================
 
 
@@ -188,6 +190,11 @@ class ResumeRAGService:
     - 按 user_id 查所有简历
     - 按 createdAt DESC 排序
     - 取最新 N 条
+
+    R7-fix / R-AUTH-2 治本方案 B (2026-06-28)：
+    - **PG `resumes` 表是 source of truth**（不再依赖 Mem0）
+    - 备选：Mem0 语义检索（quota / API 不可用时 skip）
+    - 兜底：l3 in-process dict（仅 dev mode，多 worker 不共享）
     """
 
     async def search_by_user(
@@ -197,15 +204,148 @@ class ResumeRAGService:
     ) -> list[dict]:
         """按 user_id 召回最新 N 条简历。
 
-        简化：从 in-process dict 查（生产环境从 PG 表 + Milvus 混合检索）。
+        查询顺序（治本）：
+        1. **PG `resumes` 表** (source of truth) — 按 userId 过滤，createdAt DESC 排序
+        2. Mem0 (备选) — 语义检索（如 PG 失败/为空时）
+        3. in-process dict (仅 dev mode 兜底)
+
+        Returns: list of {id, userId, position, fileName, fileSize, contentType,
+                          parsedText, parsedSkills, parsedJson, createdAt, updatedAt}
         """
-        from interview_agent.modules.memory.memory import l3_read
-        resumes = await l3_read(user_id, key=None) or {}
-        # 转 list 并排序
-        items = []
-        if isinstance(resumes, dict):
-            for k, v in resumes.items():
-                if isinstance(v, dict) and "createdAt" in v:
-                    items.append(v)
-        items.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
+        items = await self._search_by_user_pg(user_id, limit)
+        if items:
+            return items
+
+        # Mem0 备选（不可用时 except 吃掉）
+        try:
+            from interview_agent.modules.memory.memory import l3_read
+            resumes = await l3_read(user_id, key=None) or {}
+            if isinstance(resumes, dict):
+                for k, v in resumes.items():
+                    if isinstance(v, dict) and "createdAt" in v:
+                        items.append(v)
+                items.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
+                items = items[:limit]
+        except Exception as e:
+            logger.warning(f"ResumeRAGService Mem0 fallback failed: {e}")
+
         return items[:limit]
+
+    async def _search_by_user_pg(
+        self,
+        user_id: str,
+        limit: int = 5,
+    ) -> list[dict]:
+        """PG source of truth: 按 userId 查 resumes 表，按 createdAt DESC 取最新 N 条。
+
+        R7-fix / R-AUTH-2 治本方案 B — 替换原 Mem0 路径。
+        """
+        from interview_agent.infra.models import Resume
+        from interview_agent.infra.db import async_session_factory
+        from sqlalchemy import select
+
+        try:
+            async with async_session_factory() as session:
+                stmt = (
+                    select(Resume)
+                    .where(Resume.user_id == user_id)
+                    .order_by(Resume.created_at.desc())
+                    .limit(limit)
+                )
+                result = await session.execute(stmt)
+                rows = list(result.scalars().all())
+                return [
+                    {
+                        "id": r.id,
+                        "userId": r.user_id,
+                        "position": r.position,
+                        "fileName": r.file_name,
+                        "fileSize": r.file_size,
+                        "contentType": r.content_type,
+                        "parsedText": r.parsed_text,
+                        "parsedSkills": r.parsed_skills or [],
+                        "parsedJson": r.parsed_json or {},
+                        "qdrantPointId": r.qdrant_point_id,
+                        "createdAt": r.created_at.isoformat() if r.created_at else None,
+                        "updatedAt": r.updated_at.isoformat() if r.updated_at else None,
+                        # 兼容旧字段（upload 阶段用 skill 字符串、name 等）
+                        "name": (r.parsed_json or {}).get("name") if r.parsed_json else None,
+                        "skills": "、".join(r.parsed_skills or []),
+                        "summary": (r.parsed_json or {}).get("summary")
+                        if r.parsed_json
+                        else None,
+                    }
+                    for r in rows
+                ]
+        except Exception as e:
+            logger.warning(f"ResumeRAGService PG query failed: {e}")
+            return []
+
+
+# ============================================================
+# 工具函数（供 upload_resume 调用，写 PG resumes 表）
+# ============================================================
+
+
+async def insert_resume_to_pg(
+    user_id: str,
+    position: str,
+    file_name: str,
+    file_path: str,
+    file_size: int,
+    content_type: str,
+    parsed_text: str | None,
+    parsed_skills: list[str] | None,
+    parsed_json: dict | None,
+) -> str:
+    """写 PG resumes 表（source of truth）。
+
+    步骤：
+    1. Upsert user (auto-create if not exists) — 防 FK 约束违反
+       （与 start_interview 的 user upsert 行为对齐）
+    2. Insert Resume row
+
+    Returns: 新简历 id (cuid)
+    """
+    import secrets
+    from sqlalchemy import select
+    from interview_agent.infra.models import Resume, User
+    from interview_agent.infra.db import async_session_factory
+
+    resume_id = f"r{secrets.token_hex(12)}"
+    async with async_session_factory() as session:
+        # 1. Upsert user (防 FK violation)
+        existing = await session.execute(select(User).where(User.id == user_id))
+        user = existing.scalar_one_or_none()
+        if user is None:
+            user = User(
+                id=user_id,
+                email=f"{user_id}@local",
+                name=user_id,
+            )
+            session.add(user)
+            try:
+                await session.commit()
+            except Exception:
+                # email 冲突（race condition）→ 静默忽略，FK 仍能 work
+                await session.rollback()
+
+        # 2. Insert Resume row
+        row = Resume(
+            id=resume_id,
+            user_id=user_id,
+            position=position,
+            file_name=file_name,
+            file_path=file_path,
+            file_size=file_size,
+            content_type=content_type,
+            parsed_text=parsed_text,
+            parsed_skills=parsed_skills or [],
+            parsed_json=parsed_json or {},
+        )
+        session.add(row)
+        await session.commit()
+    logger.info(
+        f"[resume] inserted PG resume id={resume_id} user={user_id} pos={position}"
+    )
+    return resume_id
