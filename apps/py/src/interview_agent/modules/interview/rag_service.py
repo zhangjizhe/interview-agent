@@ -333,7 +333,8 @@ async def insert_resume_to_pg(
         if user is None:
             user = User(
                 id=user_id,
-                email=f"{user_id}@local",
+                # R-AUTH-7 fix (2026-06-29): email 后缀统一为 @demo.local（与 NestJS / lifecycle 一致）
+                email=f"{user_id}@demo.local",
                 name=user_id,
             )
             session.add(user)

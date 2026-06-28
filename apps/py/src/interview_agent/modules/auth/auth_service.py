@@ -131,7 +131,9 @@ async def register(user_id: str, session: "AsyncSession", email: str | None = No
     """
     validate_user_id(user_id)
     lower_id = user_id.lower()
-    final_email = email or f"{lower_id}@local"
+    # R-AUTH-7 fix (2026-06-29): email 后缀统一为 @demo.local（与 NestJS / lifecycle 一致）
+    # 旧实现用 @local → 写入后 lifecycle 用 @demo.local 查不到 → list/stats/empty-rooms 返回空
+    final_email = email or f"{lower_id}@demo.local"
 
     # 检查是否已存在
     existing = await session.execute(select(User).where(User.id == lower_id))
@@ -180,7 +182,9 @@ async def login(user_id: str, session: "AsyncSession", email: str | None = None)
     """
     validate_user_id(user_id)
     lower_id = user_id.lower()
-    final_email = email or f"{lower_id}@local"
+    # R-AUTH-7 fix (2026-06-29): email 后缀统一为 @demo.local（与 NestJS / lifecycle 一致）
+    # 旧实现用 @local → 写入后 lifecycle 用 @demo.local 查不到 → list/stats/empty-rooms 返回空
+    final_email = email or f"{lower_id}@demo.local"
 
     # 自动 upsert user
     user = await _upsert_user(session, lower_id, final_email)
