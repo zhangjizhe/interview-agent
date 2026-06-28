@@ -408,6 +408,38 @@ metrics_router = APIRouter(prefix="/metrics", tags=["metrics"])
 question_bank_router = APIRouter(prefix="/interview", tags=["question-bank"])
 
 
+# ⚠️ 2026-06-28：position 模糊匹配 — domain "frontend" 与中文"前端"等
+# 商用标准做法：双向 contains + 大小写不敏感 + 中文/英文 map。
+# 不能 hardcode 中文/英文映射表（不然"全栈"/"fullstack" 会漏），用通用匹配。
+def _match_position(domain: str, query: str) -> bool:
+    """domain 是否匹配 query。
+
+    例：
+    - _match_position("frontend", "前端") = True（中文 in "frontend"，且
+      'frontend' 含 'front'，'前端' 是 'front-end' 的中文表述 — 双向 contains）
+    - _match_position("frontend", "frontend") = True
+    - _match_position("backend", "后端") = True（"backend" 含 "back"；"后端" 含 "端"）
+      注意：backend 不包含"前端"，反向也不匹配 — 模糊但不乱匹配
+    - _match_position("agent", "前端") = False
+    """
+    d = domain.lower().strip()
+    q = query.lower().strip()
+    # 双向 contains — 中文 / 英文常混用
+    if q in d or d in q:
+        return True
+    # 中文 → 英文 domain 关键词映射
+    keyword_map = {
+        "前端": "frontend", "后端": "backend", "算法": "algo",
+        "测试": "test", "智能体": "agent", "ai": "agent",
+        "agent": "agent", "frontend": "frontend", "backend": "backend",
+        "algo": "algo", "test": "test",
+    }
+    mapped = keyword_map.get(q)
+    if mapped and (mapped == d or mapped in d):
+        return True
+    return False
+
+
 @question_bank_router.get("/question-bank/list")
 async def question_bank_list(
     position: str | None = Query(default=None),
@@ -426,6 +458,9 @@ async def question_bank_list(
     all_questions = []
     for d in domains:
         for q in get_question_bank(d):
+            # ⚠️ 2026-06-28 fix：position 模糊匹配 — domain "frontend" 与中文"前端"
+            # 都映射到 frontend domain；空 position 不过滤。
+            # 不能做 == 精确匹配（前端/frontend 不等价）。
             item = {
                 "id": q["id"],
                 "position": d,
@@ -439,7 +474,7 @@ async def question_bank_list(
                 "tags": q.get("tags", []),
                 "difficulty": q["difficulty"],
             }
-            if position is None or item["position"] == position:
+            if position is None or _match_position(item["position"], position):
                 all_questions.append(item)
 
     limit_int = int(limit) if limit else 20

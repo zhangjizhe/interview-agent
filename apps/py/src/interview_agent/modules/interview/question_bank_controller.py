@@ -34,9 +34,35 @@ logger = logging.getLogger(__name__)
 # main.py 必须把这个 router 在 interview_router 之前注册
 router = APIRouter(tags=["question-bank"])
 
-# In-memory 题库（简化；NestJS 用 Milvus question_bank_v2 collection + Qdrant）
-# 跨进程重启会丢失 — 测试用，生产应换 Milvus/Qdrant
-_QUESTION_BANK: list[dict] = []
+# In-memory 题库（用户 add 的题，跨进程重启会丢失；NestJS 端用 Milvus question_bank_v2 collection）
+# ⚠️ 2026-06-28 fix：list/search 必须合并：
+#   1. knowledge_banks.py 的 14 道内置题（web_search 权威资料 700-1000 字符/题）
+#   2. 用户通过 add 接口动态添加的题（_USER_QUESTIONS）
+# 不能只看 _USER_QUESTIONS（永远空，让前端以为题库空的）。
+_USER_QUESTIONS: list[dict] = []
+
+
+def _all_questions() -> list[dict]:
+    """合并内置题库 + 用户题库（统一格式：position=domain, answer 非空）。"""
+    from interview_agent.modules.knowledge_base.knowledge_banks import (
+        get_question_bank,
+        list_all_domains,
+    )
+    builtin = []
+    for d in list_all_domains():
+        for q in get_question_bank(d):
+            builtin.append({
+                "id": q["id"],
+                "questionId": q["id"],
+                "position": d,
+                "level": q.get("difficulty", "P5"),
+                "category": q.get("category", ""),
+                "question": q.get("question", ""),
+                "answer": q.get("answer", ""),
+                "tags": q.get("tags", []),
+                "difficulty": q.get("difficulty", ""),
+            })
+    return builtin + _USER_QUESTIONS
 
 
 def _gen_question_id() -> str:
@@ -78,7 +104,7 @@ async def add_question(body: dict) -> dict:
         )
 
     question = _make_question(body)
-    _QUESTION_BANK.append(question)
+    _USER_QUESTIONS.append(question)
     return {"success": True, "questionId": question["questionId"], **question}
 
 
@@ -105,7 +131,7 @@ async def add_questions_batch(body: BatchAddRequest) -> dict:
         if not q.get("position") or not q.get("question") or not q.get("answer"):
             continue
         question = _make_question(q)
-        _QUESTION_BANK.append(question)
+        _USER_QUESTIONS.append(question)
         added.append(question)
 
     return {
@@ -136,7 +162,7 @@ async def search_questions(
         return {"query": "", "results": [], "count": 0}
 
     results = []
-    for item in _QUESTION_BANK:
+    for item in _all_questions():
         if position and item.get("position") != position:
             continue
         if level and item.get("level") != level:
@@ -177,8 +203,17 @@ async def list_questions(
 
     Python 端已有 kb_list_router /knowledge-base/list；这里 NestJS 是 /interview/question-bank/list
     是另一个 path。两者并存。
+
+    ⚠️ 2026-06-28 fix：position 模糊匹配 — domain "frontend" 与中文"前端" 等，
+    不能 == 精确比较。复用 lifecycle_controller._match_position（已在那边定义）。
     """
-    items = [q for q in _QUESTION_BANK if not position or q.get("position") == position]
+    from interview_agent.modules.interview.lifecycle_controller import (
+        _match_position,
+    )
+    items = [
+        q for q in _all_questions()
+        if not position or _match_position(q.get("position", ""), position)
+    ]
     return {"position": position, "results": items[:limit], "count": len(items[:limit])}
 
 
@@ -193,10 +228,10 @@ async def delete_question(question_id: str) -> dict:
 
     对齐 NestJS L108-111：返 {success, deletedCount}
     """
-    global _QUESTION_BANK
-    before = len(_QUESTION_BANK)
-    _QUESTION_BANK = [q for q in _QUESTION_BANK if q.get("questionId") != question_id]
-    deleted = before - len(_QUESTION_BANK)
+    global _USER_QUESTIONS
+    before = len(_USER_QUESTIONS)
+    _USER_QUESTIONS = [q for q in _USER_QUESTIONS if q.get("questionId") != question_id]
+    deleted = before - len(_USER_QUESTIONS)
     return {"success": True, "deletedCount": deleted, "questionId": question_id}
 
 
@@ -252,7 +287,7 @@ async def import_question_bank_file(
             "answer": chunk,
             "tags": [],
         })
-        _QUESTION_BANK.append(question)
+        _USER_QUESTIONS.append(question)
         imported_ids.append(question["questionId"])
 
     return {
@@ -357,7 +392,7 @@ async def import_question_bank_url(body: ImportUrlRequest) -> dict:
             "answer": chunk,
             "tags": [],
         })
-        _QUESTION_BANK.append(question)
+        _USER_QUESTIONS.append(question)
         imported_ids.append(question["questionId"])
 
     return {

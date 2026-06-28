@@ -607,10 +607,37 @@ async def _build_report(
     suggestions: str,
     error: bool = False,
 ) -> Report:
-    """构造 Report 对象 + session.commit + return refreshed Report。
+    """构造 Report 对象 + upsert + return refreshed Report。
+
+    ⚠️ 2026-06-28 fix：end 同一 interview 第二次会撞 reports_interviewId_key 唯一约束。
+    改成"先查有就 update、无就 insert"的 upsert 语义（对齐 NestJS prisma.report.upsert）。
 
     抽出来因为 LLM 成功 + fallback 两条路径都要做这件事。
     """
+    # ⚠️ 2026-06-28 fix：先查 existing report（处理 retry / 用户连续点 end 按钮）
+    from sqlalchemy import select
+
+    existing_q = await session.execute(
+        select(Report).where(Report.interview_id == interview.id)
+    )
+    existing = existing_q.scalar_one_or_none()
+
+    if existing:
+        # Update 已有 report — 用同一 id，不变
+        existing.overall_score = overall_score
+        existing.scores = scores
+        existing.strengths = strengths
+        existing.weaknesses = weaknesses
+        existing.suggestions = suggestions
+        await session.commit()
+        await session.refresh(existing)
+        if error:
+            logger.warning(
+                f"[end] interview {interview.id} 更新 fallback report "
+                f"(score={overall_score})"
+            )
+        return existing
+
     report = Report(
         id=f"r{secrets.token_hex(12)}",
         interview_id=interview.id,
