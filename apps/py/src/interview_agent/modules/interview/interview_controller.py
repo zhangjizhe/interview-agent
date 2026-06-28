@@ -22,7 +22,7 @@ from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,28 +70,37 @@ class StartInterviewRequest(BaseModel):
     - snake_case: user_id / user_role / thread_id （前端实际发的）
 
     ⚠️ 与 NestJS 对齐：NestJS 用 interface（不校验），用前端 user_id 当 userId，
-    用 user_role 当 position。Python 端用 Pydantic alias + populate_by_name 兼容。
+    用 user_role 当 position。Python 端用 Pydantic AliasChoices 兼容多字段名。
+
+    R-AUTH-2 (2026-06-28) 修复：之前用 alias="userId" + 单独的 user_id 字段，
+    Pydantic v2 不允许字段名=alias 时通过 snake_case 字段填充。
+    改用 AliasChoices 让 userId 字段接受 userId/user_id 两个 key。
     """
 
     model_config = {"populate_by_name": True}
 
-    userId: str | None = Field(default=None, alias="userId")
-    position: str | None = Field(default=None)
+    userId: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("userId", "user_id"),
+    )
+    position: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("position", "user_role"),
+    )
     level: str | None = Field(default="P5")
 
-    # 前端 snake_case 兼容字段
-    user_id: str | None = Field(default=None, alias="user_id")
-    user_role: str | None = Field(default=None, alias="user_role")
-    user_message: str | None = Field(default=None, alias="user_message")
-    thread_id: str | None = Field(default=None, alias="thread_id")
+    # 可选字段（前端额外发的，不参与 resolve）
+    user_message: str | None = Field(default=None)
+    thread_id: str | None = Field(default=None)
 
     def resolve(self) -> tuple[str, str, str]:
         """返回标准化 (userId, position, level)。
 
-        优先级：camelCase > snake_case。fallback 到 level="P5"。
+        优先级：camelCase > snake_case（AliasChoices 已经按顺序匹配）。
+        fallback：position="通用"、level="P5"。
         """
-        uid = self.userId or self.user_id
-        pos = self.position or self.user_role or "通用"
+        uid = self.userId
+        pos = self.position or "通用"
         lvl = self.level or "P5"
         if not uid:
             raise ValueError("userId or user_id required")
