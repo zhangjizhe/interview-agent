@@ -233,7 +233,7 @@ class ToggleRequest(BaseModel):
     enabled: bool
 
 
-@admin_mcp_servers_router.get("")
+@admin_mcp_servers_router.get("/")
 async def list_mcp_servers() -> dict:
     """所有 MCP server + 运行时状态。"""
     _ensure_registered()

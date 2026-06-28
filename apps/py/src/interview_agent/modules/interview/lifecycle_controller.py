@@ -432,7 +432,10 @@ async def question_bank_list(
                 "level": "P5",
                 "category": q["category"],
                 "question": q["question"],
-                "answer": "",  # 内置题库不存答案
+                # ⚠️ 2026-06-28 fix：之前写死 "" 把答案丢了 — 14 题的 answer 字段全在
+                # knowledge_banks.py 里（web_search 搜的权威资料 700-1000 字符/题）。
+                # 前端 QuestionBankPage 显示这个字段，丢答案 = UI 显示空白。
+                "answer": q.get("answer", ""),
                 "tags": q.get("tags", []),
                 "difficulty": q["difficulty"],
             }

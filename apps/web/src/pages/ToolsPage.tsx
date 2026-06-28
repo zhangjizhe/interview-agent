@@ -201,7 +201,7 @@ export function ToolsPage() {
       </div>
 
       {/* MCP server 状态条（admin） */}
-      {mcpStatus && mcpStatus.servers.length > 0 && (
+      {(mcpStatus?.servers?.length ?? 0) > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-3 md:p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
