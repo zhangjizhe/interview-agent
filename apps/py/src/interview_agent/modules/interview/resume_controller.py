@@ -135,6 +135,24 @@ def pick_questions(bank: DomainType, count: int = 5) -> list[dict]:
     return out[:count]
 
 
+def _sanitize_nul_in_obj(obj: Any) -> Any:
+    """R-AUTH-2 B7 (2026-06-28) — 递归清洗任意 Python 对象中的 NUL 字节。
+
+    PostgreSQL TEXT/JSONB 都不允许 0x00，json.dumps 会把 NUL 输出成
+    `\\u0000` 字符串，asyncpg 仍会抛 UntranslatableCharacterError。
+    适用范围：str（清洗）/ dict（递归）/ list（递归）/ 其他（透传）。
+    """
+    if isinstance(obj, str):
+        return obj.replace("\x00", "")
+    if isinstance(obj, dict):
+        return {k: _sanitize_nul_in_obj(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_nul_in_obj(v) for v in obj]
+    if isinstance(obj, tuple):
+        return tuple(_sanitize_nul_in_obj(v) for v in obj)
+    return obj
+
+
 def _to_parsed_resume(parsed_pdf: dict, position: str) -> dict:
     """把 parse_resume_pdf 的 {text, skills, pageCount} 转成 NestJS ParsedResume 字段。
 
@@ -289,6 +307,15 @@ async def upload_resume(
     rag_ingested = False
     resume_id: str | None = None
     if userId:
+        # R-AUTH-2 B7 (2026-06-28) — 防御性 UTF-8 sanitize: PostgreSQL TEXT
+        # 不允许 NUL 字节 (0x00)，pdfminer/pypdf 解析真实 PDF 时常见 NUL，
+        # insert 触发 asyncpg.CharacterNotInRepertoireError /
+        # UntranslatableCharacterError (`\u0000 cannot be converted to text`)。
+        # 同时必须 sanitize parsed_json 里所有 str（含 _fullText/name/summary），
+        # 否则 SQLAlchemy JSON 序列化会把 NUL 转成 `\u0000` 字符串，
+        # asyncpg 仍会在 JSONB 参数路径上抛同一错误。
+        parsed_text_for_pg = (parsed_pdf.get("text") or "").replace("\x00", "")
+        parsed_json_for_pg = _sanitize_nul_in_obj(parsed)
         try:
             # 简化存储路径（demo / 本地）：直接用 userId + 文件名（生产用 S3 URL）
             storage_path = f"uploads/{userId}/{fname}"
@@ -299,15 +326,21 @@ async def upload_resume(
                 file_path=storage_path,
                 file_size=len(content),
                 content_type=content_type or "application/pdf",
-                parsed_text=parsed_pdf.get("text"),
+                parsed_text=parsed_text_for_pg,
                 parsed_skills=parsed.get("skills") or [],
-                parsed_json=parsed,
+                parsed_json=parsed_json_for_pg,
             )
             rag_ingested = True
         except Exception as e:
-            logger.error(f"[resume] PG insert failed: {e}")
-            # PG 失败时继续尝试 Mem0 兜底，但 frontend 会拿到 ragIngested=false
-            rag_ingested = False
+            # R-AUTH-2 B7 (2026-06-28) — 不再静默 swallow：PG insert 失败时
+            # 抛 500 给前端，让 UI 能正确显示错误，不再返 200 假成功。
+            logger.error(
+                f"[resume] PG insert failed: {e}", exc_info=True
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"简历入库失败: {type(e).__name__}",
+            )
 
         # 4. 备选：写 Mem0 / L3 长期记忆（语义检索备用，PG 是 source of truth）
         # ⚠️ 失败不阻塞：Mem0 quota 1000/1000 时常见失败，PG 已写就算成功

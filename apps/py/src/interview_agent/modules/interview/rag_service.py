@@ -312,6 +312,19 @@ async def insert_resume_to_pg(
     from interview_agent.infra.models import Resume, User
     from interview_agent.infra.db import async_session_factory
 
+    # R-AUTH-2 B7 (2026-06-28) — 防御性 UTF-8 sanitize: PostgreSQL TEXT/JSONB
+    # 不允许 NUL 字节 (0x00)，pdfminer/pypdf 解析真实 PDF 时常见 NUL。
+    # json.dumps 会把 NUL 转为 `\u0000` 字符串，asyncpg 在 JSONB 参数路径
+    # 上同样抛 UntranslatableCharacterError。
+    # 统一在 DB insert 入口递归清洗 parsed_text + parsed_json 中所有 str。
+    if parsed_text:
+        parsed_text = parsed_text.replace("\x00", "")
+    if parsed_json:
+        from interview_agent.modules.interview.resume_controller import (
+            _sanitize_nul_in_obj,
+        )
+        parsed_json = _sanitize_nul_in_obj(parsed_json)
+
     resume_id = f"r{secrets.token_hex(12)}"
     async with async_session_factory() as session:
         # 1. Upsert user (防 FK violation)
