@@ -360,10 +360,21 @@ async def interview_message(
 @router.post("/{interview_id}/end")
 async def end_interview(
     interview_id: str,
-    req: EndInterviewRequest,
     session: SessionDep,
+    req: EndInterviewRequest | None = None,  # 2026-06-28 fix：前端不传 body，必须 optional
 ) -> dict:
-    """结束面试：生成 Report + 关闭 SessionCost。"""
+    """结束面试：生成 Report + 关闭 SessionCost。
+
+    ⚠️ 2026-06-28 修复：前端 InterviewPage.tsx L206 fetch 不传 body，
+    原 `req: EndInterviewRequest` 必传 → 422 missing field。
+    现在 `req | None = None`，无 body 时用默认值（finalScore=None / summary=None）。
+
+    对齐 NestJS：NestJS `@Post(':interviewId/end') endInterview(@Param() string)`
+    完全不接 body，行为对齐"前端空 body"。
+    """
+    if req is None:
+        req = EndInterviewRequest()
+
     interview = await session.get(Interview, interview_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
