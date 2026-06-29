@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, FileText, ChevronRight, Plus, BarChart3, X, Cpu, Sparkles, Upload, CheckCircle2, Loader2 } from 'lucide-react';
+import { Clock, FileText, ChevronRight, Plus, BarChart3, X, Cpu, Sparkles, Upload, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import type { McpToolMeta } from '@interview-agent/shared-types';
 import { safeJson } from '../utils/safeJson';
 
@@ -444,6 +444,32 @@ export function HomePage() {
               </button>
             </div>
             <div className="p-5 space-y-4">
+              {/* 2026-06-29 修复：弹窗顶部先显示简历确认状态（PM 验收意见）
+                  之前岗位/level 排在简历前，用户看不到"先确认简历"的指引
+                  现在未上传 → 顶部红色警告 + 上传引导
+                  已上传 → 顶部绿色确认 + 简历摘要 */}
+              {resumeUploaded ? (
+                <div className="flex items-start gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-emerald-900">简历已确认</div>
+                    <div className="text-xs text-emerald-700 mt-0.5 truncate">
+                      {resumeFile?.name} · AI 面试官将基于此简历提问
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-amber-900">请先上传简历</div>
+                    <div className="text-xs text-amber-700 mt-0.5">
+                      简历是面试提问的基础，未上传无法开始面试
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">应聘岗位</label>
                 <div className="flex flex-wrap gap-2">
