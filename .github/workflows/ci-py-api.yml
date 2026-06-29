@@ -169,11 +169,147 @@ jobs:
       - name: Vitest (59 case, @interview-agent/web)
         run: pnpm --filter @interview-agent/web exec vitest run --reporter=verbose
 
+  e2e-test:
+    runs-on: ubuntu-latest
+    # 真实浏览器 UI 交互测试（Playwright）：
+    # - homepage-defensive：mock /api/tools 错误格式，验证前端不崩
+    # - streaming-flow：4 轮真实对话 + SSE 流式 token 推送
+    # - reviewer-prompt-fix：4 轮对话 + 检查追问不开场白
+    # CI 模式：homepage-defensive 必过；LLM 假 key 时 streaming/reviewer skip 而非 fail
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: interview
+          POSTGRES_USER: dev
+          POSTGRES_PASSWORD: dev123
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies (monorepo root)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        # 只装 chromium（避免 firefox/webkit ~300MB）
+        run: pnpm --filter @interview-agent/web exec playwright install chromium --with-deps
+
+      - name: Build NestJS api
+        working-directory: apps/api
+        run: |
+          npx prisma generate
+          npx nest build
+
+      - name: Start NestJS api
+        env:
+          DATABASE_URL: postgresql://dev:dev123@localhost:5432/interview
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: ci_test_secret_at_least_32_characters_long_xxxxxxxx
+          PORT: 3001
+          NODE_ENV: production
+          QWEN_API_KEY: sk-test-placeholder
+          DEEPSEEK_API_KEY: sk-test-placeholder
+        working-directory: apps/api
+        run: |
+          nohup node dist/main.js > api-e2e.log 2>&1 &
+          echo $! > /tmp/api-e2e.pid
+
+      - name: Wait for api healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:3001/api/health 2>/dev/null | grep -q '"status":"ok"'; then
+              echo "✓ api is healthy"
+              break
+            fi
+            sleep 3
+          done
+
+      - name: Build web
+        working-directory: apps/web
+        run: pnpm --filter @interview-agent/web exec vite build
+
+      - name: Start web (preview server)
+        working-directory: apps/web
+        run: |
+          nohup pnpm --filter @interview-agent/web exec vite preview --host 0.0.0.0 --port 5173 > web-e2e.log 2>&1 &
+          echo $! > /tmp/web-e2e.pid
+
+      - name: Wait for web ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5173/ 2>/dev/null > /dev/null; then
+              echo "✓ web is ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run Playwright E2E (3 specs)
+        working-directory: apps/web
+        env:
+          API_URL: http://localhost:3001
+          WEB_URL: http://localhost:5173
+          # CI 模式（默认）：LLM 假 key 时 streaming/reviewer skip 而非 fail
+          # dev 模式：STRICT_LLM=1 必须全过
+        run: |
+          set +e
+          node e2e/run-all.mjs 2>&1 | tee e2e.log
+          echo "=== exit code: $? ==="
+
+      - name: Upload E2E screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: apps/web/e2e/screenshots/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload E2E log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-log
+          path: apps/web/e2e.log
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ -f /tmp/api-e2e.pid ]; then kill $(cat /tmp/api-e2e.pid) 2>/dev/null || true; fi
+          if [ -f /tmp/web-e2e.pid ]; then kill $(cat /tmp/web-e2e.pid) 2>/dev/null || true; fi
+          rm -f /tmp/api-e2e.pid /tmp/web-e2e.pid
+
   ci-summary:
     runs-on: ubuntu-latest
     # 2026-06-26 架构回退后，apps/api-legacy 已重命名为 apps/api
     # NestJS 测试见 .github/workflows/ci-api.yml；ci-py-api.yml 只管 py-api + web
-    needs: [lint-type-test, docker-build-test, web-test]
+    needs: [lint-type-test, docker-build-test, web-test, e2e-test]
     if: always()
     steps:
       - name: Summary
@@ -185,8 +321,10 @@ jobs:
           echo "| lint-type-test | ${{ needs.lint-type-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| docker-build-test | ${{ needs.docker-build-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| web-test | ${{ needs.web-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| e2e-test | ${{ needs.e2e-test.result }} |" >> $GITHUB_STEP_SUMMARY
           if [ "${{ needs.lint-type-test.result }}" != "success" ] || \
              [ "${{ needs.docker-build-test.result }}" != "success" ] || \
-             [ "${{ needs.web-test.result }}" != "success" ]; then
+             [ "${{ needs.web-test.result }}" != "success" ] || \
+             [ "${{ needs.e2e-test.result }}" != "success" ]; then
             exit 1
           fi
