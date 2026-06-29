@@ -91,32 +91,51 @@ jobs:
             .
 
       - name: Smoke test (image healthcheck)
+        # set +e + tee log 让 fail 时能看到容器错（GH API log 要 admin）
         run: |
-          # 启动容器（无外部依赖），验证健康检查通过
-          docker run -d \
-            --name py-api-smoke \
-            -e NODE_ENV=production \
-            -e JWT_SECRET=ci_test_secret_at_least_32_characters_long_xxxxxxxx \
-            -e QWEN_API_KEY=sk-test-placeholder \
-            -e DEEPSEEK_API_KEY=sk-test-placeholder \
-            -e POSTGRES_HOST=localhost \
-            -e REDIS_HOST=localhost \
-            -e MILVUS_HOST=localhost \
-            -e QDRANT_URL=http://localhost:6333 \
-            -p 3002:3002 \
-            interview-py-api:test
+          set +e
+          {
+            echo "=== docker run ==="
+            docker run -d \
+              --name py-api-smoke \
+              -e NODE_ENV=production \
+              -e JWT_SECRET=ci_test_secret_at_least_32_characters_long_xxxxxxxx \
+              -e QWEN_API_KEY=sk-test-placeholder \
+              -e DEEPSEEK_API_KEY=sk-test-placeholder \
+              -e POSTGRES_HOST=localhost \
+              -e REDIS_HOST=localhost \
+              -e MILVUS_HOST=localhost \
+              -e QDRANT_URL=http://localhost:6333 \
+              -p 3002:3002 \
+              interview-py-api:test
 
-          # 等待启动
-          for i in $(seq 1 30); do
-            if curl -s http://localhost:3002/api/health 2>/dev/null | grep -q "ok"; then
-              echo "✓ py-api is healthy"
-              break
-            fi
-            sleep 2
-          done
+            sleep 3
+            echo "=== container status ==="
+            docker ps -a --filter name=py-api-smoke --format "table {{.Names}}\t{{.Status}}"
 
-          curl -s http://localhost:3002/api/health
-          docker logs py-api-smoke | tail -20
+            echo "=== container logs ==="
+            docker logs py-api-smoke --tail 50
+
+            echo "=== wait for /api/health (max 60s) ==="
+            for i in $(seq 1 30); do
+              HEALTH=$(curl -s -w '\nHTTP %{http_code}' http://localhost:3002/api/health 2>&1)
+              echo "[$i] $HEALTH"
+              if echo "$HEALTH" | grep -q "ok"; then
+                echo "✓ py-api is healthy"
+                break
+              fi
+              sleep 2
+            done
+          } 2>&1 | tee smoke.log
+
+      - name: Upload smoke test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-log
+          path: smoke.log
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Cleanup
         if: always()
