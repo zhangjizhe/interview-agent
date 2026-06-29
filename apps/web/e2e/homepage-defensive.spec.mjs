@@ -11,10 +11,20 @@
  * 退出码：0 = 全部通过
  */
 import { chromium } from 'playwright';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { mkdirSync } from 'fs';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SCREENSHOTS_DIR = join(__dirname, 'screenshots');
+mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+
+// CI runner 默认无 Chrome；用 playwright 自带 chromium（CHROME_PATH 不设时自动用 bundled）
+const CHROME_PATH = process.env.CHROME_PATH || null;
 
 async function main() {
   const browser = await chromium.launch({
-    executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    executablePath: CHROME_PATH || undefined,
     headless: true,
     args: ['--no-sandbox'],
   });
@@ -109,7 +119,7 @@ async function main() {
   ok('No ErrorBoundary after restore', !state3.hasErrorUI);
   ok('Skills market shows real count', state3.skillsText && state3.skillsText !== '0/0 可用');
 
-  await page.screenshot({ path: '/Users/zhangjizhe/Desktop/interview-agent-2/apps/web/e2e/screenshots/3-homepage-defensive.png', fullPage: true });
+  await page.screenshot({ path: join(__dirname, 'screenshots/3-homepage-defensive.png'), fullPage: true });
 
   await browser.close();
   console.log(`\n━━━ Result ━━━`);
