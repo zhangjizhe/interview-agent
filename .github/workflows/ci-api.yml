@@ -161,8 +161,23 @@ jobs:
       - name: Build NestJS api
         # lint-type-test 只跑 jest（ts-jest 转译），不输出 dist/
         # E2E 跑 node dist/main.js 需要先 nest build
+        # set +e + tee log 让 fail 也能看到真实错（GH API 看不到 step log）
         working-directory: apps/api
-        run: npx nest build
+        run: |
+          set +e
+          npx nest build 2>&1 | tee nest-build.log
+          echo "=== exit code: $? ==="
+          echo "=== ls dist/ ==="
+          ls -la dist/ 2>&1 | head -10
+
+      - name: Upload nest build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nest-build-log
+          path: apps/api/nest-build.log
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Start NestJS api (in runner, not container)
         # GH service container（postgres / redis）在 runner 上 listen localhost:5432 / 6379
