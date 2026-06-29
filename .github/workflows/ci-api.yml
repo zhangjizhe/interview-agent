@@ -129,23 +129,34 @@ jobs:
         # nest build 需要 @prisma/client type 定义（来自 .prisma/client/）
         # npm ci 装 @prisma/client 但不自动 generate
         # 顺序：prisma generate 必须在 nest build 前
+        # set +e 让 step 不因 grep error 立刻 fail（把 log 留给 upload-artifact 让我能看）
         working-directory: apps/api
         run: |
+          set +e
           echo "=== prisma --version ==="
-          npx prisma --version 2>&1 || echo "prisma --version fail"
+          npx prisma --version 2>&1
           echo "=== ls node_modules/.bin/prisma ==="
-          ls -la node_modules/.bin/prisma 2>&1 || echo "no prisma bin"
+          ls -la node_modules/.bin/prisma 2>&1
           echo "=== ls prisma/ ==="
           ls -la prisma/ 2>&1
           echo "=== pwd ==="
           pwd
+          echo "=== node version ==="
+          node --version
+          echo "=== npm version ==="
+          npm --version
           echo "=== prisma generate ==="
           npx prisma generate 2>&1 | tee prisma-generate.log
-          if grep -q "Error\|error" prisma-generate.log; then
-            echo "::error::prisma generate reported error"
-            cat prisma-generate.log
-            exit 1
-          fi
+          echo "=== exit code: $? ==="
+
+      - name: Upload prisma generate log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prisma-generate-log
+          path: apps/api/prisma-generate.log
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Build NestJS api
         # lint-type-test 只跑 jest（ts-jest 转译），不输出 dist/
