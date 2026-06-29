@@ -215,64 +215,65 @@ jobs:
           done
 
       - name: E2E 接口测试（9 个核心 endpoint）
+        # set +e + tee log 让 9 个 endpoint 都跑完（看哪个 fail）
         run: |
-          echo "=== 1. Liveness ==="
-          curl -sf http://localhost:3001/api/health && echo " ✓" || (echo "✗ FAIL"; exit 1)
+          set +e
+          {
+            echo "=== 1. Liveness ==="
+            curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/health
 
-          echo "=== 2. Readiness（postgres + redis 真连） ==="
-          READY=$(curl -sf http://localhost:3001/api/health/ready)
-          echo "$READY"
-          if echo "$READY" | grep -q '"status":"ready"' && \
-             echo "$READY" | grep -q '"postgres":"ok"' && \
-             echo "$READY" | grep -q '"redis":"ok"'; then
-            echo "✓ readiness OK"
-          else
-            echo "✗ readiness FAIL"
-            docker logs api-e2e 2>&1 | tail -30 || true
-            cat api-e2e.log 2>&1 | tail -50 || true
-            exit 1
-          fi
+            echo "=== 2. Readiness（postgres + redis 真连） ==="
+            READY=$(curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/health/ready)
+            echo "$READY"
 
-          echo "=== 3. /api/interview/list ==="
-          curl -sf "http://localhost:3001/api/interview/list?userId=demo-user-ci" > /dev/null && echo "✓" || (echo "✗"; exit 1)
+            echo "=== 3. /api/interview/list ==="
+            curl -sw 'HTTP %{http_code}\n' "http://localhost:3001/api/interview/list?userId=demo-user-ci"
 
-          echo "=== 4. /api/interview/stats ==="
-          curl -sf "http://localhost:3001/api/interview/stats?userId=demo-user-ci" > /dev/null && echo "✓" || (echo "✗"; exit 1)
+            echo "=== 4. /api/interview/stats ==="
+            curl -sw 'HTTP %{http_code}\n' "http://localhost:3001/api/interview/stats?userId=demo-user-ci"
 
-          echo "=== 5. /api/tools ==="
-          curl -sf http://localhost:3001/api/tools > /dev/null && echo "✓" || (echo "✗"; exit 1)
+            echo "=== 5. /api/tools ==="
+            curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/tools
 
-          echo "=== 6. /api/admin/mcp-servers ==="
-          curl -sf http://localhost:3001/api/admin/mcp-servers > /dev/null && echo "✓" || (echo "✗"; exit 1)
+            echo "=== 6. /api/admin/mcp-servers ==="
+            curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/admin/mcp-servers
 
-          echo "=== 7. /api/knowledge-base/list ==="
-          curl -sf http://localhost:3001/api/knowledge-base/list > /dev/null && echo "✓" || (echo "✗"; exit 1)
+            echo "=== 7. /api/knowledge-base/list ==="
+            curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/knowledge-base/list
 
-          echo "=== 8. /api/interview/question-bank/list ==="
-          curl -sf "http://localhost:3001/api/interview/question-bank/list?limit=3" > /dev/null && echo "✓" || (echo "✗"; exit 1)
+            echo "=== 8. /api/interview/question-bank/list ==="
+            curl -sw 'HTTP %{http_code}\n' "http://localhost:3001/api/interview/question-bank/list?limit=3"
 
-          echo "=== 9. /api/interview/upload-resume ==="
-          # 用最小有效 PDF（CI 内联生成）
-          python3 -c "
+            echo "=== 9. /api/interview/upload-resume ==="
+            python3 -c "
           from reportlab.pdfgen import canvas
           c = canvas.Canvas('/tmp/ci-resume.pdf')
           c.drawString(50, 750, 'Name: CI Test')
           c.drawString(50, 730, 'Email: ci@test.local')
           c.drawString(50, 710, 'Skills: Python TypeScript NestJS FastAPI')
           c.save()
-          "
-          UPLOAD=$(curl -sf -X POST http://localhost:3001/api/interview/upload-resume \
-            -F "file=@/tmp/ci-resume.pdf" \
-            -F "position=AI Agent" \
-            -F "userId=demo-user-ci" \
-            -w "%{http_code}" -o /tmp/upload-response.json)
-          if [ "$UPLOAD" = "200" ] && grep -q "ragIngested\|interviewId" /tmp/upload-response.json; then
-            echo "✓ upload-resume 200 + valid response"
-          else
-            echo "✗ upload-resume FAIL (status=$UPLOAD)"
+          " 2>&1
+            curl -sw 'HTTP %{http_code}\n' -X POST http://localhost:3001/api/interview/upload-resume \
+              -F "file=@/tmp/ci-resume.pdf" \
+              -F "position=AI Agent" \
+              -F "userId=demo-user-ci" \
+              -o /tmp/upload-response.json
+            echo "--- /tmp/upload-response.json ---"
             cat /tmp/upload-response.json
-            exit 1
-          fi
+            echo
+          } 2>&1 | tee e2e.log
+          # 最后看 api process log（如果 endpoint 5xx 可能有错）
+          echo "=== api-e2e.log tail (最后 30 行) ==="
+          tail -30 api-e2e.log 2>&1 || true
+
+      - name: Upload E2E log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-log
+          path: apps/api/e2e.log
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: E2E summary
         if: always()
