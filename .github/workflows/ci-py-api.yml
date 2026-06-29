@@ -82,12 +82,13 @@ jobs:
 
       - name: Build py-api image (cache disabled for verification)
         # 只 build，不 push（验证 Dockerfile 可构建）
+        # context 必须是 monorepo 根（apps/py-api/Dockerfile 假设 COPY apps/py-api/...）
         run: |
           docker build \
             -f apps/py-api/Dockerfile \
             -t interview-py-api:test \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
-            apps/py-api/
+            .
 
       - name: Smoke test (image healthcheck)
         run: |
@@ -132,11 +133,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        # 不带 cache（cache:'pnpm' + cache-dependency-path 在 GH runner fail 高发，去掉）
+        # pnpm install 自身的 store 缓存就够
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-          cache-dependency-path: 'pnpm-lock.yaml'
 
       - uses: pnpm/action-setup@v3
         with:
