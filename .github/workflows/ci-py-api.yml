@@ -150,7 +150,9 @@ jobs:
 
   ci-summary:
     runs-on: ubuntu-latest
-    needs: [lint-type-test, docker-build-test, api-legacy-test, web-test]
+    # 2026-06-26 架构回退后，apps/api-legacy 已重命名为 apps/api
+    # NestJS 测试见 .github/workflows/ci-api.yml；ci-py-api.yml 只管 py-api + web
+    needs: [lint-type-test, docker-build-test, web-test]
     if: always()
     steps:
       - name: Summary
@@ -161,11 +163,9 @@ jobs:
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| lint-type-test | ${{ needs.lint-type-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| docker-build-test | ${{ needs.docker-build-test.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| api-legacy-test | ${{ needs.api-legacy-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| web-test | ${{ needs.web-test.result }} |" >> $GITHUB_STEP_SUMMARY
           if [ "${{ needs.lint-type-test.result }}" != "success" ] || \
              [ "${{ needs.docker-build-test.result }}" != "success" ] || \
-             [ "${{ needs.api-legacy-test.result }}" != "success" ] || \
              [ "${{ needs.web-test.result }}" != "success" ]; then
             exit 1
           fi
