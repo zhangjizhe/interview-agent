@@ -17,6 +17,14 @@ export function HomePage() {
   const showNew = searchParams.get('new') === '1';
 
   const [userId, setUserId] = useState(() => {
+    // 2026-06-29 修复：优先级 URL ?userId= > localStorage > 新生成
+    // 之前优先 localStorage，导致 URL 带不同 userId 进来还是用旧 userId，
+    // 首页 stats/list 显示历史 demo-user 数据但 list 空（数据关联错乱）
+    const fromUrl = searchParams.get('userId');
+    if (fromUrl) {
+      localStorage.setItem('ia_userId', fromUrl);
+      return fromUrl;
+    }
     const stored = localStorage.getItem('ia_userId');
     if (stored) return stored;
     // R-P2-18 修复：原 Math.random().toString(36).slice(2,8) 仅 6 字符 (~36^6=2B)，
@@ -27,11 +35,26 @@ export function HomePage() {
     return id;
   });
 
-  // 切换用户（清空记忆 + 生成新 userId）
+  // 2026-06-29 修复：URL ?userId= 变化时（用户点击"切换用户"链接或 share URL）同步 userId state + localStorage
+  useEffect(() => {
+    const fromUrl = searchParams.get('userId');
+    if (fromUrl && fromUrl !== userId) {
+      localStorage.setItem('ia_userId', fromUrl);
+      setUserId(fromUrl);
+    }
+  }, [searchParams, userId]);
+
+  // 切换用户（清空记忆 + 生成新 userId + 同步更新 URL）
   const switchUser = () => {
     const id = `demo-user-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
     localStorage.setItem('ia_userId', id);
     setUserId(id);
+    // 同步 URL ?userId= 让 share / 收藏 / reload 都能保留 userId
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('userId', id);
+      return next;
+    }, { replace: true });
   };
 
   const [showForm, setShowForm] = useState(showNew);
@@ -213,11 +236,13 @@ export function HomePage() {
       const res = await fetch('/api/interview/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // 2026-06-29 修复：API DTO 是 StartInterviewDto { userId, position, level? }
+        // 之前字段名错（user_id 而非 userId）+ 漏传 level + position
         body: JSON.stringify({
-          user_id: userId,
-          user_message: `开始 ${position} ${level} 面试`,
-          user_role: position,
-          thread_id: undefined,
+          userId,
+          position,
+          level,
+          resumeConfirmed: true,
         }),
       });
       const data = await safeJson(res);
