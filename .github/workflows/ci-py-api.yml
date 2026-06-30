@@ -12,6 +12,7 @@ on:
     branches: [main]
     paths:
       - 'apps/py-api/**'
+      - 'apps/web/**'
       - 'docker-compose.yml'
       - 'deploy.sh'
       - '.github/workflows/ci-py-api.yml'
