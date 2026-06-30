@@ -103,6 +103,30 @@ export function HomePage() {
     }
   };
 
+  // 2026-06-29 修复：组件 mount 或 userId 变化时 fetch 已有简历 + 自动同步 uploadedInterviewId
+  // 之前 upload-resume 后简历状态只在 HomePage 内存里有，关闭弹窗 / 离开页面 / 重新打开弹窗状态都丢失
+  // 修法：调 GET /api/interview/list?userId= 拿最老的 IN_PROGRESS interview 作为 uploadedInterviewId
+  //       （upload 时已经创建了 Interview 记录，list 接口能拿到）
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const r = await fetch(`/api/interview/list?userId=${encodeURIComponent(userId)}`);
+        if (!r.ok) return;
+        const data = await safeJson(r);
+        const list = Array.isArray(data) ? data : [];
+        // 找 status=IN_PROGRESS 的最早 interview（upload-resume 创建的）
+        const inProgress = list.find((iv) => iv.status === 'IN_PROGRESS' || iv.status === 'PENDING');
+        if (inProgress) {
+          setResumeUploaded(true);
+          setUploadedInterviewId(inProgress.id);
+        }
+      } catch (err) {
+        console.warn('fetch interviews failed:', err);
+      }
+    })();
+  }, [userId]);
+
   const { data: interviews = [] } = useQuery({
     queryKey: ['interviews', userId],
     queryFn: async () => {
@@ -132,14 +156,14 @@ export function HomePage() {
     refetchOnMount: 'always',
   });
 
-  // 工具列表（首页技能市场）
+// 工具列表（首页技能市场）
   // 2026-06-26 修：queryKey 改 'tools-count' 跟 App.tsx 头部共享 React Query cache
   // 之前 queryKey='tools' 独立，App.tsx 拿到 2/3 但 HomePage 拿到 0/0（cache 错位）
   const { data: toolsData } = useQuery({
     queryKey: ['tools-count'],
     queryFn: async () => {
       const r = await fetch('/api/tools');
-      const data: any = safeJson(r);
+      const data: any = await safeJson(r);
       if (data && Array.isArray(data.tools)) {
         return data as { tools: McpToolMeta[]; count: number; enabledCount: number };
       }
