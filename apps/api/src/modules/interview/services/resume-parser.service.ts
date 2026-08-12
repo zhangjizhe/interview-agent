@@ -40,7 +40,7 @@ export class ResumeParserService {
     if (typeof fileOrText === 'string') {
       rawText = fileOrText;
     } else if (fileOrText?.buffer) {
-      // 根据文件类型选择解析方式：PDF 用 pdfjs-dist@4 (鲁棒) + pdf-parse 兜底，二进制/文本直接读
+      // PDF 用 pdfjs-dist@4 (鲁棒) + pdf-parse 兜底，Markdown/纯文本直接读。
       const isPdf =
         fileOrText.mimetype === 'application/pdf' ||
         (fileOrText.originalname || '').toLowerCase().endsWith('.pdf');
@@ -121,7 +121,7 @@ export class ResumeParserService {
     const lines = text.split('\n').map((l) => l.trim()).filter((l) => l);
     // 简历开头的短句子通常是姓名
     for (let i = 0; i < Math.min(5, lines.length); i++) {
-      const line = lines[i];
+      const line = lines[i].replace(/^#{1,6}\s*/, '').trim();
       if (line.length > 0 && line.length < 10 && !line.includes('@') && !isPdfStructureToken(line)) {
         return line;
       }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, BadRequestException, Req } from '@nestjs/common';
 import { McpRegistry } from './services/mcp-registry';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
@@ -15,7 +15,6 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
  * - list() 返回 enabled 字段 = 系统级 && 用户级都开
  */
 interface UpsertPrefDto {
-  userId: string;
   toolName: string;
   enabled: boolean;
   config?: any;
@@ -26,19 +25,10 @@ export class ToolsController {
   constructor(private prisma: PrismaService) {}
 
   @Get()
-  async list(@Query('userId') userId?: string) {
+  async list(@Req() req: any) {
+    const userId = req.user.userId;
     const tools = McpRegistry.list();
 
-    if (!userId) {
-      // 无 userId：返回系统级
-      return {
-        tools,
-        count: tools.length,
-        enabledCount: tools.filter((t) => t.enabled).length,
-      };
-    }
-
-    // 有 userId：合并 Prisma 偏好
     const prefs = await this.prisma.userToolPreference.findMany({ where: { userId } });
     const prefMap = new Map(prefs.map((p) => [p.toolName, p.enabled]));
 
@@ -60,8 +50,8 @@ export class ToolsController {
   }
 
   @Get('preferences')
-  async getPreferences(@Query('userId') userId: string) {
-    if (!userId) throw new BadRequestException('userId required');
+  async getPreferences(@Req() req: any) {
+    const userId = req.user.userId;
     const prefs = await this.prisma.userToolPreference.findMany({ where: { userId } });
     return {
       userId,
@@ -71,9 +61,9 @@ export class ToolsController {
   }
 
   @Post('preferences')
-  async upsertPreference(@Body() body: UpsertPrefDto) {
-    if (!body.userId || !body.toolName || typeof body.enabled !== 'boolean') {
-      throw new BadRequestException('userId, toolName, enabled required');
+  async upsertPreference(@Body() body: UpsertPrefDto, @Req() req: any) {
+    if (!body.toolName || typeof body.enabled !== 'boolean') {
+      throw new BadRequestException('toolName and enabled required');
     }
     // 验证工具存在
     const tool = McpRegistry.get(body.toolName);
@@ -82,9 +72,9 @@ export class ToolsController {
     }
 
     const pref = await this.prisma.userToolPreference.upsert({
-      where: { userId_toolName: { userId: body.userId, toolName: body.toolName } },
+      where: { userId_toolName: { userId: req.user.userId, toolName: body.toolName } },
       create: {
-        userId: body.userId,
+        userId: req.user.userId,
         toolName: body.toolName,
         enabled: body.enabled,
         config: body.config ?? undefined,

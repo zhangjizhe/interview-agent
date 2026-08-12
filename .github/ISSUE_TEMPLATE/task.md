@@ -3,7 +3,7 @@ name: 📋 项目任务
 about: 项目维护任务 · 文档更新 / CI 修复 / 重构 / 杂项
 title: '[TASK] '
 labels: chore
-assignees: zhangjizhe
+assignees: ''
 ---
 
 ## 任务描述

@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-08-12T15:30:23.289Z",
+  "checks": [
+    {
+      "name": "resume confirmation displays parsed candidate data",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "admin question-bank search renders imported TypeScript content",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "screenshots": [
+    "09-resume-confirmation.png",
+    "10-question-bank-url-search.png"
+  ]
+}

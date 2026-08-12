@@ -1,0 +1,58 @@
+{
+  "generatedAt": "2026-08-12T15:24:16.251Z",
+  "api": "http://localhost:3001",
+  "passed": 10,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "resume name is normalized",
+      "passed": true,
+      "detail": "Li Ming"
+    },
+    {
+      "name": "resume is ingested into RAG",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "resume generates personalized questions",
+      "passed": true,
+      "detail": "3"
+    },
+    {
+      "name": "owner can recall uploaded resume",
+      "passed": true,
+      "detail": "1"
+    },
+    {
+      "name": "interview starts after resume ingestion",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "question-bank file import extracts questions",
+      "passed": true,
+      "detail": "2"
+    },
+    {
+      "name": "file import is immediately searchable",
+      "passed": true,
+      "detail": "5"
+    },
+    {
+      "name": "URL import generates questions from technical documentation",
+      "passed": true,
+      "detail": "5"
+    },
+    {
+      "name": "URL import is immediately searchable",
+      "passed": true,
+      "detail": "5"
+    },
+    {
+      "name": "SSRF-protected URL is rejected",
+      "passed": true,
+      "detail": "400"
+    }
+  ]
+}

@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -16,6 +17,8 @@ import { QuestionBankService } from '../services/question-bank.service';
 import { QuestionGeneratorService } from '../services/question-generator.service';
 import { ResumeParserService } from '../services/resume-parser.service';
 import { assertSafeExternalUrl } from './external-url.util';
+import { Roles } from '../../auth/roles.decorator';
+import { requireOwnedInterview } from '../../../common/ownership.util';
 
 interface QuestionDto {
   questionId?: string;
@@ -46,6 +49,7 @@ export class QuestionBankController {
   ) {}
 
   @Post('question-bank')
+  @Roles('ADMIN')
   async addQuestion(@Body() dto: QuestionDto) {
     const result = await this.questionBank.addQuestion({
       questionId: dto.questionId || `q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -60,6 +64,7 @@ export class QuestionBankController {
   }
 
   @Post('question-bank/batch')
+  @Roles('ADMIN')
   async addQuestions(@Body() dto: { questions: QuestionDto[] }) {
     const result = await this.questionBank.addQuestions(
       (dto.questions || []).map((q) => ({
@@ -106,6 +111,7 @@ export class QuestionBankController {
   }
 
   @Delete('question-bank/:questionId')
+  @Roles('ADMIN')
   async deleteQuestionBank(@Param('questionId') questionId: string) {
     return this.questionBank.deleteQuestion(questionId);
   }
@@ -115,6 +121,7 @@ export class QuestionBankController {
    * 后端解析 → LLM 提取结构化 → 入库
    */
   @Post('question-bank/import-file')
+  @Roles('ADMIN')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   async importQuestionBankFile(
     @UploadedFile() file: any,
@@ -139,6 +146,7 @@ export class QuestionBankController {
    * 从 URL 导入面试题（抓取网页文本 → LLM 提取 → 入库）
    */
   @Post('question-bank/import-url')
+  @Roles('ADMIN')
   async importQuestionBankUrl(
     @Body() dto: { url: string; position: string; level?: string; category?: string },
   ) {
@@ -162,8 +170,12 @@ export class QuestionBankController {
       throw new BadRequestException(`URL 抓取失败：${err.message}`);
     }
 
-    // HTML → 纯文本（去 script / style / 标签）
-    const text = html
+    // HTML → 纯文本（保留 title 和主要文本，供 LLM 从技术文档生成题目）
+    const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+      ?.replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || '';
+    const bodyText = html
       .replace(/<script[\s\S]*?<\/script>/gi, ' ')
       .replace(/<style[\s\S]*?<\/style>/gi, ' ')
       .replace(/<[^>]+>/g, ' ')
@@ -175,6 +187,7 @@ export class QuestionBankController {
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 20000); // 限长 20k
+    const text = `${title ? `文档标题：${title}\n\n` : ''}${bodyText}`.slice(0, 20000);
 
     const result = await this.questionBank.importQuestions({
       text,
@@ -183,6 +196,9 @@ export class QuestionBankController {
       category: dto.category,
       source: `url:${dto.url}`,
     });
+    if (result.count === 0) {
+      throw new BadRequestException('未能从 URL 内容中提取或生成可导入的面试题');
+    }
     return { success: true, ...result, url: dto.url };
   }
 
@@ -244,9 +260,9 @@ export class QuestionBankController {
   async generateDynamicQuestions(
     @Param('interviewId') interviewId: string,
     @Body() dto: { resumeText: string; count?: number },
+    @Req() req: any,
   ) {
-    const interview = await this.prisma.interview.findUnique({ where: { id: interviewId } });
-    if (!interview) throw new BadRequestException('Interview not found');
+    const interview = await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
 
     const analysis = await this.resumeParser.parse(dto.resumeText, interview.position);
     const questions = await this.questionGenerator.generateQuestions(

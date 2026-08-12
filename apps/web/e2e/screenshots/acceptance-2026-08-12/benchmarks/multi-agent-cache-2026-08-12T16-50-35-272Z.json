@@ -1,0 +1,46 @@
+{
+  "benchmark": "current-default-nestjs-multi-agent-cache",
+  "generatedAt": "2026-08-12T16:53:30.118Z",
+  "api": "http://localhost:3001",
+  "rounds": 10,
+  "environment": {
+    "apiHealth": "ok",
+    "defaultPath": "NestJS + JWT-authenticated SSE",
+    "experimentalPath": "LangGraph multi-agent workflow via /api/interview/:id/message"
+  },
+  "control": {
+    "provider": "qwen",
+    "model": "qwen-plus",
+    "calls": 10,
+    "usage": {
+      "promptTokens": 12902,
+      "completionTokens": 2500,
+      "totalTokens": 15402
+    },
+    "wallMs": 48598.248459999995
+  },
+  "experiment": {
+    "interviewId": "cmsqbspic000111lk5z3mzrik",
+    "cost": {
+      "totalTokens": 20024,
+      "llmCalls": 61,
+      "promptCacheHits": 0,
+      "promptCacheMisses": 0,
+      "semanticCacheHits": 46,
+      "semanticCacheMisses": 0,
+      "cacheSavedTokens": 0,
+      "retryRate": 0,
+      "fallbackRate": 0,
+      "estimatedCostCny": 0.1302
+    },
+    "firstEventMedianMs": 259.17887499998324,
+    "totalWallMs": 110180.50737499999,
+    "costPanelMs": 8.822374999988824
+  },
+  "comparison": {
+    "tokenSavings": -4622,
+    "tokenSavingsPct": -30.009089728606675,
+    "promptCacheHitRate": 0,
+    "semanticCacheHitRate": 1
+  }
+}

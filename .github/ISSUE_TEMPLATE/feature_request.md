@@ -3,7 +3,7 @@ name: ✨ Feature Request
 about: 请求一个新功能 · 必填场景 + 期望 + 替代方案
 title: '[FEAT] '
 labels: enhancement
-assignees: zhangjizhe
+assignees: ''
 ---
 
 ## 场景描述

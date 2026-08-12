@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Current Multi-Agent Cache Benchmark</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f7fb; color: #172033; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .canvas { width: 1440px; min-height: 920px; padding: 48px 56px; background: #f4f7fb; }
+  h1 { margin: 0; color: #152552; font-size: 32px; letter-spacing: 0; }
+  .subtitle { margin: 10px 0 28px; color: #5b6780; font-size: 16px; }
+  .method { display: grid; grid-template-columns: 1fr 42px 1.25fr; align-items: stretch; gap: 16px; margin-bottom: 24px; }
+  .path { padding: 20px; border: 1px solid #d7e0ee; border-radius: 10px; background: #ffffff; }
+  .path h2 { margin: 0 0 9px; color: #1d3264; font-size: 18px; }
+  .path p { margin: 0; color: #60708a; font-size: 13px; line-height: 1.55; }
+  .arrow { display: flex; align-items: center; justify-content: center; color: #8291aa; font-size: 30px; }
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .metric { min-height: 150px; padding: 19px; border: 1px solid #d7e0ee; border-radius: 9px; background: #ffffff; }
+  .metric h3 { margin: 0; color: #4f5e76; font-size: 14px; }
+  .metric .value { margin: 18px 0 7px; color: #1c3264; font-size: 30px; font-weight: 800; }
+  .metric .warning { color: #b05f16; }
+  .metric .ok { color: #08785a; }
+  .metric p { margin: 0; color: #68758b; font-size: 12px; line-height: 1.45; }
+  .section { margin-top: 24px; padding: 24px; border: 1px solid #d7e0ee; border-radius: 12px; background: #ffffff; }
+  .section h2 { margin: 0 0 18px; color: #1d3264; font-size: 20px; }
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .compare-card { padding: 20px; border-radius: 9px; }
+  .control { background: #eff5ff; border: 1px solid #cbddfa; }
+  .experiment { background: #fff3e9; border: 1px solid #f2d1b3; }
+  .compare-card h3 { margin: 0; color: #284978; font-size: 16px; }
+  .experiment h3 { color: #955018; }
+  .big { margin: 17px 0 5px; color: #1d5caf; font-size: 42px; font-weight: 800; }
+  .experiment .big { color: #b05f16; }
+  .compare-card p { margin: 0; color: #536680; font-size: 13px; line-height: 1.55; }
+  .findings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .finding { padding: 17px; border: 1px solid #d7e0ee; border-radius: 8px; background: #ffffff; }
+  .finding h3 { margin: 0 0 8px; color: #1d3264; font-size: 15px; }
+  .finding p { margin: 0; color: #61708a; font-size: 13px; line-height: 1.55; }
+  .footer { margin-top: 24px; padding: 14px 16px; border-radius: 8px; background: #eaf1ff; color: #405578; font-size: 13px; line-height: 1.55; }
+  .footer strong { color: #1b57b5; }
+</style>
+</head>
+<body>
+<main class="canvas">
+  <h1>当前多 Agent + 缓存 Token 基准</h1>
+  <p class="subtitle">2026-08-12 真实运行 · 10 轮 · Qwen 对照组 vs 默认 NestJS 鉴权多 Agent SSE 路径</p>
+
+  <div class="method">
+    <article class="path">
+      <h2>对照组：直接 Qwen</h2>
+      <p>相同的 10 轮技术面试输入，完整历史直接发送给 Qwen `chat/completions`。不经过 NestJS、Agent 编排、检索或缓存。</p>
+    </article>
+    <div class="arrow">vs</div>
+    <article class="path">
+      <h2>实验组：当前默认产品路径</h2>
+      <p>注册/登录 -> 简历上传与 RAG -> 创建并确认面试 -> JWT 鉴权 SSE -> LangGraph 多 Agent -> API 会话成本面板。</p>
+    </article>
+  </div>
+
+  <div class="metrics">
+    <article class="metric"><h3>对照组 Token</h3><div class="value">15,402</div><p>10 次直接 Qwen 调用<br>prompt 12,902 + completion 2,500</p></article>
+    <article class="metric"><h3>多 Agent Token</h3><div class="value warning">20,024</div><p>默认产品路径 API 成本面板累计<br>61 次模型调用</p></article>
+    <article class="metric"><h3>差异</h3><div class="value warning">+30.01%</div><p>当前配置下，多节点编排开销超过缓存节省；不是 Token 降幅。</p></article>
+    <article class="metric"><h3>语义缓存计数</h3><div class="value ok">46</div><p>成本面板记录的语义命中次数。命中计数不应单独等同于总成本收益。</p></article>
+  </div>
+
+  <section class="section">
+    <h2>实测对比</h2>
+    <div class="comparison">
+      <article class="compare-card control">
+        <h3>直接 Qwen 对照</h3>
+        <div class="big">48.60s</div>
+        <p>10 次调用累计 wall time。调用次数固定为 10，作为同输入的基础成本与 Token 参照。</p>
+      </article>
+      <article class="compare-card experiment">
+        <h3>默认多 Agent + 缓存路径</h3>
+        <div class="big">110.18s</div>
+        <p>10 轮 SSE 累计 wall time；首个 SSE 事件中位数为 259ms，成本面板读取为 8.8ms。</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>结论与后续优化</h2>
+    <div class="findings">
+      <article class="finding"><h3>当前结论</h3><p>在该 10 轮真实样本中，当前多 Agent 默认路径没有节省 Token。README 不将历史 82.6% 数据用于描述当前版本表现。</p></article>
+      <article class="finding"><h3>已验证能力</h3><p>认证、简历 RAG、SSE、LangGraph、多轮成本累计和会话成本面板均在当前默认部署中真实运行，基准脚本与 JSON 可复跑。</p></article>
+      <article class="finding"><h3>优化方向</h3><p>减少每轮图节点模型调用、对重复输入做更早的短路、核对语义缓存命中后是否仍触发下游节点，并为每个节点记录独立 token 归因。</p></article>
+    </div>
+  </section>
+
+  <div class="footer"><strong>数据来源：</strong>`apps/web/e2e/multi-agent-cache-benchmark.mjs` 输出的机器可读 JSON。该结果使用有效 Qwen 凭据和当前 Docker 默认 NestJS 服务；不包含 API Key 或模型响应正文。样本为 10 轮，适合当前版本回归基线，不替代上线前的目标流量压测。</div>
+</main>
+</body>
+</html>

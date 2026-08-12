@@ -93,16 +93,16 @@ describe('ExternalMcpLoader - registerFromClient', () => {
   it('3) bindExecute forwards to McpClient.callTool with raw tool name (no prefix)', async () => {
     const mock = makeMockClient(
       [{ name: 'get_user' }],
-      { get_user: { login: 'zhangjizhe', followers: 42 } },
+      { get_user: { login: 'octocat', followers: 42 } },
     );
     await ExternalMcpLoader.registerFromClient('gh', mock);
 
     const tool = McpRegistry.get('ext_gh_get_user');
     expect(tool?.execute).toBeDefined();
 
-    const result = await tool!.execute!({ username: 'zhangjizhe' });
-    expect(mock.callTool).toHaveBeenCalledWith('get_user', { username: 'zhangjizhe' });
-    expect(result).toEqual({ login: 'zhangjizhe', followers: 42 });
+    const result = await tool!.execute!({ username: 'octocat' });
+    expect(mock.callTool).toHaveBeenCalledWith('get_user', { username: 'octocat' });
+    expect(result).toEqual({ login: 'octocat', followers: 42 });
   });
 
   it('4) callTool throws → execute returns structured error object', async () => {

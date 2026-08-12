@@ -23,7 +23,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const require = createRequire(import.meta.url);
-const { chromium } = require('/Users/ext.zhangjizhe1/Desktop/interview-agent/apps/web/node_modules/playwright');
+const { chromium } = require('../apps/web/node_modules/playwright');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = join(__dirname, '../docs/assets/cost-baseline.html');

@@ -21,10 +21,14 @@
  * - 加 rate limiting + IP 风控
  * - 真正的"账号系统"远不止一个 JWT 签发服务
  */
-import { Injectable, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
+import { promisify } from 'util';
+
+const scrypt = promisify(scryptCallback);
 
 export interface LoginResult {
   accessToken: string;
@@ -33,12 +37,14 @@ export interface LoginResult {
   userId: string;
   email: string;
   name: string | null;
+  role: string;
 }
 
 export interface RegisterResult {
   userId: string;
   email: string;
   name: string | null;
+  role: string;
   created: boolean;
 }
 
@@ -50,7 +56,7 @@ export interface CheckResult {
 
 export interface LoginDto {
   userId: string;
-  email?: string;
+  password: string;
 }
 
 /**
@@ -116,6 +122,26 @@ export class AuthService {
     }
   }
 
+  private validatePassword(password: string): void {
+    if (typeof password !== 'string' || password.length < 12 || password.length > 128) {
+      throw new BadRequestException('密码必须为 12-128 个字符');
+    }
+  }
+
+  private async hashPassword(password: string): Promise<string> {
+    const salt = randomBytes(16).toString('hex');
+    const derived = await scrypt(password, salt, 64) as Buffer;
+    return `${salt}:${derived.toString('hex')}`;
+  }
+
+  private async verifyPassword(password: string, storedHash: string): Promise<boolean> {
+    const [salt, expectedHex] = storedHash.split(':');
+    if (!salt || !expectedHex) return false;
+    const actual = await scrypt(password, salt, 64) as Buffer;
+    const expected = Buffer.from(expectedHex, 'hex');
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
+
   /**
    * R-AUTH-1 注册新 ID：检查格式 + 保留名 + 是否已占用 → 创建 User
    *
@@ -123,11 +149,14 @@ export class AuthService {
    * - /login 接受任何合规 userId（已存在或不存在都返回 token）— 适合 demo 临时登录
    * - /register 严格拒绝已存在 ID（返回 409）— 适合"创建新身份"流程
    */
-  async register(userId: string, email?: string): Promise<RegisterResult> {
+  async register(userId: string, password: string): Promise<RegisterResult> {
     this.validateUserId(userId);
+    this.validatePassword(password);
 
     const lowerUserId = userId.toLowerCase();
-    const finalEmail = email || `${lowerUserId}@local`;
+    const finalEmail = `${lowerUserId}@local`;
+    const isBootstrapAdmin = (this.config.get<string[]>('auth.adminUserIds') || [])
+      .includes(lowerUserId);
 
     const existing = await this.prisma.user.findUnique({ where: { id: lowerUserId } });
     if (existing) {
@@ -139,6 +168,8 @@ export class AuthService {
         id: lowerUserId,
         email: finalEmail,
         name: userId,  // 默认 name = userId（前端可改）
+        passwordHash: await this.hashPassword(password),
+        role: isBootstrapAdmin ? 'ADMIN' : 'USER',
       },
     });
 
@@ -146,6 +177,7 @@ export class AuthService {
       userId: user.id,
       email: user.email,
       name: user.name,
+      role: user.role,
       created: true,
     };
   }
@@ -183,28 +215,22 @@ export class AuthService {
    */
   async login(dto: LoginDto): Promise<LoginResult> {
     this.validateUserId(dto.userId);
+    this.validatePassword(dto.password);
 
     const lowerUserId = dto.userId.toLowerCase();
-    const finalEmail = dto.email || `${lowerUserId}@local`;
-
-    // R-AUTH-1 自动 upsert user（demo 阶段保证 userId → user 记录 1:1 映射）
-    const user = await this.prisma.user.upsert({
+    const user = await this.prisma.user.findUnique({
       where: { id: lowerUserId },
-      create: {
-        id: lowerUserId,
-        email: finalEmail,
-        name: dto.userId,
-      },
-      update: {
-        email: finalEmail,
-      },
     });
+    if (!user?.passwordHash || !(await this.verifyPassword(dto.password, user.passwordHash))) {
+      throw new UnauthorizedException('用户名或密码错误');
+    }
 
     const expiresIn = this.config.get<string>('auth.jwtExpiresIn') || '7d';
 
-    const payload = {
-      sub: lowerUserId,  // JWT subject = userId
+  const payload = {
+      sub: user.id,
       email: user.email,
+      role: user.role,
     };
 
     // 锁定算法为 HS256，防止 algorithm confusion（攻击者伪造 alg=none / RS256）
@@ -226,6 +252,7 @@ export class AuthService {
       userId: user.id,
       email: user.email,
       name: user.name,
+      role: user.role,
     };
   }
 

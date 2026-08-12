@@ -17,6 +17,7 @@
 import { Controller, Post, Get, Body, UseGuards, Req, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService, LoginDto } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { Public } from './public.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -28,9 +29,10 @@ export class AuthController {
    * 格式不合法 / 保留名 → 400 Bad Request
    */
   @Post('register')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async register(@Body() dto: LoginDto) {
-    return this.auth.register(dto.userId, dto.email);
+    return this.auth.register(dto.userId, dto.password);
   }
 
   /**
@@ -38,6 +40,7 @@ export class AuthController {
    * 永远返回 200 + 结构化结果（前端实时校验用，不抛 4xx）
    */
   @Get('check/:userId')
+  @Public()
   async check(@Param('userId') userId: string) {
     return this.auth.checkAvailability(userId);
   }
@@ -48,6 +51,7 @@ export class AuthController {
    * 不需要密码验证
    */
   @Post('login')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
@@ -63,6 +67,7 @@ export class AuthController {
     return {
       userId: req.user.userId,
       email: req.user.email,
+      role: req.user.role,
     };
   }
 }

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Interview Agent Architecture</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f7fb; color: #172033; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .canvas { width: 1440px; min-height: 960px; padding: 48px 56px 52px; background: #f4f7fb; }
+  h1 { margin: 0; color: #152552; font-size: 32px; letter-spacing: 0; }
+  .subtitle { margin: 10px 0 34px; color: #5b6780; font-size: 16px; }
+  .section { position: relative; border: 1px solid #d7e0ee; border-radius: 12px; background: #ffffff; padding: 28px 26px 24px; margin-top: 22px; }
+  .section-title { position: absolute; top: -15px; left: 24px; padding: 5px 13px; border-radius: 5px; color: #ffffff; font-size: 14px; font-weight: 700; }
+  .web-title { background: #2878e9; }
+  .api-title { background: #7c4dcb; }
+  .data-title { background: #078a66; }
+  .grid { display: grid; gap: 16px; }
+  .web-grid { grid-template-columns: repeat(4, 1fr); }
+  .api-grid { grid-template-columns: repeat(4, 1fr); }
+  .data-grid { grid-template-columns: repeat(5, 1fr); }
+  .card { min-height: 112px; border: 1px solid #d7e0ee; border-radius: 8px; padding: 16px; background: #ffffff; }
+  .web .card { border-top: 4px solid #2878e9; }
+  .api .card { border-top: 4px solid #7c4dcb; }
+  .data .card { border-top: 4px solid #078a66; }
+  .provider .card { border-top: 4px solid #d76622; }
+  .card h3 { margin: 0 0 9px; color: #18294f; font-size: 16px; letter-spacing: 0; }
+  .card p { margin: 0; color: #596780; font-size: 13px; line-height: 1.55; }
+  .flow { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 26px 0 4px; color: #56647b; font-size: 14px; }
+  .flow .arrow { color: #8291aa; font-size: 23px; }
+  .band { display: grid; grid-template-columns: 1.25fr 1.25fr 1.25fr 1.6fr; gap: 16px; }
+  .band .card { min-height: 122px; }
+  .providers { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+  .footer { margin-top: 28px; display: flex; gap: 16px; }
+  .note { flex: 1; padding: 15px 18px; border-radius: 8px; background: #eaf1ff; color: #36496e; font-size: 13px; line-height: 1.55; }
+  .note strong { color: #1b57b5; }
+  .accent { color: #7141bf; font-weight: 700; }
+</style>
+</head>
+<body>
+<main class="canvas">
+  <h1>Interview Agent · 当前默认产品架构</h1>
+  <p class="subtitle">NestJS + React 主路径 · JWT / RBAC / 资源隔离 · 2026-08-12 验收基线</p>
+
+  <section class="section web">
+    <div class="section-title web-title">客户端</div>
+    <div class="grid web-grid">
+      <article class="card"><h3>认证入口</h3><p>注册、登录、会话恢复<br>角色感知导航</p></article>
+      <article class="card"><h3>候选人工作区</h3><p>简历上传、确认、创建面试<br>SSE 流式对话与报告</p></article>
+      <article class="card"><h3>题库与工具</h3><p>语义检索、题目浏览<br>普通用户只读访问</p></article>
+      <article class="card"><h3>管理员工作区</h3><p>题库导入、知识库维护<br>MCP Server 管理</p></article>
+    </div>
+  </section>
+
+  <div class="flow"><span>HTTPS / SSE / Bearer JWT</span><span class="arrow">↓</span></div>
+
+  <section class="section api">
+    <div class="section-title api-title">NestJS API</div>
+    <div class="band">
+      <article class="card"><h3>访问控制</h3><p><span class="accent">默认拒绝</span>的 JWT Guard<br>USER / ADMIN RBAC<br>Interview、Resume、Cost 归属校验</p></article>
+      <article class="card"><h3>面试领域</h3><p>简历解析与 RAG 写入<br>生命周期、SSE、评估<br>报告与答题历史</p></article>
+      <article class="card"><h3>Agent 编排</h3><p>LangGraph 状态图<br>任务队列、HITL、Checkpoint<br>Planner / Executor / Reviewer</p></article>
+      <article class="card"><h3>模型与检索</h3><p>Qwen 主模型、DeepSeek fallback<br>精确/语义缓存、成本统计<br>Dense + BM25 + RRF + Rerank</p></article>
+    </div>
+  </section>
+
+  <div class="flow"><span>状态、检索、观测与模型调用</span><span class="arrow">↓</span></div>
+
+  <section class="section data">
+    <div class="section-title data-title">数据与外部服务</div>
+    <div class="grid data-grid">
+      <article class="card"><h3>PostgreSQL</h3><p>用户、面试、任务<br>AnswerHistory、报告</p></article>
+      <article class="card"><h3>Redis</h3><p>会话上下文<br>精确缓存、实时成本</p></article>
+      <article class="card"><h3>Milvus</h3><p>简历与题库向量<br>写后 flush 保证即时检索</p></article>
+      <article class="card"><h3>Qdrant</h3><p>语义缓存<br>检索降级路径</p></article>
+      <article class="card"><h3>Langfuse</h3><p>可选链路追踪<br>模型调用观测</p></article>
+    </div>
+    <div class="providers provider">
+      <article class="card"><h3>Qwen</h3><p>主模型。承担简历解析、Embedding、个性化出题和面试生成。</p></article>
+      <article class="card"><h3>DeepSeek</h3><p>备用模型。Provider 健康检查和永久错误熔断后参与故障降级。</p></article>
+    </div>
+  </section>
+
+  <div class="footer">
+    <div class="note"><strong>写入一致性：</strong>题库文件与 URL 导入在返回成功前显式 flush 向量写入，确保管理员能够立即检索新内容。</div>
+    <div class="note"><strong>导入安全：</strong>URL 导入只允许公开 HTTPS 目标，拒绝 loopback 和内网地址；无可用题目时返回明确的 400 错误。</div>
+    <div class="note"><strong>部署边界：</strong>默认部署使用 Docker Compose；生产发布由流水线执行 Prisma migration，并配置受控的 JWT_SECRET 与 ADMIN_USER_IDS。</div>
+  </div>
+</main>
+</body>
+</html>

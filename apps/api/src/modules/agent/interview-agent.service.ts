@@ -444,6 +444,14 @@ export class InterviewAgentService {
     /** token 用量，controller 写入 session_costs */
     usage?: { promptTokens: number; completionTokens: number };
   }> {
+    const answerHistory = await this.prisma.answerHistory.findMany({
+      where: { interviewId: ctx.sessionId },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (answerHistory.length === 0) {
+      throw new Error('没有可用于生成报告的已评分答题记录');
+    }
+
     const bank: BankKey = matchBank(ctx.position);
     const questions = pickQuestions(bank, 5);
     const rubric = buildScoringRubric(bank, questions);
@@ -452,7 +460,9 @@ export class InterviewAgentService {
       `你是一位严格的面试评估 AI。请基于以下评分细则评估候选人表现。\n\n` +
       `【岗位】${ctx.position}（${ctx.level}）\n\n` +
       `【评分细则（每道题的考察点和参考答案）】\n${rubric}\n\n` +
-      `【候选人对话】\n${conversation.map((m) => `${m.role}: ${m.content}`).join('\n')}\n\n` +
+      `【已评分答题记录】\n${answerHistory.map((item) =>
+        `问题：${item.question}\n候选人回答：${item.answer}\n评分：${Math.round(item.score * 100)} / 100\n反馈：${item.feedback || '无'}`
+      ).join('\n\n')}\n\n` +
       `【评估维度】（每项 0-100）\n` +
       `1. technical（技术深度）：候选人回答命中了多少 keyPoints\n` +
       `2. communication（沟通表达）：思路是否清晰\n` +

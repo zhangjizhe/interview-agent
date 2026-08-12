@@ -229,6 +229,7 @@ export class QuestionBankService {
           },
         ],
       });
+      await (this.client as any).flushSync?.({ collection_names: [this.COLLECTION] });
       this.logger.log(`Added question ${item.questionId} (${item.position}/${item.level})`);
       return { questionId: item.questionId };
     } catch (err: any) {
@@ -262,6 +263,9 @@ export class QuestionBankService {
           createdAt: now,
         })),
       });
+      // Milvus insert is asynchronous by default. Flush before returning so a
+      // successful import is immediately visible to the next search/list call.
+      await (this.client as any).flushSync?.({ collection_names: [this.COLLECTION] });
       this.logger.log(`Added ${items.length} questions in batch`);
       return { count: items.length };
     } catch (err: any) {
@@ -332,7 +336,7 @@ export class QuestionBankService {
         output_fields: outputFields,
       });
 
-      const results: Array<RerankedQuestion> = (hybridResult.results || []).map((r: any) => ({
+      let results: Array<RerankedQuestion> = (hybridResult.results || []).map((r: any) => ({
         id: String(r.id),
         questionId: r.questionId,
         position: r.position,
@@ -344,6 +348,32 @@ export class QuestionBankService {
         createdAt: r.createdAt,
         score: r.score,
       }));
+
+      // Some Milvus deployments delay BM25 function materialization after an
+      // insert. A dense-only fallback keeps newly imported questions searchable
+      // instead of incorrectly returning an empty result set.
+      if (results.length === 0) {
+        const denseResult = await this.client.search({
+          collection_name: this.COLLECTION,
+          vector,
+          anns_field: 'vector',
+          limit,
+          filter,
+          output_fields: outputFields,
+        } as any);
+        results = ((denseResult.results || []) as any[]).map((r: any) => ({
+          id: String(r.id),
+          questionId: r.questionId,
+          position: r.position,
+          level: r.level,
+          category: r.category,
+          question: r.question,
+          answer: r.answer,
+          tags: r.tags,
+          createdAt: r.createdAt,
+          score: r.score,
+        }));
+      }
 
       // Rerank 精排
       if (rerank && this.rerankEnabled && results.length > 0) {
@@ -505,8 +535,9 @@ export class QuestionBankService {
 1. 一道题一个对象，多道题用逗号分隔
 2. 题干必须从原文摘，不要改写
 3. 标签用 2-4 个关键词（如"Redis" "限流" "分布式"）
-4. 跳过纯标题 / 目录 / 版权信息
-5. 文本里没有明显题目时返回空数组 []
+4. 对技术文档：可基于原文的关键概念生成 1-5 道面试题，答案必须由原文事实支撑
+5. 跳过纯标题 / 目录 / 版权信息
+6. 只有文本既无明确题目也无可用于出题的技术内容时才返回空数组 []
 
 【面试题文本】
 ${text.slice(0, 6000)}

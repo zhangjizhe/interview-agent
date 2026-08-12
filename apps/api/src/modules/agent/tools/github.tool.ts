@@ -77,7 +77,7 @@ export class GitHubTool {
         parameters: {
           type: 'object',
           properties: {
-            username: { type: 'string', description: 'GitHub 用户名（如 zhangjizhe）' },
+            username: { type: 'string', description: 'GitHub 用户名（如 octocat）' },
           },
           required: ['username'],
         },
@@ -112,7 +112,7 @@ export class GitHubTool {
         parameters: {
           type: 'object',
           properties: {
-            owner: { type: 'string', description: '仓库 owner（如 zhangjizhe）' },
+            owner: { type: 'string', description: '仓库 owner（如 octocat）' },
             repo: { type: 'string', description: '仓库名（如 interview-agent）' },
           },
           required: ['owner', 'repo'],

@@ -6,6 +6,7 @@ import {
   Logger,
   Param,
   Post,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -15,7 +16,14 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { ResumeParserService, type ParsedResume } from '../services/resume-parser.service';
 import { ResumeRAGService } from '../services/resume-rag.service';
 import { matchBank, pickQuestions, type BankKey } from '../knowledge-banks';
-import { resolveUserId } from './user-resolver.util';
+
+const MAX_RESUME_BYTES = 10 * 1024 * 1024;
+const SUPPORTED_RESUME_EXTENSIONS = new Set(['.pdf', '.md', '.txt']);
+const SUPPORTED_RESUME_MIME_TYPES = new Set([
+  'application/pdf',
+  'text/markdown',
+  'text/plain',
+]);
 
 /**
  * 简历管理（上传 / 解析 / 列表）
@@ -37,28 +45,40 @@ export class ResumeController {
 
   /**
    * 简历上传 + 解析 + 自动生成面试题
-   * 支持 PDF / DOC / DOCX / TXT / MD
+   * 支持 PDF / TXT / MD
    */
   @Post('upload-resume')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   async uploadResume(
     @UploadedFile() file: any,
     @Body('position') position: string,
-    @Body('userId') userId?: string,
+    @Req() req: any,
   ) {
     if (!file) throw new BadRequestException('No file uploaded');
     if (!position) throw new BadRequestException('position is required');
+    if (!file.size || file.size > MAX_RESUME_BYTES) {
+      throw new BadRequestException('简历文件必须在 1 字节到 10MB 之间');
+    }
+
+    const originalName = String(file.originalname || '').toLowerCase();
+    const extension = originalName.includes('.')
+      ? originalName.slice(originalName.lastIndexOf('.'))
+      : '';
+    const supportedByExtension = SUPPORTED_RESUME_EXTENSIONS.has(extension);
+    const supportedByMime = SUPPORTED_RESUME_MIME_TYPES.has(String(file.mimetype || '').toLowerCase());
+    if (!supportedByExtension && !supportedByMime) {
+      throw new BadRequestException('仅支持 PDF、Markdown 或纯文本简历');
+    }
 
     // 1. 解析简历（支持 PDF/DOC/DOCX/TXT/MD）
     const parsed: ParsedResume = await this.resumeParser.parse(file, position);
 
     // 2. 写入 Milvus（简历 RAG）
-    if (userId) {
-      try {
-        await this.resumeRag.ingestResume(userId, position, parsed);
-      } catch (err: any) {
-        this.logger.warn(`Resume RAG ingest failed: ${err.message}`);
-      }
+    const userId = req.user.userId;
+    try {
+      await this.resumeRag.ingestResume(userId, position, parsed);
+    } catch (err: any) {
+      this.logger.warn(`Resume RAG ingest failed: ${err.message}`);
     }
 
     // 3. 匹配知识库
@@ -78,11 +98,12 @@ export class ResumeController {
   }
 
   @Get('resumes/:userId')
-  async getUserResumes(@Param('userId') userId: string) {
-    // 直接按 demo userId 查（与 ingest 写入的 userId 一致），同时返回真实 Prisma userId 便于后续关联
-    const realUserId = await resolveUserId(this.prisma, userId);
+  async getUserResumes(@Param('userId') userId: string, @Req() req: any) {
+    if (userId !== req.user.userId) {
+      throw new BadRequestException('Cannot access another user resumes');
+    }
     const resumes = await this.resumeRag.searchByUser(userId, 10);
-    return { userId: realUserId || userId, resumes, count: resumes.length };
+    return { userId, resumes, count: resumes.length };
   }
 
   /**

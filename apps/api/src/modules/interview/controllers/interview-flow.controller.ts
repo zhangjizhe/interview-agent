@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Req,
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -15,6 +16,7 @@ import { ResumeParserService, type ResumeAnalysis } from '../services/resume-par
 import { ScoringService } from '../services/scoring.service';
 import type { InterviewQuestion } from '../services/question-generator.service';
 import { extractKeywordsFromQuestion } from './keyword-extract.util';
+import { requireOwnedInterview } from '../../../common/ownership.util';
 
 interface MessageDto {
   userId: string;
@@ -54,9 +56,9 @@ export class InterviewFlowController {
   async getNextQuestion(
     @Param('interviewId') interviewId: string,
     @Body() dto: { lastQuestion?: string; lastAnswer?: string; resumeText?: string },
+    @Req() req: any,
   ) {
-    const interview = await this.prisma.interview.findUnique({ where: { id: interviewId } });
-    if (!interview) throw new BadRequestException('Interview not found');
+    const interview = await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
 
     // 如果有简历，基于简历动态出题
     if (dto.resumeText && dto.resumeText.trim().length > 50) {
@@ -151,6 +153,7 @@ export class InterviewFlowController {
   async streamMessage(
     @Param('interviewId') interviewId: string,
     @Body() dto: MessageDto,
+    @Req() req: any,
     @Res() res: Response,
   ) {
     res.status(HttpStatus.OK);
@@ -177,8 +180,8 @@ export class InterviewFlowController {
       return;
     }
 
-    const interview = await this.prisma.interview.findUnique({
-      where: { id: interviewId },
+    const interview = await this.prisma.interview.findFirst({
+      where: { id: interviewId, userId: req.user.userId },
     });
     if (!interview) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: 'Interview not found' })}\n\n`);

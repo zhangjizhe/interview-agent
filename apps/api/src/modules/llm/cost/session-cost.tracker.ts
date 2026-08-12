@@ -50,13 +50,18 @@ export class SessionCostTracker implements OnModuleInit {
   }
 
   async startSession(interviewId: string): Promise<void> {
-    // 幂等创建
-    await this.prisma.sessionCost.upsert({
+    const existing = await this.prisma.sessionCost.findUnique({
       where: { interviewId },
-      create: { interviewId, startedAt: new Date() },
-      update: { startedAt: new Date() },
+      select: { interviewId: true },
     });
-    // 清 Redis counter
+
+    if (existing) {
+      return;
+    }
+
+    await this.prisma.sessionCost.create({
+      data: { interviewId, startedAt: new Date() },
+    });
     await this.redis.del(this.redisKey(interviewId));
   }
 

@@ -1,875 +1,264 @@
-# Interview Agent — LLM Orchestration Platform
+# Interview Agent
 
-> Production-grade 多智能体编排平台：候选人履历结构化提取 → 智能出题 → 流式追问 → 自动评分报告
->
-> **核心技术**：LangGraph StateGraph · Specialist Handoffs · 四层记忆分层治理 · Prompt Prefix Cache · 混合检索 RAG · 全链路可观测性
+面向技术招聘场景的开源 AI 面试平台。候选人上传简历后，系统会解析候选人信息、生成岗位相关题目，并通过流式对话完成追问、评估与报告；管理员可以维护题库，并从文件或公开技术文档导入内容。
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
-[![NestJS](https://img.shields.io/badge/NestJS-10-red)](https://nestjs.com/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-1.3.6-green)](https://langchain-ai.github.io/langgraphjs/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-[![CI api](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml/badge.svg)](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml)
-[![CI py-api](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-py-api.yml/badge.svg)](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-py-api.yml)
-[![CI web](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-py-api.yml/badge.svg?job=web-test)](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-py-api.yml)
+项目默认采用 NestJS + React 技术路线，面向企业内部验证和受控上线设计。系统将模型编排、检索、持久化状态、权限控制、可观测性和验收测试组合为完整的面试业务闭环。
 
----
+## 核心能力
 
-## 最新基准（2026-06-23 实测 · 真实 A/B 对比）
-
-### Cache 命中率 · 50 轮实测（2026-06-23）
-
-**测试设计**：5 轮场景各 10 query,覆盖语义缓存完整路径（Redis 精确桶 + Qdrant cosine）
-- R1 cold start（10 个互不相同） → 期望 miss
-- R2 same query 重复（10 次相同） → 期望 Redis 精确桶 hit
-- R3 paraphrase 同语义复述（10 个不同措辞） → 期望 Qdrant cosine hit
-- R4 unrelated 完全无关（10 个跨主题） → 期望 miss
-- R5 edge 边缘（10 个同主题不同切入） → 期望部分 hit
-
-**实测结果**（threshold = 0.92,Qwen text-embedding-v3, dim=1024）：
-
-| 指标 | 实测值 | 备注 |
-|---|---|---|
-| **总命中率** | **23/50 = 46.00%** | 整体 hit rate（混合场景） |
-| **期望命中召回率（Recall）** | **23/25 = 92.00%** | 25 个期望 hit 的 query 中实际命中 23 个 |
-| **误命中率（FPR）** | **0/25 = 0.00%** | 25 个期望 miss 的 query 全部正确 miss（无答非所问） |
-| **Hit 平均相似度** | **0.9845** | Qdrant cosine 平均（命中时） |
-| **平均 Lookup 耗时** | **130.8 ms** | 含 embedding API 调用 |
-| R1 cold start | 0/10 = 0.0% | 全 miss（符合 cold start 预期） |
-| R2 same query | 10/10 = 100.0% | Redis 精确桶全命中 |
-| R3 paraphrase | 8/10 = 80.0% | 2 个 FN（Qwen 嵌入相似度 < 0.92 阈值）|
-| R4 unrelated | 0/10 = 0.0% | 全 miss（无误判） |
-| R5 edge | 5/10 = 50.0% | 同主题前 5 命中，后 5 实际无关正确 miss |
-
-> **诚实标注**：真正可信指标是 **Recall 92%** 和 **FPR 0%**——召回高、误判零，说明阈值 0.92 在"语义去重"场景是合适的。2 个 FN（paraphrase-8/9）是 Qwen embedding 对同义但表述差异大的 query 判定相似度 < 0.92，不是阈值配置问题。
-
-### 50 轮 LLM 调用 A/B 实测（2026-06-21 · 上一次）
-
-| 指标 | 实测值 | 备注 |
-|---|---|---|
-| **Cost Panel 响应** | **7-45 ms** | 目标 < 1000 ms；Redis Hash + Postgres 双写 |
-| 实验组 LLM 调用 | **179 次 / 105,549 tokens / ¥0.33** | `session_costs.totalTokens` + `estimatedCostCny`（41 interview 累计，最可信口径）|
-| Fallback 链路触发 | **8 次 / 179 = 4.5%** | DeepSeek 402 → Qwen 复活路径触发 |
-| Prompt Cache 命中 | **33/50 = 66%**（bench interview）/ 0%（其他 9 个） | Qwen dashscope OpenAI 兼容层不支持 `prompt_cache_key`（已知根因）|
-| Semantic Cache 命中 | **117/156 = 75%** | 同 query / 同 userId 高频重复触发命中 |
-| Cache 节省 tokens | **19,200 tokens** | 累计 `cacheSavedTokens`（单 bench interview） |
-| 单次 SSE 流式 TTFT | **1.10-1.63 秒（中位数 1.31 秒）** | 4 次 e2e 实测，首字节（`thinking` event）到达客户端的延迟 |
-| 单元测试 | **120/120 passed** | Jest 12 suites（api）+ Vitest 7 files（web） |
-| 容器启动 | 10 容器 healthy | api / web / postgres / redis / qdrant / milvus / milvus-etcd / minio / mem0 / etcd |
-
-### A/B 对照 · 真实测量（3 组，50 轮）
-
-<p align="center">
-  <img src="./docs/assets/cost-baseline.png" alt="LLM Inference Benchmark · v11 · 41 interview 累计 · 每项独立卡片" width="900">
-</p>
-
-| 指标 | 对照组（直接调 Qwen）| 实验组（multi-agent + cache）| 实测节省 |
-|---|---|---|---|
-| **总 Token** | 88,000（max bench） | **1,530（avg per interview）/ 105,549 总（41 interview 累计）** | ↓ 82%+ |
-| **成本 (¥)** | — | **¥0.33**（41 interview 累计） | — |
-| **LLM 调用** | 50（bench） | **179 次**（41 interview） / 单 interview 4-58 次 | — |
-| **总耗时** | — | **42-70s 单 interview**（e2e 实测 4 次中位数 54s） | — |
-| **TTFT 首字节** | — | **1.10-1.63 秒（中位数 1.31 秒）** | 4 次 e2e 实测 |
-| **Semantic Cache 命中率** | — | **117/156 = 75%** | 累计 session_costs |
-| **Cache 节省 tokens** | — | **19,200**（单 bench interview） | cacheSavedTokens 累计 |
-
-> ⚠️ **诚实标注**：数据来源 `session_costs` 表（Prisma 实测，非估算/mock）。Cache 命中率**分场景**：Semantic 75%（生产高频重复触发）/ Prompt Cache bench interview 66%（高重复 prompt）/ 其他真实场景 0%（Qwen dashscope 不识别 `prompt_cache_key` 是 Provider 硬限制，工程链路完整但底层不支持）。
-
----
-
-## 目录
-
-- [系统亮点](#系统亮点)
-- [系统架构](#系统架构)
-- [技术栈](#技术栈)
-- [核心工程实现](#核心工程实现)
-- [快速开始](#快速开始)
-- [项目结构](#项目结构)
-- [API 文档](#api-文档)
-- [测试与基准](#测试与基准)
-- [运维 Wiki](#运维-wiki)
-- [已知局限](#已知局限)
-- [License](#license)
-
----
-
-## 系统亮点
-
-### 1. Inference Gateway — 多模型路由 + 自动熔断
-
-基于 NestJS Provider 实现的 LLM 网关，支持双模型热切 + 永久错自动熔断：
-
-| 故障类别 | HTTP 状态 | 策略 | 商用价值 |
-|---|---|---|---|
-| **永久错** | 401 / 402 / 403 / 404 | `disableProvider()` 进程级熔断 | 余额耗尽时避免持续扣费 |
-| **临时错** | 429 / 5xx | fallback provider | 高可用切换 |
-| **网络错** | ECONNRESET / ETIMEDOUT | fallback provider | 链路抖动容错 |
-
-**实测验证**：DeepSeek 返回 `402 Insufficient Balance` → healthCheckProviders 自动标记 dead → 后续所有调用直接走 Qwen fallback，**fallbackRate = 33.3%** 路径完全工作。
-
-### 2. 三层缓存工程 — Provider 无关的 Token 优化
-
-| 层级 | 实现 | 设计目标 |
-|---|---|---|
-| **Prompt Prefix Cache** | 3 段前缀识别 + `cache_control` / `prompt_cache_key` 注入 | SYSTEM/SEMI-STATIC 段前缀哈希复用 |
-| **Semantic Cache** | Qwen embedding-v3 + Qdrant cosine (阈值 0.92) + 黑白名单 | 相似 query 直接返回 |
-| **Exact Cache** | Redis Hash `hash(userId + cacheType + query)` | < 1 ms 命中 |
-
-**代码规模**：3 个核心文件 / 727 行（`prompt-cache.strategy.ts` 273 + `prompt-cache.interceptor.ts` 194 + `semantic-cache.service.ts` 260）。
-
-**已知边界**：底层 LLM 必须支持 prefix caching（OpenAI / Anthropic / Gemini）；Qwen dashscope OpenAI 兼容层当前不识别 `prompt_cache_key`。
-
-### 3. Multi-Agent Orchestration — Plan-and-Execute + HITL + Handoffs
-
-基于 LangGraph StateGraph 的 5+2 节点拓扑，相比 ReAct 更适合多步结构化面试场景：
-
-```
-START → Supervisor → Planner → Executor → Replanner → Reviewer → END
-                ↑                   │___replan___↑        │
-                └─────────revise────┘                ▼
-                                              hitl_review (interrupt)
-                                                ↓ HR 审批
-                                          approved → END
-                                          rejected → Planner
-```
-
-- **PostgresSaver Checkpoint**：面试中断可从断点恢复，状态零丢失
-- **引擎热切换**：`AGENT_ENGINE=multi|deepagents|llm-direct`，故障可秒级降级
-- **防死循环兜底**：`retry_count ≥ 2` 强制进入 Reviewer，避免无限循环
-- **HITL 中断审批**：Reviewer 评分争议（score < 0.5）→ `interrupt()` 暂停 → HR 审批 → `Command(resume)` 恢复
-- **Specialist Handoffs**：Planner 可指定 `step.specialist`（interviewer/evaluator/searcher/general），Executor 按 Specialist 路由到不同 system prompt
-
-### 4. 四层记忆架构 — 分层存储与治理
-
-```
-L1 工作记忆    Redis Hash    面试进度状态（questionIndex / coveredSkills / scoreHistory）跨实例安全
-L2 会话记忆    Redis List    lpush + ltrim(0, 49) + TTL，近 50 条对话滚动窗口
-L3 长期记忆    Milvus+Mem0   候选人画像双写，自动去重合并，语义召回
-L4 结构化      Prisma/PG     面试结束后归档，支持历史复盘
-```
-
-**降级路径**：Milvus 不可用时自动降级到 Qdrant；Mem0 不可用时回退到本地 Milvus-only memory。
-
-### 5. Agent 决策驱动 — 动态任务队列
-
-基于 PostgreSQL 持久化的动态任务队列，LLM 一次调用同时输出评分 + 追问/进阶决策（非规则阈值触发）：
-
-| 表 | 用途 |
-|---|---|
-| `InterviewTask` | 任务队列（question / follow-up / summary / evaluation） |
-| `AnswerHistory` | 答案历史 + LLM 评分（completeness / correctness / depth） |
-
-- **Agent 决策**：`agentDecide()` 一次 LLM 调用同时输出 `score` + `shouldFollowUp` + `followUpQuestion` + `shouldAdvance` + `advancedQuestion`
-- **语义驱动**：追问/进阶由 LLM 基于回答内容自主判断，不是 `score < 0.5` 硬阈值
-- **降级兜底**：LLM 不可用时 `heuristicDecide()` 启发式回退（整词边界匹配，Milvus 不可用时本地题库兜底）
-- **主流程已接入**：`completeTask` 在 assistant 回复后调用，评分 + 写 answerHistory + 更新 task status
-
-### 6. RAG 双引擎 — Hybrid Retrieval + Re-ranking
-
-```
-用户 Query
-    ↓
-Dense 向量检索（Qwen embedding-v3, dim=1024）
-+
-BM25 Sparse 检索（关键词匹配）
-    ↓
-RRF 融合排序（Reciprocal Rank Fusion）
-    ↓
-CrossEncoder Rerank（精排）
-    ↓
-Top-K 结果
-```
-
-**基准**：30 个测试用例（Golden Dataset v2，2026-06-21 升级），P@5=1.0，MRR=1.0，Recall=1.0。
-
-### 7. Citation 幻觉检测 — CRAG-lite 引用溯源
-
-基于 80+ 常见技术术语白名单的启发式硬事实检测 + `[N]` 引用标记：
-
-- **`detectHallucination()`**：识别回答中的硬事实声明，检查是否有对应引用支撑
-- **`buildCitationContext()`**：为 LLM 上下文注入引用指令 + 源类型推断（`inferSourceType`）
-- **Reviewer 集成**：reviewer 节点自动检查 hallucination，评分时考虑引用完整性
-- **白名单 80+ 术语**：避免常见技术术语（React / Docker / REST 等）被误判为硬事实
-
-### 8. 4 级水位线上下文压缩
-
-| Tier | 触发条件 | 策略 |
-|------|---------|------|
-| T0 | context < 60% | 不处理 |
-| T1 | 60%–80% | Snip：截短旧 tool 输出 / 长 assistant 消息 |
-| T2 | 80%–95% | Prune：替换为 `[已压缩]` stub |
-| T3 | ≥ 95% | 增量 LLM 摘要 |
-
-stub 决策缓存（LRU 1000 条，64-bit djb2 hash）保护 Prompt Prefix Cache 命中率；用户消息只裁代码块保留纯文本。
-
-### 9. External MCP Loader — 双向 MCP 集成（ADR #11 P1）
-
-支持把外部 MCP server（如 GitHub 官方 MCP、filesystem MCP）的工具动态注册到内部 Registry，让多 Agent executor 无缝调用：
-
-| 方向 | 实现 | 用途 |
-|---|---|---|
-| **内 → 外** | `McpAdapterService` 把内部工具暴露成 stdio MCP Server | Claude Desktop / Cursor 等外部 Client 可调用 |
-| **外 → 内** | `ExternalMcpLoader` 从 config 加载外部 server，connect + listTools + bindExecute | 内部 Agent 可调用外部 tool |
-
-**核心能力**：
-- **双 transport 支持**：`stdio`（本地子进程，如 `@modelcontextprotocol/server-filesystem`）+ `streamable-http`（远程 SaaS，如 GitHub MCP）
-- **lazy connect**：首次 listTools/callTool 时自动建立连接，避免启动阻塞
-- **降级不阻塞**：单个外部 server 连接失败 → log warn，主流程不中断；builtin 工具仍可用
-- **命名隔离**：外部 tool 用 `ext_<server>_<tool>` 前缀，避免和 builtin tool 重名冲突
-- **超时控制**：listTools/callTool 默认 30s（可配置），防止 MCP server 卡死主流程
-- **健康检查**：每个 server 状态上报 `/admin/mcp-servers`，含 transport / status / tools / latencyMs
-
-**配置示例**（`config/mcp-servers.json`）：
-```json
-{
-  "name": "github_official",
-  "transport": "streamable-http",
-  "url": "https://api.githubcopilot.com/mcp/",
-  "headers": { "Authorization": "Bearer ${GITHUB_TOKEN}" },
-  "enabled": false
-}
-```
-
-**E2E 验证**：mock stdio MCP server + 真实 spawn + 17/17 端到端检查通过（`scripts/e2e-external-mcp.ts`）。
-
-**单测覆盖**：`external-mcp-loader.spec.ts` 12 个用例覆盖：注册、prefix sanitize、callTool 转发、错误降级、listStatus、unregisterServer、config 读取 + builtin 过滤。
-
----
+- **简历工作流**：支持 `PDF`、`Markdown`、`TXT` 简历，提取结构化候选人信息，写入检索上下文，并生成个性化追问题。
+- **面试工作流**：支持创建面试、确认简历、SSE 流式对话、动态出题、人工审批（HITL）和报告生成。
+- **模型网关**：Qwen 作为主模型、DeepSeek 作为备用模型，具备健康检查、永久错误熔断、自动降级、语义缓存和会话成本统计。
+- **RAG 与题库**：结合 Milvus dense retrieval、BM25 sparse retrieval、RRF 融合和 rerank；管理员可从 Markdown 文件或公开 HTTPS 技术页面导入题目。
+- **Agent 编排**：基于 LangGraph 提供状态图、checkpoint、持久化任务队列、答题历史与多角色 handoff。
+- **安全控制**：使用 `scrypt` 密码哈希、默认拒绝的 JWT 鉴权、`USER`/`ADMIN` RBAC 和资源归属校验。
+- **交付与验证**：提供 Docker Compose、健康检查、Prisma migration、API/Web 测试、浏览器验收和真实模型内容工作流验收。
 
 ## 系统架构
 
-```
-┌─────────────────────────────────────────────────────────┐
-│         Browser  React 18 + Vite + Tailwind             │
-│         SSE 流式渲染 / HITL 审批面板 / Zustand 状态管理   │
-└───────────────────────┬─────────────────────────────────┘
-                        │ HTTP / SSE
-┌───────────────────────▼─────────────────────────────────┐
-│              NestJS API  :3001                          │
-│                                                         │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │            Inference Gateway                     │   │
-│  │  Qwen / DeepSeek 双模型路由 + 永久错自动熔断     │   │
-│  │  Prompt Prefix Cache → Semantic Cache → LLM      │   │
-│  │  Langfuse Generation 埋点 + 成本计量             │   │
-│  └──────────────────┬──────────────────────────────┘   │
-│                     │                                   │
-│  ┌──────────────────▼──────────────────────────────┐   │
-│  │       Multi-Agent Engine (LangGraph)             │   │
-│  │   Supervisor → Planner → Executor               │   │
-│  │        ↑           ↓          ↓                  │   │
-│  │   Reviewer ← Replanner ←──────┘                 │   │
-│  │   hitl_review (interrupt)                        │   │
-│  │   Specialist Handoffs: interviewer/evaluator/... │   │
-│  │   PostgresSaver Checkpoint                       │   │
-│  │   Citation (CRAG-lite 幻觉检测 + 引用溯源)         │   │
-│  └─────────────────┬──────────────────────────────┘   │
-│          ┌──────────┴───────────┐                       │
-│  ┌───────▼──────┐   ┌──────────▼──────┐                │
-│  │ Memory Layer │   │   RAG Engine    │                │
-│  │ L1 Redis Hash│   │ Milvus Hybrid  │                │
-│  │ L2 Redis List│   │ Dense+BM25+RRF │                │
-│  │ L3 Milvus    │   │ +Rerank        │                │
-│  │    +Mem0     │   │ Qdrant KB      │                │
-│  │ L4 Prisma    │   └─────────────────┘                │
-│  └──────────────┘                                       │
-│  ┌──────────────┐                                       │
-│  │ Auth Module   │ JWT HS256 + userId 格式校验           │
-│  └──────────────┘                                       │
-└─────────────────────────────────────────────────────────┘
-         │          │          │          │
-    Postgres    Redis 7    Qdrant     Milvus
-    :5432       :6379      :6333      :19530
-         │
-    Mem0 Cloud / Langfuse Cloud
+![Interview Agent 当前默认路径泳道架构](docs/assets/architecture-swimlane-current-2026-08-12.png)
+
+架构图采用泳道形式，按“候选人/管理员 -> React Web -> NestJS API -> 数据、检索与 Provider”展示责任边界。它仅描述当前默认 NestJS 产品路径，不包含已废弃或未对齐的历史实现。
+
+### 面试请求链路
+
+```text
+候选人提交回答
+  -> Bearer JWT、角色与资源归属校验
+  -> 读取面试状态、简历上下文和题库检索结果
+  -> LangGraph 编排追问、评分和工具调用
+  -> 精确/语义缓存与 Provider 路由、降级
+  -> SSE 流式事件返回浏览器
+  -> 持久化 AnswerHistory、任务、报告、成本和追踪信息
 ```
 
----
+## 核心工程优势
 
-## 产品截图
+### 持久化、可审查的 Agent 执行
 
-### ① 3 层系统架构
+面试流程不是无状态 Prompt 拼接。LangGraph 协调 planner、executor、reviewer 和 specialist handoff；checkpoint 使长流程可检查、可恢复。持久化任务队列和 `AnswerHistory` 保存候选人的真实回答与评分信号，报告生成从这些结构化记录读取数据，而不是根据聊天顺序猜测问答角色。
 
-<p align="center">
-  <img src="./docs/assets/_arch.png" alt="3 层系统架构 · 前端 SPA · NestJS + LangGraph · 10 容器 + 双模型" width="100%">
-</p>
+### 兼顾召回与写后可见性的检索设计
 
-### ② 面试对话 UI（流式输出）
+题库检索组合 dense vector search、BM25 sparse search、RRF 融合和 rerank。简历按用户独立写入检索上下文。题库导入完成前会显式 flush 向量写入，因此成功响应意味着数据可立即检索，避免向量索引异步物化带来的“写入成功但搜索不到”问题。
 
-<p align="center">
-  <img src="./docs/assets/_interview.png" alt="面试对话 UI · 流式 token 输出 + 4 级水位线上下文压缩" width="100%">
-</p>
+### 多模型容错与成本可见性
 
-### ③ 面试报告（综合评分 + 技能雷达）
+模型网关优先调用 Qwen，必要时切换到 DeepSeek。Provider 健康检查会区分永久性凭据/账单错误与临时错误；永久错误会被熔断，避免无效重复请求。精确缓存和语义缓存用于减少重复调用，会话级 token 与成本记录用于后续运营分析。
 
-<p align="center">
-  <img src="./docs/assets/_report.png" alt="面试报告 · 综合评分 + 技能雷达 + 改进建议" width="100%">
-</p>
+### 多 Agent 与缓存 Token 基准
 
-### ④ Langfuse 可观测面板（LLM trace 日志）
+![当前多 Agent 与缓存 Token 基准](docs/assets/multi-agent-cache-benchmark-2026-08-12.png)
 
-<p align="center">
-  <img src="./docs/assets/_langfuse.png" alt="Langfuse 可观测面板 · LLM trace 日志 · 三层确定性采样" width="100%">
-</p>
+这是 2026-08-12 基于当前默认 NestJS 路径完成的真实对照：同一组 10 轮技术面试输入，一组直接调用 Qwen，另一组完整经过注册登录、简历 RAG、面试确认、JWT 鉴权 SSE、LangGraph 多 Agent 和会话成本面板。
 
-> 💡 每张子图独立文件，方便在简历 / 邮件 / 文档中单独引用（不再依赖大图 product-showcase.png）。
+| 指标 | 对照/口径 | 多 Agent + 缓存结果 |
+| --- | --- | --- |
+| Token 消耗 | 直接 Qwen：`15,402` tokens | 当前多 Agent 路径：`20,024` tokens |
+| Token 差异 | 相同 10 轮输入 | `+30.01%`，当前未实现总 Token 节省 |
+| 模型调用 | 对照组 `10` 次 | 多 Agent 路径 `61` 次 |
+| 语义缓存计数 | 当前会话成本面板 | `46` 次命中记录 |
+| 累计 wall time | 直接 Qwen `48.60s` | 多 Agent SSE `110.18s` |
+| SSE 首事件中位数 | 当前多 Agent SSE | `259ms` |
+| 成本面板响应 | 当前运行中 API | `8.8ms` |
 
-| 子图 | 内容 | 数据源 |
-|---|---|---|
-| ① 3 层系统架构 | 前端 SPA · NestJS + LangGraph · 7 容器 + 双模型 | 手画 SVG（`_arch.html`） |
-| ② 对话界面 | SSE 流式 token 输出，真实 multi-agent 路径 | `puppeteer` 截 localhost:5173 |
-| ③ 报告界面 | 总分 + 4 维度评分 + 优点/不足/建议 | `puppeteer` 截 localhost:5173 |
-| ④ Langfuse Dashboard | Trace / Token / 模型分布 | 已补（脱敏 Langfuse 全景图，commits `4b108bc` + `59f0e6d`，`_langfuse.html` mock 数据） |
+实测说明：当前多节点图编排的调用开销大于缓存带来的收益，因此不能将语义缓存命中次数直接解释为 Token 节省。该结果作为当前版本的回归基线，后续优化方向是减少每轮图节点调用、对重复输入提前短路、确认缓存命中后不再触发下游模型节点，并增加按节点的 Token 归因。
 
-> 📝 **如何补 Langfuse 截图**：把云端截图命名为 `docs/assets/_langfuse.png`，改 `_showcase.html` 里 `④` 那块的 `<div class="cell-body placeholder">` 为 `<div class="cell-body"><img src="_langfuse.png"></div>`，重新跑 `node /tmp/render.js _showcase.html product-showcase.png 2300`。
+完整机器可读结果见 [当前多 Agent 基准 JSON](apps/web/e2e/screenshots/acceptance-2026-08-12/benchmarks/multi-agent-cache-2026-08-12T16-50-35-272Z.json)，可通过 `node apps/web/e2e/multi-agent-cache-benchmark.mjs` 复跑。该脚本使用有效 Provider 凭据，输出只包含脱敏聚合指标，不记录 API Key 或模型正文。
 
----
+本轮基准还修复了会话成本统计的累计问题：同一面试的后续消息不再重置 Redis 实时计数器，并已加入对应的回归测试。
+
+### 贯穿产品的安全边界
+
+安全不只存在于登录接口。全局 JWT Guard、角色 Guard 和资源归属校验共同保护业务接口；前端会隐藏管理员操作并将普通用户从管理路由重定向，后端仍是最终授权边界。题库写入、知识库写入和 MCP 管理仅允许管理员执行。
+
+### 显式失败语义的内容导入
+
+简历上传有明确的文件格式约束。题库 URL 导入仅允许公开 HTTPS 地址，拒绝内网和 loopback 地址，保留页面标题，并能从技术文档生成面试题，而非只能提取已有问答。如果页面无法产出可用题目，接口返回明确错误，而不是返回空数据的伪成功。
 
 ## 技术栈
 
-| 层 | 选型 | 备注 |
-|---|---|---|
-| 前端 | React 18 + Vite + TypeScript + Tailwind | SSE 流式渲染 + HITL 审批面板 |
-| 后端 | NestJS 10 + TypeScript | 模块化 DI，装饰器生态 |
-| 数据库 | PostgreSQL 16 + Prisma | 9 张业务表（含 InterviewTask / AnswerHistory） |
-| 短期记忆 | Redis 7 | Hash（工作记忆）+ List（会话）+ SharedContext（SCAN 替代 KEYS） |
-| 长期记忆 | Mem0 Cloud / OSS | 自动去重合并候选人画像 |
-| 向量库 | Qdrant 1.18 + Milvus 2.4 | 双引擎：Qdrant 轻量 KB + Milvus 商用重型 |
-| Agent 框架 | LangGraph 1.3.6 + LangChain 1.x | StateGraph + checkpoint + interrupt + Command |
-| LLM | Qwen-plus + DeepSeek-chat | OpenAI 兼容协议，国产双模 |
-| 认证 | JWT (HS256) + userId 格式校验 | 生产环境 fail-fast，RBAC 待补充 |
-| 可观测 | Langfuse Cloud + 自建成本面板 | 三层确定性采样（djb2 hash，trace 10% / span 50% / gen 100%）|
-| 部署 | Docker Compose（7 容器） | postgres / redis / qdrant / milvus / milvus-etcd / api / web |
-
----
-
-## 核心工程实现
-
-### 1. Prompt Prefix Cache 策略
-
-三段识别将消息序列分为不同缓存优先级：
-
-```typescript
-// SYSTEM 段（长期稳定）→ cache_control: ephemeral
-// SEMI-STATIC 段（tools / few-shot，≥1024 token）→ prompt_cache_key
-// DYNAMIC 段（对话历史）→ 永远不进缓存
-
-// prompt_cache_key = hash(userId + systemVersion + toolsetHash)
-```
-
-横切拦截器 `wrapChat / wrapStream` 包装 provider 调用，**provider 切换零代码改动**。
-
-### 2. Semantic Cache
-
-```
-Query → Redis 精确层（hash 碰撞检查）
-     → Qdrant cosine 相似度（阈值 0.92）
-     → 命中：直接返回，记录 semanticCacheHits
-     → 未中：LLM 调用后写入 Qdrant + Redis
-```
-
-白名单仅缓存 `interview_question / general_qa`，黑名单强制 miss：`scoring / resume_parse / report_generate`（涉及个性化评估，不能复用）。
-
-### 3. 会话成本追踪
-
-6 维度实时计量：
-
-```typescript
-interface SessionCost {
-  llmCalls: number
-  totalTokens: number
-  promptCacheHits: number     // Prompt Cache 命中次数
-  semanticCacheHits: number   // Semantic Cache 命中次数
-  retries: number
-  cost: number                // 估算成本（CNY）
-}
-// Redis HINCRBY pipeline + 5 次写入刷盘防抖
-// GET /api/session/:id/cost 响应 < 100ms（实测 9-10ms）
-```
-
-### 4. Provider 永久错检测
-
-```typescript
-// 区分永久错（禁用 provider）vs 临时错（走 fallback）
-// 401 / 402 / 403 / 404 → 永久 disable，避免余额耗尽时持续扣费
-// 5xx / 429 → 临时，走 fallback provider
-```
-
-### 5. HITL 中断审批
-
-Reviewer 评分争议时触发 LangGraph `interrupt()`，HR 审批后通过 `Command(resume)` 恢复：
-
-```
-Reviewer 评分 < 0.5
-    → hitl_pending=true
-    → 路由到 hitl_review 节点
-    → interrupt() 暂停图执行
-    → 前端轮询 /hitl/graph-status 显示审批面板
-    → HR 点击"批准"或"拒绝"
-    → POST /hitl/graph-resume { verdict: 'approved' | 'rejected' }
-    → Command(resume=verdict) 恢复图执行
-    → approved → END（使用 Reviewer 草稿）
-    → rejected → Planner（打回重做）
-```
-
-### 6. Specialist Handoffs
-
-Planner 在 PlanStep 中指定 `specialist` 字段，Executor 按类型路由到不同 system prompt：
-
-| Specialist | 职责 | 触发场景 |
-|-----------|------|---------|
-| interviewer | 出题、追问、评估回答质量 | 面试问答环节 |
-| evaluator | 评分、反馈、生成报告 | 评分/总结环节 |
-| searcher | 联网搜索、信息检索 | 需要外部知识时 |
-| general | 通用处理 | 其他场景 |
-
-### 7. Citation 幻觉检测
-
-CRAG-lite 架构，启发式硬事实检测 + 引用溯源：
-
-```typescript
-// 1. detectHallucination()：识别硬事实声明，检查引用支撑
-// 2. 80+ 常见技术术语白名单（React/Docker/REST...），避免误报
-// 3. inferSourceType()：动态推断引用源类型（documentation/code/example）
-// 4. buildCitationContext()：注入引用指令到 LLM 上下文
-// 5. Reviewer 集成：评分时考虑引用完整性
-```
-
-### 8. JSON 容错解析
-
-解决 LLM 输出 markdown 包装 + 嵌套结构时正则贪婪匹配失效问题：
-
-```
-1. 剥 markdown ```json 包装
-2. 花括号平衡扫描（处理字符串内转义 \"）
-3. repairJsonLoose（去尾逗号 / 加引号 key / 去注释）
-4. JSON.parse
-```
-
----
-
-## 架构（2026-06-26 双后端并存：NestJS 默认 + py-api 选配）
-
-> **默认后端**：NestJS（`apps/api/`，端口 3001）— docker compose 一键启动
-> **选配后端**：Python FastAPI（`apps/py-api/`，端口 3002）— `bash deploy.sh --py` 启
-> **共享数据**：postgres / redis / milvus / qdrant / mem0 两个后端共用
-> **py-api 薄壳版**：保留 8 项商用 best practice（结构化日志 / 错误处理 / Rate Limit / 真流式 / Metrics / 重试+超时 / Docker fail-fast / 一键部署），可作技术选型对比
-
-### 架构图
-
-```
-                    ┌──────────────────────────────────┐
-                    │  共享数据层（postgres/redis/milvus/qdrant/mem0）│
-                    └──────────────────────────────────┘
-                            ▲                       ▲
-                            │                       │
-              ┌─────────────┴──────┐    ┌───────────┴────────┐
-              │  NestJS api         │    │  Python FastAPI    │
-              │  apps/api/          │    │  apps/py-api/      │
-              │  :3001（默认）       │    │  :3002（选配）      │
-              │  LangGraph 1.3 + TS  │    │  LangGraph 0.5     │
-              │  Prisma + Postgres  │    │  SQLAlchemy        │
-              └─────────────────────┘    └────────────────────┘
-                            ▲                       ▲
-                            └───────────┬───────────┘
-                                        │
-                          ┌────────────┴──────────────┐
-                          │  React Frontend            │
-                          │  apps/web/ :5173           │
-                          │  反代 → api:3001（默认）     │
-                          └───────────────────────────┘
-```
-
-### 5 节点 LangGraph 拓扑
-
-```
-   START
-     ↓
-   supervisor ──→ planner ──→ executor ──→ replanner ──→ reviewer
-     │                              │            │            │
-     └→ respond_directly            │            │            │
-                                   └────────────┘            │
-                                                             ↓
-                                          reviewer ──→ planner (revise)
-                                                             ↓
-                                            reviewer → END (approved)
-                                            reviewer ──→ hitl_review ──→ END
-```
-
-### 4 层记忆
-
-| 层 | 存储 | 用途 |
-|---|---|---|
-| L1 | Redis Hash | 工作记忆（last_message_at / thread_id / status）|
-| L2 | Redis List | 会话消息（lpush 最新在前 + get_messages_chronological 最老在前）|
-| L3 | Milvus + Mem0 | 长期向量（Milvus COSINE 1024d + Mem0 cloud/oss）|
-| L4 | PostgreSQL | 持久化（User / Interview / SessionCost / Message，SQLAlchemy + Alembic）|
-
-### 关键能力（商用 best practice · 2026-06-26）
-
-| 维度 | 状态 |
-|---|---|
-| 5 节点 LangGraph + 4 层记忆 | ✓ |
-| HITL 评分争议中断 + Command 恢复 | ✓ |
-| SSE 流式 + 节点追踪 | ✓（CallbackHandler 收集 token）|
-| JWT 鉴权 + 商用 fail-fast | ✓（pydantic model_validator + 启动前 sys.exit(1)）|
-| 结构化日志全覆盖 | ✓（structlog + trace_id 自动注入）|
-| 请求追踪 middleware | ✓（X-Request-ID + contextvars）|
-| 错误处理统一 | ✓（AppError + handler + JSON 4xx/5xx）|
-| LLM 重试 + 超时 | ✓（tenacity 指数退避 + asyncio.wait_for）|
-| Milvus SQL 注入防护 | ✓（escape_milvus_string + build_milvus_eq）|
-| 单测覆盖 | **66 / 66** ✓（9 个文件）|
-
-### Makefile 一键命令
-
-```bash
-make help        # 查看所有命令
-make up          # 启动 NestJS + 基础设施（默认 · 8 容器）
-make up-py       # 启动 NestJS + py-api（双后端 · 9 容器）
-make down        # 全部停掉
-make logs        # api 日志
-make rebuild     # 强制 rebuild api 镜像
-make status      # 容器状态
-make health      # 健康检查
-make clean       # 清理所有容器+卷
-```
-
-### 一键启动 + 验证
-
-```bash
-# 1. 配置环境变量
-cp .env.example .env
-# 必填：QWEN_API_KEY（dev 占位 OK，但商用必须 ≥32 字符 JWT_SECRET）
-# ⚠️ JWT_SECRET：.env.example 给 dev 占位（≥32 字符），商用前 `openssl rand -base64 48`
-
-# 2. 启动（NestJS 默认）
-make up
-
-# 3. 验证
-curl http://localhost:3001/health           # 200 OK（liveness）
-curl http://localhost:3001/api/health/ready # 200 + 真连 Redis + Milvus（readiness）
-curl -X POST http://localhost:3001/api/auth/login -H "Content-Type: application/json" -d '{}'
-# {"access_token":"eyJ...","token_type":"Bearer","expires_in":"7d"}
-
-# 4. 跑测试
-docker exec interview-api bash -c "cd /app/apps/api && npx jest --ci"
-# 203 passed
-```
-
-### 商用部署清单
-
-部署到生产环境前必检：
-
-- [ ] `NODE_ENV=production` 必设（JWT_SECRET fail-fast 触发）
-- [ ] `JWT_SECRET` ≥32 字符（`openssl rand -base64 48` 生成）
-- [ ] `QWEN_API_KEY` 商用 Key（不能是 dev 占位）
-- [ ] `MEM0_API_KEY`（如果启用 L3 长期记忆）
-- [ ] `DEEPSEEK_API_KEY`（fallback）
-- [ ] `LANGFUSE_PUBLIC_KEY` + `LANGFUSE_SECRET_KEY`（可观测）
-- [ ] K8s readinessProbe 配 `/api/health/ready`（fail 时流量切走）
-- [ ] 监控：`/api/health` liveness + 容器日志接入 Loki/ELK
-- [ ] `CORS allow_origins` 改实际域名（不是 localhost）
-- [ ] 反向代理 + HTTPS + rate limit（Nginx / Caddy）
-
-### apps/api-legacy/ 说明
-
-NestJS api 全部代码保留在 `apps/api-legacy/`（git rename），可作为：
-
-- 简历展示多语言栈（TS + Python）
-- 应急回滚（mv apps/api-legacy apps/api + 改 docker-compose 即可恢复）
-- NestJS 商业 best practice 参考（fail-fast / mcp / cache / metrics）
-
-如需恢复 NestJS 启动：
-
-```bash
-mv apps/api-legacy apps/api
-# 改 docker-compose.yml 加 api 服务 + profiles
-# 改 Makefile 加 up / rebuild
-```
-
----
+| 领域 | 技术 |
+| --- | --- |
+| 前端 | React 18、Vite、TypeScript、Zustand、TanStack Query |
+| 后端 | NestJS 10、TypeScript、Prisma |
+| Agent | LangGraph、DeepAgents、Model Context Protocol |
+| 模型 | Qwen OpenAI 兼容 API、DeepSeek fallback |
+| 数据 | PostgreSQL、Redis、Milvus、Qdrant |
+| 可观测性 | Langfuse、会话级 token 与成本统计 |
+| 质量保障 | Docker Compose、GitHub Actions、Jest、Vitest、Playwright |
 
 ## 快速开始
 
-### 前置条件
+### 前置要求
 
-- Docker & Docker Compose
-- Node.js 20+，pnpm 8+
-- Qwen API Key（[申请](https://dashscope.aliyuncs.com/)）或 DeepSeek API Key
+- Node.js 20+
+- pnpm 9+
+- Docker Desktop / Docker Compose
+- Qwen API Key，用于简历解析、embedding、出题和流式面试
 
-### 方式 A：Docker 全量启动
+### 配置并启动
 
 ```bash
-# 1. 配置环境变量
 cp .env.example .env
-# 必填：QWEN_API_KEY / DEEPSEEK_API_KEY / JWT_SECRET
-#   └─ JWT_SECRET：.env.example 已给 dev 占位值（≥32 字符），本地跑通即可；
-#      商用 / 隐私敏感场景必须 `openssl rand -base64 48` 重生成
-# 可选：LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / BOCHA_API_KEY / MEM0_API_KEY
-#
-# ⚠️ 修复 2026-06-22：docker-compose.yml 写死 NODE_ENV=production（触发 P0-3
-#    fail-fast），JWT_SECRET 必须显式设。未设时 docker compose 启动时立即报错：
-#      "JWT_SECRET must be set in .env (商用必填，dev 占位见 .env.example)"
-
-# 2. 一键启动（推荐 · 自动 .env + JWT_SECRET + 等 healthy + 端到端验证）
-bash deploy.sh
-
-#   deploy.sh 自动做：
-#   - 检查 .env（缺则自动 cp .env.example）
-#   - 自动 `openssl rand -base64 48` 写入 JWT_SECRET（如未设）
-#   - docker compose up -d --build（8 容器 · NestJS 默认 + 共享 postgres/redis/milvus）
-#   - 等 api healthy（最久 60s）
-#   - 端到端 curl /health + /api/health/ready
-#   - 打印容器状态 + 总结
-#
-#   选配启 py-api（薄壳版 · 端口 3002）：
-#   bash deploy.sh --py
-
-# 3. 访问前端
-open http://localhost:5173
-
-# 4. 手动验证
-curl http://localhost:3001/health           # 200 OK（NestJS liveness）
-curl http://localhost:3001/api/health/ready # 200 + 真连 Redis + Milvus（readiness）
 ```
 
-### 方式 B：基础设施 Docker + 后端本地（开发推荐）
+至少需要配置 `QWEN_API_KEY`，且应在任何非本地部署中替换 `JWT_SECRET`。`DEEPSEEK_API_KEY` 可选，但配置后可启用 Provider 降级。需要初始化管理员时，请在管理员注册前通过 `ADMIN_USER_IDS` 配置受控的用户 ID 列表。
 
 ```bash
-# 1. 启动基础设施
-docker compose up -d postgres redis qdrant milvus milvus-etcd
-
-# 2. 安装依赖
-cp .env.example .env && pnpm install
-
-# 3. 初始化数据库
-cd apps/api
-pnpm prisma:generate && pnpm prisma:migrate
-
-# 4. 启动后端
-pnpm start:dev
-
-# 5. 启动前端（另开终端）
-cd apps/web && pnpm dev
+pnpm install
+pnpm docker:up
+pnpm db:deploy
 ```
 
-### 引擎模式切换
+| 服务 | 地址 |
+| --- | --- |
+| Web 应用 | http://localhost:5173 |
+| API | http://localhost:3001/api |
+| Liveness | http://localhost:3001/api/health |
+| Readiness | http://localhost:3001/api/health/ready |
+
+默认产品路径为 NestJS API。`apps/py-api` 保留为实验性、按需启用的实现，不是当前推荐的产品部署路径。
+
+### 注册与登录
 
 ```bash
-AGENT_ENGINE=multi        # LangGraph Supervisor（默认）
-AGENT_ENGINE=deepagents   # LangChain DeepAgents（stream 走 ChatOpenAI 真流式）
-AGENT_ENGINE=llm-direct   # 直连 LLM（最小依赖降级兜底）
+curl -X POST http://localhost:3001/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"local-user","password":"local-password-123"}'
+
+curl -X POST http://localhost:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"local-user","password":"local-password-123"}'
 ```
 
----
+登录响应会返回 `accessToken`、`tokenType`、`expiresIn`、`userId` 和 `role`。访问受保护的接口时携带：
 
-## 部署说明：本地自托管 vs 云服务
+```text
+Authorization: Bearer <accessToken>
+```
 
-> ⚠️ **为什么这一节重要**：本仓库 `.env.example` 默认指向云服务（Mem0 Cloud / Langfuse Cloud），开箱即用无配置；但**生产 / 商用 / 隐私敏感场景必须切到本地自托管**。下表是所有外部依赖的部署模式说明，便于按场景选型。
+## 主要业务流程
 
-### 外部依赖部署模式
+### 候选人流程
 
-| 依赖 | 本仓库默认 | 本地自托管方案 | 数据出域 | 适用场景 |
-|---|---|---|---|---|
-| **LLM（Qwen/DeepSeek）** | DashScope / DeepSeek 云 API | OpenAI 兼容私有部署（vLLM / Ollama / LocalAI） | ✅ 上云 | Demo / 生产需自托管 |
-| **Milvus** | Docker 容器本地部署 | ✅ 默认就是本地 | ❌ 不出域 | 生产可用 |
-| **Qdrant** | Docker 容器本地部署 | ✅ 默认就是本地 | ❌ 不出域 | 生产可用 |
-| **Postgres** | Docker 容器本地部署 | ✅ 默认就是本地 | ❌ 不出域 | 生产可用 |
-| **Redis** | Docker 容器本地部署 | ✅ 默认就是本地 | ❌ 不出域 | 生产可用 |
-| **Mem0** | **Mem0 Cloud（api.mem0.ai）** | Mem0 OSS + 自托管 Postgres / Qdrant 后端 | ⚠️ **默认上传第三方** | 隐私场景必切 |
-| **Langfuse** | **Langfuse Cloud（us.cloud.langfuse.com）** | Langfuse OSS + Docker 自部署 | ⚠️ **默认上传第三方** | 隐私场景必切 |
+1. 注册或登录。
+2. 通过 `POST /api/interview/upload-resume` 上传简历，multipart 字段名为 `file`，并传入 `position`。
+3. 查看解析后的简历和个性化问题。
+4. 调用 `POST /api/interview/start` 创建面试。
+5. 确认简历后，通过 `POST /api/interview/:interviewId/message` 进行流式对话。
+6. 结束面试并生成报告。
 
-### Mem0 切换为本地自托管
+候选人的面试和简历数据均绑定当前登录用户，其他用户访问会被拒绝。
 
-Mem0 OSS (`mem0ai` 包) 支持接入自托管 vector store + LLM，避免数据上云：
+### 管理员流程
+
+- 通过 `POST /api/interview/question-bank/import-file` 导入题库文件。
+- 通过 `POST /api/interview/question-bank/import-url` 从公开技术文档导入题目。
+- 检索和管理题库。
+- 导入、管理和基准测试共享知识库。
+- 查看、重新加载和启停已配置 MCP Server。
+
+## 测试与验收链路
+
+质量门禁按“静态检查 -> 回归测试 -> 生产构建 -> Docker 健康检查 -> 浏览器验收 -> 真实 Provider 内容工作流 -> 截图与 JSON 证据”推进。当前验证数据见上方的“当前质量门禁与验收证据”图；缓存命中数据受 Provider 能力影响，不能脱离特定模型和负载单独解读。
+
+| 验证层级 | 覆盖内容 |
+| --- | --- |
+| API 回归测试 | 注册登录、角色授予、跨用户资源隔离、简历输入校验、导入失败语义和核心服务逻辑 |
+| Web 单元测试 | 组件行为、前端状态和权限相关展示 |
+| Typecheck 与生产构建 | 跨模块类型契约、Prisma 类型和可部署产物 |
+| API CI 接口校验 | 在已构建服务中验证健康检查、认证和关键接口行为 |
+| 浏览器验收 | 对 Docker 中运行的真实前后端验证登录门禁、管理员路由和移动端渲染 |
+| 真实 Provider 内容工作流 | 验证简历解析、RAG 写入、个性化出题、面试确认、文件/URL 导入、即时检索与 SSRF 拒绝 |
+
+### 最近一次验收证据
+
+2026-08-12 的交付验收重新构建了 Docker API 与 Web 镜像，结果如下：
+
+| 检查项 | 结果 |
+| --- | --- |
+| API Jest | `214 passed` |
+| Web Vitest | `59 passed` |
+| API 与 Web typecheck/build | 通过 |
+| Prisma schema validation | 通过 |
+| 浏览器认证与 RBAC 验收 | `9/9 passed` |
+| 有效 Provider 的真实内容工作流 | `10/10 passed` |
+
+内容工作流验证了简历上传与 RAG 写入、个性化问题生成、面试创建与确认、题库文件导入、从技术文档 URL 生成题目并立即检索、用户数据隔离和 SSRF 拒绝。
+
+可查看完整的[验收报告](docs/ACCEPTANCE-REPORT-2026-08-12.md)、[内容工作流 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/content-workflow-results.json)和[浏览器验收 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/real-results.json)。验收脚本会将截图和 JSON 结果提交到仓库，便于评审者在不先复跑真实 Provider 链路的情况下检查证据。
+
+### 浏览器验收截图
+
+| 登录门禁 | 普通用户首页 |
+| --- | --- |
+| ![桌面端登录门禁](apps/web/e2e/screenshots/acceptance-2026-08-12/05-real-login-desktop.png) | ![普通用户认证后首页](apps/web/e2e/screenshots/acceptance-2026-08-12/06-real-user-home.png) |
+
+| 管理员 MCP 管理页 | 移动端登录门禁 |
+| --- | --- |
+| ![管理员 MCP 管理页](apps/web/e2e/screenshots/acceptance-2026-08-12/07-real-admin-mcp.png) | ![移动端登录门禁](apps/web/e2e/screenshots/acceptance-2026-08-12/08-real-login-mobile.png) |
+
+| 简历确认与开始面试 | URL 题库导入后的检索 |
+| --- | --- |
+| ![真实简历确认页](apps/web/e2e/screenshots/acceptance-2026-08-12/09-resume-confirmation.png) | ![真实 URL 题库检索页](apps/web/e2e/screenshots/acceptance-2026-08-12/10-question-bank-url-search.png) |
+
+### 本地验证命令
 
 ```bash
-# .env 配置：把 Mem0 切到本地 OSS（用项目已有的 Qdrant 做向量存储）
-MEM0_API_KEY=                       # 清空，不走 Cloud
-MEM0_HOST=http://localhost:8000     # 自托管 Mem0 OSS endpoint（需单独部署）
-# 或者彻底关掉 Mem0，仅用 Milvus 长期记忆
-MEM0_ENABLED=false
+pnpm typecheck
+pnpm build
+pnpm --filter @interview-agent/api test
+pnpm --filter @interview-agent/web test
 ```
 
-代码侧已实现自动降级：`apps/api/src/modules/memory/long-term/mem0.store.ts` 检测到 `MEM0_ENABLED=false` 时直接返回空，调用方 fallback 到 `milvus-memory.store.ts` 纯本地向量召回。
-
-### Langfuse 切换为本地自托管
-
-Langfuse OSS 提供 Docker 一键部署（[官方文档](https://langfuse.com/self-hosting)）：
+运行浏览器和真实内容验收前，需要先启动 Docker 环境、配置管理员账号和有效模型凭据：
 
 ```bash
-# 1. 启动 Langfuse OSS（pg + clickhouse + langfuse-web + langfuse-worker）
-git clone https://github.com/langfuse/langfuse.git
-cd langfuse
-docker compose up -d
-
-# 2. .env 配置：切换到自托管
-LANGFUSE_HOST=http://localhost:3000        # 自托管 Langfuse endpoint
-LANGFUSE_PUBLIC_KEY=lf_pk_xxx              # 自托管项目 public key
-LANGFUSE_SECRET_KEY=lf_sk_xxx              # 自托管项目 secret key
+node apps/web/e2e/content-workflow-acceptance.mjs
+node apps/web/e2e/content-real-screenshots.mjs
 ```
 
-代码侧已实现自动降级：`apps/api/src/infra/langfuse/langfuse.service.ts` 检测到 `LANGFUSE_PUBLIC_KEY` 为空时跳过调用，不影响主流程。
-
-### 关于本仓库的产品截图
-
-`docs/assets/product-showcase.png` 第 4 格是 **Langfuse Dashboard 模拟图（Privacy-Safe）**，不是云端真实截图：
-
-- ✅ 演示了 Trace 树 / Token 消耗 / 模型分布 / Latency 等核心可观测能力
-- ✅ 所有用户标识用 `user_001 / user_002` 占位，无真实 PII
-- ❌ 数字是 mock 的，不是真实 A/B 测量值（真实数据见 `docs/assets/cost-baseline.png`）
-
-要查看**真实 Langfuse 数据**：
+## 开发与数据库
 
 ```bash
-# 1. 用 Docker 跑 Langfuse OSS（参考上面"切换为本地自托管"）
-# 2. 启动 interview-agent，会自动上报 trace 到 http://localhost:3000
-# 3. 浏览器打开 Langfuse → 选 agent-demo 项目 → 看真实 trace
+pnpm dev
+pnpm dev:api
+pnpm dev:web
+
+pnpm db:generate
+pnpm db:migrate
+pnpm db:deploy
+pnpm db:studio
 ```
 
-### 商用部署检查清单
-
-部署到生产前逐项确认：
-
-- [ ] `MEM0_API_KEY` 清空，启用本地 Milvus 长期记忆（避免 GDPR 风险）
-- [ ] `LANGFUSE_PUBLIC_KEY` 指向自托管 Langfuse 或关闭
-- [ ] LLM API Key 走公司内部代理或私有部署（避免 token 泄漏）
-- [ ] Postgres / Redis / Qdrant / Milvus 全部本地 Docker 或 K8s 部署
-- [ ] 启用 HTTPS（Nginx + Let's Encrypt / ALB）
-- [ ] 配置 `.env.production` 不入 Git（参考 `.gitignore`）
-
----
+生产发布应由部署流水线在新 API 版本接收流量前执行 `pnpm db:deploy`。
 
 ## 项目结构
 
-```
-interview-agent/
-├── apps/
-│   ├── api/                              # NestJS 后端（15,000+ 行 TS，99 个 .ts 文件）
-│   │   └── src/
-│   │       ├── modules/
-│   │       │   ├── llm/                  # Inference Gateway + 三层缓存 + 成本追踪
-│   │       │   │   ├── llm.gateway.service.ts
-│   │       │   │   ├── cache/
-│   │       │   │   │   ├── prompt-cache.strategy.ts        ★ 3 段前缀识别
-│   │       │   │   │   ├── prompt-cache.interceptor.ts
-│   │       │   │   │   └── semantic-cache.service.ts
-│   │       │   │   └── cost/session-cost.tracker.ts        ★ 实时成本计量
-│   │       │   ├── agent/                # Agent 引擎
-│   │       │   │   ├── interview-agent.service.ts          ★ 主流程（10 步）
-│   │       │   │   ├── multi-agent.service.ts              ★ LangGraph 编排 + HITL resume
-│   │       │   │   ├── deepagents-agent.service.ts
-│   │       │   │   ├── services/context-manager.ts         ★ 4 级水位线压缩
-│   │       │   │   ├── shared-context.service.ts           ★ 多 Agent 共享上下文（SCAN 替代 KEYS）
-│   │       │   │   └── tools/
-│   │       │   │       ├── bocha-search.tool.ts            ★ 联网搜索
-│   │       │   │       ├── notion.tool.ts                  ★ Notion 3 工具（15s 超时 + 分页）
-│   │       │   │       └── github.tool.ts                  ★ GitHub 3 工具（README 截断）
-│   │       │   ├── agents/multi-agent/
-│   │       │   │   ├── state.ts                            ★ Zod schema + SpecialistType
-│   │       │   │   ├── graph.ts                            ★ 拓扑定义 + hitl_review + recursionLimit=30
-│   │       │   │   ├── llm-gateway-chat-model.ts           ★ BaseChatModel 适配器 + 流式
-│   │       │   │   ├── citation.ts                         ★ CRAG-lite 幻觉检测 + 引用溯源
-│   │       │   │   └── nodes/                              ★ 7 节点实现
-│   │       │   ├── interview/
-│   │       │   │   ├── controllers/hitl.controller.ts      ★ HITL 审批 + graph-resume
-│   │       │   │   └── services/
-│   │       │   │       ├── dynamic-task-queue.service.ts    ★ 动态任务队列 + Agent 决策
-│   │       │   │       ├── heuristic-decide.util.ts         ★ 启发式回退（整词边界匹配）
-│   │       │   │       ├── escape-milvus.util.ts            ★ Milvus filter 注入防护
-│   │       │   │       ├── question-bank.service.ts         ★ Milvus 混合检索 + RRF + Rerank
-│   │       │   │       ├── hitl.service.ts                 ★ HITL Redis 状态
-│   │       │   │       └── mcp-registry.ts                 ★ 工具注册表
-│   │       │   ├── auth/                # 认证（JWT + userId 格式校验 + HS256 锁定）
-│   │       │   ├── reflection/           # Reflection 自我修正闭环
-│   │       │   ├── memory/               # 四层记忆
-│   │       │   └── knowledge-base/       # Qdrant 知识库
-│   │       ├── infra/                    # Redis / Prisma / Langfuse / Qdrant
-│   │       │   ├── langfuse/sampling.util.ts               ★ djb2 确定性三层采样
-│   │       │   └── config/configuration.ts                 ★ parseSafeInt + LLM fail-fast
-│   │       └── common/json-extract.ts   ★ LLM JSON 容错解析
-│   └── web/                              # React 前端
-├── docker-compose.yml                    # 7 容器编排
-├── docs/architecture-decisions.md        # ADR 架构决策记录
-├── WIKI.md                               # 运维审计 Wiki
-└── .env.example
+```text
+apps/
+  api/                 NestJS API 与 Prisma schema
+    src/agents/        LangGraph 编排与 Agent 工具
+    src/modules/       auth、interview、llm、memory、knowledge-base、mcp
+    prisma/            数据库 schema 与 migration
+  web/                 React 应用与浏览器验收脚本
+  py-api/              实验性替代后端，默认不启用
+packages/
+  shared-types/        前后端共享类型
+docs/
+  ACCEPTANCE-REPORT-2026-08-12.md
 ```
 
----
+## 已知边界与后续商用工作
 
-## API 文档
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `POST` | `/user` | 创建候选人用户 |
-| `POST` | `/interview/start` | 开启面试（传 userId + 岗位） |
-| `POST` | `/interview/:id/message` | **SSE 流式对话**（核心端点）|
-| `POST` | `/interview/:id/end` | 结束面试 + 生成评分报告 |
-| `GET` | `/api/session/:id/cost` | 实时会话成本统计（**实测 9–10ms**）|
-| `GET` | `/api/knowledge-base/recall` | RAG 召回调试（`?q=&debug=true`）|
-| `POST` | `/api/knowledge-base/benchmark` | 召回基准测试 |
-| `GET` | `/admin/mcp` | MCP 工具管理（系统级启停）|
-| `GET` | `/hitl/pending/:interviewId` | 获取 HITL pending 状态 |
-| `POST` | `/hitl/approve/:interviewId` | HR 审批通过 |
-| `POST` | `/hitl/reject/:interviewId` | HR 审批拒绝 |
-| `GET` | `/hitl/all` | 获取所有 pending HITL |
-| `GET` | `/hitl/graph-status/:interviewId` | 检查图 HITL 中断状态 |
-| `POST` | `/hitl/graph-resume/:interviewId` | HR 审批后恢复图执行 |
-
----
-
-## 测试与基准
-
-### 单元测试（105 个，全过）
-
-```bash
-cd apps/api
-npm test
-# Jest 实测: 105/105 passed (Jest 83 + node:test 22)
-# 覆盖 Agent 决策 / Citation 幻觉检测 / ContextManager / Langfuse 采样 / JSON 容错解析 等核心模块
-```
-
-### RAG 召回基准（30 Case P@5 = 1.0）
-
-```bash
-curl -X POST "http://localhost:3001/api/knowledge-base/benchmark?limit=5&threshold=0.6" \
-  -H "Content-Type: application/json" \
-  -d @apps/api/tests/recall-benchmark-cases.json | jq '.metrics'
-# { precisionAt5: 1.0, meanReciprocalRank: 1.0, recall: 1.0 }
-```
-
-### Cost & Fallback 基准（50 轮真实 LLM）
-
-<p align="center">
-  <img src="./docs/assets/cost-baseline.png" alt="Cost & Fallback 基准 · v11 · 41 interview 累计 · 每项独立卡片" width="900">
-</p>
-
----
-
-## 运维 Wiki
-
-完整工程审计文档见 [**WIKI.md**](WIKI.md)，包含：
-
-- 模块清单（按行数 / 重要性排序）
-- 工程化亮点详解（Inference Gateway 熔断、3 段前缀识别、4 级水位线压缩、HITL 中断审批等）
-- 已知短板诚实清单
-- 可执行验证命令清单
-- 评分维度建议（架构合理性 / 工程化程度 / 代码质量 / 性能优化 / 可观测性 / 测试覆盖 / 商用化潜力 / AI 工程深度）
-
----
-
-## 已知局限
-
-1. **Prompt Prefix Cache 依赖底层 Provider**：当前 Qwen dashscope OpenAI 兼容层不识别 `prompt_cache_key`，生产环境需切换至 OpenAI 直连或 Anthropic Claude 方可生效
-2. **测试覆盖**：105 个单测（Jest 83 + node:test 22），核心业务逻辑（Agent 决策 / Citation / SSE / 评分 / Langfuse 采样）已有覆盖；前端 Vitest 与 Playwright e2e 待补充；7 个 Jest spec 因依赖未对齐暂 skip
-3. **Provider 临时错 retry**：当前仅 Provider 级 fallback，单次调用内部无指数退避
-4. **认证机制**：JWT HS256 + userId 格式校验已落地，OAuth2 + RBAC 待补充
-5. **Mem0 Cloud**：候选画像数据传到第三方 SaaS，GDPR 合规存疑；建议商用时切本地 OSS 或 per-tenant namespace
-6. **SSE 单连接**：未实现连接复用，每个浏览器 tab 一个长连接；断线重连无 server-side offset（已知限制）
-7. **Milvus 单机部署**：数据量 < 100K 足够；> 1M 需考虑分片
-8. **搜索结果下一轮可见**：bocha_search 结果注入短期记忆后需下一轮 LLM 才能看到，当前轮回复已发出无法修改
-9. **Reflection 闭环**：Phase 1 已落地（`reflection_logs` 表 + `issue_tags` 9 种），Phase 2 自动修正策略待实现
-
----
+- 尚未提供 refresh token rotation、token revocation list、邮箱验证、OAuth/SSO、MFA 和审计导出。
+- Provider fallback 已实现，但临时 Provider 错误尚未提供请求级指数退避。
+- 语义缓存和 prompt cache 的实际收益依赖具体模型与真实流量，应在目标业务中单独压测后再形成成本结论。
+- Langfuse 与 Mem0 是可选集成；将候选人数据发送到第三方服务前，需要独立进行隐私与合规评估。
+- 当前 Milvus 为单机 Compose 部署；多租户、高数据量场景需要容量规划、备份方案和托管或集群化向量数据库。
+- SSE 断线重连尚无服务端 event offset，无法恢复已部分传输的流式响应。
+- `apps/py-api` 与默认 NestJS 产品路径暂未保持功能完全一致。
 
 ## License
 

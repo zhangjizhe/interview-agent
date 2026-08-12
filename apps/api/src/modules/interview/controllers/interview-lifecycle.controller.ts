@@ -8,6 +8,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { InterviewAgentService } from '../../agent/interview-agent.service';
 import { MultiAgentService } from '../../agent/multi-agent.service';
@@ -15,7 +16,7 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { MemoryService } from '../../memory/memory.service';
 import { ResumeRAGService } from '../services/resume-rag.service';
 import type { ChatMessage } from '../../llm/providers/types';
-import { resolveUserId } from './user-resolver.util';
+import { requireOwnedInterview } from '../../../common/ownership.util';
 
 interface StartInterviewDto {
   userId: string;
@@ -51,18 +52,14 @@ export class InterviewLifecycleController {
   // ===== 静态路由（必须在 :interviewId 之前）=====
 
   @Get('list')
-  async listInterviews(@Query('userId') userId: string) {
-    if (!userId) return [];
-    const user = await this.prisma.user.findUnique({
-      where: { email: `${userId}@demo.local` },
-    });
-    if (!user) return [];
+  async listInterviews(@Req() req: any) {
+    const userId = req.user.userId;
     const interviews = await this.prisma.interview.findMany({
-      where: { userId: user.id },
+      where: { userId },
       orderBy: { startedAt: 'desc' },
       include: { report: true, messages: true },
     });
-    const resumes = await this.resumeRag.searchByUser(user.id, 1).catch(() => []);
+    const resumes = await this.resumeRag.searchByUser(userId, 1).catch(() => []);
     const latest = resumes[0] || null;
     return interviews.map((iv) => ({
       ...iv,
@@ -79,29 +76,9 @@ export class InterviewLifecycleController {
   }
 
   @Get('stats')
-  async tokenStats(@Query('userId') userId?: string) {
-    let where: any = undefined;
-
-    // 优先按 userId 过滤；找不到对应 user 时 fallback 到所有 demo-user-* 聚合
-    // (前端 localStorage 可能切过多次 user，DB 里没这个 userId 时不直接返 0)
-    if (userId) {
-      const user = await this.prisma.user.findUnique({
-        where: { email: `${userId}@demo.local` },
-      });
-      if (user) {
-        where = { userId: user.id };
-      } else {
-        // fallback: 查所有 demo-user-* 前缀用户的总数据
-        const demoUsers = await this.prisma.user.findMany({
-          where: { email: { startsWith: 'demo-user-' } },
-          select: { id: true },
-        });
-        where = { userId: { in: demoUsers.map((u) => u.id) } };
-      }
-    }
-
+  async tokenStats(@Req() req: any) {
     const interviews = await this.prisma.interview.findMany({
-      where,
+      where: { userId: req.user.userId },
       include: { messages: true },
     });
 
@@ -126,16 +103,9 @@ export class InterviewLifecycleController {
   }
 
   @Post('start')
-  async startInterview(@Body() dto: StartInterviewDto) {
-    const email = `${dto.userId}@demo.local`;
-    const user = await this.prisma.user.upsert({
-      where: { email },
-      create: { email, name: dto.userId },
-      update: {},
-    });
-
-    // 必须先上传简历（查询 Milvus resumes collection，userId 用 demo 字符串以匹配 ingest）
-    const resumes = await this.resumeRag.searchByUser(dto.userId, 1).catch(() => []);
+  async startInterview(@Body() dto: StartInterviewDto, @Req() req: any) {
+    const userId = req.user.userId;
+    const resumes = await this.resumeRag.searchByUser(userId, 1).catch(() => []);
     if (resumes.length === 0) {
       throw new BadRequestException(
         '请先上传简历（支持 .pdf / .md / .txt 格式）',
@@ -144,7 +114,7 @@ export class InterviewLifecycleController {
 
     const interview = await this.prisma.interview.create({
       data: {
-        userId: user.id,
+        userId,
         position: dto.position,
         level: dto.level || 'P5',
         status: 'IN_PROGRESS',
@@ -165,14 +135,10 @@ export class InterviewLifecycleController {
    */
   @Get('empty-rooms')
   async listEmptyRooms(
-    @Query('userId') userId: string,
+    @Req() req: any,
     @Query('idleMinutes') idleMinutes?: string,
   ) {
-    if (!userId) return { userId, emptyRooms: [], count: 0 };
-    const user = await this.prisma.user.findUnique({
-      where: { email: `${userId}@demo.local` },
-    });
-    if (!user) return { userId, emptyRooms: [], count: 0 };
+    const userId = req.user.userId;
 
     const minutes = idleMinutes ? parseInt(idleMinutes, 10) : 30;
     const threshold = new Date(Date.now() - minutes * 60 * 1000);
@@ -182,7 +148,7 @@ export class InterviewLifecycleController {
     // _count 在 Prisma 5.22 + 该 schema 下不支持，改用 messages: { none: true } 表达"没有消息"
     const candidates = await this.prisma.interview.findMany({
       where: {
-        userId: user.id,
+        userId,
         status: 'IN_PROGRESS',
         startedAt: { lt: threshold },
         messages: { none: {} },
@@ -211,27 +177,9 @@ export class InterviewLifecycleController {
   @Delete(':interviewId')
   async deleteInterview(
     @Param('interviewId') interviewId: string,
-    @Query('userId') userId?: string,
+    @Req() req: any,
   ) {
-    // 1) userId 必填：不传 → forbidden（防止任意人知道 interviewId 就能删）
-    if (!userId) {
-      return { deleted: false, reason: 'forbidden', message: 'userId required' };
-    }
-
-    const interview = await this.prisma.interview.findUnique({
-      where: { id: interviewId },
-    });
-    if (!interview) {
-      return { deleted: false, reason: 'not_found' };
-    }
-
-    // 2) 归属校验：user 查不到也视作 forbidden（不留"查不到就不校验"的口子）
-    const user = await this.prisma.user.findUnique({
-      where: { email: `${userId}@demo.local` },
-    });
-    if (!user || interview.userId !== user.id) {
-      return { deleted: false, reason: 'forbidden' };
-    }
+    await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
 
     await this.prisma.interview.delete({ where: { id: interviewId } });
     this.logger.log(`Deleted interview ${interviewId} (manual cleanup)`);
@@ -243,7 +191,8 @@ export class InterviewLifecycleController {
    * GET /interview/:interviewId/checkpoint
    */
   @Get(':interviewId/checkpoint')
-  async getCheckpoint(@Param('interviewId') interviewId: string) {
+  async getCheckpoint(@Param('interviewId') interviewId: string, @Req() req: any) {
+    await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
     if (!this.multiAgent.isEnabled()) {
       return { enabled: false };
     }
@@ -275,27 +224,20 @@ export class InterviewLifecycleController {
   // ===== 动态路由 =====
 
   @Get('memories/:userId')
-  async getMemories(@Param('userId') userId: string) {
-    const realUserId = await resolveUserId(this.prisma, userId);
-    if (!realUserId) return { userId, memories: [], count: 0 };
-    const memories = await this.memory.getAllMemories(realUserId);
-    return { userId: realUserId, memories, count: memories.length };
+  async getMemories(@Param('userId') userId: string, @Req() req: any) {
+    if (userId !== req.user.userId) {
+      throw new BadRequestException('Cannot access another user memories');
+    }
+    const memories = await this.memory.getAllMemories(userId);
+    return { userId, memories, count: memories.length };
   }
 
   @Get(':interviewId')
-  async getInterview(@Param('interviewId') interviewId: string) {
-    const interview = await this.prisma.interview.findUnique({
-      where: { id: interviewId },
-      include: {
-        messages: { orderBy: { createdAt: 'asc' } },
-        report: true,
-      },
+  async getInterview(@Param('interviewId') interviewId: string, @Req() req: any) {
+    const interview: any = await requireOwnedInterview(this.prisma, interviewId, req.user.userId, {
+      include: { messages: { orderBy: { createdAt: 'asc' } }, report: true },
     });
-    if (!interview) return null;
-    // 用 user.email 反查 demo userId（与 ingest 写入的 userId 一致）
-    const user = await this.prisma.user.findUnique({ where: { id: interview.userId } });
-    const demoUserId = user?.email?.replace(/@demo\.local$/, '') || interview.userId;
-    const resumes = await this.resumeRag.searchByUser(demoUserId, 1).catch(() => []);
+    const resumes = await this.resumeRag.searchByUser(interview.userId, 1).catch(() => []);
     const latest = resumes[0] || null;
     // 修复 2026-06-22：IN_PROGRESS interview 不返回 report，避免前端进入"已完成"页面
     // 而是显示聊天界面。COMPLETED 才返回 report 让前端展示报告。
@@ -321,11 +263,8 @@ export class InterviewLifecycleController {
    * POST /interview/:interviewId/confirm-resume
    */
   @Post(':interviewId/confirm-resume')
-  async confirmResume(@Param('interviewId') interviewId: string) {
-    const interview = await this.prisma.interview.findUnique({ where: { id: interviewId } });
-    if (!interview) {
-      return { success: false, reason: 'not_found' };
-    }
+  async confirmResume(@Param('interviewId') interviewId: string, @Req() req: any) {
+    await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
     await this.prisma.interview.update({
       where: { id: interviewId },
       data: { resumeConfirmed: true },
@@ -335,14 +274,10 @@ export class InterviewLifecycleController {
   }
 
   @Post(':interviewId/end')
-  async endInterview(@Param('interviewId') interviewId: string) {
-    const interview = await this.prisma.interview.findUnique({
-      where: { id: interviewId },
+  async endInterview(@Param('interviewId') interviewId: string, @Req() req: any) {
+    const interview: any = await requireOwnedInterview(this.prisma, interviewId, req.user.userId, {
       include: { messages: { orderBy: { createdAt: 'asc' } } },
     });
-    if (!interview) {
-      throw new BadRequestException('Interview not found');
-    }
 
     // 空面试：直接删除（不保留无聊天记录的空面试）
     if (interview.messages.length === 0) {
@@ -407,8 +342,7 @@ export class InterviewLifecycleController {
       // 候选人画像构建（失败不阻塞 status 更新）
       workingState = await this.memory.getWorkingState(interviewId);
       user = await this.prisma.user.findUnique({ where: { id: interview.userId } });
-      const demoUserId = user?.email?.replace(/@demo\.local$/, '') || '';
-      const resumes = await this.resumeRag.searchByUser(demoUserId, 1).catch(() => []);
+      const resumes = await this.resumeRag.searchByUser(interview.userId, 1).catch(() => []);
       resume = resumes[0] || null;
     } catch (err: any) {
       // generateReport 失败：fallback 到"评估失败"占位 report，保证 status 仍能切到 COMPLETED

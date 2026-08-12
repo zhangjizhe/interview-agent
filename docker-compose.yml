@@ -131,6 +131,7 @@ services:
       MEM0_HOST: ${MEM0_HOST:-}
       # 商用 fail-fast：JWT_SECRET 未设置时 docker compose 立即报错（容器不启动）
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (deploy.sh 自动生成 dev 占位)}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
       PORT: 3001
       NODE_ENV: production
     env_file:
@@ -174,6 +175,7 @@ services:
       MEM0_HOST: ${MEM0_HOST:-}
       # 商用 fail-fast：JWT_SECRET 未设置时 docker compose 立即报错（容器不启动）
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (deploy.sh 自动生成 dev 占位)}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
       PORT: 3002
     env_file:
       - .env

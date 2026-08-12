@@ -4,7 +4,7 @@ import { join } from 'path';
 
 const API_URL = 'http://localhost:3001';
 const WEB_URL = 'http://localhost:5173';
-const ASSETS = '/Users/ext.zhangjizhe1/Desktop/interview-agent/docs/assets';
+const ASSETS = join(process.cwd(), 'docs', 'assets');
 
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });

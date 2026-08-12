@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Interview Agent Swimlane Architecture</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f7fb; color: #172033; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .canvas { width: 1440px; min-height: 1110px; padding: 46px 54px; background: #f4f7fb; }
+  h1 { margin: 0; color: #152552; font-size: 32px; letter-spacing: 0; }
+  .subtitle { margin: 10px 0 28px; color: #5b6780; font-size: 16px; }
+  .lanes { border: 1px solid #d7e0ee; border-radius: 12px; overflow: hidden; background: #ffffff; }
+  .lane { display: grid; grid-template-columns: 190px 1fr; min-height: 154px; border-bottom: 1px solid #d7e0ee; }
+  .lane:last-child { border-bottom: 0; }
+  .label { padding: 25px 20px; border-right: 1px solid #d7e0ee; }
+  .label h2 { margin: 0 0 8px; font-size: 18px; }
+  .label p { margin: 0; color: #62718a; font-size: 12px; line-height: 1.55; }
+  .actor { background: #edf5ff; }
+  .actor h2 { color: #2366b8; }
+  .web { background: #f4efff; }
+  .web h2 { color: #6840b0; }
+  .api { background: #fff6ec; }
+  .api h2 { color: #a65d20; }
+  .data { background: #edf9f4; }
+  .data h2 { color: #08785a; }
+  .content { position: relative; display: flex; align-items: center; gap: 14px; padding: 22px 26px; }
+  .node { position: relative; z-index: 1; flex: 1; min-height: 92px; padding: 15px 16px; border: 1px solid #d7e0ee; border-radius: 8px; background: #ffffff; }
+  .node h3 { margin: 0 0 8px; color: #1d3264; font-size: 15px; }
+  .node p { margin: 0; color: #61708a; font-size: 12px; line-height: 1.5; }
+  .arrow { position: relative; z-index: 1; color: #8291aa; font-size: 28px; font-weight: 400; }
+  .vertical { position: absolute; left: 50%; top: -21px; color: #8291aa; font-size: 24px; transform: translateX(-50%); }
+  .lane .content::before { position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed #dce5f0; content: ""; }
+  .callout { margin-top: 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .note { padding: 16px 18px; border: 1px solid #d7e0ee; border-radius: 8px; background: #ffffff; }
+  .note h3 { margin: 0 0 7px; color: #1d3264; font-size: 15px; }
+  .note p { margin: 0; color: #61708a; font-size: 13px; line-height: 1.55; }
+  .foot { margin-top: 20px; padding: 14px 16px; border-radius: 8px; background: #eaf1ff; color: #405578; font-size: 13px; line-height: 1.55; }
+  .foot strong { color: #1b57b5; }
+</style>
+</head>
+<body>
+<main class="canvas">
+  <h1>Interview Agent · 当前默认路径泳道架构</h1>
+  <p class="subtitle">从候选人动作到持久化、检索与模型调用的责任边界 · NestJS + React · 2026-08-12</p>
+
+  <section class="lanes">
+    <div class="lane">
+      <aside class="label actor">
+        <h2>候选人 / 管理员</h2>
+        <p>候选人完成简历上传、面试和报告查看。管理员维护题库、知识库和 MCP 配置。</p>
+      </aside>
+      <div class="content">
+        <article class="node"><h3>候选人</h3><p>注册、登录、上传简历<br>确认简历、提交面试回答</p></article>
+        <span class="arrow">→</span>
+        <article class="node"><h3>管理员</h3><p>题库文件/URL 导入<br>知识库和 MCP 管理</p></article>
+      </div>
+    </div>
+
+    <div class="lane">
+      <aside class="label web">
+        <h2>React Web</h2>
+        <p>会话持久化、角色感知路由、SSE 事件渲染与管理员操作入口。</p>
+      </aside>
+      <div class="content">
+        <span class="vertical">↓</span>
+        <article class="node"><h3>认证与路由门禁</h3><p>Bearer Token 注入<br>USER / ADMIN 页面边界</p></article>
+        <span class="arrow">→</span>
+        <article class="node"><h3>候选人工作区</h3><p>简历确认、面试页<br>SSE 流式问题与反馈</p></article>
+        <span class="arrow">→</span>
+        <article class="node"><h3>管理工作区</h3><p>题库检索和导入<br>MCP Server 管理</p></article>
+      </div>
+    </div>
+
+    <div class="lane">
+      <aside class="label api">
+        <h2>NestJS API</h2>
+        <p>默认产品主路径。鉴权、业务、Agent、检索和成本计量均以当前用户与面试 ID 为边界。</p>
+      </aside>
+      <div class="content">
+        <span class="vertical">↓ HTTPS / SSE / JWT</span>
+        <article class="node"><h3>访问控制</h3><p>全局 JWT Guard<br>RBAC + 资源归属校验<br>限流与输入校验</p></article>
+        <span class="arrow">→</span>
+        <article class="node"><h3>面试领域服务</h3><p>简历解析、生命周期<br>题库导入、SSE、报告<br>AnswerHistory 与任务队列</p></article>
+        <span class="arrow">→</span>
+        <article class="node"><h3>LangGraph Agent</h3><p>Planner / Executor / Reviewer<br>Checkpoint、HITL、工具调用<br>多步骤决策与追问</p></article>
+        <span class="arrow">→</span>
+        <article class="node"><h3>模型网关</h3><p>Qwen 主模型<br>DeepSeek fallback<br>缓存与会话成本计量</p></article>
+      </div>
+    </div>
+
+    <div class="lane">
+      <aside class="label data">
+        <h2>数据 / 检索 / Provider</h2>
+        <p>结构化状态、短期上下文、向量检索、语义缓存、追踪与模型服务。</p>
+      </aside>
+      <div class="content">
+        <span class="vertical">↓ 状态、检索与调用</span>
+        <article class="node"><h3>PostgreSQL</h3><p>用户、面试、任务、报告<br>AnswerHistory、SessionCost</p></article>
+        <span class="arrow">↔</span>
+        <article class="node"><h3>Redis</h3><p>会话上下文、精确缓存<br>实时成本计数</p></article>
+        <span class="arrow">↔</span>
+        <article class="node"><h3>Milvus / Qdrant</h3><p>简历和题库向量<br>Dense + BM25 + RRF<br>语义缓存与降级检索</p></article>
+        <span class="arrow">→</span>
+        <article class="node"><h3>Qwen / DeepSeek</h3><p>主模型与备用模型<br>Provider 健康检查与熔断<br>可选 Langfuse 追踪</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="callout">
+    <article class="note"><h3>内容导入</h3><p>URL 仅允许公开 HTTPS 地址，拒绝 loopback 与内网目标。题库向量写入完成前执行 flush，确保成功导入后可立即检索。</p></article>
+    <article class="note"><h3>鉴权与隔离</h3><p>业务请求先经过 JWT、角色与资源归属校验。普通用户无法访问管理员写操作，用户间的简历、面试与成本数据隔离。</p></article>
+    <article class="note"><h3>可观测性</h3><p>每个面试会话的模型调用、Token、缓存、重试与 fallback 均进入会话成本面板；Langfuse 用于可选链路追踪。</p></article>
+  </section>
+
+  <div class="foot"><strong>当前边界：</strong>此图仅描述默认 NestJS 产品路径。`apps/py-api` 是实验性替代实现，不作为当前架构、验收或商用基线的一部分。</div>
+</main>
+</body>
+</html>

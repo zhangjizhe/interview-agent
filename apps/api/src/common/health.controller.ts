@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { RedisService } from '../infra/redis/redis.service';
+import { Public } from '../modules/auth/public.decorator';
 
 /**
  * 健康检查端点（docker healthcheck / 负载均衡探测用）
@@ -10,6 +11,7 @@ import { RedisService } from '../infra/redis/redis.service';
  * - readiness（/ready）：依赖都连上 → 200，否则 503（K8s 会切流量）
  */
 @Controller('health')
+@Public()
 export class HealthController {
   constructor(
     private prisma: PrismaService,

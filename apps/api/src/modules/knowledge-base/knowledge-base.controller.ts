@@ -20,6 +20,7 @@ import {
   Body,
 } from '@nestjs/common';
 import { KnowledgeBaseService, KnowledgeSearchHit } from './knowledge-base.service';
+import { Roles } from '../auth/roles.decorator';
 
 interface DebugInfo {
   query: string;
@@ -102,6 +103,7 @@ export class KnowledgeBaseController {
   }
 
   @Post('import')
+  @Roles('ADMIN')
   async importNow() {
     const stats = await this.kb.importFromJson();
     return { success: true, ...stats };
@@ -112,6 +114,7 @@ export class KnowledgeBaseController {
    * Body: { topic, title, body, tags?: string[], number?: number }
    */
   @Post('add')
+  @Roles('ADMIN')
   async add(@Body() body: {
     topic: string;
     title: string;
@@ -143,6 +146,7 @@ export class KnowledgeBaseController {
    * 返回 P@5 / P@10 / MRR / Recall@K
    */
   @Post('benchmark')
+  @Roles('ADMIN')
   async benchmark(
     @Body() body: {
       cases: Array<{ query: string; expectedItemIds: string[]; topic?: string }>;

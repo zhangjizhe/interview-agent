@@ -45,12 +45,7 @@ jobs:
         run: npm run lint --if-present || echo "⚠️ lint not configured, skipping"
 
       - name: TypeScript (tsc --noEmit)
-        # 严格类型检查；渐进式收紧，0 error 阻塞
-        run: |
-          npx tsc --noEmit 2>&1 | tee tsc.log
-          if grep -q "error TS" tsc.log; then
-            echo "::warning::TypeScript reported errors (see tsc.log)"
-          fi
+        run: npx tsc --noEmit
 
       - name: Jest (203 case)
         run: npx jest --ci
@@ -131,23 +126,13 @@ jobs:
         # 顺序：prisma generate 必须在 nest build 前
         # set +e 让 step 不因 grep error 立刻 fail（把 log 留给 upload-artifact 让我能看）
         working-directory: apps/api
-        run: |
-          set +e
-          echo "=== prisma --version ==="
-          npx prisma --version 2>&1
-          echo "=== ls node_modules/.bin/prisma ==="
-          ls -la node_modules/.bin/prisma 2>&1
-          echo "=== ls prisma/ ==="
-          ls -la prisma/ 2>&1
-          echo "=== pwd ==="
-          pwd
-          echo "=== node version ==="
-          node --version
-          echo "=== npm version ==="
-          npm --version
-          echo "=== prisma generate ==="
-          npx prisma generate 2>&1 | tee prisma-generate.log
-          echo "=== exit code: $? ==="
+        run: npx prisma generate
+
+      - name: Apply Prisma migrations
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://dev:dev123@localhost:5432/interview
+        run: npx prisma migrate deploy
 
       - name: Upload prisma generate log
         if: always()
@@ -163,12 +148,7 @@ jobs:
         # E2E 跑 node dist/main.js 需要先 nest build
         # set +e + tee log 让 fail 也能看到真实错（GH API 看不到 step log）
         working-directory: apps/api
-        run: |
-          set +e
-          npx nest build 2>&1 | tee nest-build.log
-          echo "=== exit code: $? ==="
-          echo "=== ls dist/ ==="
-          ls -la dist/ 2>&1 | head -10
+        run: npx nest build
 
       - name: Upload nest build log
         if: always()
@@ -208,63 +188,35 @@ jobs:
           for i in $(seq 1 60); do
             if curl -s http://localhost:3001/api/health 2>/dev/null | grep -q '"status":"ok"'; then
               echo "✓ api is healthy"
-              break
+              exit 0
             fi
             echo "waiting... ($i)"
             sleep 3
           done
+          echo "API did not become healthy"
+          exit 1
 
-      - name: E2E 接口测试（9 个核心 endpoint）
-        # set +e + tee log 让 9 个 endpoint 都跑完（看哪个 fail）
+      - name: E2E 接口测试（认证与资源隔离）
         run: |
-          set +e
-          {
-            echo "=== 1. Liveness ==="
-            curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/health
+          set -euo pipefail
+          curl --fail-with-body http://localhost:3001/api/health
+          curl --fail-with-body http://localhost:3001/api/health/ready
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/api/interview/list)" = "401"
 
-            echo "=== 2. Readiness（postgres + redis 真连） ==="
-            READY=$(curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/health/ready)
-            echo "$READY"
+          curl --fail-with-body -X POST http://localhost:3001/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"userId":"ci-user","password":"ci-password-123"}'
+          TOKEN=$(curl --fail-with-body -s -X POST http://localhost:3001/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"userId":"ci-user","password":"ci-password-123"}' | node -e 'let body=""; process.stdin.on("data", chunk => body += chunk).on("end", () => console.log(JSON.parse(body).accessToken))')
+          test -n "$TOKEN"
 
-            echo "=== 3. /api/interview/list ==="
-            curl -sw 'HTTP %{http_code}\n' "http://localhost:3001/api/interview/list?userId=demo-user-ci"
-
-            echo "=== 4. /api/interview/stats ==="
-            curl -sw 'HTTP %{http_code}\n' "http://localhost:3001/api/interview/stats?userId=demo-user-ci"
-
-            echo "=== 5. /api/tools ==="
-            curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/tools
-
-            echo "=== 6. /api/admin/mcp-servers ==="
-            curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/admin/mcp-servers
-
-            echo "=== 7. /api/knowledge-base/list ==="
-            curl -sw 'HTTP %{http_code}\n' http://localhost:3001/api/knowledge-base/list
-
-            echo "=== 8. /api/interview/question-bank/list ==="
-            curl -sw 'HTTP %{http_code}\n' "http://localhost:3001/api/interview/question-bank/list?limit=3"
-
-            echo "=== 9. /api/interview/upload-resume ==="
-            python3 -c "
-          from reportlab.pdfgen import canvas
-          c = canvas.Canvas('/tmp/ci-resume.pdf')
-          c.drawString(50, 750, 'Name: CI Test')
-          c.drawString(50, 730, 'Email: ci@test.local')
-          c.drawString(50, 710, 'Skills: Python TypeScript NestJS FastAPI')
-          c.save()
-          " 2>&1
-            curl -sw 'HTTP %{http_code}\n' -X POST http://localhost:3001/api/interview/upload-resume \
-              -F "file=@/tmp/ci-resume.pdf" \
-              -F "position=AI Agent" \
-              -F "userId=demo-user-ci" \
-              -o /tmp/upload-response.json
-            echo "--- /tmp/upload-response.json ---"
-            cat /tmp/upload-response.json
-            echo
-          } 2>&1 | tee e2e.log
-          # 最后看 api process log（如果 endpoint 5xx 可能有错）
-          echo "=== api-e2e.log tail (最后 30 行) ==="
-          tail -30 api-e2e.log 2>&1 || true
+          AUTH_HEADER="Authorization: Bearer $TOKEN"
+          curl --fail-with-body -H "$AUTH_HEADER" http://localhost:3001/api/interview/list
+          curl --fail-with-body -H "$AUTH_HEADER" http://localhost:3001/api/interview/stats
+          curl --fail-with-body -H "$AUTH_HEADER" http://localhost:3001/api/tools
+          curl --fail-with-body -H "$AUTH_HEADER" http://localhost:3001/api/knowledge-base/list
+          curl --fail-with-body -H "$AUTH_HEADER" "http://localhost:3001/api/interview/question-bank/list?limit=3"
 
       - name: Upload E2E log
         if: always()

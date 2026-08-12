@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Upload, Search, Trash2, Plus, Sparkles, Loader2, Database, BookOpen, Layers, X, Tag, FileText, Clock, Hash } from 'lucide-react';
+import { getSession } from '../utils/auth';
 
 const POSITIONS = ['后端开发工程师', '前端开发工程师', 'AI Agent 工程师', '算法工程师', '产品经理'];
 
@@ -123,6 +124,10 @@ interface Question {
 }
 
 export function QuestionBankPage() {
+  const isAdmin = getSession()?.role === 'ADMIN';
+  const availableViews: Array<'list' | 'add' | 'import' | 'search'> = isAdmin
+    ? ['list', 'add', 'import', 'search']
+    : ['list', 'search'];
   const [view, setView] = useState<'list' | 'add' | 'search' | 'import'>('list');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [searchResults, setSearchResults] = useState<Question[]>([]);
@@ -238,7 +243,7 @@ export function QuestionBankPage() {
     try {
       let r: Response;
       if (form.storeTo === 'milvus') {
-        r = await fetch('/api/interview/questions/add', {
+        r = await fetch('/api/interview/question-bank', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -407,7 +412,7 @@ export function QuestionBankPage() {
       </div>
 
       <div className="flex gap-2 border-b border-slate-200">
-        {(['list', 'add', 'import', 'search'] as const).map((v) => (
+        {availableViews.map((v) => (
           <button
             key={v}
             onClick={() => {

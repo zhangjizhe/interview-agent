@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Interview Agent Verification</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f7fb; color: #172033; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .canvas { width: 1440px; min-height: 980px; padding: 48px 56px; background: #f4f7fb; }
+  h1 { margin: 0; color: #152552; font-size: 32px; letter-spacing: 0; }
+  .subtitle { margin: 10px 0 32px; color: #5b6780; font-size: 16px; }
+  .strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 28px; }
+  .step { position: relative; min-height: 82px; padding: 13px; border: 1px solid #d7e0ee; border-radius: 8px; background: #ffffff; }
+  .step:not(:last-child)::after { position: absolute; right: -10px; top: 31px; content: "›"; z-index: 1; color: #8291aa; font-size: 23px; font-weight: 700; }
+  .step b { display: block; color: #1d3264; font-size: 13px; }
+  .step span { display: block; margin-top: 7px; color: #65728a; font-size: 12px; line-height: 1.35; }
+  .section { margin-top: 24px; padding: 24px; border: 1px solid #d7e0ee; border-radius: 12px; background: #ffffff; }
+  h2 { margin: 0 0 18px; color: #1d3264; font-size: 20px; }
+  .checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .check { min-height: 130px; padding: 17px; border: 1px solid #d7e0ee; border-radius: 8px; background: #ffffff; }
+  .check .status { float: right; color: #078a66; font-size: 12px; font-weight: 700; }
+  .check h3 { margin: 0; color: #1d3264; font-size: 15px; }
+  .check .value { margin: 18px 0 7px; color: #08785a; font-size: 27px; font-weight: 800; }
+  .check p { margin: 0; color: #65728a; font-size: 12px; line-height: 1.45; }
+  .evidence { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; }
+  .table { border: 1px solid #d7e0ee; border-radius: 8px; overflow: hidden; }
+  .row { display: grid; grid-template-columns: 1.4fr .7fr 1.8fr; border-bottom: 1px solid #e6edf6; }
+  .row:last-child { border-bottom: 0; }
+  .row div { padding: 12px 14px; color: #4f5e76; font-size: 13px; }
+  .row.head { background: #eef3fb; }
+  .row.head div { color: #31466f; font-weight: 700; }
+  .ok { color: #08785a !important; font-weight: 700; }
+  .bench { padding: 20px; border-radius: 8px; background: #f7f1ff; border: 1px solid #e4d5ff; }
+  .bench h3 { margin: 0; color: #60419a; font-size: 16px; }
+  .bench .metric { margin: 16px 0; color: #5c3d95; font-size: 31px; font-weight: 800; }
+  .bench p { margin: 0; color: #66547d; font-size: 13px; line-height: 1.55; }
+  .footer { margin-top: 22px; padding: 14px 16px; border-radius: 8px; background: #eaf1ff; color: #405578; font-size: 13px; line-height: 1.5; }
+  .footer strong { color: #1b57b5; }
+</style>
+</head>
+<body>
+<main class="canvas">
+  <h1>Interview Agent · 当前质量门禁与验收证据</h1>
+  <p class="subtitle">2026-08-12 · 以 Docker 默认 NestJS 路径、浏览器实测与真实 Provider 内容链路为准</p>
+
+  <div class="strip">
+    <div class="step"><b>静态检查</b><span>TypeScript<br>Prisma schema</span></div>
+    <div class="step"><b>回归测试</b><span>Jest<br>Vitest</span></div>
+    <div class="step"><b>生产构建</b><span>NestJS build<br>Vite build</span></div>
+    <div class="step"><b>容器部署</b><span>Docker Compose<br>Health / Readiness</span></div>
+    <div class="step"><b>接口校验</b><span>认证、RBAC<br>资源隔离</span></div>
+    <div class="step"><b>浏览器验收</b><span>桌面、管理员<br>移动端</span></div>
+    <div class="step"><b>真实内容链路</b><span>简历、RAG<br>题库与 SSRF</span></div>
+  </div>
+
+  <section class="section">
+    <h2>当前验收结果</h2>
+    <div class="checks">
+      <article class="check"><span class="status">PASS</span><h3>API Jest</h3><div class="value">214</div><p>认证、归属隔离、简历与题库导入、会话成本累计回归覆盖。</p></article>
+      <article class="check"><span class="status">PASS</span><h3>Web Vitest</h3><div class="value">59</div><p>组件、状态与权限展示行为覆盖。</p></article>
+      <article class="check"><span class="status">PASS</span><h3>类型与构建</h3><div class="value">2 / 2</div><p>API 与 Web typecheck、生产构建通过。</p></article>
+      <article class="check"><span class="status">PASS</span><h3>Prisma Schema</h3><div class="value">Valid</div><p>认证字段与角色 migration 对应 schema 已校验。</p></article>
+      <article class="check"><span class="status">PASS</span><h3>浏览器验收</h3><div class="value">9 / 9</div><p>登录门禁、USER/ADMIN、路由保护与移动端。</p></article>
+      <article class="check"><span class="status">PASS</span><h3>真实内容工作流</h3><div class="value">10 / 10</div><p>有效 Qwen/DeepSeek Provider 下的真实链路。</p></article>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>真实内容工作流断言</h2>
+    <div class="evidence">
+      <div class="table">
+        <div class="row head"><div>业务断言</div><div>结果</div><div>验证内容</div></div>
+        <div class="row"><div>简历解析与写入</div><div class="ok">PASS</div><div>Markdown 姓名规范化、RAG 写入、个性化问题</div></div>
+        <div class="row"><div>面试创建与确认</div><div class="ok">PASS</div><div>当前用户创建面试并确认已上传简历</div></div>
+        <div class="row"><div>题库文件导入</div><div class="ok">PASS</div><div>导入后立即语义检索返回结果</div></div>
+        <div class="row"><div>技术文档 URL 导入</div><div class="ok">PASS</div><div>生成 5 道题并立即检索返回</div></div>
+        <div class="row"><div>安全边界</div><div class="ok">PASS</div><div>跨用户资源隔离与 SSRF 地址拒绝</div></div>
+      </div>
+      <aside class="bench">
+        <h3>历史多 Agent + 缓存基准</h3>
+        <div class="metric">82.6% Token 降幅</div>
+        <p>2026-06-24 的 50 轮高重复面试对照：直接调用路径累计 88,000 tokens；多 Agent + 缓存路径单面试平均 1,530 tokens。</p>
+        <p style="margin-top: 12px;">同一数据集还记录了 `117 / 156` 的语义缓存命中和 4 次 E2E 的 `1.31s` SSE 首字节中位数。</p>
+      </aside>
+    </div>
+  </section>
+
+  <div class="footer"><strong>数据边界：</strong>当前验收结果来自 8 月运行中的 Docker 服务；多 Agent Token 数据为 6 月高重复面试基准，必须按目标 Provider、Prompt 和生产流量重新压测。Qwen DashScope OpenAI 兼容层不支持 `prompt_cache_key`，Prompt Cache 收益不可视为通用结论。</div>
+</main>
+</body>
+</html>

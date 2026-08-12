@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import * as path from 'path';
+
 /**
  * McpClient demo — 启动 stdio MCP server，连接后调用 echo 和 get_github_user
  *
@@ -10,15 +12,17 @@
  * 用法：
  *   npx tsx scripts/test-mcp-client.ts
  */
-process.chdir('/Users/zhangjizhe/Desktop/interview-agent-2/apps/api');
+import * as path from 'path';
 
 import { McpClient } from '../src/modules/interview/services/mcp-client';
+
+process.chdir(path.resolve(__dirname, '..'));
 
 const client = new McpClient({
   name: 'test-stdio',
   transport: 'stdio',
   command: 'npx',
-  args: ['tsx', '/Users/zhangjizhe/Desktop/interview-agent-2/apps/api/scripts/test-mcp-server.ts'],
+  args: ['tsx', path.join(__dirname, 'test-mcp-server.ts')],
   timeoutMs: 15_000,
 });
 
@@ -38,7 +42,7 @@ const client = new McpClient({
   console.log();
 
   console.log('🔧 Calling get_github_user...');
-  const ghResult = await client.callTool('get_github_user', { username: 'zhangjizhe' });
+  const ghResult = await client.callTool('get_github_user', { username: 'octocat' });
   console.log('Result:', JSON.stringify(ghResult, null, 2));
   console.log();
 

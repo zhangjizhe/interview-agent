@@ -2,7 +2,7 @@
 
 > 2026-06-26 · 当前架构：**NestJS api (3001) 默认 + py-api (3002) 选配**
 >
-> GH Wiki 未启用时，此目录作为项目内 wiki 入口；启用后可用 `gh api import` 同步到 `zhangjizhe/interview-agent.wiki`。
+> GH Wiki 未启用时，此目录作为项目内 wiki 入口；启用后可用 `gh api import` 同步到 `<owner>/interview-agent.wiki`。
 
 ---
 
@@ -43,7 +43,7 @@
 ### 一键部署（默认 NestJS 后端）
 
 ```bash
-git clone https://github.com/zhangjizhe/interview-agent
+git clone https://github.com/<owner>/interview-agent
 cd interview-agent
 bash deploy.sh
 # → 自动 .env + openssl rand JWT_SECRET
@@ -159,8 +159,8 @@ bash deploy.sh
 
 **当前 badge**：
 
-- ![CI api](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml/badge.svg)
-- ![CI py-api](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-py-api.yml/badge.svg)
+- ![CI api](https://github.com/<owner>/interview-agent/actions/workflows/ci-api.yml/badge.svg)
+- ![CI py-api](https://github.com/<owner>/interview-agent/actions/workflows/ci-py-api.yml/badge.svg)
 
 ---
 
@@ -205,7 +205,7 @@ bash deploy.sh
 
 ## 链接
 
-- [GitHub Repo](https://github.com/zhangjizhe/interview-agent)
+- [GitHub Repo](https://github.com/<owner>/interview-agent)
 - [README](../../README.md)
 - [Architecture](./architecture.md)
 - [Runbook](./runbook.md)

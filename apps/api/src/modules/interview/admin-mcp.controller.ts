@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, Param, BadRequestException } from '@nestjs/common';
 import { McpRegistry } from './services/mcp-registry';
+import { Roles } from '../auth/roles.decorator';
 
 /**
  * MCP 服务管理 API（系统级，admin 用）
@@ -19,6 +20,7 @@ interface ToggleDto {
 }
 
 @Controller('admin/mcp-servers')
+@Roles('ADMIN')
 export class AdminMcpController {
   @Get()
   list() {

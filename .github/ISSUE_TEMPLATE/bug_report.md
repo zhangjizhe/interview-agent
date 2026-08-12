@@ -3,7 +3,7 @@ name: 🐛 Bug 报告
 about: 报告一个 bug · 必填复现步骤 + 期望 vs 实际 + 截图
 title: '[BUG] '
 labels: bug
-assignees: zhangjizhe
+assignees: ''
 ---
 
 ## Bug 描述

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
 interface CreateUserDto {
@@ -11,7 +11,10 @@ export class UserController {
   constructor(private prisma: PrismaService) {}
 
   @Post()
-  async createUser(@Body() dto: CreateUserDto) {
+  async createUser(@Body() dto: CreateUserDto, @Req() req: any) {
+    if (dto.email !== req.user.email) {
+      throw new BadRequestException('Cannot modify another user');
+    }
     return this.prisma.user.upsert({
       where: { email: dto.email },
       create: dto,
@@ -20,12 +23,14 @@ export class UserController {
   }
 
   @Get(':id')
-  async getUser(@Param('id') id: string) {
+  async getUser(@Param('id') id: string, @Req() req: any) {
+    if (id !== req.user.userId) throw new BadRequestException('Cannot access another user');
     return this.prisma.user.findUnique({ where: { id } });
   }
 
   @Get(':id/interviews')
-  async getUserInterviews(@Param('id') id: string) {
+  async getUserInterviews(@Param('id') id: string, @Req() req: any) {
+    if (id !== req.user.userId) throw new BadRequestException('Cannot access another user');
     return this.prisma.interview.findMany({
       where: { userId: id },
       orderBy: { startedAt: 'desc' },

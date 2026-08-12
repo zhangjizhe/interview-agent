@@ -76,6 +76,7 @@ export interface AppConfig {
   auth: {
     jwtSecret: string;
     jwtExpiresIn: string;
+    adminUserIds: string[];
   };
   throttler: {
     ttl: number;
@@ -240,6 +241,10 @@ export const configuration = (): AppConfig => {
       return 'INSECURE-DEV-DO-NOT-USE-IN-PRODUCTION-CHANGE-ME-PLEASE-32-CHARS';
     })(),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    adminUserIds: (process.env.ADMIN_USER_IDS || '')
+      .split(',')
+      .map((userId) => userId.trim().toLowerCase())
+      .filter(Boolean),
   },
   throttler: {
     ttl: parseInt(process.env.THROTTLER_TTL || '60', 10),

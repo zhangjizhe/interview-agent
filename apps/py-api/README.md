@@ -47,7 +47,7 @@ START → supervisor → planner → executor → replanner → reviewer → END
 ### Docker Compose（一键起）
 
 ```bash
-cd /Users/zhangjizhe/Desktop/interview-agent-2
+cd /path/to/interview-agent
 docker compose up -d py-api
 ```
 

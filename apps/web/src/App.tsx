@@ -1,10 +1,11 @@
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useState, lazy, Suspense, useEffect } from 'react';
 import { Cpu, Database } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { HomePage } from './pages/HomePage';
 import { initWebVitals } from './utils/web-vitals';
+import { getSession, saveSession } from './utils/auth';
 
 // 安全 JSON 解析：当 API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
 async function safeJson(res: Response): Promise<any> {
@@ -199,26 +200,107 @@ function ToolsIndicator() {
   );
 }
 
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState(getSession);
+  const [userId, setUserId] = useState('');
+  const [password, setPassword] = useState('');
+  const [registering, setRegistering] = useState(false);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const endpoint = registering ? '/api/auth/register' : '/api/auth/login';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, password }),
+      });
+      const data = await safeJson(response);
+      if (!response.ok || data?._error) {
+        throw new Error(data?.message || '认证失败');
+      }
+
+      if (registering) {
+        setRegistering(false);
+        setPassword('');
+        setError('账号已创建，请登录。');
+        return;
+      }
+
+      const next = {
+        accessToken: data.accessToken,
+        userId: data.userId,
+        email: data.email,
+        role: data.role,
+      };
+      saveSession(next);
+      setSession(next);
+    } catch (err: any) {
+      setError(err.message || '认证失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (session) return <>{children}</>;
+
+  return (
+    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <form onSubmit={submit} className="w-full max-w-sm bg-white border border-slate-200 rounded-lg shadow-sm p-6 space-y-4">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">小面</h1>
+          <p className="mt-1 text-sm text-slate-500">{registering ? '创建账号以保护你的面试与简历数据' : '登录以继续你的面试记录'}</p>
+        </div>
+        <label className="block text-sm text-slate-700">
+          用户名
+          <input value={userId} onChange={(e) => setUserId(e.target.value.toLowerCase())} autoComplete="username" required className="mt-1 w-full border border-slate-300 rounded-md px-3 py-2" />
+        </label>
+        <label className="block text-sm text-slate-700">
+          密码
+          <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" minLength={12} maxLength={128} autoComplete={registering ? 'new-password' : 'current-password'} required className="mt-1 w-full border border-slate-300 rounded-md px-3 py-2" />
+        </label>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <button disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-md py-2 text-sm font-medium">
+          {submitting ? '处理中...' : registering ? '创建账号' : '登录'}
+        </button>
+        <button type="button" onClick={() => { setRegistering((value) => !value); setError(''); }} className="w-full text-sm text-blue-700">
+          {registering ? '已有账号，去登录' : '没有账号，创建账号'}
+        </button>
+      </form>
+    </main>
+  );
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  return getSession()?.role === 'ADMIN' ? <>{children}</> : <Navigate to="/" replace />;
+}
+
 export default function App() {
   // 初始化 Web Vitals 性能监控
   useEffect(() => { initWebVitals(); }, []);
 
   return (
-    <div className="min-h-screen">
-      <TopBar />
-      <main>
-        <ErrorBoundary>
-          <Suspense fallback={<PageSpinner />}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/interview/:id" element={<InterviewPage />} />
-              <Route path="/question-bank" element={<QuestionBankPage />} />
-              <Route path="/tools" element={<ToolsPage />} />
-              <Route path="/admin/mcp" element={<AdminMcpPage />} />
-            </Routes>
-          </Suspense>
-        </ErrorBoundary>
-      </main>
-    </div>
+    <AuthGate>
+      <div className="min-h-screen">
+        <TopBar />
+        <main>
+          <ErrorBoundary>
+            <Suspense fallback={<PageSpinner />}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/interview/:id" element={<InterviewPage />} />
+                <Route path="/question-bank" element={<QuestionBankPage />} />
+                <Route path="/tools" element={<ToolsPage />} />
+                <Route path="/admin/mcp" element={<AdminRoute><AdminMcpPage /></AdminRoute>} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </main>
+      </div>
+    </AuthGate>
   );
 }

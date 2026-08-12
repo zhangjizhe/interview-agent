@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { Public } from '../auth/public.decorator';
 
 interface VitalMetric {
   name: string;
@@ -11,6 +12,7 @@ interface VitalMetric {
 }
 
 @Controller('metrics')
+@Public()
 export class MetricsController {
   private readonly logger = new Logger(MetricsController.name);
 

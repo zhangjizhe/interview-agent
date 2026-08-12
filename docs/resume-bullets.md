@@ -9,7 +9,7 @@
 
 **技术栈**：NestJS + Python（py-api）+ React + LangGraph 1.x + DeepAgents + Mem0 + Qdrant + Milvus + Qwen / DeepSeek + Langfuse
 
-**项目地址**：github.com/zhangjizhe/interview-agent
+**项目地址**：github.com/your-org/interview-agent
 
 **项目亮点**（按 STAR + 量化）：
 

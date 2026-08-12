@@ -1,0 +1,59 @@
+{
+  "generatedAt": "2026-08-12T14:53:05.740Z",
+  "webUrl": "http://localhost:5173",
+  "passed": 9,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "login gate is visible before session",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "browser-user-1786546377706 login submit is enabled",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "browser-user-1786546377706 receives USER session role",
+      "passed": true,
+      "detail": "USER"
+    },
+    {
+      "name": "ordinary user reaches authenticated home",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ordinary user is redirected from admin route",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "admin-acceptance login submit is enabled",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "admin-acceptance receives ADMIN session role",
+      "passed": true,
+      "detail": "ADMIN"
+    },
+    {
+      "name": "administrator can access MCP management page",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile login gate renders against real API",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "screenshots": [
+    "05-real-login-desktop.png",
+    "06-real-user-home.png",
+    "07-real-admin-mcp.png",
+    "08-real-login-mobile.png"
+  ]
+}

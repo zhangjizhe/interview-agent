@@ -4,11 +4,13 @@ import {
   Controller,
   Param,
   Post,
+  Req,
 } from '@nestjs/common';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { ScoringService, type AnswerEvaluation } from '../services/scoring.service';
 import type { InterviewQuestion } from '../services/question-generator.service';
 import { extractKeywordsFromQuestion } from './keyword-extract.util';
+import { requireOwnedInterview } from '../../../common/ownership.util';
 
 /**
  * 面试评估（单题评分 / 面试过程评分 / 生成报告）
@@ -56,9 +58,9 @@ export class EvaluationController {
   async evaluateAnswerInInterview(
     @Param('interviewId') interviewId: string,
     @Body() dto: { question: string; answer: string; category?: string },
+    @Req() req: any,
   ) {
-    const interview = await this.prisma.interview.findUnique({ where: { id: interviewId } });
-    if (!interview) throw new BadRequestException('Interview not found');
+    await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
 
     const question: InterviewQuestion = {
       id: `eval-${Date.now()}`,
@@ -90,43 +92,27 @@ export class EvaluationController {
    * 生成完整面试报告（综合评分）
    */
   @Post(':interviewId/generate-report')
-  async generateInterviewReport(@Param('interviewId') interviewId: string) {
-    const interview = await this.prisma.interview.findUnique({
-      where: { id: interviewId },
-      include: { messages: { orderBy: { createdAt: 'asc' } } },
+  async generateInterviewReport(@Param('interviewId') interviewId: string, @Req() req: any) {
+    await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
+    const answerHistory = await this.prisma.answerHistory.findMany({
+      where: { interviewId },
+      orderBy: { createdAt: 'asc' },
     });
-    if (!interview) throw new BadRequestException('Interview not found');
 
-    // 从问答对生成评估（假设 user 消息是问题、assistant 消息是回答；或用 evaluate 记录）
-    const evaluations: AnswerEvaluation[] = [];
-
-    // 成对提取 user 消息和 assistant 消息
-    const questionAnswerPairs: Array<{ q: string; a: string }> = [];
-    for (let i = 0; i < interview.messages.length - 1; i++) {
-      if (interview.messages[i].role === 'user') {
-        const nextMsg = interview.messages[i + 1];
-        if (nextMsg && nextMsg.role === 'assistant') {
-          questionAnswerPairs.push({
-            q: interview.messages[i].content,
-            a: nextMsg.content,
-          });
-        }
-      }
-    }
-
-    for (const pair of questionAnswerPairs) {
-      if (!pair.a || pair.a.trim().length < 5) continue;
-      const question: InterviewQuestion = {
-        id: `q-${Date.now()}-${Math.random()}`,
-        category: 'general',
-        difficulty: 'medium',
-        question: pair.q,
-        expectedPoints: extractKeywordsFromQuestion(pair.q),
-        followUpHints: [],
-      };
-      const evalItem = await this.scoring.evaluateAnswer(question, pair.a);
-      evaluations.push(evalItem);
-    }
+    // AnswerHistory is written by the task queue after each candidate answer.
+    // Do not infer roles from chat messages: user messages are answers in this product.
+    const evaluations: AnswerEvaluation[] = answerHistory.map((item) => ({
+      questionId: item.id,
+      question: item.question,
+      answer: item.answer,
+      score: Math.round(item.score <= 1 ? item.score * 100 : item.score),
+      completeness: item.completeness,
+      correctness: item.correctness,
+      depth: item.depth,
+      keywordMatch: [],
+      feedback: item.feedback || '',
+      improvementSuggestions: [],
+    }));
 
     if (evaluations.length === 0) {
       return {
