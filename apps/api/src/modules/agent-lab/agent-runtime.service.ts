@@ -7,12 +7,14 @@ import {
 import { MultiAgentService } from '../agent/multi-agent.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { RunAgentDto } from './dto/agent.dto';
+import { TraceEventService } from './trace-event.service';
 
 @Injectable()
 export class AgentRuntimeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly multiAgent: MultiAgentService,
+    private readonly trace: TraceEventService,
   ) {}
 
   async runAgent(userId: string, agentId: string, dto: RunAgentDto) {
@@ -54,10 +56,15 @@ export class AgentRuntimeService {
         startedAt,
       },
     });
-    await this.writeTrace(run.id, 1, {
-      type: 'run.started',
+    await this.writeTrace(run.id, {
+      type: 'turn.start',
       name: 'Agent Run Started',
+      step: 'runtime',
       input: dto.input,
+      payload: {
+        application: dto.application ?? null,
+        adapter: runtimeConfig.adapter,
+      },
       metadata: {
         application: dto.application ?? null,
         adapter: runtimeConfig.adapter,
@@ -95,10 +102,12 @@ export class AgentRuntimeService {
           completedAt,
         },
       });
-      await this.writeTrace(run.id, 2, {
-        type: 'run.completed',
+      await this.writeTrace(run.id, {
+        type: 'turn.end',
         name: 'Agent Run Completed',
+        step: 'runtime',
         output,
+        payload: { status: 'COMPLETED', output },
         latencyMs,
         metadata: {
           adapter: runtimeConfig.adapter,
@@ -120,9 +129,11 @@ export class AgentRuntimeService {
           completedAt,
         },
       });
-      await this.writeTrace(run.id, 2, {
+      await this.writeTrace(run.id, {
         type: 'run.failed',
         name: 'Agent Run Failed',
+        step: 'runtime',
+        payload: { status: 'FAILED', error: message },
         latencyMs,
         error: message,
       });
@@ -166,10 +177,12 @@ export class AgentRuntimeService {
 
   async getTrace(userId: string, runId: string) {
     await this.getRun(userId, runId);
-    return this.prisma.traceEvent.findMany({
-      where: { runId },
-      orderBy: { sequence: 'asc' },
-    });
+    return this.trace.list(runId);
+  }
+
+  async exportTrace(userId: string, runId: string) {
+    await this.getRun(userId, runId);
+    return this.trace.exportJsonl(runId);
   }
 
   private async resolveVersion(agent: any, requestedVersionId?: string) {
@@ -218,10 +231,11 @@ export class AgentRuntimeService {
 
   private async writeTrace(
     runId: string,
-    sequence: number,
     event: {
       type: string;
       name: string;
+      step?: string;
+      payload?: unknown;
       input?: unknown;
       output?: unknown;
       metadata?: unknown;
@@ -229,18 +243,16 @@ export class AgentRuntimeService {
       error?: string;
     },
   ) {
-    return this.prisma.traceEvent.create({
-      data: {
-        runId,
-        sequence,
-        type: event.type,
-        name: event.name,
-        input: event.input as any,
-        output: event.output as any,
-        metadata: event.metadata as any,
-        latencyMs: event.latencyMs,
-        error: event.error,
-      },
+    return this.trace.append(runId, {
+      type: event.type,
+      name: event.name,
+      step: event.step,
+      payload: event.payload,
+      input: event.input,
+      output: event.output,
+      metadata: event.metadata,
+      latencyMs: event.latencyMs,
+      error: event.error,
     });
   }
 }

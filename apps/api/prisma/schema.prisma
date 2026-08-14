@@ -141,6 +141,7 @@ model Run {
   tokenUsage     Json?
   estimatedCost  Float?
   error          String?   @db.Text
+  traceSequence  Int       @default(0)
   createdAt      DateTime  @default(now())
   startedAt      DateTime?
   completedAt    DateTime?
@@ -160,10 +161,16 @@ model Run {
 
 model TraceEvent {
   id            String   @id @default(cuid())
+  formatVersion Int      @default(1)
   runId         String
-  sequence      Int
+  seq           Int      @map("sequence")
+  turnId        String?
+  step          String?
+  callId        String?
   type          String
   name          String
+  modelVisible  Boolean  @default(false)
+  payload       Json?
   input         Json?
   output        Json?
   metadata      Json?
@@ -175,8 +182,9 @@ model TraceEvent {
 
   run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
 
-  @@unique([runId, sequence])
-  @@index([runId, sequence])
+  @@unique([runId, seq])
+  @@index([runId, seq])
+  @@index([runId, callId])
   @@map("trace_events")
 }
 

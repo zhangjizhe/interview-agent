@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Header,
   Param,
   Post,
   Body,
@@ -36,5 +37,11 @@ export class AgentRuntimeController {
   @Get('runs/:runId/trace')
   getTrace(@Req() req: any, @Param('runId') runId: string) {
     return this.runtime.getTrace(req.user.userId, runId);
+  }
+
+  @Get('runs/:runId/trace.jsonl')
+  @Header('Content-Type', 'application/x-ndjson; charset=utf-8')
+  exportTrace(@Req() req: any, @Param('runId') runId: string) {
+    return this.runtime.exportTrace(req.user.userId, runId);
   }
 }

@@ -9,6 +9,10 @@ jest.mock('../agent/multi-agent.service', () => ({
   MultiAgentService: class MultiAgentService {},
 }));
 
+jest.mock('./trace-event.service', () => ({
+  TraceEventService: class TraceEventService {},
+}));
+
 function createPrismaMock() {
   return {
     workspace: {
@@ -26,10 +30,14 @@ function createPrismaMock() {
       findMany: jest.fn(),
       findFirst: jest.fn(),
     },
-    traceEvent: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-    },
+  };
+}
+
+function createTraceMock() {
+  return {
+    append: jest.fn().mockResolvedValue({ id: 'trace-1' }),
+    list: jest.fn(),
+    exportJsonl: jest.fn(),
   };
 }
 
@@ -64,7 +72,8 @@ describe('AgentRuntimeService', () => {
         threadId: 'run-1',
       }),
     };
-    const service = new AgentRuntimeService(prisma, multiAgent as any);
+    const trace = createTraceMock();
+    const service = new AgentRuntimeService(prisma, multiAgent as any, trace as any);
 
     const result = await service.runAgent('user-a', 'agent-1', {
       input: { message: '请开始面试' },
@@ -72,7 +81,7 @@ describe('AgentRuntimeService', () => {
 
     expect(result).toMatchObject({ id: 'run-1', status: 'COMPLETED' });
     expect(multiAgent.run).toHaveBeenCalledWith('请开始面试', 'run-1');
-    expect(prisma.traceEvent.create).toHaveBeenCalledTimes(2);
+    expect(trace.append).toHaveBeenCalledTimes(2);
     expect(prisma.run.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'run-1' },
@@ -93,7 +102,8 @@ describe('AgentRuntimeService', () => {
       isEnabled: jest.fn().mockReturnValue(false),
       run: jest.fn(),
     };
-    const service = new AgentRuntimeService(prisma, multiAgent as any);
+    const trace = createTraceMock();
+    const service = new AgentRuntimeService(prisma, multiAgent as any, trace as any);
 
     await expect(
       service.runAgent('user-a', 'agent-1', { input: { message: '请开始面试' } }),
@@ -104,7 +114,7 @@ describe('AgentRuntimeService', () => {
         data: expect.objectContaining({ status: 'FAILED' }),
       }),
     );
-    expect(prisma.traceEvent.create).toHaveBeenCalledTimes(2);
+    expect(trace.append).toHaveBeenCalledTimes(2);
   });
 
   it('拒绝访问不属于当前 Workspace 的 Agent', async () => {
@@ -114,7 +124,11 @@ describe('AgentRuntimeService', () => {
       isEnabled: jest.fn(),
       run: jest.fn(),
     };
-    const service = new AgentRuntimeService(prisma, multiAgent as any);
+    const service = new AgentRuntimeService(
+      prisma,
+      multiAgent as any,
+      createTraceMock() as any,
+    );
 
     await expect(
       service.runAgent('user-a', 'foreign-agent', { input: { message: '请开始面试' } }),
