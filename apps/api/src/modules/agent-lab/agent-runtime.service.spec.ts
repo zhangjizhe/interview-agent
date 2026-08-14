@@ -41,6 +41,12 @@ function createTraceMock() {
   };
 }
 
+function createTraceBundleMock() {
+  return {
+    buildBundle: jest.fn(),
+  };
+}
+
 const publishedInterviewVersion = {
   id: 'version-1',
   version: '1.0.0',
@@ -73,7 +79,12 @@ describe('AgentRuntimeService', () => {
       }),
     };
     const trace = createTraceMock();
-    const service = new AgentRuntimeService(prisma, multiAgent as any, trace as any);
+    const service = new AgentRuntimeService(
+      prisma,
+      multiAgent as any,
+      trace as any,
+      createTraceBundleMock() as any,
+    );
 
     const result = await service.runAgent('user-a', 'agent-1', {
       input: { message: '请开始面试' },
@@ -103,7 +114,12 @@ describe('AgentRuntimeService', () => {
       run: jest.fn(),
     };
     const trace = createTraceMock();
-    const service = new AgentRuntimeService(prisma, multiAgent as any, trace as any);
+    const service = new AgentRuntimeService(
+      prisma,
+      multiAgent as any,
+      trace as any,
+      createTraceBundleMock() as any,
+    );
 
     await expect(
       service.runAgent('user-a', 'agent-1', { input: { message: '请开始面试' } }),
@@ -128,11 +144,27 @@ describe('AgentRuntimeService', () => {
       prisma,
       multiAgent as any,
       createTraceMock() as any,
+      createTraceBundleMock() as any,
     );
 
     await expect(
       service.runAgent('user-a', 'foreign-agent', { input: { message: '请开始面试' } }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.run.create).not.toHaveBeenCalled();
+  });
+
+  it('拒绝读取不属于当前 Workspace 的 Trace', async () => {
+    const prisma: any = createPrismaMock();
+    prisma.run.findFirst.mockResolvedValue(null);
+    const trace = createTraceMock();
+    const service = new AgentRuntimeService(
+      prisma,
+      { isEnabled: jest.fn(), run: jest.fn() } as any,
+      trace as any,
+      createTraceBundleMock() as any,
+    );
+
+    await expect(service.getTrace('user-a', 'foreign-run')).rejects.toBeInstanceOf(NotFoundException);
+    expect(trace.list).not.toHaveBeenCalled();
   });
 });

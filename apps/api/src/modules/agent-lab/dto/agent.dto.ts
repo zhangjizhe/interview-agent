@@ -204,3 +204,12 @@ export class RunEvaluationDto {
   @MaxLength(100)
   agentVersionId?: string;
 }
+
+export class SpawnSubRunDto {
+  @IsObject()
+  input!: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  budget?: Record<string, unknown>;
+}

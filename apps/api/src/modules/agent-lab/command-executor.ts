@@ -114,7 +114,9 @@ export class LocalCommandExecutor implements CommandExecutor {
       : workspace;
     const timeoutMs = request.timeoutMs ?? 30_000;
     const maxOutputBytes = request.maxOutputBytes ?? 256 * 1024;
-    const environment = this.sanitizedEnvironment(request.env);
+    const tempDir = path.join(workspace, '.agent-lab-tmp');
+    await fs.mkdir(tempDir, { recursive: true, mode: 0o700 });
+    const environment = this.sanitizedEnvironment(request.env, tempDir);
 
     return new Promise<CommandResult>((resolve) => {
       let stdout = '';
@@ -231,12 +233,13 @@ export class LocalCommandExecutor implements CommandExecutor {
     return real;
   }
 
-  private sanitizedEnvironment(requestEnv?: Record<string, string>) {
+  private sanitizedEnvironment(requestEnv: Record<string, string> | undefined, tempDir: string) {
     const allowedBase = ['PATH', 'LANG', 'LC_ALL'];
     const env: Record<string, string> = {};
     for (const key of allowedBase) {
       if (process.env[key]) env[key] = process.env[key]!;
     }
+    env.TMPDIR = tempDir;
     for (const [key, value] of Object.entries(requestEnv || {})) {
       if (/key|token|secret|password/i.test(key)) continue;
       env[key] = value;

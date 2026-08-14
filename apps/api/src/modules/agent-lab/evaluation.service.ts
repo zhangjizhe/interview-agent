@@ -185,11 +185,12 @@ export class EvaluationService {
             data: {
               evaluationRunId: evaluation.id,
               datasetCaseId: datasetCase.id,
+              runId: error?.agentLabRunId,
               status: 'FAILED',
               passed: false,
               failureCategory: 'RUN_FAILED',
               failureMessage: message,
-              evidence: { error: message },
+              evidence: { error: message, runId: error?.agentLabRunId ?? null },
             },
           });
           caseResults.push({ score: 0, passed: false });

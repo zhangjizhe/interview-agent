@@ -40,6 +40,10 @@ AgentLab 新增独立 `ToolRunner` 契约，供后续 MCP、插件和工作区 p
 
 首版本地执行能力只提供 `plan`（只读）和 `workspace-write`（受控工作区写入）预设，使用最小环境变量、受控临时目录、相对路径与符号链接边界检查、超时和输出大小上限。它不是 OS 级沙箱，网络放行默认拒绝，本地部署不应将其用于不受信任的任意命令；生产环境应改用受限容器或远程 worker。现有 Interview/MCP 调用尚未迁移到该管道，以避免改变已有业务流程。
 
+可观测性与扩展前置能力：`GET /api/agent-lab/runs/:runId/trace.bundle` 导出带运行元数据、按序事件和大 payload 引用的本地 Trace bundle，可由离线 reducer 还原模型会话、工具调用/结果、终态与错误关联。生命周期遥测尽力写入，不会因为遥测异常中断 Agent Run；模型可见历史和 ToolRunner 安全审计仍为强制事件。插件使用版本化 manifest 与 capability provider，可卸载/重载且不会遗留注册；MCP 仅作为 provider，必须由调用方交给 ToolRunner 后才会执行。
+
+子 Agent 或后台任务必须创建独立的子 Run，保存 `parentRunId`、独立 `budget`、状态和取消时间，并通过父子 Trace 事件投递创建、结果、取消或失败。当前仅提供状态与审计契约，不包含队列调度器、远程 worker 或自动重试；这些能力将在真实隔离执行环境完成后接入。新的迁移尚未在数据库应用，部署前必须执行 `pnpm db:deploy`。
+
 ## 系统架构
 
 ![Interview Agent 当前默认路径泳道架构](docs/assets/architecture-swimlane-current-2026-08-12.png)

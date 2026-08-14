@@ -134,6 +134,7 @@ model Run {
   agentVersionId String
   application    String?
   externalRunId  String?
+  parentRunId    String?
   input          Json
   output         Json?
   status         RunStatus @default(PENDING)
@@ -141,15 +142,19 @@ model Run {
   tokenUsage     Json?
   estimatedCost  Float?
   error          String?   @db.Text
+  budget         Json?
   traceSequence  Int       @default(0)
   createdAt      DateTime  @default(now())
   startedAt      DateTime?
   completedAt    DateTime?
+  cancelRequestedAt DateTime?
 
-  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  agent        Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  agentVersion AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
-  traceEvents  TraceEvent[]
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion   AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  parentRun      Run?         @relation("RunChildren", fields: [parentRunId], references: [id], onDelete: SetNull)
+  childRuns      Run[]        @relation("RunChildren")
+  traceEvents    TraceEvent[]
   evaluationResults EvaluationResult[]
   toolApprovals ToolApproval[]
 
@@ -157,6 +162,7 @@ model Run {
   @@index([agentId, createdAt])
   @@index([agentVersionId, createdAt])
   @@index([externalRunId])
+  @@index([parentRunId, createdAt])
   @@map("runs")
 }
 

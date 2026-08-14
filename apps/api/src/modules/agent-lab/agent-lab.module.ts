@@ -10,6 +10,9 @@ import { EvaluationService } from './evaluation.service';
 import { TraceEventService } from './trace-event.service';
 import { ToolApprovalService } from './tool-approval.service';
 import { ToolRunner } from './tool-runner.service';
+import { TraceBundleService } from './trace-bundle.service';
+import { PluginRegistryService } from './plugin-registry.service';
+import { SubRunService } from './sub-run.service';
 
 @Module({
   imports: [PrismaModule, AgentModule],
@@ -21,6 +24,9 @@ import { ToolRunner } from './tool-runner.service';
     TraceEventService,
     ToolApprovalService,
     ToolRunner,
+    TraceBundleService,
+    PluginRegistryService,
+    SubRunService,
   ],
   exports: [
     AgentRegistryService,
@@ -29,6 +35,9 @@ import { ToolRunner } from './tool-runner.service';
     TraceEventService,
     ToolApprovalService,
     ToolRunner,
+    TraceBundleService,
+    PluginRegistryService,
+    SubRunService,
   ],
 })
 export class AgentLabModule {}

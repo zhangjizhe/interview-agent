@@ -171,8 +171,10 @@ describe('EvaluationService', () => {
       { id: 'evaluator-1', type: 'LATENCY', config: { maxLatencyMs: 100 } },
       [{ id: 'case-1', input: { message: '开始' }, expectedOutput: {} }],
     );
+    const runError: any = new Error('运行时不可用');
+    runError.agentLabRunId = 'run-1';
     const runtime = {
-      runAgent: jest.fn().mockRejectedValue(new Error('运行时不可用')),
+      runAgent: jest.fn().mockRejectedValue(runError),
     };
     const service = new EvaluationService(prisma, runtime as any);
 
@@ -185,6 +187,7 @@ describe('EvaluationService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           status: 'FAILED',
+          runId: 'run-1',
           passed: false,
           failureCategory: 'RUN_FAILED',
           failureMessage: '运行时不可用',

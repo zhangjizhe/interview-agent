@@ -2,19 +2,24 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { MultiAgentService } from '../agent/multi-agent.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { RunAgentDto } from './dto/agent.dto';
 import { TraceEventService } from './trace-event.service';
+import { TraceBundleService } from './trace-bundle.service';
 
 @Injectable()
 export class AgentRuntimeService {
+  private readonly logger = new Logger(AgentRuntimeService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly multiAgent: MultiAgentService,
     private readonly trace: TraceEventService,
+    private readonly traceBundles: TraceBundleService,
   ) {}
 
   async runAgent(userId: string, agentId: string, dto: RunAgentDto) {
@@ -137,6 +142,9 @@ export class AgentRuntimeService {
         latencyMs,
         error: message,
       });
+      if (error && typeof error === 'object') {
+        error.agentLabRunId = run.id;
+      }
       throw error;
     }
   }
@@ -183,6 +191,12 @@ export class AgentRuntimeService {
   async exportTrace(userId: string, runId: string) {
     await this.getRun(userId, runId);
     return this.trace.exportJsonl(runId);
+  }
+
+  async exportTraceBundle(userId: string, runId: string) {
+    const run = await this.getRun(userId, runId);
+    const events = await this.trace.list(runId);
+    return this.traceBundles.buildBundle(run, events);
   }
 
   private async resolveVersion(agent: any, requestedVersionId?: string) {
@@ -243,16 +257,20 @@ export class AgentRuntimeService {
       error?: string;
     },
   ) {
-    return this.trace.append(runId, {
-      type: event.type,
-      name: event.name,
-      step: event.step,
-      payload: event.payload,
-      input: event.input,
-      output: event.output,
-      metadata: event.metadata,
-      latencyMs: event.latencyMs,
-      error: event.error,
-    });
+    try {
+      return await this.trace.append(runId, {
+        type: event.type,
+        name: event.name,
+        step: event.step,
+        payload: event.payload,
+        input: event.input,
+        output: event.output,
+        metadata: event.metadata,
+        latencyMs: event.latencyMs,
+        error: event.error,
+      });
+    } catch (error: any) {
+      this.logger.warn(`运行遥测写入失败，Run ${runId}: ${error?.message || 'unknown error'}`);
+    }
   }
 }
