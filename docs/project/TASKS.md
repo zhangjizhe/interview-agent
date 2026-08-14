@@ -4,7 +4,15 @@
 
 ## 当前
 
-当前没有活跃实现任务。TASK-006 已完成。开始实现改动前，必须在 `ACTIVE_TASK.md` 认领且仅认领一个后续任务。
+当前活跃任务：TASK-010。该任务先建立重构基线和分批迁移设计；开始任何实现批次前，必须在 `ACTIVE_TASK.md` 认领且仅认领一个后续任务。
+
+### TASK-010：重构基线与迁移设计
+
+- 状态：进行中
+- 目标：审计当前产品资产与 Agent 实验代码，定义证据优先的 AI Interview Training Platform 目标架构、数据迁移和分批验收路线。
+- 范围：架构、数据库、API、安全、成本、Agent Evaluation、Harness、Docker/Web 基线与迁移风险评估。
+- 非目标：未经验证地替换默认 NestJS/React/LangGraph/Prisma 路径，或在同一任务中实施所有后续业务功能。
+- 依赖：TASK-003、TASK-005、TASK-006 交付，当前 Docker/API/Schema 开发基线，Agent 实验目录的只读审计。
 
 ## 下一任务
 

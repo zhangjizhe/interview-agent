@@ -16,6 +16,7 @@
 
 | 需求 | 优先阅读 | 再检查 |
 | --- | --- | --- |
+| 大型重构/迁移 | `docs/product/REFACTOR_PROGRAM.md`、`docs/project/ARCHITECTURE_MAP.md`、`docs/project/DECISIONS.md` | Prisma Schema/Migration、Docker EntryPoint、相关模块与验收资产 |
 | 产品、IA、UX | `docs/product/PRODUCT_VISION.md`、`docs/product/USER_JOURNEY.md`、`docs/product/INFORMATION_ARCHITECTURE.md`、`docs/product/SCREEN_SPEC.md`、`docs/product/P0_IMPLEMENTATION_PLAN.md` | `apps/web/src/App.tsx`、受影响页面/组件、Shared Type、匹配的 API Controller |
 | 当前架构 | `docs/project/ARCHITECTURE_MAP.md`、`docs/architecture.md`、`docs/architecture-decisions.md` | `apps/api/src/app.module.ts`、相关 Module 与 Service |
 | 面试生命周期/SSE | `docs/ACCEPTANCE-REPORT-2026-08-12.md` | `apps/api/src/modules/interview/`、`apps/web/src/pages/InterviewPage.tsx`、Stream Hook/Store |
