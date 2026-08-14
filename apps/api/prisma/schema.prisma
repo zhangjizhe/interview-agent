@@ -19,8 +19,104 @@ model User {
 
   interviews      Interview[]
   reflectionLogs  ReflectionLog[]
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  workspaceMembers WorkspaceMember[]
 
   @@map("users")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  ownerId   String
+  owner     User     @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members WorkspaceMember[]
+  agents  Agent[]
+
+  @@index([ownerId])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String          @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole  @default(OWNER)
+  createdAt   DateTime        @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+enum WorkspaceRole {
+  OWNER
+  MEMBER
+}
+
+model Agent {
+  id               String      @id @default(cuid())
+  workspaceId      String
+  key              String
+  name             String
+  description      String?     @db.Text
+  type             String
+  status           AgentStatus @default(DRAFT)
+  currentVersionId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  versions       AgentVersion[] @relation("AgentVersions")
+  currentVersion AgentVersion?  @relation("CurrentAgentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@map("agents")
+}
+
+model AgentVersion {
+  id               String             @id @default(cuid())
+  agentId          String
+  version          String
+  status           AgentVersionStatus @default(DRAFT)
+  modelConfig      Json?
+  systemPrompt     String             @default("") @db.Text
+  runtimeConfig    Json?
+  toolBindings     Json?
+  knowledgeBindings Json?
+  memoryBindings   Json?
+  inputSchema      Json?
+  outputSchema     Json?
+  changelog        String?            @db.Text
+  createdAt        DateTime           @default(now())
+  publishedAt      DateTime?
+
+  currentForAgents Agent[] @relation("CurrentAgentVersion")
+  parentAgent      Agent   @relation("AgentVersions", fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, version])
+  @@index([agentId, createdAt])
+  @@map("agent_versions")
+}
+
+enum AgentStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum AgentVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }
 
 enum UserRole {
