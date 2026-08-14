@@ -87,8 +87,8 @@
 - 目标：基于真实目标岗位与准备度 API 重建候选人 Web Shell，交付岗位设置、首页准备度、面试记录和评价失败恢复状态。
 - 范围：候选人主导航、TargetJob/JD 设置、Dashboard、Readiness/Insufficient Evidence、面试记录和报告失败恢复。
 - 非目标：训练生成逻辑、SSE 协议改版、Payment、Quota Enforcement、模型/Prompt 改动。
-- 验证：Web typecheck、Vitest（9 suites / 64 tests）、生产构建和 `git diff --check` 通过。
-- 浏览器限制：本机 API 未启动，且数据库 Migration Baseline 尚未完成，无法在不创建测试账户和数据的情况下完成认证后的浏览器端到端验收；登录页移动宽度检查无横向溢出。
+- 验证：Web typecheck、Vitest（9 suites / 64 tests）、生产构建、API typecheck/生产构建、目标岗位 API 合同测试和 `git diff --check` 通过。Docker API 镜像已成功构建，容器健康且目标岗位路由已注册。
+- 浏览器限制：本机开发 API 与 Schema 已按授权启动，但仍需通过可复现测试账户完成认证后的浏览器端到端验收。生产 Migration Baseline 未完成，不能以本机 Docker Schema 同步作为生产迁移。
 - 未完成：CandidateSkillState 生产聚合、训练建议/训练界面、面试模式/SSE 合同和额度边界仍由 TASK-007 至 TASK-009 处理。
 
 ## 阻塞

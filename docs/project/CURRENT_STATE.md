@@ -51,4 +51,5 @@
 - P0 产品规格要求先完成 P0-1 评估证据/技能合同，才能诚实实现准备度、技能、训练和对比 UI。
 - 2026-08-13 已完成 P0-1 Schema、Migration、最终评估运行/展示快照边界和基础 API；本机 PostgreSQL 因没有 Prisma migration 基线触发 `P3005`，Migration 尚未执行，生产流尚未聚合 CandidateSkillState。
 - 2026-08-14 已完成目标岗位、文本 JD 导入和准备度 API。准备度只在当前目标岗位具备简历、成功 FINAL 评价、岗位要求和正式技能状态时计算；否则返回显式缺失原因和 `overallScore: null`。
-- 2026-08-14 已完成候选人训练平台前端壳：岗位设置、准备度首页、面试记录和评价失败恢复已使用真实 API 合同；浏览器主流程仍需可用 API、已迁移数据库和认证测试账户才能完成端到端验收。
+- 2026-08-14 已完成候选人训练平台前端壳：岗位设置、准备度首页、面试记录和评价失败恢复已使用真实 API 合同。Docker API 镜像已验证在 Nest 编译前生成 Prisma Client，本机开发数据库已按授权通过 `db push` 同步 Schema，目标岗位路由可用；认证后的创建路径仍需用可复现测试账户完成浏览器验收。
+- Prisma Migration History Baseline 仍未建立。生产部署必须使用审计、备份和受控 Baseline Procedure，不能以本机 Docker 的 `db push --accept-data-loss` 作为替代。

@@ -162,7 +162,18 @@ export class JobReadinessService {
       source: string;
       skill: { id: string; slug: string; name: string; taxonomyVersion: string };
     }>;
-    const stateBySkill = new Map(states.map((state) => [state.skillId, state]));
+    const stateBySkill = new Map<string, {
+      score: number;
+      confidence: number;
+      evidenceCount: number;
+    }>(states.map((state: any) => [
+      state.skillId,
+      {
+        score: state.score,
+        confidence: state.confidence,
+        evidenceCount: state.evidenceCount,
+      },
+    ]));
     const matchedStates: Array<{
       requirement: { importance: number };
       state: { score: number; confidence: number; evidenceCount: number };
@@ -172,11 +183,7 @@ export class JobReadinessService {
       if (state) {
         matchedStates.push({
           requirement: { importance: requirement.importance },
-          state: {
-            score: state.score,
-            confidence: state.confidence,
-            evidenceCount: state.evidenceCount,
-          },
+          state,
         });
       }
     }

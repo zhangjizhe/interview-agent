@@ -15,6 +15,7 @@ TASK-006：训练平台前端壳
 - 面试记录支持继续进行中会话、打开已有评价，或在已结束无 Report 时重试最终评价。
 - 面试页面不再向候选人展示 Token、工具、MCP、Agent 调用、模型、提示词、追踪信息或内部复核的评分/操作。
 - 新增 Web 训练合同测试，覆盖证据不足与评价失败恢复映射。
+- 修复 API Docker 构建顺序：在 Nest 编译前生成 Prisma Client；新 Schema 的枚举和模型不再使镜像构建失败。
 
 ## 改动文件
 
@@ -42,10 +43,12 @@ TASK-006：训练平台前端壳
 ## 当前状态
 
 候选人可在 Web 中建立和切换目标岗位，查看透明准备度摘要，开始关联岗位的模拟面试，并从面试记录恢复评价失败。CandidateSkillState 尚未由正式评价自动聚合，因此当前正常用户会看到证据不足状态，这是预期且诚实的行为。
+本机 Docker API 已重建、健康检查通过，目标岗位路由已注册；用户已授权本机开发数据库的 Schema 同步。
 
 ## 已知问题
 
 - 本机 PostgreSQL 已有业务表但没有 Prisma migration 基线，`prisma migrate deploy` 返回 `P3005`，未执行任何 Migration。先完成 Schema 审计、备份和受控 Baseline Procedure，禁止直接标记历史迁移已应用。
+- Docker EntryPoint 仍使用 `prisma db push --accept-data-loss`。它只可在授权的本机开发恢复中使用，生产部署必须替换为受控 Migration Baseline Procedure。
 - ResumeRAG 不是版本化简历存储；准备度目前只判断当前可检索简历是否存在。
 - 生产技能状态聚合、趋势、训练推荐和训练界面尚未实现。
 - 本地 `.pnpm-store/` 是前序包管理器尝试重装产生的未跟踪缓存，不纳入交付。

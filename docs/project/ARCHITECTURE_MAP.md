@@ -89,4 +89,5 @@ Agent/Prompt Version Registry
 - Provider Key 和外部 MCP 配置不能进入源码。
 - `EvaluationRun` 是完整评价历史；`Report` 仅是当前候选人展示快照。PREVIEW/PRACTICE 不得写入正式 Report 或技能状态。
 - `JobReadinessService` 只读取当前目标岗位、可检索简历、成功 FINAL EvaluationRun 和其正式技能状态；JD 使用本地有界关键词映射，不调用模型。
+- API Docker 镜像必须在 Nest 编译前运行 `prisma generate`，使新增模型和枚举进入编译时 Prisma Client。开发容器现有 `db push` 仅用于本机 Schema 同步，不能代替生产 Migration Baseline。
 - 架构改动只有在代码和测试证明后才更新本地图。

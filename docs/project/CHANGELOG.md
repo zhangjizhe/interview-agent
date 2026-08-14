@@ -10,12 +10,14 @@
 - TargetJob 与可选 JD 的前端创建、编辑、激活流程。
 - Readiness API 的准备度、置信度、构成项和证据不足状态。
 - 已结束但无报告时的评价重试入口与 Web 合同测试。
+- Docker API 构建顺序修复：Prisma Client 现在在 Nest 编译前基于最新 Schema 生成，避免新模型与枚举导致镜像构建失败。
 
 变更：
 
 - 新面试从当前目标岗位发起并传递 `targetJobId`。
 - 候选人首页和面试页不再显示 Token、工具、MCP、Agent 调用、模型或内部复核细节。
 - `TASK-006` 完成；训练建议、SSE 合同与额度边界仍保持独立后续任务。
+- 本机 Docker API 已重建并按授权同步开发 Schema，`target-jobs` 路由已启动；生产 Migration Baseline 仍是单独部署前置。
 
 ## 2026-08-13
 

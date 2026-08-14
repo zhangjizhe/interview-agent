@@ -20,6 +20,13 @@ COPY packages/shared-types/package.json ./packages/shared-types/
 # 装依赖
 RUN pnpm install --frozen-lockfile=false
 
+# Prisma Client 必须在 Nest 编译前根据当前 schema 生成。
+# 否则新增模型或枚举不会出现在 TypeScript 类型中。
+COPY apps/api/prisma ./apps/api/prisma
+WORKDIR /app/apps/api
+RUN ./node_modules/.bin/prisma generate
+WORKDIR /app
+
 # 拷贝源码
 COPY apps/api/src ./apps/api/src
 COPY apps/api/tsconfig*.json ./apps/api/
@@ -31,12 +38,6 @@ COPY packages/shared-types ./packages/shared-types
 # nest build
 WORKDIR /app/apps/api
 RUN ./node_modules/.bin/nest build
-
-# Prisma：先 copy schema，再 generate 生成 client（runtime 需要）
-# 2026-06-26 修：之前只 copy prisma 目录但没 generate，导致 runtime
-# @prisma/client did not initialize yet
-COPY apps/api/prisma ./prisma
-RUN ./node_modules/.bin/prisma generate
 
 # entrypoint
 COPY apps/api/docker-entrypoint.sh /usr/local/bin/
