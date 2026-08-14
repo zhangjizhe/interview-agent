@@ -205,35 +205,106 @@ export class DynamicTaskQueueService {
    *   LLM 看完候选人回答 → 自己判断该不该追问 / 追什么 / 是否进阶
    *   不再用硬编码阈值，而是让 LLM 基于语义理解做决策
    */
-  async completeTask(interviewId: string, userId: string, taskId: string, answer: string): Promise<void> {
+  async completeTask(
+    interviewId: string,
+    userId: string,
+    taskId: string,
+    answer: string,
+    answerMessageId?: string,
+  ): Promise<void> {
     const task = await this.prisma.interviewTask.findUnique({ where: { id: taskId } });
     if (!task) return;
+
+    const questionRecord = await this.ensureQuestionRecord(task);
+    if (answerMessageId) {
+      const existingAnswer = await this.prisma.interviewAnswer.findUnique({
+        where: { messageId: answerMessageId },
+      });
+      if (existingAnswer) {
+        this.logger.debug(`[TaskQueue] Answer already recorded for message ${answerMessageId}`);
+        return;
+      }
+    }
 
     // Agent 一次决策：评分 + 是否追问 + 追问内容 + 是否进阶 + 进阶内容
     const decision = await this.agentDecide(interviewId, userId, task.question, answer, task.category, task.difficulty);
 
     // 写入评分记录
-    await this.prisma.answerHistory.create({
-      data: {
-        interviewId,
-        question: task.question,
-        answer,
-        score: decision.score,
-        completeness: decision.completeness,
-        correctness: decision.correctness,
-        depth: decision.depth,
-        feedback: decision.feedback,
-        llmEvaluated: true,
-      },
-    });
+    await this.prisma.$transaction(async (tx) => {
+      const answerRecord = answerMessageId
+        ? await tx.interviewAnswer.create({
+            data: {
+              interviewId,
+              questionId: questionRecord.id,
+              messageId: answerMessageId,
+              content: answer,
+            },
+          })
+        : null;
 
-    await this.prisma.interviewTask.update({
-      where: { id: taskId },
-      data: { status: 'COMPLETED' },
+      await tx.answerHistory.create({
+        data: {
+          interviewId,
+          question: task.question,
+          answer,
+          score: decision.score,
+          completeness: decision.completeness,
+          correctness: decision.correctness,
+          depth: decision.depth,
+          feedback: decision.feedback,
+          llmEvaluated: true,
+          questionId: questionRecord.id,
+          answerId: answerRecord?.id,
+        },
+      });
+
+      await tx.interviewTask.update({
+        where: { id: taskId },
+        data: { status: 'COMPLETED' },
+      });
     });
 
     // 执行 Agent 决策结果（而非规则触发）
     await this.executeAgentDecision(interviewId, task, decision);
+  }
+
+  private async ensureQuestionRecord(task: any) {
+    const existing = await this.prisma.interviewQuestion.findUnique({
+      where: { sourceTaskId: task.id },
+    });
+    if (existing) return existing;
+
+    const context = this.parseTaskContext(task.context);
+    const parentQuestion = context.followUpFrom
+      ? await this.prisma.interviewQuestion.findUnique({
+          where: { sourceTaskId: context.followUpFrom },
+        })
+      : null;
+    return this.prisma.interviewQuestion.create({
+      data: {
+        interviewId: task.interviewId,
+        sourceTaskId: task.id,
+        parentQuestionId: parentQuestion?.id,
+        externalQuestionId: context.questionId || null,
+        question: task.question,
+        category: task.category,
+        difficulty: task.difficulty,
+        expectedEvidence: context.expectedPoints || undefined,
+        source: context.advanced ? 'agent-advanced' : task.type === 'FOLLOW_UP' ? 'agent-follow-up' : 'task-queue',
+      },
+    });
+  }
+
+  private parseTaskContext(context: unknown): Record<string, any> {
+    if (!context) return {};
+    if (typeof context === 'string') {
+      try {
+        return JSON.parse(context);
+      } catch {
+        return {};
+      }
+    }
+    return context as Record<string, any>;
   }
 
   /**

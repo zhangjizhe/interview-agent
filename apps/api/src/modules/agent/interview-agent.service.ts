@@ -56,6 +56,7 @@ export interface AgentContext {
   position: string;
   level: string;
   provider?: string; // P0-3 修复：按 provider 取 maxTokens 配置
+  answerMessageId?: string;
 }
 
 @Injectable()
@@ -374,6 +375,7 @@ export class InterviewAgentService {
             ctx.userId,
             currentTask.id,
             userInput,
+            ctx.answerMessageId,
           );
         } catch (e: any) {
           this.logger.warn(
@@ -443,6 +445,7 @@ export class InterviewAgentService {
     suggestions: string[];
     /** token 用量，controller 写入 session_costs */
     usage?: { promptTokens: number; completionTokens: number };
+    model?: string;
   }> {
     const answerHistory = await this.prisma.answerHistory.findMany({
       where: { interviewId: ctx.sessionId },
@@ -516,6 +519,7 @@ export class InterviewAgentService {
     return {
       ...result,
       usage: response.usage, // 把 token 透出给 controller
+      model: response.model,
     };
   }
 

@@ -2,6 +2,30 @@
 
 在修改本仓库前，所有开发者和 AI Coding Agent 必须完整阅读并遵守 [项目开发宪法](docs/PROJECT-CONSTITUTION.md)。
 
+## Codex Context Protocol
+
+Repository is the durable project memory. Chat history is not a source of truth.
+
+Every new Codex task must load context in this order before scanning code:
+
+1. `AGENTS.md`
+2. `docs/PROJECT-CONSTITUTION.md`
+3. `docs/project/PROJECT_CONTEXT.md`
+4. `docs/project/CURRENT_STATE.md`
+5. `docs/project/ACTIVE_TASK.md`
+6. `docs/project/CONTEXT_INDEX.md`, then only the documents and code selected for the active task
+
+Do not bulk-read the repository or historical archives without a task-specific reason. If a
+context document conflicts with code, code is authoritative; update the relevant context document
+as part of the task. Keep one active task only, record out-of-scope discoveries in
+`docs/project/TASKS.md`, and use `docs/project/THREAD_HANDOFF.md` to transfer work between
+threads.
+
+At task completion, run relevant verification, inspect the diff, and update `CURRENT_STATE.md`,
+`TASKS.md`, and `THREAD_HANDOFF.md`. Update `ARCHITECTURE_MAP.md`, `DECISIONS.md`, and
+`CHANGELOG.md` when the task changes those facts. Keep current context concise; move obsolete
+history to `docs/project/archive/` rather than growing the live context indefinitely.
+
 执行规则：
 
 1. 非简单改动先阅读现有实现、数据流、API、数据库、安全边界和成本影响，再提出最小可行方案。

@@ -19,6 +19,8 @@ model User {
 
   interviews      Interview[]
   reflectionLogs  ReflectionLog[]
+  targetJobs      TargetJob[]
+  candidateSkillStates CandidateSkillState[]
 
   @@map("users")
 }
@@ -39,6 +41,8 @@ model Interview {
   endedAt         DateTime?
   summary         String? // 面试总结（AI 生成）
   resumeConfirmed Boolean         @default(false) // 用户是否确认过简历（false = 仍显示确认面板）
+  targetJobId     String?
+  targetJob       TargetJob? @relation(fields: [targetJobId], references: [id], onDelete: SetNull)
 
   messages       Message[]
   report         Report?
@@ -46,6 +50,10 @@ model Interview {
   tasks          InterviewTask[]
   answerHistories AnswerHistory[]
   reflectionLogs ReflectionLog[]
+  questions      InterviewQuestion[]
+  answers        InterviewAnswer[]
+  evaluationRuns EvaluationRun[]
+  assessmentEvidence AssessmentEvidence[]
 
   @@index([userId, startedAt])
   @@map("interviews")
@@ -102,6 +110,7 @@ model Message {
   promptTokens     Int       @default(0)
   completionTokens Int       @default(0)
   createdAt        DateTime  @default(now())
+  interviewAnswer  InterviewAnswer?
 
   @@index([interviewId, createdAt])
   @@map("messages")
@@ -111,6 +120,8 @@ model Report {
   id           String    @id @default(cuid())
   interviewId  String    @unique
   interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  currentEvaluationRunId String? @unique
+  currentEvaluationRun EvaluationRun? @relation("ReportCurrentEvaluationRun", fields: [currentEvaluationRunId], references: [id], onDelete: SetNull)
   overallScore Int // 总分 0-100
   scores       Json // 多维度评分：技术、表达、逻辑
   strengths    String    @db.Text // 优点
@@ -157,6 +168,7 @@ model InterviewTask {
   status    TaskStatus @default(PENDING)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  questionRecord InterviewQuestion?
 
   @@index([interviewId, status, priority])
   @@map("interview_tasks")
@@ -175,10 +187,233 @@ model AnswerHistory {
   depth         Float     @default(0)     // 深度 0-1
   feedback      String?   @db.Text        // 反馈建议
   llmEvaluated  Boolean   @default(false) // 是否由 LLM 评分
+  questionId    String?
+  questionRecord InterviewQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+  answerId      String?   @unique
+  answerRecord  InterviewAnswer? @relation(fields: [answerId], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now())
 
   @@index([interviewId])
+  @@index([questionId])
+  @@index([answerId])
   @@map("answer_histories")
+}
+
+model TargetJob {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  level       String?
+  isActive    Boolean  @default(false)
+  source      String   @default("manual")
+  company     String?
+  jobDescription String? @db.Text
+  jobDescriptionHash String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidateSkillStates CandidateSkillState[]
+  skillRequirements JobSkillRequirement[]
+  interviews      Interview[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, isActive])
+  @@map("target_jobs")
+}
+
+model SkillDefinition {
+  id              String   @id @default(cuid())
+  slug            String
+  name            String
+  parentId        String?
+  parent          SkillDefinition? @relation("SkillHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children        SkillDefinition[] @relation("SkillHierarchy")
+  taxonomyVersion String
+  applicableRoles String[]
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  questions      InterviewQuestion[]
+  assessmentEvidence AssessmentEvidence[]
+  candidateSkillStates CandidateSkillState[]
+  jobRequirements JobSkillRequirement[]
+
+  @@unique([slug, taxonomyVersion])
+  @@index([taxonomyVersion, isActive])
+  @@map("skill_definitions")
+}
+
+model JobSkillRequirement {
+  id             String   @id @default(cuid())
+  targetJobId    String
+  targetJob      TargetJob @relation(fields: [targetJobId], references: [id], onDelete: Cascade)
+  skillId        String
+  skill          SkillDefinition @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  importance     Int      @default(3)
+  expectedLevel  String?
+  source         String
+  matchedTerms   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([targetJobId, skillId])
+  @@index([targetJobId, importance])
+  @@map("job_skill_requirements")
+}
+
+model InterviewQuestion {
+  id             String   @id @default(cuid())
+  interviewId    String
+  interview      Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  sourceTaskId   String?  @unique
+  sourceTask     InterviewTask? @relation(fields: [sourceTaskId], references: [id], onDelete: SetNull)
+  parentQuestionId String?
+  parentQuestion InterviewQuestion? @relation("QuestionFollowUp", fields: [parentQuestionId], references: [id], onDelete: SetNull)
+  followUpQuestions InterviewQuestion[] @relation("QuestionFollowUp")
+  skillId        String?
+  skill          SkillDefinition? @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  externalQuestionId String?
+  version        Int      @default(1)
+  question       String   @db.Text
+  category       String
+  difficulty     String
+  expectedEvidence Json?
+  source         String
+  createdAt      DateTime @default(now())
+
+  answers        InterviewAnswer[]
+  answerHistories AnswerHistory[]
+  assessmentEvidence AssessmentEvidence[]
+
+  @@index([interviewId, createdAt])
+  @@index([skillId])
+  @@index([parentQuestionId])
+  @@map("interview_questions")
+}
+
+model InterviewAnswer {
+  id             String   @id @default(cuid())
+  interviewId    String
+  interview      Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       InterviewQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  messageId      String   @unique
+  message        Message  @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  content        String   @db.Text
+  revision       Int      @default(1)
+  createdAt      DateTime @default(now())
+
+  answerHistories AnswerHistory[]
+  assessmentEvidence AssessmentEvidence[]
+
+  @@index([interviewId, createdAt])
+  @@index([questionId])
+  @@map("interview_answers")
+}
+
+model EvaluationDefinition {
+  id                    String   @id @default(cuid())
+  version               String   @unique
+  definitionHash        String   @unique
+  evaluatorVersion      String
+  promptVersion         String
+  rubricVersion         String
+  modelProvider         String
+  modelVersion          String
+  modelParameters       Json?
+  evaluationMode        EvaluationMode
+  fallbackPolicyVersion String
+  createdAt             DateTime @default(now())
+
+  evaluationRuns EvaluationRun[]
+
+  @@index([evaluationMode, createdAt])
+  @@map("evaluation_definitions")
+}
+
+model EvaluationRun {
+  id                   String   @id @default(cuid())
+  interviewId          String
+  interview            Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  definitionId         String
+  definition           EvaluationDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  inputRevision        String
+  mode                 EvaluationMode
+  status               EvaluationRunStatus @default(PENDING)
+  idempotencyKey       String   @unique
+  reportPayload        Json?
+  error                String?  @db.Text
+  degradedReason       String?  @db.Text
+  supersedesId         String?
+  supersedes           EvaluationRun? @relation("EvaluationRunSupersedes", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy         EvaluationRun[] @relation("EvaluationRunSupersedes")
+  createdAt            DateTime @default(now())
+  completedAt          DateTime?
+
+  assessmentEvidence   AssessmentEvidence[]
+  reportSnapshots      Report[] @relation("ReportCurrentEvaluationRun")
+  candidateSkillStates CandidateSkillState[]
+
+  @@unique([interviewId, inputRevision, definitionId, mode])
+  @@index([interviewId, createdAt])
+  @@index([status, createdAt])
+  @@map("evaluation_runs")
+}
+
+model AssessmentEvidence {
+  id                   String   @id @default(cuid())
+  evaluationRunId      String
+  evaluationRun        EvaluationRun @relation(fields: [evaluationRunId], references: [id], onDelete: Cascade)
+  interviewId          String
+  interview            Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  questionId           String
+  question             InterviewQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answerId             String
+  answer               InterviewAnswer @relation(fields: [answerId], references: [id], onDelete: Restrict)
+  skillId              String?
+  skill                SkillDefinition? @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  answerExcerpt        String   @db.Text
+  expectedEvidence     Json?
+  observedEvidence     Json?
+  dimensions           Json?
+  score                Float?
+  reason               String?  @db.Text
+  missingEvidence      Json?
+  recommendation       String?  @db.Text
+  confidence           Float    @default(0)
+  version              Int      @default(1)
+  createdAt            DateTime @default(now())
+
+  @@unique([evaluationRunId, answerId])
+  @@index([interviewId, createdAt])
+  @@index([skillId, createdAt])
+  @@map("assessment_evidence")
+}
+
+model CandidateSkillState {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetJobId     String
+  targetJob       TargetJob @relation(fields: [targetJobId], references: [id], onDelete: Cascade)
+  skillId         String
+  skill           SkillDefinition @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  score           Float
+  confidence      Float
+  trend           Float?
+  evidenceCount   Int      @default(0)
+  lastAssessedAt  DateTime
+  sourceRunId     String?
+  sourceRun       EvaluationRun? @relation(fields: [sourceRunId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, targetJobId, skillId])
+  @@index([userId, lastAssessedAt])
+  @@index([sourceRunId])
+  @@map("candidate_skill_states")
 }
 
 // ADR #10 Phase 1：Reviewer 反思日志
@@ -222,4 +457,19 @@ enum TaskStatus {
   PENDING
   COMPLETED
   SKIPPED
+}
+
+enum EvaluationMode {
+  FINAL
+  PRACTICE
+  PREVIEW
+}
+
+enum EvaluationRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  DEGRADED
+  SUPERSEDED
 }

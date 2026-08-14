@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { safeJson } from '../utils/safeJson';
 import {
   Send,
@@ -15,28 +15,23 @@ import {
   ChevronDown,
   ChevronUp,
   Check,
-  Zap,
   ShieldAlert,
-  ThumbsUp,
-  ThumbsDown,
   Lock,
 } from 'lucide-react';
 import { useInterviewStream } from '../hooks/useInterviewStream';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useVirtualList } from '../hooks/useVirtualList';
-import { ToolsPanel } from '../components/ToolsPanel';
 import { ChatBubble } from '../components/ChatBubble';
-import { CotPanel } from '../components/CotPanel';
 import { useInterviewStore } from '../store/interview-store';
 import type { Report } from '@interview-agent/shared-types';
+import { getSession } from '../utils/auth';
 
 // safeJson 已提取到 utils/safeJson.ts（审查员 R-P2-17 去重）
 
 export function InterviewPage() {
   const { id: interviewId } = useParams<{ id: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const userId = searchParams.get('userId') || 'demo-user';
+  const userId = getSession()?.userId || '';
 
   // ========== 读 zustand store（单一数据源） ==========
   const messages = useInterviewStore((s) => s.messages);
@@ -49,21 +44,14 @@ export function InterviewPage() {
   const setInterviewStatus = useInterviewStore((s) => s.setInterviewStatus);
   const isReadOnly = interviewStatus === 'COMPLETED';
   const drawerOpen = useInterviewStore((s) => s.drawerOpen);
-  const sessionTokens = useInterviewStore((s) => s.sessionTokens);
   const uploading = useInterviewStore((s) => s.uploading);
   const uploadedName = useInterviewStore((s) => s.uploadedName);
   const confirming = useInterviewStore((s) => s.confirming);
   const input = useInterviewStore((s) => s.input);
   const streaming = useInterviewStore((s) => s.streaming);
   const reconnecting = useInterviewStore((s) => s.reconnecting);
-  const agentEvents = useInterviewStore((s) => s.agentEvents);
   const hitlPending = useInterviewStore((s) => s.hitlPending);
-  const hitlScore = useInterviewStore((s) => s.hitlScore);
-  const hitlIssues = useInterviewStore((s) => s.hitlIssues);
-  const hitlSuggestion = useInterviewStore((s) => s.hitlSuggestion);
-  const hitlResuming = useInterviewStore((s) => s.hitlResuming);
   const setHitlPending = useInterviewStore((s) => s.setHitlPending);
-  const setHitlResuming = useInterviewStore((s) => s.setHitlResuming);
 
   const setInput = useInterviewStore((s) => s.setInput);
   const setMessages = useInterviewStore((s) => s.setMessages);
@@ -76,7 +64,6 @@ export function InterviewPage() {
   const setUploading = useInterviewStore((s) => s.setUploading);
   const setUploadedName = useInterviewStore((s) => s.setUploadedName);
   const setConfirming = useInterviewStore((s) => s.setConfirming);
-  const addTokens = useInterviewStore((s) => s.addTokens);
 
   const { send } = useInterviewStream();
 
@@ -178,8 +165,6 @@ export function InterviewPage() {
     const content = input.trim();
     setInput('');
     await send(interviewId, userId, content);
-    // 估算并累积 token 数（仅 UI 展示用）
-    addTokens(Math.ceil(content.length / 2));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -236,8 +221,7 @@ export function InterviewPage() {
     try {
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('position', searchParams.get('position') || '前端开发工程师');
-      fd.append('userId', userId);
+      fd.append('position', resume?.position || '通用岗位');
       const res = await fetch('/api/interview/upload-resume', { method: 'POST', body: fd });
       const data = await safeJson(res);
       if (data?.ragIngested) {
@@ -303,35 +287,6 @@ export function InterviewPage() {
       if (intervalId) clearInterval(intervalId);
     };
   }, [interviewId, resumeConfirmed, hitlPending, setHitlPending]);
-
-  // HITL 审批：通过/拒绝
-  const handleHitlVerdict = async (verdict: 'approved' | 'rejected') => {
-    if (!interviewId || hitlResuming) return;
-    setHitlResuming(true);
-    try {
-      const res = await fetch(`/api/hitl/graph-resume/${interviewId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ verdict }),
-      });
-      const data = await safeJson(res);
-      if (data.success) {
-        setHitlPending(false);
-        // 如果 approved，把 response 加到消息列表
-        if (verdict === 'approved' && data.response) {
-          const store = useInterviewStore.getState();
-          store.setMessages([
-            ...store.messages,
-            { role: 'assistant', content: data.response, streaming: false },
-          ]);
-        }
-      }
-    } catch (err) {
-      console.error('HITL resume failed:', err);
-    } finally {
-      setHitlResuming(false);
-    }
-  };
 
   // ========== 渲染 ==========
   return (
@@ -448,30 +403,15 @@ export function InterviewPage() {
           </button>
         </div>
         <div className="p-4 flex-1 overflow-y-auto space-y-4">
-          {/* 工具/MCP 面板（最上面，醒目） */}
-          <ToolsPanel activeToolNames={
-            agentEvents
-              .filter((e) => e.type === 'tool_call')
-              .map((e) => e.toolName)
-              .filter(Boolean) as string[]
-          } />
-
           {/* 当前面试信息 */}
           <div>
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
               当前面试
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="text-sm font-medium text-slate-900 break-all">
-                面试 #{interviewId?.slice(0, 8)}
+              <div className="text-sm font-medium text-slate-900">
+                本次模拟面试
               </div>
-              <div className="text-xs text-slate-500 mt-1 break-all">候选人: {userId}</div>
-              {sessionTokens > 0 && (
-                <div className="text-xs text-slate-600 mt-2 font-mono flex items-center gap-1">
-                  <Zap className="w-3 h-3" />
-                  本次 {sessionTokens.toLocaleString()} tokens
-                </div>
-              )}
 
               {/* 简历状态 + 上传/换 */}
               <div className="mt-3 pt-3 border-t border-blue-200">
@@ -517,36 +457,16 @@ export function InterviewPage() {
             </div>
           </div>
 
-          {/* 工具调用轨迹 */}
-          {agentEvents.length > 0 && (
-            <div>
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                本轮调用
-              </div>
-              <div className="space-y-1">
-                {agentEvents
-                  .filter((e) => e.type === 'tool_call' || e.type === 'tool_result')
-                  .map((e, i) => (
-                    <div
-                      key={i}
-                      className="text-[11px] text-slate-600 bg-slate-50 rounded px-2 py-1.5 flex items-center gap-1.5"
-                    >
-                      {e.type === 'tool_call' ? (
-                        <>
-                          <span>调用</span>
-                          <span className="font-mono text-slate-800">{e.toolName}</span>
-                        </>
-                      ) : (
-                        <span className="text-emerald-600">✓ 返回结果</span>
-                      )}
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
         </div>
         <div className="p-4 border-t border-slate-200">
-          {messages.length > 0 ? (
+          {isReadOnly ? (
+            <button
+              onClick={() => navigate('/interviews')}
+              className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium py-2 px-3 rounded-lg transition"
+            >
+              <ArrowLeft className="w-4 h-4" /> 返回面试记录
+            </button>
+          ) : messages.length > 0 ? (
             <button
               onClick={handleEnd}
               disabled={ending}
@@ -614,14 +534,6 @@ export function InterviewPage() {
                             {report.candidate.messageCount} 轮
                           </div>
                         </div>
-                        {report.totalTokens != null && (
-                          <div>
-                            <div className="text-slate-400">Token</div>
-                            <div className="font-mono text-slate-700">
-                              {report.totalTokens.toLocaleString()}
-                            </div>
-                          </div>
-                        )}
                       </div>
                       {report.candidate.resumeSkills && (
                         <div className="mt-2 flex flex-wrap gap-1">
@@ -689,11 +601,6 @@ export function InterviewPage() {
                   面试 #{interviewId?.slice(0, 8)}
                 </span>
               </div>
-              {sessionTokens > 0 && (
-                <span className="text-xs font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded">
-                  ⚡ {sessionTokens.toLocaleString()}
-                </span>
-              )}
             </div>
 
             {/* 简历摘要面板（可折叠） */}
@@ -776,7 +683,7 @@ export function InterviewPage() {
                     <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
                       <div className="font-medium">此面试已结束</div>
-                      <div className="text-xs text-amber-700 mt-0.5">报告已生成在左侧栏，消息输入已禁用。如需重新面试，请返回首页创建新面试。</div>
+                      <div className="text-xs text-amber-700 mt-0.5">评价尚未生成，消息输入已禁用。请返回面试记录重试生成评价。</div>
                     </div>
                   </div>
                 )}
@@ -794,44 +701,14 @@ export function InterviewPage() {
                     streaming={msg.streaming}
                   />
                 ))}
-                {/* CoT 思维链面板 */}
-                <CotPanel events={agentEvents} />
-                {/* HITL 审批面板 */}
+                {/* 候选人只看到复核状态，不暴露内部评分或操作信息。 */}
                 {hitlPending && (
-                  <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-3">
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-4">
                     <div className="flex items-center gap-2">
                       <ShieldAlert className="w-5 h-5 text-amber-600" />
-                      <span className="font-semibold text-amber-800">评分争议，等待 HR 审批</span>
+                      <span className="font-semibold text-amber-800">回答正在复核</span>
                     </div>
-                    <div className="text-sm text-amber-700 space-y-1">
-                      {hitlScore != null && (
-                        <div>AI 评分：<span className="font-mono font-bold">{(hitlScore * 100).toFixed(0)}</span>/100</div>
-                      )}
-                      {hitlIssues.length > 0 && (
-                        <div>问题：{hitlIssues.join('；')}</div>
-                      )}
-                      {hitlSuggestion && (
-                        <div>建议：{hitlSuggestion}</div>
-                      )}
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => handleHitlVerdict('approved')}
-                        disabled={hitlResuming}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 transition"
-                      >
-                        {hitlResuming ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsUp className="w-4 h-4" />}
-                        批准通过
-                      </button>
-                      <button
-                        onClick={() => handleHitlVerdict('rejected')}
-                        disabled={hitlResuming}
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 transition"
-                      >
-                        {hitlResuming ? <Loader2 className="w-4 h-4 animate-spin" /> : <ThumbsDown className="w-4 h-4" />}
-                        打回重做
-                      </button>
-                    </div>
+                    <p className="mt-2 text-sm text-amber-700">系统正在确认本轮回答，请稍候。</p>
                   </div>
                 )}
                 {/* 重连提示 */}

@@ -89,7 +89,9 @@ export class EvaluationController {
 
   /**
    * POST /interview/:interviewId/generate-report
-   * 生成完整面试报告（综合评分）
+   * 生成预览报告，不写入正式 Report 或 CandidateSkillState。
+   *
+   * 正式评价只能由结束面试路径写入 EvaluationRun，再显式切换 Report 展示快照。
    */
   @Post(':interviewId/generate-report')
   async generateInterviewReport(@Param('interviewId') interviewId: string, @Req() req: any) {
@@ -124,28 +126,9 @@ export class EvaluationController {
 
     const report = await this.scoring.generateReport(evaluations);
 
-    // 保存报告到 DB
-    const savedReport = await this.prisma.report.upsert({
-      where: { interviewId },
-      create: {
-        interviewId,
-        overallScore: report.overallScore,
-        scores: report as any,
-        strengths: report.strengthAreas.join('\n'),
-        weaknesses: report.improvementAreas.join('\n'),
-        suggestions: report.summary,
-      },
-      update: {
-        overallScore: report.overallScore,
-        scores: report as any,
-        strengths: report.strengthAreas.join('\n'),
-        weaknesses: report.improvementAreas.join('\n'),
-        suggestions: report.summary,
-      },
-    });
-
     return {
       success: true,
+      mode: 'PREVIEW',
       report: {
         overallScore: report.overallScore,
         recommendation: report.finalRecommendation,
@@ -159,7 +142,6 @@ export class EvaluationController {
         score: e.score,
         feedback: e.feedback,
       })),
-      savedReportId: savedReport.id,
     };
   }
 }

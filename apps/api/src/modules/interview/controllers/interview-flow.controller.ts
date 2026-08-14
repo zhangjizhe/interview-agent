@@ -199,7 +199,7 @@ export class InterviewFlowController {
       return;
     }
 
-    await this.prisma.message.create({
+    const candidateMessage = await this.prisma.message.create({
       data: { interviewId, role: 'user', content: dto.content },
     });
 
@@ -210,6 +210,7 @@ export class InterviewFlowController {
       level: interview.level,
       // P0-3 修复：传 provider，让 maxTokens 走对应 provider 配置
       provider: (dto as any).provider || 'qwen',
+      answerMessageId: candidateMessage.id,
     };
 
     const writeEvent = (event: object) => {

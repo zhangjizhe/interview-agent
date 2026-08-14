@@ -6,6 +6,7 @@ import { InterviewLifecycleController } from './controllers/interview-lifecycle.
 import { ResumeController } from './controllers/resume.controller';
 import { QuestionBankController } from './controllers/question-bank.controller';
 import { EvaluationController } from './controllers/evaluation.controller';
+import { SkillProfileController } from './controllers/skill-profile.controller';
 import { InterviewFlowController } from './controllers/interview-flow.controller';
 import { AgentModule } from '../agent/agent.module';
 import { TaskQueueModule } from '../agent/task-queue.module';
@@ -20,6 +21,8 @@ import { QuestionBankService } from './services/question-bank.service';
 import { QuestionGeneratorService } from './services/question-generator.service';
 import { ScoringService } from './services/scoring.service';
 import { HitlService } from './services/hitl.service';
+import { EvaluationService } from './services/evaluation.service';
+import { JobReadinessService } from './services/job-readiness.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
 @Module({
@@ -29,6 +32,8 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
   // NestJS 跨 controller 按注册顺序匹配路由，避免 /interview/list 被
   // /interview/:interviewId 抢先匹配。
   controllers: [
+    // target-jobs/readiness 必须在 LifecycleController 的 :interviewId GET 之前注册。
+    SkillProfileController,
     InterviewLifecycleController,
     ResumeController,
     QuestionBankController,
@@ -44,6 +49,8 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
     QuestionBankService,
     QuestionGeneratorService,
     ScoringService,
+    EvaluationService,
+    JobReadinessService,
     // RagService 已删除（2026-06-25 dead code 清理）
     HitlService,
     PrismaService,
@@ -54,6 +61,8 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
     QuestionBankService,
     QuestionGeneratorService,
     ScoringService,
+    EvaluationService,
+    JobReadinessService,
     HitlService,
   ],
 })
