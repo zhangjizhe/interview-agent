@@ -55,3 +55,4 @@
 - 2026-08-15 已完成 B0 验收基线：候选人 SSE 仅接收文本、可操作错误和完成信号；内部 Agent、工具、检索、模型与 Token 成本事件均在 API/Web 双层过滤。真实浏览器验收覆盖随机用户登录、岗位创建、USER/ADMIN 隔离和移动端登录。
 - 2026-08-15 已完成 B1 Prisma Migration Baseline：当前实际 PostgreSQL Schema（包括历史约束与 LangGraph checkpoint 表）已通过隔离恢复、Schema 指纹和 22 张表行数对账。活动迁移目录只保留单一 Baseline；Docker 独立 migration job 成功后 API 才启动，`/api/health/ready` 会检查 Baseline。生产仍须重复受控备份/恢复程序，不能将本机演练当作生产发布批准。
 - 2026-08-15 已完成 B2 FINAL 技能状态聚合：`EvaluationService` 在成功 FINAL 运行的同一事务中写入 Evidence、运行快照、CandidateSkillState 和 Report；聚合只查询同一用户/岗位的成功 FINAL Evidence，非正式、失败和降级运行不改变技能状态。
+- 2026-08-15 已完成 B3 岗位版本与准备度合同：TargetJob 有可递增 `profileVersion`，PostgreSQL 部分唯一索引保证每用户至多一个活跃岗位，准备度响应返回对应档案版本。

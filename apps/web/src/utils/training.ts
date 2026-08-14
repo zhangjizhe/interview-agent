@@ -5,6 +5,7 @@ export interface TargetJob {
   company: string | null;
   jobDescription: string | null;
   isActive: boolean;
+  profileVersion: number;
   createdAt: string;
   updatedAt: string;
 }

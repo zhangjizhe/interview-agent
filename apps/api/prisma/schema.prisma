@@ -207,6 +207,7 @@ model TargetJob {
   level       String?
   isActive    Boolean  @default(false)
   source      String   @default("manual")
+  profileVersion Int   @default(1)
   company     String?
   jobDescription String? @db.Text
   jobDescriptionHash String?

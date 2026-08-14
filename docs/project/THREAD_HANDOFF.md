@@ -4,22 +4,22 @@
 
 ## 上一任务
 
-TASK-013：B2 正式评价与技能状态聚合
+TASK-014：B3 岗位版本与准备度合同
 
 ## 已完成
 
-- 新增独立技能状态聚合服务，由 Final Evaluation 的 Prisma transaction 调用。
-- 仅当前用户、目标岗位、成功 FINAL EvaluationRun 中具有 `skillId` 与分数的 Evidence 可重算 CandidateSkillState。
-- 聚合按全部有效 Evidence 重算分数、置信度和证据数，不通过内存计数累加；同一 source run 重试不会污染趋势。
-- PREVIEW、PRACTICE、FAILED、DEGRADED 和无归属证据不写入正式技能状态。
+- 新增 `profileVersion`，岗位档案更新后递增，准备度响应返回对应版本。
+- PostgreSQL 部分唯一索引强制每位用户至多一个活跃 TargetJob。
+- 并发活跃岗位冲突被转换为显式业务错误；所有权和缺失证据的原有语义保留。
+- migration 已在隔离 Baseline 与本机开发库验证。
 
 ## 改动文件
 
-- `apps/api/src/modules/interview/services/skill-state-aggregation.service.ts`
-- `apps/api/src/modules/interview/services/evaluation.service.ts`
-- `apps/api/src/modules/interview/interview.module.ts`
-- `apps/api/src/__tests__/skill-state-aggregation.service.spec.ts`
-- `apps/api/src/__tests__/evaluation.service.spec.ts`
+- `apps/api/prisma/schema.prisma`
+- `apps/api/prisma/migrations/20260815001000_target_job_profile_version/migration.sql`
+- `apps/api/src/modules/interview/services/job-readiness.service.ts`
+- `apps/api/src/__tests__/job-readiness.service.spec.ts`
+- `apps/web/src/utils/training.ts`
 - `docs/project/CURRENT_STATE.md`
 - `docs/project/ACTIVE_TASK.md`
 - `docs/project/TASKS.md`
@@ -27,13 +27,13 @@ TASK-013：B2 正式评价与技能状态聚合
 
 ## 重要决策
 
-- 正式技能状态只能由成功 FINAL EvaluationRun 的 AssessmentEvidence 生成，不能从旧 AnswerHistory 或自由文本 Report 回填。
-- 聚合服务使用 transaction client，任何 Evidence、EvaluationRun、SkillState 或 Report 写入失败会一起回滚。
+- 单活跃岗位是数据库约束，不是 UI 约定；事务冲突必须由 API 明确处理。
+- 岗位档案版本是准备度的事实边界，后续面试模式和训练推荐必须记录或比较它。
 - 本任务不产生训练结论；现有技能状态为空时，候选人仍必须看到证据不足。
 
 ## 当前状态
 
-重构 B2 已完成。正式 FINAL 证据到技能状态的事务、隔离和幂等合同已具备 API 回归保护；API 25 suites / 241 tests、Cache 22 tests、Golden Dataset 结构校验、typecheck/build 通过。
+重构 B3 已完成。岗位单活跃约束、档案版本与准备度合同已经过隔离/本机 migration 和 API/Web 全量回归验证；API 25 suites / 243 tests、Cache 22 tests、Web 10 files / 75 tests、API/Web typecheck/build 通过。
 
 ## 已知问题
 
@@ -42,13 +42,13 @@ TASK-013：B2 正式评价与技能状态聚合
 
 ## 推荐下一任务
 
-TASK-B3：岗位版本与准备度合同强化。
+TASK-B4：受控面试模式与稳定题目合同。
 
 ## 所需上下文
 
-按 `AGENTS.md` 读取核心顺序，再读取 `docs/product/REFACTOR_PROGRAM.md`、TargetJob/JobReadinessService、Prisma Schema、岗位并发/所有权测试与候选人 API 合同。
+按 `AGENTS.md` 读取核心顺序，再读取 `docs/agent/AGENT_RUNTIME.md`、`docs/agent/QUESTION_INTELLIGENCE.md`、`agent-lab` 面试模拟合同、InterviewTask/Question/Answer Schema、SSE 与生命周期测试。
 
 ## 风险
 
-- TargetJob 仍缺少数据库层的单活跃岗位约束和版本边界，不能在 UI 中假设并发写入正确。
+- Interview 尚未持久化完整模拟/单技能练习模式、稳定题目技能元数据和受控追问目的。
 - 后续任务不得重新引入 API runtime DDL 或绕过 B0 SSE 候选人边界。

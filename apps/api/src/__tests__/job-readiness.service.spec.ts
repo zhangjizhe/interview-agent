@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 jest.mock('../modules/interview/services/resume-rag.service', () => ({
   ResumeRAGService: class ResumeRAGService {},
@@ -116,5 +116,36 @@ describe('JobReadinessService', () => {
 
     await expect(service.getReadiness('user-a', 'job-b'))
       .rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('increments the target-job profile version when requirements are rebuilt', async () => {
+    prisma.targetJob.findFirst.mockResolvedValueOnce({
+      id: 'job-1',
+      title: 'AI Agent 工程师',
+      level: 'P5',
+      company: null,
+      jobDescription: null,
+    });
+    prisma.targetJob.update.mockResolvedValueOnce({
+      id: 'job-1',
+      title: 'AI Agent 工程师',
+      level: 'P6',
+      jobDescription: null,
+    });
+    const service = new JobReadinessService(prisma as any, resumeRag as any);
+
+    await service.updateTargetJob('user-a', 'job-1', { level: 'P6' });
+
+    expect(prisma.targetJob.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ profileVersion: { increment: 1 } }),
+    }));
+  });
+
+  it('maps the database single-active-job conflict to a retryable business error', async () => {
+    prisma.$transaction.mockRejectedValueOnce({ code: 'P2002' });
+    const service = new JobReadinessService(prisma as any, resumeRag as any);
+
+    await expect(service.createTargetJob('user-a', { title: 'AI Agent 工程师' }))
+      .rejects.toBeInstanceOf(ConflictException);
   });
 });

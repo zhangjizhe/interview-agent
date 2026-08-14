@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -42,33 +43,37 @@ export class JobReadinessService {
 
   async createTargetJob(userId: string, input: UpsertTargetJobInput) {
     const normalized = this.normalizeInput(input);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.targetJob.updateMany({
-        where: { userId, isActive: true },
-        data: { isActive: false },
-      });
-      const targetJob = await tx.targetJob.create({
-        data: {
-          userId,
-          ...normalized,
-          isActive: true,
-          source: normalized.jobDescription ? 'jd-keyword-v1' : 'role-baseline-v1',
-          jobDescriptionHash: normalized.jobDescription
-            ? this.hash(normalized.jobDescription)
-            : null,
-        },
-      });
-      await this.syncRequirements(tx, targetJob.id, targetJob.title, targetJob.level, targetJob.jobDescription);
-      return tx.targetJob.findUniqueOrThrow({
-        where: { id: targetJob.id },
-        include: {
-          skillRequirements: {
-            include: { skill: { select: { slug: true, name: true, taxonomyVersion: true } } },
-            orderBy: { importance: 'desc' },
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.targetJob.updateMany({
+          where: { userId, isActive: true },
+          data: { isActive: false },
+        });
+        const targetJob = await tx.targetJob.create({
+          data: {
+            userId,
+            ...normalized,
+            isActive: true,
+            source: normalized.jobDescription ? 'jd-keyword-v1' : 'role-baseline-v1',
+            jobDescriptionHash: normalized.jobDescription
+              ? this.hash(normalized.jobDescription)
+              : null,
           },
-        },
+        });
+        await this.syncRequirements(tx, targetJob.id, targetJob.title, targetJob.level, targetJob.jobDescription);
+        return tx.targetJob.findUniqueOrThrow({
+          where: { id: targetJob.id },
+          include: {
+            skillRequirements: {
+              include: { skill: { select: { slug: true, name: true, taxonomyVersion: true } } },
+              orderBy: { importance: 'desc' },
+            },
+          },
+        });
       });
-    });
+    } catch (error) {
+      this.rethrowActiveJobConflict(error);
+    }
   }
 
   async updateTargetJob(userId: string, targetJobId: string, input: Partial<UpsertTargetJobInput>) {
@@ -84,6 +89,7 @@ export class JobReadinessService {
         where: { id: targetJobId },
         data: {
           ...normalized,
+          profileVersion: { increment: 1 },
           source: normalized.jobDescription ? 'jd-keyword-v1' : 'role-baseline-v1',
           jobDescriptionHash: normalized.jobDescription
             ? this.hash(normalized.jobDescription)
@@ -106,16 +112,20 @@ export class JobReadinessService {
 
   async activateTargetJob(userId: string, targetJobId: string) {
     await this.requireOwnedTargetJob(userId, targetJobId);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.targetJob.updateMany({
-        where: { userId, isActive: true },
-        data: { isActive: false },
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await tx.targetJob.updateMany({
+          where: { userId, isActive: true },
+          data: { isActive: false },
+        });
+        return tx.targetJob.update({
+          where: { id: targetJobId },
+          data: { isActive: true },
+        });
       });
-      return tx.targetJob.update({
-        where: { id: targetJobId },
-        data: { isActive: true },
-      });
-    });
+    } catch (error) {
+      this.rethrowActiveJobConflict(error);
+    }
   }
 
   async getReadiness(userId: string, targetJobId: string) {
@@ -240,6 +250,7 @@ export class JobReadinessService {
         title: targetJob.title,
         level: targetJob.level,
         company: targetJob.company,
+        profileVersion: targetJob.profileVersion,
         hasJobDescription: Boolean(targetJob.jobDescription),
         skillRequirements: requiredSkills.map((requirement) => ({
           skill: requirement.skill,
@@ -334,6 +345,13 @@ export class JobReadinessService {
     const company = this.normalizeShortText(input.company, '公司名称', 120, false);
     const jobDescription = this.normalizeJobDescription(input.jobDescription);
     return { title, level, company, jobDescription };
+  }
+
+  private rethrowActiveJobConflict(error: unknown): never {
+    if ((error as { code?: string })?.code === 'P2002') {
+      throw new ConflictException('当前岗位设置已被另一请求更新，请刷新后重试');
+    }
+    throw error;
   }
 
   private normalizeShortText(value: string | undefined, field: string, maxLength: number, required: boolean) {

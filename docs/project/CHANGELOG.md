@@ -10,6 +10,7 @@
 - 无 Provider 的 Golden Dataset Schema 校验命令与 B0 验收报告。
 - B1 单一 Prisma Baseline、数据库备份/恢复/指纹脚本和独立 Docker migration job。
 - B2 成功 FINAL 评价到 CandidateSkillState 的事务性、可追溯聚合。
+- B3 TargetJob profile version 与数据库级单活跃岗位约束。
 
 变更：
 
@@ -17,6 +18,7 @@
 - `TASK-011` 完成；Production Migration Baseline 仍是下一独立批次。
 - API 运行时不再运行 `db push` 或 checkpoint DDL；readiness 现在要求 Baseline、PostgreSQL 和 Redis 均可用。
 - 正式技能状态只由成功 FINAL Evidence 重算；非正式、失败或降级评价不影响候选人准备度。
+- 准备度现在属于明确的岗位档案版本；活跃岗位并发冲突由服务端拒绝。
 
 ## 2026-08-14
 

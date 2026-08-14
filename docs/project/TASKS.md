@@ -42,6 +42,15 @@
 - 依赖：TASK-012 Baseline、EvaluationRun/AssessmentEvidence/CandidateSkillState Schema 与现有 Evaluation Service。
 - 验证：FINAL 事务聚合、同源重试、无目标岗位/无分数隔离、失败 Final Run 和外部关系筛选合同测试通过；API 25 suites / 241 tests、Cache 22 tests、Golden Dataset 30 Case 结构校验、typecheck/build 通过。
 
+### TASK-014：B3 岗位版本与准备度合同
+
+- 状态：2026-08-15 完成
+- 目标：将单活跃目标岗位、岗位档案版本与版本化准备度建立为数据库和 API 事实。
+- 范围：TargetJob/JobSkillRequirement 的加性 Schema、并发安全创建/切换、Readiness 合同和测试。
+- 非目标：面试模式、训练推荐、候选人 UI 重做、LLM JD 分析、Provider/Prompt/Graph 改造。
+- 依赖：TASK-012 Baseline、TASK-013 FINAL 技能状态聚合、TargetJob/Readiness API。
+- 验证：隔离和本机加性 migration、部分唯一索引、Prisma 状态、岗位版本/冲突 API 测试、API 25 suites / 243 tests、Cache 22 tests、Web 10 files / 75 tests、API/Web typecheck/build 通过。
+
 ## 下一任务
 
 ### TASK-007：训练建议与训练界面

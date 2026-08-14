@@ -118,6 +118,12 @@ Web
 - PREVIEW、PRACTICE、FAILED、DEGRADED、无技能/无分数证据与旧 AnswerHistory 不会生成正式技能状态。
 - 同一来源运行重试保留既有趋势，避免重复累计；API 合同测试覆盖事务调用、范围筛选和无证据状态。
 
+### B3 验收记录（2026-08-15）
+
+- TargetJob 使用 PostgreSQL 部分唯一索引强制每位用户最多一个活跃岗位；服务端将并发冲突转换为可重试业务错误。
+- TargetJob 档案更新会递增 `profileVersion`，准备度响应与 Web 合同返回该版本。
+- 加性 migration 已在隔离 Baseline 与本机开发库执行，迁移状态正常；无正式技能证据时准备度继续返回明确缺失原因，不伪造分数。
+
 ## 团队交叉验收
 
 | 责任 | 审核内容 |
