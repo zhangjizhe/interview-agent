@@ -8,11 +8,27 @@ import { AgentRuntimeService } from './agent-runtime.service';
 import { EvaluationController } from './evaluation.controller';
 import { EvaluationService } from './evaluation.service';
 import { TraceEventService } from './trace-event.service';
+import { ToolApprovalService } from './tool-approval.service';
+import { ToolRunner } from './tool-runner.service';
 
 @Module({
   imports: [PrismaModule, AgentModule],
   controllers: [AgentRegistryController, AgentRuntimeController, EvaluationController],
-  providers: [AgentRegistryService, AgentRuntimeService, EvaluationService, TraceEventService],
-  exports: [AgentRegistryService, AgentRuntimeService, EvaluationService, TraceEventService],
+  providers: [
+    AgentRegistryService,
+    AgentRuntimeService,
+    EvaluationService,
+    TraceEventService,
+    ToolApprovalService,
+    ToolRunner,
+  ],
+  exports: [
+    AgentRegistryService,
+    AgentRuntimeService,
+    EvaluationService,
+    TraceEventService,
+    ToolApprovalService,
+    ToolRunner,
+  ],
 })
 export class AgentLabModule {}

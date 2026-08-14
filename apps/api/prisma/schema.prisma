@@ -151,6 +151,7 @@ model Run {
   agentVersion AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
   traceEvents  TraceEvent[]
   evaluationResults EvaluationResult[]
+  toolApprovals ToolApproval[]
 
   @@index([workspaceId, createdAt])
   @@index([agentId, createdAt])
@@ -194,6 +195,33 @@ enum RunStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum ToolApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
+  CANCELLED
+  TIMED_OUT
+  ERROR
+}
+
+model ToolApproval {
+  id             String             @id @default(cuid())
+  runId          String
+  callId         String
+  toolName       String
+  status         ToolApprovalStatus @default(PENDING)
+  request        Json
+  decision       Json?
+  requestedAt    DateTime           @default(now())
+  resolvedAt     DateTime?
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, callId])
+  @@index([runId, status])
+  @@map("tool_approvals")
 }
 
 model EvaluationDataset {
