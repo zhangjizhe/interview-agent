@@ -1,7 +1,7 @@
 # 重构总纲与迁移程序
 
 最后更新：2026-08-15
-状态：TASK-010 设计完成；B0 验收基线已通过。本文是后续实现的约束，不代表后续批次已经上线。
+状态：TASK-010 设计完成；B0、B1 验收基线已通过。本文是后续实现的约束，不代表后续批次已经上线。
 
 ## 目标方向
 
@@ -102,6 +102,14 @@ Web
 - API 在写入候选人 SSE 前使用白名单；Web 仅处理 `token`、`error` 和完成信号。Agent、工具、检索、模型与 `token_usage` 事件不会进入候选人合同。
 - `pnpm --filter @interview-agent/api run eval:validate` 通过，验证 30 个 Golden Dataset Case 的结构；此检查不调用 Provider，也不构成质量发布门。
 - 完整验证及限制记录在 `docs/ACCEPTANCE-REPORT-2026-08-15.md`。B1 仍被 Production Migration Baseline 的备份、恢复和 Schema 对账前置条件阻塞。
+
+### B1 验收记录（2026-08-15）
+
+- 旧 Prisma 迁移链已移至 `apps/api/prisma/migrations-legacy/` 作为审计材料；活动目录只保留一个由已恢复实际 PostgreSQL Schema 生成的 Baseline。
+- Baseline 明确保留 Prisma datamodel 未表达的历史检查约束、唯一约束和 LangGraph checkpoint 表。后续 Schema 变化必须以新的加性 migration 处理，不得重新生成或改写 Baseline。
+- 已完成源库到隔离恢复库的 Schema 指纹与 22 张表行数对账；空库 Baseline、checkpoint 初始化和 `migrate status` 均通过。
+- Docker Compose 增加独立 migration job。API 启动时不再执行 `db push` 或忽略 DDL 失败，且 `/api/health/ready` 仅在 PostgreSQL、Redis 和 Baseline 均可用时返回 200。
+- 本机开发库已在恢复验证后显式登记 Baseline。生产执行仍要求使用同一备份、恢复、指纹和双人发布程序。
 
 ## 团队交叉验收
 

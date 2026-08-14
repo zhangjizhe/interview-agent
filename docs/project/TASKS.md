@@ -24,6 +24,15 @@
 - 验证：API 23 suites / 235 tests、Cache 22 tests、Web 10 files / 75 tests、API/Web typecheck/build、Golden Dataset 30 Case 结构校验、Docker health 和 10/10 真实浏览器验收通过。
 - 结果：候选人 SSE 不再传递 Agent、工具、检索、模型或 Token 成本事件；真实验收覆盖当前候选人导航和岗位创建。
 
+### TASK-012：B1 Production Migration Baseline
+
+- 状态：2026-08-15 完成
+- 目标：建立可恢复、可审计、fail-closed 的 Prisma Migration Baseline，使后续 Agent Lab 产品化领域变更可安全部署。
+- 范围：Schema/数据指纹、备份恢复演练、单一 Baseline Migration、专用 Migration Job、API 就绪门和受控 Runbook。
+- 非目标：技能聚合、训练推荐、候选人 UI 重做、SSE 断点续传、Agent/Provider/Prompt 行为改造。
+- 依赖：TASK-010/011、当前 Prisma Schema、Docker/PostgreSQL 开发基线。
+- 验证：源库到隔离恢复库 Schema 指纹和 22 张表行数对账通过；空库 Baseline/Checkpoint/`migrate status` 通过；本机显式 Baseline 登记、API 24 suites / 237 tests、Cache 22 tests、API build、Docker migration job 和 readiness 通过。
+
 ## 下一任务
 
 ### TASK-007：训练建议与训练界面

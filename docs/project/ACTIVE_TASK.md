@@ -4,11 +4,11 @@
 
 ## 任务 ID
 
-TASK-011
+TASK-012
 
 ## 目标
 
-完成重构 B0：冻结可执行验收基线，并在 API 与浏览器之间建立候选人 SSE 事件边界。
+完成 B1：建立可恢复、可审计的 Prisma Production Migration Baseline 与 API 就绪门。
 
 ## 状态
 
@@ -16,40 +16,43 @@ TASK-011
 
 ## 范围
 
-- 将 JWT 真实登录、候选人训练导航和岗位设置作为可执行浏览器验收入口。
-- 候选人 SSE 只接收候选可见事件；内部 Agent、工具、检索、模型和成本事件必须在 API 与 Web 双层拦截。
-- 为 Golden Dataset 添加不调用 Provider 的结构校验入口，并记录其不是质量发布门的事实。
-- 更新重构程序、任务列表和交接中的 B0 验收结果。
+- 为 PostgreSQL Schema 指纹、备份和恢复演练提供可复现脚本与 Runbook。
+- 从已验证 Schema 创建单一 Baseline Migration；不伪造旧 Migration 历史。
+- 将 Docker API 的运行时 `db push` 替换为专用 Migration Job 与 fail-closed 就绪门。
+- 验证恢复后旧数据可读、`migrate status` 正常且 Migration 失败时 API 不就绪。
 
 ## 非目标
 
-- 数据库 Migration Baseline、Schema 重建、CandidateSkillState 聚合、训练推荐、SSE 断点续传、额度或支付。
+- CandidateSkillState 聚合、训练推荐、SSE 断点续传、额度或支付。
 - 改变 LangGraph 拓扑、Provider、Prompt、检索和工具执行策略。
+- 在生产数据或未恢复的数据库上执行 destructive migration。
 
 ## 相关文件
 
-- `apps/api/src/modules/interview/controllers/interview-flow.controller.ts`
-- `apps/web/src/hooks/useInterviewStream.ts`
-- `apps/web/e2e/auth-real-acceptance.mjs`
-- `apps/api/src/evals/`
-- `apps/api/package.json`
+- `apps/api/prisma/schema.prisma`
+- `apps/api/prisma/migrations/`
+- `apps/api/docker-entrypoint.sh`
+- `apps/api/Dockerfile`
+- `docker-compose.yml`
+- `scripts/`
+- `docs/runbook.md`
 - `docs/product/REFACTOR_PROGRAM.md`
 
 ## 验收标准
 
-- 真实登录浏览器脚本在当前候选人导航下完成登录、岗位创建、用户/管理员隔离和移动端检查。
-- SSE 响应与客户端状态中没有候选人不可见事件；错误与完成事件继续可用。
-- Golden Dataset 可在无 Provider 的情况下执行结构校验。
-- API/Web 测试、类型检查、构建、Docker 健康和 B0 浏览器验收有记录。
+- 备份和恢复脚本能在隔离 PostgreSQL 中验证 Schema 与数据指纹。
+- Baseline Migration 由受控 Migration Job 执行，API 运行时不再拥有/调用 DDL 同步。
+- `migrate status`、API 就绪检查和旧面试数据读取均有可复现记录。
+- API/Web 测试、类型检查、构建、Docker 健康和 B1 迁移演练有记录。
 
 ## 已知风险
 
-- 真实浏览器验收会创建有界测试账号和岗位数据；必须使用随机标识且不得记录个人数据。
-- 本机 Docker Web 镜像需要重建后，生产静态入口才包含当前候选人导航。
+- 现有本机开发数据库没有 Prisma Migration History；不得将 `db push` 或 `migrate resolve` 作为生产 Baseline 替代。
+- 本机 Docker 数据仅用于演练；任何生产执行需要独立备份、恢复验证和发布负责人批准。
 
 ## 交付结果
 
-- 候选人 SSE 在 API 与 Web 双层采用显式事件白名单。`token_usage` 仅保留在受保护的持久化成本记录中，不再发送给浏览器。
-- 真实浏览器验收覆盖 JWT 登录、候选人首页、目标岗位创建、USER/ADMIN 路由隔离和移动端登录页。
-- Golden Dataset 结构校验可在无 Provider 情况下运行；它只验证数据合同，不代表模型质量或发布批准。
-- 2026-08-15 验证：API 23 suites / 235 tests，Cache 22 tests，Web 10 files / 75 tests，API/Web typecheck 与 build，Docker health 和 10/10 浏览器检查均通过。
+- 活动 Prisma 迁移目录仅保留经恢复验证的 `20260815000000_production_baseline`；旧链保留在审计目录。
+- 源库恢复至隔离 PostgreSQL 后，Schema 指纹与 22 张表行数均一致；空库 Baseline、checkpoint 与 Prisma 状态均通过。
+- 本机开发数据库在上述验证后显式登记 Baseline；Docker 独立 migration job 成功后 API 才启动。
+- API readiness 现在验证 PostgreSQL、Redis 和 Baseline，并在任一失败时返回脱敏的 503。

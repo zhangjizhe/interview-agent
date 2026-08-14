@@ -53,4 +53,4 @@
 - 2026-08-14 已完成目标岗位、文本 JD 导入和准备度 API。准备度只在当前目标岗位具备简历、成功 FINAL 评价、岗位要求和正式技能状态时计算；否则返回显式缺失原因和 `overallScore: null`。
 - 2026-08-14 已完成候选人训练平台前端壳：岗位设置、准备度首页、面试记录和评价失败恢复已使用真实 API 合同。Docker API 镜像已验证在 Nest 编译前生成 Prisma Client，本机开发数据库已按授权通过 `db push` 同步 Schema，目标岗位路由可用；认证后的创建路径仍需用可复现测试账户完成浏览器验收。
 - 2026-08-15 已完成 B0 验收基线：候选人 SSE 仅接收文本、可操作错误和完成信号；内部 Agent、工具、检索、模型与 Token 成本事件均在 API/Web 双层过滤。真实浏览器验收覆盖随机用户登录、岗位创建、USER/ADMIN 隔离和移动端登录。
-- Prisma Migration History Baseline 仍未建立。生产部署必须使用审计、备份和受控 Baseline Procedure，不能以本机 Docker 的 `db push --accept-data-loss` 作为替代。
+- 2026-08-15 已完成 B1 Prisma Migration Baseline：当前实际 PostgreSQL Schema（包括历史约束与 LangGraph checkpoint 表）已通过隔离恢复、Schema 指纹和 22 张表行数对账。活动迁移目录只保留单一 Baseline；Docker 独立 migration job 成功后 API 才启动，`/api/health/ready` 会检查 Baseline。生产仍须重复受控备份/恢复程序，不能将本机演练当作生产发布批准。

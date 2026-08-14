@@ -34,7 +34,6 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MultiAgentService.name);
   private graph: ReturnType<typeof buildInterviewGraph> | null = null;
   private checkpointer: BaseCheckpointSaver | null = null;
-  private checkpointerSetupDone = false;
   private enabled = false;
 
   constructor(
@@ -83,17 +82,14 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
 
       try {
         this.checkpointer = PostgresSaver.fromConnString(connString, { schema: 'public' });
-        await (this.checkpointer as any).setup();
-        this.checkpointerSetupDone = true;
-        this.logger.log(`✅ PostgresSaver ready (${connString.replace(/:[^:@]+@/, ':***@')})`);
+        this.logger.log(`✅ PostgresSaver connected (${connString.replace(/:[^:@]+@/, ':***@')})`);
       } catch (cpErr: any) {
-        this.logger.error(`PostgresSaver init failed, falling back to no-checkpoint: ${cpErr.message}`);
-        this.checkpointer = null;
+        throw new Error(`PostgresSaver connection failed after migration job: ${cpErr.message}`);
       }
 
-      this.graph = buildInterviewGraph(model, this.checkpointer || undefined);
+      this.graph = buildInterviewGraph(model, this.checkpointer);
       this.enabled = true;
-      this.logger.log(`✅ MultiAgent graph compiled (provider=${providerName}, llmGateway=ON, checkpoint=${this.checkpointer ? 'postgres' : 'none'})`);
+      this.logger.log(`✅ MultiAgent graph compiled (provider=${providerName}, llmGateway=ON, checkpoint=postgres)`);
     } catch (err: any) {
       this.logger.error(`MultiAgent init failed: ${err.message}`);
     }

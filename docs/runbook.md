@@ -7,10 +7,31 @@
 
 ## 目录
 
+- [数据库 Migration Baseline](#数据库-migration-baseline)
 - [故障 1：JWT_SECRET 报错（启动失败）](#故障-1jwt_secret-报错启动失败)
 - [故障 2：Milvus 连接失败（readiness 503）](#故障-2milvus-连接失败readiness-503)
 - [故障 3：LLM 5xx（502/503 ExternalServiceError）](#故障-3llm-5xx502503-externalserviceerror)
 - [故障 4：Rate Limit 触发（429）](#故障-4rate-limit-触发429)
+
+---
+
+## 数据库 Migration Baseline
+
+生产数据库迁移必须在 API 启动前由独立 migration job 完成。禁止在 API entrypoint、Web、业务 Agent
+或临时脚本中执行 `db push`、`migrate reset` 或忽略 migration 错误。
+
+### 首次 Baseline
+
+1. 冻结写入，保存镜像摘要、向量库/缓存副本清单和当前 Schema 指纹。
+2. 使用 `scripts/db/snapshot.sh` 创建逻辑备份；备份不得提交、上传到日志或包含在验收产物中。
+3. 使用 `scripts/db/verify-restore.sh` 恢复到隔离 PostgreSQL，并对账 Schema 指纹与表行数。
+4. 设置 `CONFIRM_PRODUCTION_BASELINE=20260815000000_production_baseline` 和经验证的
+   `EXPECTED_SCHEMA_SHA256`，再运行 `scripts/db/mark-baseline-applied.sh`。
+5. 由 migration job 运行 `prisma migrate deploy`、LangGraph checkpoint 初始化和 `prisma migrate status`。
+6. 只在 job 成功、`/api/health/ready` 返回 200、历史面试/报告读取回归通过后再启动 API 流量。
+
+失败、Schema 漂移、恢复行数不一致或 readiness 非 200 时立即停止。回滚通过保留的恢复副本和兼容读路径完成，
+不得通过回滚已写 migration 或重新启用 API `db push` 处理。
 
 ---
 

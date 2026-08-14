@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { RedisService } from '../infra/redis/redis.service';
 import { Public } from '../modules/auth/public.decorator';
@@ -33,7 +33,7 @@ export class HealthController {
       await this.prisma.$queryRaw`SELECT 1`;
       checks.postgres = 'ok';
     } catch (e: any) {
-      checks.postgres = `fail: ${e.message}`;
+      checks.postgres = 'fail';
       ok = false;
     }
 
@@ -42,12 +42,35 @@ export class HealthController {
       await this.redis.getClient().ping();
       checks.redis = 'ok';
     } catch (e: any) {
-      checks.redis = `fail: ${e.message}`;
+      checks.redis = 'fail';
+      ok = false;
+    }
+
+    try {
+      const baseline = await this.prisma.$queryRaw<Array<{ applied: number }>>`
+        SELECT COUNT(*)::int AS "applied"
+        FROM "_prisma_migrations"
+        WHERE "migration_name" = '20260815000000_production_baseline'
+          AND "finished_at" IS NOT NULL
+          AND "rolled_back_at" IS NULL
+      `;
+      if (baseline[0]?.applied === 1) {
+        checks.migration = 'ok';
+      } else {
+        checks.migration = 'fail';
+        ok = false;
+      }
+    } catch {
+      checks.migration = 'fail';
       ok = false;
     }
 
     if (!ok) {
-      return { status: 'not_ready', checks, timestamp: new Date().toISOString() };
+      throw new ServiceUnavailableException({
+        status: 'not_ready',
+        checks,
+        timestamp: new Date().toISOString(),
+      });
     }
     return { status: 'ready', checks, timestamp: new Date().toISOString() };
   }

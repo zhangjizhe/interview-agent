@@ -1,6 +1,6 @@
 # 架构地图
 
-最后更新：2026-08-14
+最后更新：2026-08-15
 权威范围：当前默认 NestJS 路径。本文件区分已交付架构和规划能力，不将 `apps/py-api` 视为生产依赖。
 
 ## 在线运行时
@@ -9,6 +9,7 @@
 候选人或管理员
   -> React Web（apps/web）
   -> NestJS API /api（apps/api）
+     -> 独立 Migration Job 完成 Baseline / Checkpoint 初始化
      -> JWT Guard、RBAC、资源归属、校验、限流/成本边界
      -> Interview Lifecycle 与 SSE Flow Controller
   -> InterviewAgentService
@@ -89,5 +90,6 @@ Agent/Prompt Version Registry
 - Provider Key 和外部 MCP 配置不能进入源码。
 - `EvaluationRun` 是完整评价历史；`Report` 仅是当前候选人展示快照。PREVIEW/PRACTICE 不得写入正式 Report 或技能状态。
 - `JobReadinessService` 只读取当前目标岗位、可检索简历、成功 FINAL EvaluationRun 和其正式技能状态；JD 使用本地有界关键词映射，不调用模型。
-- API Docker 镜像必须在 Nest 编译前运行 `prisma generate`，使新增模型和枚举进入编译时 Prisma Client。开发容器现有 `db push` 仅用于本机 Schema 同步，不能代替生产 Migration Baseline。
+- API Docker 镜像必须在 Nest 编译前运行 `prisma generate`，使新增模型和枚举进入编译时 Prisma Client。DDL 仅由独立 migration job 执行；API entrypoint 不执行 `db push`、`migrate deploy` 或 checkpoint setup。
+- `/api/health/ready` 必须同时验证 PostgreSQL、Redis 和已完成的 Baseline；依赖或 migration 不可用时返回 503，不能将原始错误发送给客户端。
 - 架构改动只有在代码和测试证明后才更新本地图。

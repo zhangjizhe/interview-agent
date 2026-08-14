@@ -107,6 +107,23 @@ services:
       retries: 8
       start_period: 90s
 
+  # Prisma DDL is isolated from the API runtime. It must finish successfully
+  # before the API becomes eligible to start.
+  migration:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: interview-migration
+    entrypoint: ["/usr/local/bin/migration-entrypoint.sh"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev123}@postgres:5432/interview
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   # NestJS 后端（2026-06-26 恢复为默认后端，端口 3001）
   # apps/api/（之前 apps/api-legacy/）git rename 回原路径
   api:
@@ -129,7 +146,6 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       MEM0_API_KEY: ${MEM0_API_KEY:-}
       MEM0_HOST: ${MEM0_HOST:-}
-      # 商用 fail-fast：JWT_SECRET 未设置时 docker compose 立即报错（容器不启动）
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (deploy.sh 自动生成 dev 占位)}
       ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
       PORT: 3001
@@ -137,16 +153,15 @@ services:
     env_file:
       - .env
     depends_on:
-      postgres:
-        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
       redis:
         condition: service_started
       milvus:
         condition: service_healthy
     healthcheck:
       # node 18+ 内置 fetch，不依赖 curl
-      # NestJS 用 setGlobalPrefix('api')，所以路径是 /api/health 不是 /health
-      test: ['CMD-SHELL', "node -e \"fetch('http://localhost:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ['CMD-SHELL', "node -e \"fetch('http://localhost:3001/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
       timeout: 10s
       retries: 15

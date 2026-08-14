@@ -64,3 +64,13 @@
 - 原因：保留 Prompt/Model 降级、重跑和评分口径变化的可审计历史，同时避免破坏现有 `Report.interviewId` 唯一约束。
 - 替代方案：只用 evaluator/rubric 版本做幂等；将 `Report` 改为多版本历史表；继续用 upsert 覆盖报告。
 - 取舍：增加定义、运行与快照之间的迁移和查询复杂度，但不丢失历史，也避免不同模型或 Prompt 错误命中同一运行。
+
+## ADR-CTX-004：实际 Schema 基线与独立 Migration Job
+
+- 日期：2026-08-15
+- 状态：已接受
+- 背景：开发数据库存在业务表和 LangGraph checkpoint 表，但没有 `_prisma_migrations`；旧迁移链包含空目录且无法精确重建实际应用 Schema，API entrypoint 曾以 `db push ... || true` 隐藏失败。
+- 决策：以完成恢复演练的实际 PostgreSQL Schema 生成单一 Baseline，并保留旧链为审计资料。Docker 的 migration job 运行 `migrate deploy`、checkpoint 初始化和 `migrate status`；API 运行时不再拥有 DDL 初始化职责。
+- 原因：数据库事实可恢复、可验证且不能被静默同步。Checkpoint 是运行前置，不得依赖 API 请求路径临时建表。
+- 替代方案：继续使用旧 migration 链、以 `migrate resolve` 标记旧文件、保留 API `db push`、让 MultiAgentService 在启动时调用 checkpoint setup。
+- 取舍：本机已有库需在备份、恢复、指纹与数据对账后显式登记 Baseline；后续 datamodel 与历史物理约束的差异必须以加性 migration 收敛。

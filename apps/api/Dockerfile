@@ -32,6 +32,7 @@ COPY apps/api/src ./apps/api/src
 COPY apps/api/tsconfig*.json ./apps/api/
 COPY apps/api/nest-cli.json ./apps/api/
 COPY apps/api/config ./apps/api/config
+COPY apps/api/scripts ./apps/api/scripts
 COPY apps/api/knowledge-base.json ./apps/api/knowledge-base.json
 COPY packages/shared-types ./packages/shared-types
 
@@ -39,9 +40,10 @@ COPY packages/shared-types ./packages/shared-types
 WORKDIR /app/apps/api
 RUN ./node_modules/.bin/nest build
 
-# entrypoint
+# Runtime entrypoints
 COPY apps/api/docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY apps/api/migration-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/migration-entrypoint.sh
 
 # ===== Runtime stage =====
 # 不装 g++/make/python3，只装运行时需要的 openssl + curl
@@ -62,6 +64,7 @@ COPY --from=builder /app/apps/api/node_modules /app/apps/api/node_modules
 COPY --from=builder /app/apps/api/prisma /app/apps/api/prisma
 COPY --from=builder /app/apps/api/package.json /app/apps/api/package.json
 COPY --from=builder /app/apps/api/config /app/apps/api/config
+COPY --from=builder /app/apps/api/scripts /app/apps/api/scripts
 COPY --from=builder /app/apps/api/knowledge-base.json /app/apps/api/knowledge-base.json
 COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/packages /app/packages
@@ -69,6 +72,7 @@ COPY --from=builder /app/pnpm-workspace.yaml /app/
 COPY --from=builder /app/package.json /app/
 COPY --from=builder /app/.npmrc /app/
 COPY --from=builder /usr/local/bin/docker-entrypoint.sh /usr/local/bin/
+COPY --from=builder /usr/local/bin/migration-entrypoint.sh /usr/local/bin/
 
 WORKDIR /app/apps/api
 
