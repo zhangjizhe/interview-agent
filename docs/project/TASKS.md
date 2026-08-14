@@ -1,10 +1,10 @@
 # 任务列表
 
-最后更新：2026-08-14
+最后更新：2026-08-15
 
 ## 当前
 
-当前活跃任务：TASK-011。该任务完成重构 B0 的可执行验收基线与候选人 SSE 事件边界；开始任何后续批次前，必须在 `ACTIVE_TASK.md` 认领且仅认领一个后续任务。
+当前没有活跃任务。开始后续批次前，必须在 `ACTIVE_TASK.md` 认领且仅认领一个任务。
 
 ### TASK-010：重构基线与迁移设计
 
@@ -16,11 +16,13 @@
 
 ### TASK-011：B0 验收基线与候选事件边界
 
-- 状态：进行中
+- 状态：2026-08-15 完成
 - 目标：让 JWT 真实登录浏览器验收、候选人 SSE 白名单和 Golden Dataset 结构校验成为可执行的重构起点。
 - 范围：浏览器验收脚本、SSE API/Web 合同、离线数据集校验入口与 B0 证据记录。
 - 非目标：数据库 Baseline、技能聚合、训练推荐、SSE 断点续传、Agent/Prompt/Provider 改造。
 - 依赖：TASK-010 重构程序、现有 Docker/API/Web 基线。
+- 验证：API 23 suites / 235 tests、Cache 22 tests、Web 10 files / 75 tests、API/Web typecheck/build、Golden Dataset 30 Case 结构校验、Docker health 和 10/10 真实浏览器验收通过。
+- 结果：候选人 SSE 不再传递 Agent、工具、检索、模型或 Token 成本事件；真实验收覆盖当前候选人导航和岗位创建。
 
 ## 下一任务
 

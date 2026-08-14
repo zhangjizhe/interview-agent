@@ -1,67 +1,61 @@
 # 任务交接
 
-最后更新：2026-08-14
+最后更新：2026-08-15
 
 ## 上一任务
 
-TASK-006：训练平台前端壳
+TASK-011：B0 验收基线与候选事件边界
 
 ## 已完成
 
-- 新增候选人 Web Shell，主导航为首页、面试记录和岗位设置；旧工具/Token 优先首页已替换。
-- 新增 TargetJob/JD 设置页，可创建、编辑、切换当前岗位。
-- 首页读取真实 TargetJob、Readiness、简历和面试记录 API。准备度不可用时显示证据不足与 API 返回的缺失原因，不伪造分数。
-- 上传简历后通过已有 `start` API 按当前 `targetJobId` 创建面试。
-- 面试记录支持继续进行中会话、打开已有评价，或在已结束无 Report 时重试最终评价。
-- 面试页面不再向候选人展示 Token、工具、MCP、Agent 调用、模型、提示词、追踪信息或内部复核的评分/操作。
-- 新增 Web 训练合同测试，覆盖证据不足与评价失败恢复映射。
-- 修复 API Docker 构建顺序：在 Nest 编译前生成 Prisma Client；新 Schema 的枚举和模型不再使镜像构建失败。
+- API 候选 SSE 在写入响应前将 Agent 事件收敛为文本与安全错误；`token_usage` 仅持久化，不发送到浏览器。
+- Web 流式 Hook 只处理 `token`、`error` 与完成信号，并拒绝工具、检索、Agent、模型和成本事件。
+- 真实浏览器验收已适配候选人首页和岗位设置，覆盖随机用户注册/登录、岗位创建、用户管理员隔离、管理员 MCP 页面和移动端。
+- Golden Dataset 增加无 Provider 的结构校验入口，验证 30 个 Case 的 Schema。
 
 ## 改动文件
 
-- `apps/web/src/App.tsx`
-- `apps/web/src/components/AppShell.tsx`
-- `apps/web/src/pages/HomePage.tsx`
-- `apps/web/src/pages/SettingsPage.tsx`
-- `apps/web/src/pages/InterviewPage.tsx`
-- `apps/web/src/utils/training.ts`
-- `apps/web/src/pages/HomePage.test.tsx`
-- `apps/web/src/utils/training.test.ts`
+- `apps/api/src/modules/interview/controllers/interview-flow.controller.ts`
+- `apps/api/src/modules/interview/services/candidate-stream-event.util.ts`
+- `apps/api/src/__tests__/candidate-stream-event.util.spec.ts`
+- `apps/web/src/hooks/useInterviewStream.ts`
+- `apps/web/src/utils/candidateEvents.ts`
+- `apps/web/src/utils/candidateEvents.test.ts`
+- `apps/web/e2e/auth-real-acceptance.mjs`
+- `apps/api/package.json`
+- `docs/ACCEPTANCE-REPORT-2026-08-15.md`
 - `docs/project/CURRENT_STATE.md`
-- `docs/project/ARCHITECTURE_MAP.md`
-- `docs/project/TASKS.md`
 - `docs/project/ACTIVE_TASK.md`
-- `docs/project/CHANGELOG.md`
-- `docs/project/THREAD_HANDOFF.md`
+- `docs/project/TASKS.md`
+- `docs/product/REFACTOR_PROGRAM.md`
 
 ## 重要决策
 
-- 候选人 Web 必须把 Readiness API 的 `available`、`missingReasons` 和 `confidence` 作为事实来源；没有证据不能用静态卡片或历史 Token/次数替代。
-- 候选人面试与报告界面不应成为 Agent 的调试控制台。内部调用信息保留给受保护的维护路径。
-- 评价恢复复用既有 `POST /interview/:id/end` 与最终评估幂等逻辑；本任务未新增或改变评价、SSE、模型或 Prompt 合同。
+- 候选人可见 SSE 是公开产品合同，而非 Agent 事件的透传通道；仅文本、可操作错误和完成信号可跨越 API 边界。
+- Golden Dataset 的结构校验不调用 Provider，只能防止数据合同损坏，不能证明评估质量。
+- 真实浏览器验收可以创建随机测试账号及其岗位，但不得把这些标识写入交接或提交。
 
 ## 当前状态
 
-候选人可在 Web 中建立和切换目标岗位，查看透明准备度摘要，开始关联岗位的模拟面试，并从面试记录恢复评价失败。CandidateSkillState 尚未由正式评价自动聚合，因此当前正常用户会看到证据不足状态，这是预期且诚实的行为。
-本机 Docker API 已重建、健康检查通过，目标岗位路由已注册；用户已授权本机开发数据库的 Schema 同步。
+重构 B0 已完成。API 23 suites / 235 tests、Cache 22 tests、Web 10 files / 75 tests、API/Web typecheck/build、Golden Dataset 结构校验、Docker health 与 10/10 真实浏览器检查均已通过。
 
 ## 已知问题
 
 - 本机 PostgreSQL 已有业务表但没有 Prisma migration 基线，`prisma migrate deploy` 返回 `P3005`，未执行任何 Migration。先完成 Schema 审计、备份和受控 Baseline Procedure，禁止直接标记历史迁移已应用。
 - Docker EntryPoint 仍使用 `prisma db push --accept-data-loss`。它只可在授权的本机开发恢复中使用，生产部署必须替换为受控 Migration Baseline Procedure。
-- ResumeRAG 不是版本化简历存储；准备度目前只判断当前可检索简历是否存在。
-- 生产技能状态聚合、趋势、训练推荐和训练界面尚未实现。
-- 本地 `.pnpm-store/` 是前序包管理器尝试重装产生的未跟踪缓存，不纳入交付。
+- B1 Production Migration Baseline 仍须先完成备份、恢复、Schema 指纹对账和专用 Migration Job。
+- CandidateSkillState 生产聚合、趋势、训练推荐和训练界面尚未实现。
+- SSE 仍不支持 Event ID/Offset 断点续传，这属于 B4 的独立范围。
 
 ## 推荐下一任务
 
-TASK-007：训练建议与训练界面。
+TASK-B1：Production Migration Baseline。
 
 ## 所需上下文
 
-按 `AGENTS.md` 读取核心顺序，再读取 `docs/agent/SKILL_MODEL.md`、`docs/agent/QUESTION_INTELLIGENCE.md`、`docs/product/SCREEN_SPEC.md`、正式评价服务、CandidateSkillState Schema、当前 Web Route 和浏览器验收。
+按 `AGENTS.md` 读取核心顺序，再读取 `docs/product/REFACTOR_PROGRAM.md`、Prisma Schema、Docker EntryPoint、备份/恢复 Runbook 与当前数据库指纹。
 
 ## 风险
 
-- CandidateSkillState 还没有生产聚合来源，训练推荐不能据此伪造弱项或计划。
-- 不得把训练建议、SSE 改版、Quota 或 Billing 合并到同一任务。
+- 不能用本机 `db push --accept-data-loss` 或无 `_prisma_migrations` 的数据库替代生产 Baseline。
+- 后续任务不得改变 B0 SSE 白名单或把内部运行事件重新暴露给候选人。

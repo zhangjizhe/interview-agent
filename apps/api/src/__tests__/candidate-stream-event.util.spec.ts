@@ -6,7 +6,7 @@ describe('candidate stream event boundary', () => {
       .toEqual({ type: 'token', content: '请介绍你的项目。' });
   });
 
-  it.each(['thinking', 'meta', 'tool_call', 'tool_result', 'searching', 'recalling', 'token_usage'])(
+  it.each(['thinking', 'meta', 'tool_call', 'tool_result', 'searching', 'recalling', 'token_usage', 'final_response'])(
     'drops internal %s events',
     (type) => expect(toCandidateStreamEvent({ type, content: 'internal detail' })).toBeNull(),
   );

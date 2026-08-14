@@ -6,7 +6,7 @@ describe('candidate event boundary', () => {
     expect(isCandidateVisibleAgentEvent({ type } as any)).toBe(true);
   });
 
-  it.each(['thinking', 'meta', 'tool_call', 'tool_result', 'searching', 'recalling', 'token_usage'])(
+  it.each(['thinking', 'meta', 'tool_call', 'tool_result', 'searching', 'recalling', 'token_usage', 'final_response'])(
     'drops internal %s events',
     (type) => expect(isCandidateVisibleAgentEvent({ type } as any)).toBe(false),
   );

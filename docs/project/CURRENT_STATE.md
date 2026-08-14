@@ -1,6 +1,6 @@
 # 当前状态
 
-最后审计：2026-08-14
+最后审计：2026-08-15
 事实来源：仓库代码、Package Manifest、Prisma Schema 和 2026-08-12 验收证据。状态只描述已交付代码，不描述未来设计。
 
 | 领域 | 状态 | 当前事实 |
@@ -19,7 +19,7 @@
 | Billing/Quota/Entitlement | 计划中 | 没有 Usage Ledger、Quota Enforcement、Plan Model 或 Payment Integration。 |
 | Skill Map 与 Training Plan | 部分实现 | SkillDefinition、TargetJob、JobSkillRequirement、CandidateSkillState Schema 与受保护 API 已存在；目标岗位/JD 与准备度 API 已实现，但生产技能状态聚合、趋势和训练用户流程尚未完成。 |
 | Mobile/小程序 | 计划中 | 当前 Web 有响应式；没有独立小程序客户端。 |
-| 自动化测试 | 已实现 | API Jest/Unit Test、Web Vitest、Playwright/浏览器和 Content Workflow 验收资产已配置。 |
+| 自动化测试 | 已实现 | API Jest/Unit Test、Web Vitest、Playwright/浏览器和 Content Workflow 验收资产已配置；B0 真实登录与岗位创建浏览器验收已可执行。 |
 | 产品设计包 | 已实现 | 2026-08-13 已审计并建立 P0 产品、Agent、Harness 规格；未改变运行时行为。 |
 
 ## 已验证基线
@@ -52,4 +52,5 @@
 - 2026-08-13 已完成 P0-1 Schema、Migration、最终评估运行/展示快照边界和基础 API；本机 PostgreSQL 因没有 Prisma migration 基线触发 `P3005`，Migration 尚未执行，生产流尚未聚合 CandidateSkillState。
 - 2026-08-14 已完成目标岗位、文本 JD 导入和准备度 API。准备度只在当前目标岗位具备简历、成功 FINAL 评价、岗位要求和正式技能状态时计算；否则返回显式缺失原因和 `overallScore: null`。
 - 2026-08-14 已完成候选人训练平台前端壳：岗位设置、准备度首页、面试记录和评价失败恢复已使用真实 API 合同。Docker API 镜像已验证在 Nest 编译前生成 Prisma Client，本机开发数据库已按授权通过 `db push` 同步 Schema，目标岗位路由可用；认证后的创建路径仍需用可复现测试账户完成浏览器验收。
+- 2026-08-15 已完成 B0 验收基线：候选人 SSE 仅接收文本、可操作错误和完成信号；内部 Agent、工具、检索、模型与 Token 成本事件均在 API/Web 双层过滤。真实浏览器验收覆盖随机用户登录、岗位创建、USER/ADMIN 隔离和移动端登录。
 - Prisma Migration History Baseline 仍未建立。生产部署必须使用审计、备份和受控 Baseline Procedure，不能以本机 Docker 的 `db push --accept-data-loss` 作为替代。

@@ -251,14 +251,9 @@ export class InterviewFlowController {
             completionTokens: totalCompletion,
           },
         });
-        await writeEvent({
-          type: 'token_usage',
-          promptTokens: totalPrompt,
-          completionTokens: totalCompletion,
-          total: totalPrompt + totalCompletion,
-        });
       }
 
+      // Token 用量仅持久化在受保护的成本记录中，不进入候选人 SSE 合同。
       // 2026-06-23 修复：等 [DONE] 真正 flush 到 TCP 再 res.end()
       // 之前的 res.end() 是异步的,不等 res.write 完成,客户端可能 fetch done=true
       // 早于 [DONE] 到达,前端 setStreaming(false) 路径失效,按钮一直 loading。
