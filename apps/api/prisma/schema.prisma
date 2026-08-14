@@ -36,6 +36,7 @@ model Workspace {
 
   members WorkspaceMember[]
   agents  Agent[]
+  runs    Run[]
 
   @@index([ownerId])
   @@map("workspaces")
@@ -76,6 +77,7 @@ model Agent {
   workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   versions       AgentVersion[] @relation("AgentVersions")
   currentVersion AgentVersion?  @relation("CurrentAgentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  runs           Run[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, updatedAt])
@@ -101,6 +103,7 @@ model AgentVersion {
 
   currentForAgents Agent[] @relation("CurrentAgentVersion")
   parentAgent      Agent   @relation("AgentVersions", fields: [agentId], references: [id], onDelete: Cascade)
+  runs             Run[]
 
   @@unique([agentId, version])
   @@index([agentId, createdAt])
@@ -117,6 +120,66 @@ enum AgentVersionStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+model Run {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  agentId        String
+  agentVersionId String
+  application    String?
+  externalRunId  String?
+  input          Json
+  output         Json?
+  status         RunStatus @default(PENDING)
+  latencyMs      Int?
+  tokenUsage     Json?
+  estimatedCost  Float?
+  error          String?   @db.Text
+  createdAt      DateTime  @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent        Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  traceEvents  TraceEvent[]
+
+  @@index([workspaceId, createdAt])
+  @@index([agentId, createdAt])
+  @@index([agentVersionId, createdAt])
+  @@index([externalRunId])
+  @@map("runs")
+}
+
+model TraceEvent {
+  id            String   @id @default(cuid())
+  runId         String
+  sequence      Int
+  type          String
+  name          String
+  input         Json?
+  output        Json?
+  metadata      Json?
+  latencyMs     Int?
+  tokenUsage    Json?
+  estimatedCost Float?
+  error         String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sequence])
+  @@index([runId, sequence])
+  @@map("trace_events")
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
 }
 
 enum UserRole {
