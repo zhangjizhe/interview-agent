@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import { EvaluationMode } from '@prisma/client';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
+import { SkillStateAggregationService } from './skill-state-aggregation.service';
 
 export interface FinalReportPayload {
   overallScore: number;
@@ -19,6 +20,7 @@ export class EvaluationService {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private skillStateAggregation: SkillStateAggregationService,
   ) {}
 
   async beginFinalEvaluation(interviewId: string) {
@@ -146,6 +148,15 @@ export class EvaluationService {
           status: 'SUCCEEDED',
           reportPayload: reportPayload as any,
           completedAt: new Date(),
+        },
+      });
+
+      await this.skillStateAggregation.aggregateFinalRun(tx, {
+        id: run.id,
+        interviewId: run.interviewId,
+        interview: {
+          userId: run.interview.userId,
+          targetJobId: run.interview.targetJobId,
         },
       });
 

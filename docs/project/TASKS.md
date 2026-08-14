@@ -33,6 +33,15 @@
 - 依赖：TASK-010/011、当前 Prisma Schema、Docker/PostgreSQL 开发基线。
 - 验证：源库到隔离恢复库 Schema 指纹和 22 张表行数对账通过；空库 Baseline/Checkpoint/`migrate status` 通过；本机显式 Baseline 登记、API 24 suites / 237 tests、Cache 22 tests、API build、Docker migration job 和 readiness 通过。
 
+### TASK-013：B2 正式评价与技能状态聚合
+
+- 状态：2026-08-15 完成
+- 目标：在 FINAL EvaluationRun 成功时，以可追溯、幂等和事务性的方式更新 CandidateSkillState。
+- 范围：权威评价服务、技能聚合、失败/降级隔离、来源合同、测试与 Harness 结构验证。
+- 非目标：旧历史回填、训练推荐、候选人 UI 重做、面试模式、Provider/Prompt/Graph 改造。
+- 依赖：TASK-012 Baseline、EvaluationRun/AssessmentEvidence/CandidateSkillState Schema 与现有 Evaluation Service。
+- 验证：FINAL 事务聚合、同源重试、无目标岗位/无分数隔离、失败 Final Run 和外部关系筛选合同测试通过；API 25 suites / 241 tests、Cache 22 tests、Golden Dataset 30 Case 结构校验、typecheck/build 通过。
+
 ## 下一任务
 
 ### TASK-007：训练建议与训练界面

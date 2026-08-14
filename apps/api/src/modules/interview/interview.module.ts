@@ -23,6 +23,7 @@ import { ScoringService } from './services/scoring.service';
 import { HitlService } from './services/hitl.service';
 import { EvaluationService } from './services/evaluation.service';
 import { JobReadinessService } from './services/job-readiness.service';
+import { SkillStateAggregationService } from './services/skill-state-aggregation.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 
 @Module({
@@ -50,6 +51,7 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
     QuestionGeneratorService,
     ScoringService,
     EvaluationService,
+    SkillStateAggregationService,
     JobReadinessService,
     // RagService 已删除（2026-06-25 dead code 清理）
     HitlService,
@@ -62,6 +64,7 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
     QuestionGeneratorService,
     ScoringService,
     EvaluationService,
+    SkillStateAggregationService,
     JobReadinessService,
     HitlService,
   ],

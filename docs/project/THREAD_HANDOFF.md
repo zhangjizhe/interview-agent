@@ -4,27 +4,22 @@
 
 ## 上一任务
 
-TASK-012：B1 Production Migration Baseline
+TASK-013：B2 正式评价与技能状态聚合
 
 ## 已完成
 
-- 源开发库已通过隔离恢复演练；Schema 指纹和 22 张表行数均与恢复库一致。
-- 活动 Prisma 迁移目录只保留 `20260815000000_production_baseline`；旧迁移链已移至 `migrations-legacy` 审计目录。
-- Docker migration job 执行 `migrate deploy`、LangGraph checkpoint 初始化和 `migrate status`，API 不再执行或忽略 DDL。
-- API readiness 现在要求 PostgreSQL、Redis 和 Baseline 均通过；失败时返回 503 且不泄露依赖错误。
+- 新增独立技能状态聚合服务，由 Final Evaluation 的 Prisma transaction 调用。
+- 仅当前用户、目标岗位、成功 FINAL EvaluationRun 中具有 `skillId` 与分数的 Evidence 可重算 CandidateSkillState。
+- 聚合按全部有效 Evidence 重算分数、置信度和证据数，不通过内存计数累加；同一 source run 重试不会污染趋势。
+- PREVIEW、PRACTICE、FAILED、DEGRADED 和无归属证据不写入正式技能状态。
 
 ## 改动文件
 
-- `apps/api/prisma/migrations/`
-- `apps/api/prisma/migrations-legacy/`
-- `apps/api/migration-entrypoint.sh`
-- `apps/api/docker-entrypoint.sh`
-- `apps/api/scripts/setup-checkpointer.mjs`
-- `apps/api/src/common/health.controller.ts`
-- `apps/api/src/modules/agent/multi-agent.service.ts`
-- `apps/api/src/__tests__/health.controller.spec.ts`
-- `scripts/db/`
-- `docker-compose.yml`
+- `apps/api/src/modules/interview/services/skill-state-aggregation.service.ts`
+- `apps/api/src/modules/interview/services/evaluation.service.ts`
+- `apps/api/src/modules/interview/interview.module.ts`
+- `apps/api/src/__tests__/skill-state-aggregation.service.spec.ts`
+- `apps/api/src/__tests__/evaluation.service.spec.ts`
 - `docs/project/CURRENT_STATE.md`
 - `docs/project/ACTIVE_TASK.md`
 - `docs/project/TASKS.md`
@@ -32,28 +27,28 @@ TASK-012：B1 Production Migration Baseline
 
 ## 重要决策
 
-- Baseline 必须从恢复验证后的实际 Schema 生成，而非从不可信历史迁移链或 `db push` 推断。
-- API runtime 不承担 Prisma 或 LangGraph checkpoint DDL；migration job 是唯一部署初始化路径。
-- Prisma datamodel 未表达的历史约束属于 Baseline 事实，后续必须通过加性 migration 显式收敛。
+- 正式技能状态只能由成功 FINAL EvaluationRun 的 AssessmentEvidence 生成，不能从旧 AnswerHistory 或自由文本 Report 回填。
+- 聚合服务使用 transaction client，任何 Evidence、EvaluationRun、SkillState 或 Report 写入失败会一起回滚。
+- 本任务不产生训练结论；现有技能状态为空时，候选人仍必须看到证据不足。
 
 ## 当前状态
 
-重构 B1 已完成。源库恢复演练、Schema 指纹、22 表行数、空库 Baseline/Checkpoint、Prisma 状态、API 24 suites / 237 tests、Cache 22 tests、API build、Docker migration job 与 readiness 均已通过。
+重构 B2 已完成。正式 FINAL 证据到技能状态的事务、隔离和幂等合同已具备 API 回归保护；API 25 suites / 241 tests、Cache 22 tests、Golden Dataset 结构校验、typecheck/build 通过。
 
 ## 已知问题
 
-- CandidateSkillState 生产聚合、趋势、训练推荐和训练界面尚未实现。
+- 训练推荐、训练完成记录、复测关联、真实趋势比较和训练界面尚未实现。
 - SSE 仍不支持 Event ID/Offset 断点续传，这属于 B4 的独立范围。
 
 ## 推荐下一任务
 
-TASK-B2：正式评价与技能状态。
+TASK-B3：岗位版本与准备度合同强化。
 
 ## 所需上下文
 
-按 `AGENTS.md` 读取核心顺序，再读取 `docs/agent/EVALUATION.md`、`docs/agent/SKILL_MODEL.md`、Evaluation Service、Prisma Schema、正式评价合同测试和 Harness 文档。
+按 `AGENTS.md` 读取核心顺序，再读取 `docs/product/REFACTOR_PROGRAM.md`、TargetJob/JobReadinessService、Prisma Schema、岗位并发/所有权测试与候选人 API 合同。
 
 ## 风险
 
-- `EvaluationRun`、`AssessmentEvidence` 与 `CandidateSkillState` 必须维持用户、岗位、面试、问题和回答来源链，失败/预览运行不能污染正式状态。
+- TargetJob 仍缺少数据库层的单活跃岗位约束和版本边界，不能在 UI 中假设并发写入正确。
 - 后续任务不得重新引入 API runtime DDL 或绕过 B0 SSE 候选人边界。

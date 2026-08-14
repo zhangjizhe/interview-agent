@@ -111,6 +111,13 @@ Web
 - Docker Compose 增加独立 migration job。API 启动时不再执行 `db push` 或忽略 DDL 失败，且 `/api/health/ready` 仅在 PostgreSQL、Redis 和 Baseline 均可用时返回 200。
 - 本机开发库已在恢复验证后显式登记 Baseline。生产执行仍要求使用同一备份、恢复、指纹和双人发布程序。
 
+### B2 验收记录（2026-08-15）
+
+- 成功 FINAL 评价在同一 Prisma transaction 内写入 Evidence、运行成功状态、CandidateSkillState 和 Report 展示快照。
+- 聚合只消费同一用户、目标岗位和成功 FINAL 运行中具有稳定技能归属与分数的证据，重新计算而不累加内存状态。
+- PREVIEW、PRACTICE、FAILED、DEGRADED、无技能/无分数证据与旧 AnswerHistory 不会生成正式技能状态。
+- 同一来源运行重试保留既有趋势，避免重复累计；API 合同测试覆盖事务调用、范围筛选和无证据状态。
+
 ## 团队交叉验收
 
 | 责任 | 审核内容 |

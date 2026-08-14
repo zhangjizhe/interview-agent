@@ -14,6 +14,7 @@ describe('EvaluationService', () => {
     $transaction: jest.fn(),
   };
   const config = { get: jest.fn().mockReturnValue('qwen-plus') };
+  const skillStateAggregation = { aggregateFinalRun: jest.fn() };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -33,7 +34,7 @@ describe('EvaluationService', () => {
   });
 
   it('uses an immutable definition version in the final-run idempotency key', async () => {
-    const service = new EvaluationService(prisma as any, config as any);
+    const service = new EvaluationService(prisma as any, config as any, skillStateAggregation as any);
 
     await service.beginFinalEvaluation('interview-1');
 
@@ -61,7 +62,7 @@ describe('EvaluationService', () => {
       id: 'run-complete',
       status: 'SUCCEEDED',
     });
-    const service = new EvaluationService(prisma as any, config as any);
+    const service = new EvaluationService(prisma as any, config as any, skillStateAggregation as any);
 
     const result = await service.beginFinalEvaluation('interview-1');
 
@@ -70,7 +71,7 @@ describe('EvaluationService', () => {
   });
 
   it('persists a failed final run instead of manufacturing a zero-score report', async () => {
-    const service = new EvaluationService(prisma as any, config as any);
+    const service = new EvaluationService(prisma as any, config as any, skillStateAggregation as any);
 
     await service.failFinalEvaluation('run-1', new Error('provider unavailable'));
 
@@ -86,7 +87,7 @@ describe('EvaluationService', () => {
   });
 
   it('creates a replacement definition and run when the gateway returns another model', async () => {
-    const service = new EvaluationService(prisma as any, config as any);
+    const service = new EvaluationService(prisma as any, config as any, skillStateAggregation as any);
     const run = {
       id: 'run-primary',
       interviewId: 'interview-1',
@@ -128,5 +129,57 @@ describe('EvaluationService', () => {
       data: expect.objectContaining({ status: 'SUPERSEDED' }),
     });
     expect(result).toEqual({ id: 'report-1' });
+  });
+
+  it('aggregates skill state inside the successful FINAL evaluation transaction', async () => {
+    const tx = {
+      assessmentEvidence: { upsert: jest.fn().mockResolvedValue({}) },
+      evaluationRun: { update: jest.fn().mockResolvedValue({}) },
+      report: { upsert: jest.fn().mockResolvedValue({}) },
+    };
+    prisma.$transaction.mockImplementationOnce(async (callback: any) => callback(tx));
+    prisma.evaluationRun.findUniqueOrThrow.mockResolvedValueOnce({
+      id: 'run-1',
+      interviewId: 'interview-1',
+      mode: 'FINAL',
+      status: 'RUNNING',
+      interview: { userId: 'user-a', targetJobId: 'job-a' },
+      definition: { version: 'definition-v1', modelVersion: 'qwen-plus' },
+    });
+    prisma.interviewAnswer.findMany.mockResolvedValueOnce([{
+      id: 'answer-1',
+      interviewId: 'interview-1',
+      questionId: 'question-1',
+      content: '我会解释检索、重排和引用。',
+      question: { expectedEvidence: ['检索', '重排', '引用'] },
+      answerHistories: [{
+        score: 0.8,
+        completeness: 0.8,
+        correctness: 0.8,
+        depth: 0.8,
+        feedback: '覆盖了检索与引用。',
+        llmEvaluated: true,
+      }],
+    }]);
+    prisma.report.findUniqueOrThrow.mockResolvedValueOnce({ id: 'report-1' });
+    const service = new EvaluationService(prisma as any, config as any, skillStateAggregation as any);
+
+    await service.completeFinalEvaluation('run-1', {
+      overallScore: 80,
+      scores: { technical: 80 },
+      strengths: ['结构清晰'],
+      weaknesses: [],
+      suggestions: ['继续练习'],
+    });
+
+    expect(tx.evaluationRun.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'SUCCEEDED' }),
+    }));
+    expect(skillStateAggregation.aggregateFinalRun).toHaveBeenCalledWith(tx, {
+      id: 'run-1',
+      interviewId: 'interview-1',
+      interview: { userId: 'user-a', targetJobId: 'job-a' },
+    });
+    expect(tx.report.upsert).toHaveBeenCalled();
   });
 });

@@ -26,7 +26,16 @@
 - 不可变 `EvaluationDefinition` 版本：evaluator、prompt、rubric、provider、model、模型参数、运行模式和降级策略
 - 创建时间、置信度、版本、状态、幂等键和 supersedes 引用
 
-`SkillAssessment` 只能在明确方法/版本下聚合证据，记录分数、置信度、证据数量、最近评估时间和来源面试。
+`CandidateSkillState` 只能在明确方法/版本下聚合证据，记录分数、置信度、证据数量、最近评估时间和来源运行。
+
+## 已实现的 FINAL 聚合
+
+成功的 `FINAL EvaluationRun` 在写入 `AssessmentEvidence`、运行状态和 `Report` 展示快照的同一事务中调用
+技能状态聚合。聚合只查询同一用户、目标岗位、技能的成功 FINAL Evidence，并重算而非累加分数、置信度和
+证据数；同一来源运行的重试保持幂等。
+
+没有稳定 `skillId`、得分或目标岗位关联的证据不会生成状态。`PREVIEW`、`PRACTICE`、`FAILED`、`DEGRADED`
+和旧 `AnswerHistory` 不得污染正式技能状态。
 
 ## 关系、不可变性与权威来源
 
