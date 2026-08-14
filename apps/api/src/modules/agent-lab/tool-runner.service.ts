@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { TraceEventService } from './trace-event.service';
 import { ApprovalResolution, ToolApprovalService } from './tool-approval.service';
+import { RunBudgetService } from './run-budget.service';
 
 export type ToolDecision = 'ALLOW' | 'ASK' | 'DENY';
 export type ToolResultStatus = 'OK' | 'DENIED' | 'CANCELLED' | 'TIMED_OUT' | 'ERROR';
@@ -65,6 +66,7 @@ export class ToolRunner {
   constructor(
     private readonly trace: TraceEventService,
     private readonly approvals: ToolApprovalService,
+    private readonly budget: RunBudgetService,
   ) {}
 
   async run(
@@ -84,6 +86,7 @@ export class ToolRunner {
 
     let result: ToolRunResult;
     try {
+      await this.budget.enforceToolCall(call.runId);
       if (tool.name !== immutableCall.toolName) {
         throw new ToolPolicyError('工具定义与调用名称不一致');
       }

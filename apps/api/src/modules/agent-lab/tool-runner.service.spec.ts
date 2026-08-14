@@ -22,6 +22,12 @@ function createApprovalMock() {
   };
 }
 
+function createBudgetMock() {
+  return {
+    enforceToolCall: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
 function createCall() {
   return {
     runId: 'run-1',
@@ -41,7 +47,7 @@ describe('ToolRunner', () => {
       requiresApproval: true,
       execute: jest.fn(),
     };
-    const runner = new ToolRunner(trace as any, approvals as any);
+    const runner = new ToolRunner(trace as any, approvals as any, createBudgetMock() as any);
 
     const result = await runner.run(createCall(), tool);
 
@@ -70,7 +76,7 @@ describe('ToolRunner', () => {
       requiresApproval: true,
       execute: jest.fn(),
     };
-    const runner = new ToolRunner(trace as any, approvals as any);
+    const runner = new ToolRunner(trace as any, approvals as any, createBudgetMock() as any);
 
     const result = await runner.run(createCall(), tool, {
       hooks: [{ beforeCall: () => ({ decision: 'ALLOW' }) }],
@@ -87,7 +93,7 @@ describe('ToolRunner', () => {
     const approvals = createApprovalMock();
     const execute = jest.fn();
     const tool: ToolDefinition = { name: 'workspace.write', execute };
-    const runner = new ToolRunner(trace as any, approvals as any);
+    const runner = new ToolRunner(trace as any, approvals as any, createBudgetMock() as any);
     const call = createCall();
 
     const result = await runner.run(call, tool, {
@@ -116,7 +122,7 @@ describe('ToolRunner', () => {
         throw new Error('provider unavailable');
       },
     };
-    const runner = new ToolRunner(trace as any, approvals as any);
+    const runner = new ToolRunner(trace as any, approvals as any, createBudgetMock() as any);
 
     const result = await runner.run(createCall(), tool);
 
@@ -132,5 +138,21 @@ describe('ToolRunner', () => {
         error: { type: 'EXECUTION_ERROR', message: 'provider unavailable' },
       },
     });
+  });
+
+  it('在记录调用后执行持久化预算检查并拒绝超限执行', async () => {
+    const trace = createTraceMock();
+    const approvals = createApprovalMock();
+    const budget = {
+      enforceToolCall: jest.fn().mockRejectedValue(new ToolPolicyError('Run 工具调用预算已耗尽：1/0')),
+    };
+    const tool: ToolDefinition = { name: 'workspace.write', execute: jest.fn() };
+    const runner = new ToolRunner(trace as any, approvals as any, budget as any);
+
+    const result = await runner.run(createCall(), tool);
+
+    expect(result).toMatchObject({ status: 'DENIED' });
+    expect(trace.events.map((event) => event.type)).toEqual(['tool.call', 'tool.result']);
+    expect(tool.execute).not.toHaveBeenCalled();
   });
 });

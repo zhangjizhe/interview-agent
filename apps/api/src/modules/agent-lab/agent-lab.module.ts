@@ -13,6 +13,7 @@ import { ToolRunner } from './tool-runner.service';
 import { TraceBundleService } from './trace-bundle.service';
 import { PluginRegistryService } from './plugin-registry.service';
 import { SubRunService } from './sub-run.service';
+import { RunBudgetService } from './run-budget.service';
 
 @Module({
   imports: [PrismaModule, AgentModule],
@@ -27,6 +28,7 @@ import { SubRunService } from './sub-run.service';
     TraceBundleService,
     PluginRegistryService,
     SubRunService,
+    RunBudgetService,
   ],
   exports: [
     AgentRegistryService,
@@ -38,6 +40,7 @@ import { SubRunService } from './sub-run.service';
     TraceBundleService,
     PluginRegistryService,
     SubRunService,
+    RunBudgetService,
   ],
 })
 export class AgentLabModule {}
