@@ -4,6 +4,7 @@ import {
   IsString,
   Matches,
   MaxLength,
+  IsIn,
 } from 'class-validator';
 
 const AGENT_KEY_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
@@ -123,4 +124,83 @@ export class RunAgentDto {
   @IsString()
   @MaxLength(200)
   externalRunId?: string;
+}
+
+export class CreateEvaluationDatasetDto {
+  @IsString()
+  @Matches(AGENT_KEY_PATTERN, {
+    message: 'key 必须以小写字母开头，仅包含小写字母、数字和连字符，长度为 2-64',
+  })
+  key!: string;
+
+  @IsString()
+  @MaxLength(120)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  description?: string;
+
+  @IsOptional()
+  @Matches(SEMVER_PATTERN, { message: 'version 必须是语义化版本，例如 1.0.0' })
+  version?: string;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
+}
+
+export class CreateEvaluationDatasetCaseDto {
+  @IsString()
+  @Matches(AGENT_KEY_PATTERN, {
+    message: 'key 必须以小写字母开头，仅包含小写字母、数字和连字符，长度为 2-64',
+  })
+  key!: string;
+
+  @IsObject()
+  input!: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  expectedOutput?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
+}
+
+export class CreateEvaluatorDto {
+  @IsString()
+  @Matches(AGENT_KEY_PATTERN, {
+    message: 'key 必须以小写字母开头，仅包含小写字母、数字和连字符，长度为 2-64',
+  })
+  key!: string;
+
+  @IsString()
+  @MaxLength(120)
+  name!: string;
+
+  @IsString()
+  @IsIn(['KEYWORD', 'JSON_SCHEMA', 'LATENCY'])
+  type!: 'KEYWORD' | 'JSON_SCHEMA' | 'LATENCY';
+
+  @IsOptional()
+  @IsObject()
+  config?: Record<string, unknown>;
+}
+
+export class RunEvaluationDto {
+  @IsString()
+  @MaxLength(100)
+  datasetId!: string;
+
+  @IsString()
+  @MaxLength(100)
+  evaluatorId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  agentVersionId?: string;
 }

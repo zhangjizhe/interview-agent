@@ -18,7 +18,7 @@
 
 本项目正在从 AI 面试应用逐步演化为 AgentLab。Interview Agent 是 AgentLab 的第一个真实应用，而不是平台边界。
 
-当前已完成 Phase 1 与 Phase 2 的基础能力：
+当前已完成 Phase 1、Phase 2 与 Phase 3 的基础能力：
 
 - 以 NestJS `apps/api` 作为唯一主线。
 - 新增默认 Workspace、Agent、AgentVersion 的领域模型和数据库迁移。
@@ -26,8 +26,12 @@
 - 通过 `POST /api/agent-lab/bootstrap/interview-agent` 幂等注册当前 `Interview Agent v1.0.0`。
 - 提供独立运行接口 `POST /api/agent-lab/agents/:agentId/run`，并持久化 Run 与有序 TraceEvent。
 - 提供 Run 列表、详情和 Trace 查询接口。首个适配器复用现有 `MultiAgentService`，不改变 Interview 控制器。
+- 提供版本化 `EvaluationDataset`、`EvaluationCase`、`Evaluator`、`EvaluationRun` 和 `EvaluationResult`。评测结果关联实际 Agent Run，按 AgentVersion 与 Dataset 版本可回溯。
+- 首版评测器为确定性规则：`KEYWORD` 检查输出关键词、`JSON_SCHEMA` 检查输出字段、`LATENCY` 检查运行耗时。每条结果保存分数、阈值、断言明细、输出摘要和失败原因。
 
-当前阶段不会替换既有 Interview 接口和 LangGraph 面试流程。Run 已记录状态、输入、输出、耗时和错误；Token 与成本仍依赖现有 Interview 会话统计，独立 Run 会明确标记该指标暂不可用。后续将依次加入评测、基准测试、回归、失败分析、优化和工作流。
+评测 API 位于 `/api/agent-lab`：创建 Dataset 与 Case、创建 Evaluator 后，可调用 `POST /agents/:agentId/evaluations` 同步执行已发布版本；`GET /agents/:agentId/evaluations` 查看汇总，`GET /evaluations/:evaluationId` 查看逐用例结果。输入用例必须满足目标 Agent 的输入契约，首个 Interview 适配器要求 `input.message` 非空。
+
+当前阶段不会替换既有 Interview 接口和 LangGraph 面试流程。Run 已记录状态、输入、输出、耗时和错误；Token 与成本仍依赖现有 Interview 会话统计，独立 Run 会明确标记该指标暂不可用。评测不以不稳定的 LLM Judge 作为基础契约，尚未导入现有 Golden Dataset JSON，也尚未执行新的数据库 migration；部署前必须运行 `pnpm db:deploy`。后续将依次加入基准测试、回归、失败分析、优化和工作流。
 
 ## 系统架构
 

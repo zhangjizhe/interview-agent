@@ -37,6 +37,9 @@ model Workspace {
   members WorkspaceMember[]
   agents  Agent[]
   runs    Run[]
+  datasets       EvaluationDataset[]
+  evaluators     Evaluator[]
+  evaluationRuns EvaluationRun[]
 
   @@index([ownerId])
   @@map("workspaces")
@@ -78,6 +81,7 @@ model Agent {
   versions       AgentVersion[] @relation("AgentVersions")
   currentVersion AgentVersion?  @relation("CurrentAgentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   runs           Run[]
+  evaluationRuns EvaluationRun[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, updatedAt])
@@ -104,6 +108,7 @@ model AgentVersion {
   currentForAgents Agent[] @relation("CurrentAgentVersion")
   parentAgent      Agent   @relation("AgentVersions", fields: [agentId], references: [id], onDelete: Cascade)
   runs             Run[]
+  evaluationRuns  EvaluationRun[]
 
   @@unique([agentId, version])
   @@index([agentId, createdAt])
@@ -144,6 +149,7 @@ model Run {
   agent        Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
   agentVersion AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
   traceEvents  TraceEvent[]
+  evaluationResults EvaluationResult[]
 
   @@index([workspaceId, createdAt])
   @@index([agentId, createdAt])
@@ -180,6 +186,138 @@ enum RunStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+model EvaluationDataset {
+  id          String   @id @default(cuid())
+  workspaceId String
+  key         String
+  name        String
+  description String?  @db.Text
+  version     String   @default("1.0.0")
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cases          EvaluationCase[]
+  evaluationRuns EvaluationRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@map("evaluation_datasets")
+}
+
+model EvaluationCase {
+  id             String   @id @default(cuid())
+  datasetId      String
+  key            String
+  input          Json
+  expectedOutput Json?
+  metadata       Json?
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  dataset EvaluationDataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  results EvaluationResult[]
+
+  @@unique([datasetId, key])
+  @@index([datasetId, enabled])
+  @@map("evaluation_dataset_cases")
+}
+
+enum EvaluatorType {
+  KEYWORD
+  JSON_SCHEMA
+  LATENCY
+}
+
+model Evaluator {
+  id          String        @id @default(cuid())
+  workspaceId String
+  key         String
+  name        String
+  type        EvaluatorType
+  config      Json?
+  enabled     Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  evaluationRuns EvaluationRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@map("evaluators")
+}
+
+enum EvaluationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model EvaluationRun {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  agentId        String
+  agentVersionId String
+  datasetId      String
+  evaluatorId    String
+  status         EvaluationStatus @default(PENDING)
+  score          Float?
+  totalCases     Int              @default(0)
+  passedCases    Int              @default(0)
+  failedCases    Int              @default(0)
+  metrics        Json?
+  error          String?          @db.Text
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime         @default(now())
+
+  workspace Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent     Agent                 @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion AgentVersion       @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  dataset   EvaluationDataset     @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  evaluator Evaluator             @relation(fields: [evaluatorId], references: [id], onDelete: Restrict)
+  results   EvaluationResult[]
+
+  @@index([workspaceId, createdAt])
+  @@index([agentId, createdAt])
+  @@index([agentVersionId, createdAt])
+  @@map("evaluation_runs")
+}
+
+enum EvaluationCaseStatus {
+  COMPLETED
+  FAILED
+}
+
+model EvaluationResult {
+  id            String               @id @default(cuid())
+  evaluationRunId String
+  datasetCaseId String
+  runId         String?
+  status        EvaluationCaseStatus
+  score         Float?
+  passed        Boolean              @default(false)
+  metrics       Json?
+  evidence      Json?
+  outputSummary String?              @db.Text
+  failureCategory String?
+  failureMessage  String?            @db.Text
+  createdAt     DateTime             @default(now())
+
+  evaluationRun EvaluationRun @relation(fields: [evaluationRunId], references: [id], onDelete: Cascade)
+  datasetCase   EvaluationCase @relation(fields: [datasetCaseId], references: [id], onDelete: Restrict)
+  run           Run?           @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@unique([evaluationRunId, datasetCaseId])
+  @@index([datasetCaseId])
+  @@index([runId])
+  @@map("evaluation_results")
 }
 
 enum UserRole {

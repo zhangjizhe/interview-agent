@@ -5,11 +5,13 @@ import { AgentRegistryController } from './agent-registry.controller';
 import { AgentRegistryService } from './agent-registry.service';
 import { AgentRuntimeController } from './agent-runtime.controller';
 import { AgentRuntimeService } from './agent-runtime.service';
+import { EvaluationController } from './evaluation.controller';
+import { EvaluationService } from './evaluation.service';
 
 @Module({
   imports: [PrismaModule, AgentModule],
-  controllers: [AgentRegistryController, AgentRuntimeController],
-  providers: [AgentRegistryService, AgentRuntimeService],
-  exports: [AgentRegistryService, AgentRuntimeService],
+  controllers: [AgentRegistryController, AgentRuntimeController, EvaluationController],
+  providers: [AgentRegistryService, AgentRuntimeService, EvaluationService],
+  exports: [AgentRegistryService, AgentRuntimeService, EvaluationService],
 })
 export class AgentLabModule {}
