@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { useInterviewStore } from '../store/interview-store';
 import type { AgentEvent } from '@interview-agent/shared-types';
+import { isCandidateVisibleAgentEvent } from '../utils/candidateEvents';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
@@ -18,7 +19,7 @@ interface UseInterviewStreamReturn {
  *
  * 核心设计：
  * - 收到 token 事件 → 直接追加到 zustand store 的最后一条 assistant 消息
- * - 收到 thinking / searching / recalling / meta 等 → 追加到 CoT 事件流
+ * - 候选人只处理 token、可操作错误和完成事件；内部 Agent 事件一律丢弃
  * - 自动重连：最多 3 次，指数退避
  * - 使用 forceRender 机制确保每次 token 更新都触发 React 重渲染
  */
@@ -35,7 +36,6 @@ export function useInterviewStream(): UseInterviewStreamReturn {
       // 1) 把用户消息和空的 assistant 占位压入 store
       store.addMessage({ role: 'user', content, streaming: false });
       store.addMessage({ role: 'assistant', content: '', streaming: true });
-      store.clearAgentEvents();
       store.setStreaming(true);
       store.setError(null);
       store.forceRender(); // 立即渲染用户消息 + 空 assistant
@@ -56,10 +56,7 @@ export function useInterviewStream(): UseInterviewStreamReturn {
           // 60 秒没新事件 + 还在 streaming → 强制兜底
           const currentStreaming = useInterviewStore.getState().streaming;
           if (currentStreaming) {
-            useInterviewStore.getState().appendAgentEvent({
-              type: 'error',
-              error: 'SSE 流式超时（60 秒无事件），已强制结束流式',
-            });
+            useInterviewStore.getState().setError('回复超时，请稍后重试。');
             useInterviewStore.getState().finalizeLastMessage();
             useInterviewStore.getState().setStreaming(false);
             useInterviewStore.getState().forceRender();
@@ -74,11 +71,6 @@ export function useInterviewStream(): UseInterviewStreamReturn {
         if (attempt > 0) {
           reconnectingRef.current = true;
           store.setReconnecting(true);
-          store.appendAgentEvent({
-            type: 'meta',
-            content: `连接断开，第 ${attempt} 次重连中...`,
-          });
-
           // R-P1-9 已知限制：项目 SSE 协议未设计 offset / Last-Event-ID 字段，
           // server 端不存消息状态，所以无法做真正的断点续传。
           // 当前降级处理：依赖 store.appendToLastMessage 的 dedup 逻辑
@@ -129,44 +121,27 @@ export function useInterviewStream(): UseInterviewStreamReturn {
                 return;
               }
 
+              let event: AgentEvent;
               try {
-                const event: AgentEvent = JSON.parse(data);
+                event = JSON.parse(data);
+              } catch {
+                continue;
+              }
 
-                // 收到任何有效事件都重置 idle timer（说明 SSE 还活着）
-                resetStreamIdleTimer();
+              if (!isCandidateVisibleAgentEvent(event)) continue;
+              resetStreamIdleTimer();
 
-                if (event.type === 'token' && event.content) {
-                  store.appendToLastMessage(event.content);
-                  store.forceRender(); // 关键：每次 token 都强制重渲染
-                } else if (
-                  event.type === 'tool_call' ||
-                  event.type === 'tool_result' ||
-                  event.type === 'thinking' ||
-                  event.type === 'searching' ||
-                  event.type === 'recalling' ||
-                  event.type === 'meta' ||
-                  event.type === 'token_usage'
-                ) {
-                  store.appendAgentEvent(event);
-                  store.forceRender();
-                } else if (event.type === 'error') {
-                  store.appendAgentEvent({
-                    type: 'error',
-                    error: event.error || 'LLM 调用失败',
-                  });
-                  store.forceRender();
-                  throw new Error(event.error || 'LLM 调用失败');
-                } else if (event.type === 'done') {
-                  store.finalizeLastMessage();
-                  store.setStreaming(false);
-                  store.forceRender();
-                  return;
-                }
-              } catch (e) {
-                // JSON 解析失败，忽略（SSE 中间 chunk）
-                // P2-15 修复：移除 console.error 调试残留。
-                // Unexpected 错误（SSE chunk 不完整）静默跳过是预期行为。
-                // 其他错误由外层重试逻辑处理（不再静默吞）。
+              if (event.type === 'token' && event.content) {
+                store.appendToLastMessage(event.content);
+                store.forceRender();
+              } else if (event.type === 'error') {
+                store.setError(event.error || '当前回答暂时无法处理，请稍后重试。');
+                throw new Error(event.error || '当前回答暂时无法处理，请稍后重试。');
+              } else if (event.type === 'done') {
+                store.finalizeLastMessage();
+                store.setStreaming(false);
+                store.forceRender();
+                return;
               }
             }
           }
@@ -184,12 +159,7 @@ export function useInterviewStream(): UseInterviewStreamReturn {
             return;
           }
           lastError = err as Error;
-          // P2-15 修复：移除 console.error 调试残留，错误由外层 lastError + appendAgentEvent 处理
           if (attempt < MAX_RETRIES) {
-            store.appendAgentEvent({
-              type: 'meta',
-              content: `SSE 连接第 ${attempt + 1} 次失败：${lastError.message}`,
-            });
             store.forceRender();
           }
         }
@@ -201,7 +171,6 @@ export function useInterviewStream(): UseInterviewStreamReturn {
       store.finalizeLastMessage();
       store.forceRender();
       if (lastError) {
-        store.appendAgentEvent({ type: 'error', error: lastError.message });
         store.setError(lastError.message);
         store.forceRender();
       }

@@ -4,15 +4,23 @@
 
 ## 当前
 
-当前活跃任务：TASK-010。该任务先建立重构基线和分批迁移设计；开始任何实现批次前，必须在 `ACTIVE_TASK.md` 认领且仅认领一个后续任务。
+当前活跃任务：TASK-011。该任务完成重构 B0 的可执行验收基线与候选人 SSE 事件边界；开始任何后续批次前，必须在 `ACTIVE_TASK.md` 认领且仅认领一个后续任务。
 
 ### TASK-010：重构基线与迁移设计
 
-- 状态：进行中
+- 状态：2026-08-14 完成
 - 目标：审计当前产品资产与 Agent 实验代码，定义证据优先的 AI Interview Training Platform 目标架构、数据迁移和分批验收路线。
 - 范围：架构、数据库、API、安全、成本、Agent Evaluation、Harness、Docker/Web 基线与迁移风险评估。
 - 非目标：未经验证地替换默认 NestJS/React/LangGraph/Prisma 路径，或在同一任务中实施所有后续业务功能。
 - 依赖：TASK-003、TASK-005、TASK-006 交付，当前 Docker/API/Schema 开发基线，Agent 实验目录的只读审计。
+
+### TASK-011：B0 验收基线与候选事件边界
+
+- 状态：进行中
+- 目标：让 JWT 真实登录浏览器验收、候选人 SSE 白名单和 Golden Dataset 结构校验成为可执行的重构起点。
+- 范围：浏览器验收脚本、SSE API/Web 合同、离线数据集校验入口与 B0 证据记录。
+- 非目标：数据库 Baseline、技能聚合、训练推荐、SSE 断点续传、Agent/Prompt/Provider 改造。
+- 依赖：TASK-010 重构程序、现有 Docker/API/Web 基线。
 
 ## 下一任务
 

@@ -4,11 +4,11 @@
 
 ## 任务 ID
 
-TASK-010
+TASK-011
 
 ## 目标
 
-为 AI Interview Training Platform 建立以证据、评估和受控 Agent 演进为中心的重构基线，并设计可验证、可回滚的分批迁移路线。
+完成重构 B0：冻结可执行验收基线，并在 API 与浏览器之间建立候选人 SSE 事件边界。
 
 ## 状态
 
@@ -16,39 +16,33 @@ TASK-010
 
 ## 范围
 
-- 审计现有 NestJS/React/LangGraph/Prisma 资产、运行时依赖、数据关系和验收覆盖。
-- 研究本机 Agent 实验代码中可被产品复用的模式，不复制实验性实现或依赖。
-- 定义目标领域边界、数据演进、Agent 运行/评估闭环、迁移批次和每批验收门。
-- 验证当前 Docker、API、数据库和 Web 基线，识别迁移前必须修复的阻塞。
+- 将 JWT 真实登录、候选人训练导航和岗位设置作为可执行浏览器验收入口。
+- 候选人 SSE 只接收候选可见事件；内部 Agent、工具、检索、模型和成本事件必须在 API 与 Web 双层拦截。
+- 为 Golden Dataset 添加不调用 Provider 的结构校验入口，并记录其不是质量发布门的事实。
+- 更新重构程序、任务列表和交接中的 B0 验收结果。
 
 ## 非目标
 
-- 在未完成设计审查、数据备份和迁移演练前，替换默认 NestJS/React/LangGraph/Prisma 产品路径。
-- 直接将外部实验目录的代码或未验证依赖复制进产品。
-- 在同一批中混合训练推荐、SSE、额度、支付或多租户迁移。
+- 数据库 Migration Baseline、Schema 重建、CandidateSkillState 聚合、训练推荐、SSE 断点续传、额度或支付。
+- 改变 LangGraph 拓扑、Provider、Prompt、检索和工具执行策略。
 
 ## 相关文件
 
-- `docs/product/`
-- `docs/agent/`
-- `docs/harness/`
-- `docs/project/ARCHITECTURE_MAP.md`
-- `apps/api/src/modules/`
-- `apps/api/prisma/schema.prisma`
+- `apps/api/src/modules/interview/controllers/interview-flow.controller.ts`
+- `apps/web/src/hooks/useInterviewStream.ts`
+- `apps/web/e2e/auth-real-acceptance.mjs`
 - `apps/api/src/evals/`
-- `apps/web/src/`
-- `/Users/zhangjizhe/Desktop/agent-work/`（只读研究来源，具体子目录待确认）
+- `apps/api/package.json`
+- `docs/product/REFACTOR_PROGRAM.md`
 
 ## 验收标准
 
-- 给出可追溯的现状资产与阻塞清单，代码优先于过期文档。
-- 给出保留/替换/延后决策，覆盖架构、数据库、API、安全、成本和测试影响。
-- 每个迁移批次定义输入、输出、数据库策略、验证门、回滚条件和独立审查责任。
-- 当前开发环境的 API、Docker、数据库 Schema 与 Web 基线有可复现验证记录。
-- 形成后续单一主题实现任务；只有通过该设计门的批次才能开始改动。
+- 真实登录浏览器脚本在当前候选人导航下完成登录、岗位创建、用户/管理员隔离和移动端检查。
+- SSE 响应与客户端状态中没有候选人不可见事件；错误与完成事件继续可用。
+- Golden Dataset 可在无 Provider 的情况下执行结构校验。
+- API/Web 测试、类型检查、构建、Docker 健康和 B0 浏览器验收有记录。
 
 ## 已知风险
 
-- 现有本机 PostgreSQL 缺少 Prisma Migration History Baseline；开发环境已获授权通过 `db push` 同步 Schema，但生产迁移仍需审计、备份与受控 Baseline Procedure。
-- Agent 实验目录不是默认产品路径，可能缺少鉴权、资源归属、成本限制、评测与回滚能力。
-- 当前 CandidateSkillState 尚未由正式评价生产聚合，不能据此生成训练结论。
+- 真实浏览器验收会创建有界测试账号和岗位数据；必须使用随机标识且不得记录个人数据。
+- 本机 Docker Web 镜像需要重建后，生产静态入口才包含当前候选人导航。

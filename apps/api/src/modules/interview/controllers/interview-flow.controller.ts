@@ -17,6 +17,7 @@ import { ScoringService } from '../services/scoring.service';
 import type { InterviewQuestion } from '../services/question-generator.service';
 import { extractKeywordsFromQuestion } from './keyword-extract.util';
 import { requireOwnedInterview } from '../../../common/ownership.util';
+import { toCandidateStreamEvent } from '../services/candidate-stream-event.util';
 
 interface MessageDto {
   userId: string;
@@ -231,7 +232,10 @@ export class InterviewFlowController {
         if (event.type === 'token' && event.content) {
           fullResponse += event.content;
         }
-        await writeEvent(event);
+        const candidateEvent = toCandidateStreamEvent(event);
+        if (candidateEvent) {
+          await writeEvent(candidateEvent);
+        }
       }
 
       const totalPrompt = Math.ceil((dto.content.length + fullResponse.length * 0.3) / 2);
@@ -267,7 +271,7 @@ export class InterviewFlowController {
     } catch (err: any) {
       // 错误路径也要等 flush 完成
       await new Promise<void>((resolve) => {
-        res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'error', error: '当前回答暂时无法处理，请稍后重试。' })}\n\n`);
         (res as any).flush?.();
         res.end(() => resolve());
       });
