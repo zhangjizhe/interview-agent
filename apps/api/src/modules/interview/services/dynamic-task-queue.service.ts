@@ -89,7 +89,18 @@ export class DynamicTaskQueueService {
     @Optional() private questionBank?: QuestionBankService,
   ) {}
 
-  async initializeQueue(interviewId: string, position: string, level: string): Promise<void> {
+  async initializeQueue(
+    interviewId: string,
+    position: string,
+    level: string,
+    selection: {
+      mode: string;
+      targetJobId?: string;
+      targetJobProfileVersion?: number;
+      practiceSkillId?: string;
+      practiceSkillName?: string;
+    } = { mode: 'FULL_SIMULATION' },
+  ): Promise<void> {
     const existingTasks = await this.prisma.interviewTask.count({ where: { interviewId } });
     if (existingTasks > 0) {
       this.logger.debug(`[TaskQueue] Queue already initialized for ${interviewId}`);
@@ -104,7 +115,7 @@ export class DynamicTaskQueueService {
       category: q.category,
       difficulty: q.difficulty,
       priority: index + 1,
-      context: JSON.stringify({ position, level, questionId: q.questionId }),
+      context: JSON.stringify({ position, level, questionId: q.questionId, ...selection }),
     }));
 
     await this.prisma.interviewTask.createMany({ data: tasksData });
@@ -286,10 +297,21 @@ export class DynamicTaskQueueService {
         sourceTaskId: task.id,
         parentQuestionId: parentQuestion?.id,
         externalQuestionId: context.questionId || null,
+        skillId: context.practiceSkillId || null,
+        subSkill: context.subSkill || null,
         question: task.question,
         category: task.category,
         difficulty: task.difficulty,
         expectedEvidence: context.expectedPoints || undefined,
+        followUpPurpose: context.followUpReason || null,
+        selectionMetadata: {
+          mode: context.mode || 'FULL_SIMULATION',
+          targetJobId: context.targetJobId || null,
+          targetJobProfileVersion: context.targetJobProfileVersion || null,
+          practiceSkillId: context.practiceSkillId || null,
+          practiceSkillName: context.practiceSkillName || null,
+          taskType: task.type,
+        },
         source: context.advanced ? 'agent-advanced' : task.type === 'FOLLOW_UP' ? 'agent-follow-up' : 'task-queue',
       },
     });
@@ -423,6 +445,7 @@ export class DynamicTaskQueueService {
           difficulty: completedTask.difficulty,
           priority: 1,
           context: JSON.stringify({
+            ...this.parseTaskContext(completedTask.context),
             followUpFrom: completedTask.id,
             followUpReason: decision.followUpReason,
           }),
@@ -448,8 +471,11 @@ export class DynamicTaskQueueService {
             question: decision.advancedQuestion,
             category: completedTask.category,
             difficulty: difficultyMap[completedTask.difficulty] || 'hard',
-            priority: pendingCount + 1,
-            context: JSON.stringify({ advanced: true }),
+          priority: pendingCount + 1,
+          context: JSON.stringify({
+            ...this.parseTaskContext(completedTask.context),
+            advanced: true,
+          }),
           },
         });
         this.logger.debug(`[TaskQueue] Agent decided advance for ${interviewId}`);

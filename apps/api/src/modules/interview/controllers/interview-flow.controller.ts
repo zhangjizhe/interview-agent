@@ -18,10 +18,12 @@ import type { InterviewQuestion } from '../services/question-generator.service';
 import { extractKeywordsFromQuestion } from './keyword-extract.util';
 import { requireOwnedInterview } from '../../../common/ownership.util';
 import { toCandidateStreamEvent } from '../services/candidate-stream-event.util';
+import { StreamMessageDeliveryService } from '../services/stream-message-delivery.service';
 
 interface MessageDto {
   userId: string;
   content: string;
+  clientMessageId?: string;
 }
 
 /**
@@ -45,6 +47,7 @@ export class InterviewFlowController {
     private resumeParser: ResumeParserService,
     private scoring: ScoringService,
     private prisma: PrismaService,
+    private streamDelivery: StreamMessageDeliveryService,
   ) {}
 
   /**
@@ -183,6 +186,9 @@ export class InterviewFlowController {
 
     const interview = await this.prisma.interview.findFirst({
       where: { id: interviewId, userId: req.user.userId },
+      include: {
+        practiceSkill: { select: { id: true, name: true } },
+      },
     });
     if (!interview) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: 'Interview not found' })}\n\n`);
@@ -200,9 +206,48 @@ export class InterviewFlowController {
       return;
     }
 
-    const candidateMessage = await this.prisma.message.create({
-      data: { interviewId, role: 'user', content: dto.content },
-    });
+    if (
+      dto.clientMessageId
+      && (typeof dto.clientMessageId !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(dto.clientMessageId))
+    ) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: '请求标识无效，请重新发送。' })}\n\n`);
+      (res as any).flush?.();
+      res.end();
+      return;
+    }
+
+    const writeEvent = (event: object) => {
+      const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
+      (res as any).flush?.();
+      if (!ok) return new Promise<void>((r) => res.once('drain', r));
+      return Promise.resolve();
+    };
+
+    const claim = await this.streamDelivery.claimCandidateMessage(
+      interviewId,
+      dto.content,
+      dto.clientMessageId,
+    );
+    if (claim.state === 'conflict') {
+      await writeEvent({ type: 'error', error: '请求标识与已有消息不匹配，请重新发送。' });
+      res.end();
+      return;
+    }
+    if (claim.state === 'pending') {
+      await writeEvent({ type: 'error', error: '上一次回答仍在处理中，请稍后重试。' });
+      res.end();
+      return;
+    }
+    if (claim.state === 'replay') {
+      await writeEvent({ type: 'token', content: claim.content });
+      await new Promise<void>((resolve) => {
+        res.write('data: [DONE]\n\n');
+        (res as any).flush?.();
+        res.end(() => resolve());
+      });
+      return;
+    }
+    const candidateMessage = claim.message;
 
     const ctx: AgentContext = {
       userId: interview.userId,
@@ -212,16 +257,15 @@ export class InterviewFlowController {
       // P0-3 修复：传 provider，让 maxTokens 走对应 provider 配置
       provider: (dto as any).provider || 'qwen',
       answerMessageId: candidateMessage.id,
-    };
-
-    const writeEvent = (event: object) => {
-      const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
-      (res as any).flush?.();
-      if (!ok) return new Promise<void>((r) => res.once('drain', r));
-      return Promise.resolve();
+      interviewMode: interview.mode,
+      practiceSkillId: interview.practiceSkill?.id,
+      practiceSkillName: interview.practiceSkill?.name,
+      targetJobId: interview.targetJobId || undefined,
+      targetJobProfileVersion: interview.targetJobProfileVersion || undefined,
     };
 
     let fullResponse = '';
+    let assistantPersisted = false;
 
     // 默认走 multi 模式（LangGraph Supervisor 拓扑），SSE 流式逐 token 推送
     // 路径：processMessage → MultiAgentService.stream → graph.stream(streamMode='messages')
@@ -229,6 +273,9 @@ export class InterviewFlowController {
     // llm-direct 模式走 LlmGatewayService.streamChat（纯 LLM，无 Agent 拓扑）
     try {
       for await (const event of this.agent.processMessage(ctx, dto.content)) {
+        if (event.type === 'error') {
+          throw new Error(event.error || 'Interview response failed');
+        }
         if (event.type === 'token' && event.content) {
           fullResponse += event.content;
         }
@@ -241,17 +288,17 @@ export class InterviewFlowController {
       const totalPrompt = Math.ceil((dto.content.length + fullResponse.length * 0.3) / 2);
       const totalCompletion = Math.ceil(fullResponse.length / 2);
 
-      if (fullResponse) {
-        await this.prisma.message.create({
-          data: {
-            interviewId,
-            role: 'assistant',
-            content: fullResponse,
-            promptTokens: totalPrompt,
-            completionTokens: totalCompletion,
-          },
-        });
+      if (!fullResponse) {
+        throw new Error('Interview response was empty');
       }
+      await this.streamDelivery.persistAssistantResponse(
+        interviewId,
+        candidateMessage.id,
+        fullResponse,
+        totalPrompt,
+        totalCompletion,
+      );
+      assistantPersisted = true;
 
       // Token 用量仅持久化在受保护的成本记录中，不进入候选人 SSE 合同。
       // 2026-06-23 修复：等 [DONE] 真正 flush 到 TCP 再 res.end()
@@ -264,6 +311,9 @@ export class InterviewFlowController {
         res.end(() => resolve());
       });
     } catch (err: any) {
+      if (!assistantPersisted) {
+        await this.streamDelivery.releaseUnansweredMessage(candidateMessage.id).catch(() => undefined);
+      }
       // 错误路径也要等 flush 完成
       await new Promise<void>((resolve) => {
         res.write(`data: ${JSON.stringify({ type: 'error', error: '当前回答暂时无法处理，请稍后重试。' })}\n\n`);

@@ -4,7 +4,32 @@
 
 ## 当前
 
-当前没有活跃任务。开始后续批次前，必须在 `ACTIVE_TASK.md` 认领且仅认领一个任务。
+### TASK-017：B5 单技能训练推荐与复测关联
+
+- 状态：进行中
+- 目标：基于成功 FINAL Evidence 为当前岗位技能缺口生成可追溯的单技能训练推荐，并关联训练完成与复测。
+- 范围：TrainingRecommendation/Attempt 数据合同、受保护 API、候选人训练入口、复测关联和验收。
+- 非目标：多日计划、支付、额度、Agent 自主训练策略或直接提高 CandidateSkillState。
+- 依赖：TASK-013 FINAL 技能状态聚合、TASK-014 岗位版本、TASK-016 稳定面试模式/题目/SSE 合同。
+
+## 已完成
+
+### TASK-016：B4 受控面试模式与稳定题目合同
+
+- 状态：2026-08-15 完成
+- 目标：明确完整模拟与单技能练习的面试状态、题目进度和候选人 SSE 合同。
+- 范围：Interview Mode、目标岗位关联、稳定选题元数据、SSE 候选人事件白名单、断流幂等和验收。
+- 非目标：训练建议、额度、支付、重写 Agent Runtime 或暴露内部事件。
+- 验证：加性 migration 和 Prisma 状态正常；API 27 suites / 249 tests、Web 10 files / 75 tests、API/Web typecheck/build、Docker migration/API health 和真实 JWT 浏览器验收 21/21 通过。
+- 残余限制：重试重放已完成回复，不提供 Event ID/Offset 逐 token 续传；真实 Provider Canary 仍由 Harness 发布门控制。
+
+### TASK-015：目标岗位真实端到端验收
+
+- 状态：2026-08-15 完成
+- 目标：通过真实 JWT 浏览器会话验证目标岗位创建、读取、编辑、激活、准备度和资源归属合同。
+- 范围：可重复的 Docker 浏览器脚本、岗位档案版本与单活跃不变量、无正式证据状态、跨用户拒绝和验收记录。
+- 非目标：训练推荐、SSE 断点续传、额度、支付、真实 Provider 面试或 Agent Benchmark。
+- 验证：Docker API 健康；真实浏览器验收 19/19 通过。随机测试账户、岗位和截图仅保留在未跟踪的本地生成目录。
 
 ### TASK-010：重构基线与迁移设计
 
@@ -84,8 +109,6 @@
 - 范围：版本标识、评估记录格式、对比标准和回归门。
 - 非目标：大型实验 UI、Prompt 自动修改或根据单次运行宣称质量。
 - 依赖：`apps/api/src/evals/`、Langfuse/Cost Data 和具有代表性的生产安全 Case。
-
-## 已完成
 
 ### TASK-001：上下文管理层
 

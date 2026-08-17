@@ -83,6 +83,14 @@ describe('DynamicTaskQueueService persistence', () => {
         interviewId: 'interview-1',
         sourceTaskId: 'task-1',
         externalQuestionId: 'bank-react-hooks',
+        selectionMetadata: {
+          mode: 'FULL_SIMULATION',
+          targetJobId: null,
+          targetJobProfileVersion: null,
+          practiceSkillId: null,
+          practiceSkillName: null,
+          taskType: 'QUESTION',
+        },
       }),
     });
     expect(prisma.interviewAnswer.create).toHaveBeenCalledWith({

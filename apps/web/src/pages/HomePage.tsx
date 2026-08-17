@@ -28,6 +28,8 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
   const [showStart, setShowStart] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [interviewMode, setInterviewMode] = useState<'FULL_SIMULATION' | 'SKILL_PRACTICE'>('FULL_SIMULATION');
+  const [practiceSkillId, setPracticeSkillId] = useState('');
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
@@ -88,6 +90,7 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
   const hasResume = (resumesQuery.data?.length || 0) > 0;
   const interviews = interviewsQuery.data || [];
   const readiness = readinessQuery.data;
+  const practiceSkills = readiness?.targetJob?.skillRequirements || [];
 
   const uploadResume = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -132,6 +135,8 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
           position: activeJob.title,
           level: activeJob.level || undefined,
           targetJobId: activeJob.id,
+          mode: interviewMode,
+          practiceSkillId: interviewMode === 'SKILL_PRACTICE' ? practiceSkillId : undefined,
         }),
       });
       const data = await safeJson(response);
@@ -290,6 +295,39 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
           <div className="w-full border border-slate-200 bg-white p-5 shadow-xl md:max-w-md">
             <h2 id="start-interview-title" className="text-lg font-semibold">开始模拟面试</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">本场面试将围绕 <span className="font-medium text-slate-900">{activeJob.title}</span>{activeJob.level ? ` · ${activeJob.level}` : ''} 进行。</p>
+            <div className="mt-5 grid grid-cols-2 border border-slate-200 p-1">
+              <button
+                type="button"
+                onClick={() => setInterviewMode('FULL_SIMULATION')}
+                className={`px-3 py-2 text-sm font-medium ${interviewMode === 'FULL_SIMULATION' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+              >
+                完整模拟
+              </button>
+              <button
+                type="button"
+                onClick={() => setInterviewMode('SKILL_PRACTICE')}
+                className={`px-3 py-2 text-sm font-medium ${interviewMode === 'SKILL_PRACTICE' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+              >
+                单技能练习
+              </button>
+            </div>
+            {interviewMode === 'SKILL_PRACTICE' && (
+              <label className="mt-4 block text-sm font-medium text-slate-700">
+                练习技能
+                <select
+                  value={practiceSkillId}
+                  onChange={(event) => setPracticeSkillId(event.target.value)}
+                  className="mt-1.5 h-10 w-full border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="">选择一项岗位技能</option>
+                  {practiceSkills.map((requirement) => (
+                    <option key={requirement.skill.id} value={requirement.skill.id}>
+                      {requirement.skill.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="mt-5 border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-start gap-2">
                 <FileUp className="mt-0.5 h-4 w-4 text-slate-600" aria-hidden="true" />
@@ -307,7 +345,7 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setShowStart(false)} className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">取消</button>
-              <button type="button" disabled={!hasResume || starting} onClick={startInterview} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300">
+              <button type="button" disabled={!hasResume || starting || (interviewMode === 'SKILL_PRACTICE' && !practiceSkillId)} onClick={startInterview} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300">
                 {starting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
                 开始面试
               </button>

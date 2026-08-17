@@ -36,6 +36,7 @@ model Interview {
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   position        String // 岗位，如"前端开发"
   level           String          @default("P5") // 职级
+  mode            InterviewMode   @default(FULL_SIMULATION)
   status          InterviewStatus @default(IN_PROGRESS)
   startedAt       DateTime        @default(now())
   endedAt         DateTime?
@@ -43,6 +44,9 @@ model Interview {
   resumeConfirmed Boolean         @default(false) // 用户是否确认过简历（false = 仍显示确认面板）
   targetJobId     String?
   targetJob       TargetJob? @relation(fields: [targetJobId], references: [id], onDelete: SetNull)
+  targetJobProfileVersion Int?
+  practiceSkillId String?
+  practiceSkill   SkillDefinition? @relation("PracticeInterviewSkill", fields: [practiceSkillId], references: [id], onDelete: SetNull)
 
   messages       Message[]
   report         Report?
@@ -106,6 +110,10 @@ model Message {
   interview        Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
   role             String // 'system' | 'user' | 'assistant' | 'tool'
   content          String    @db.Text
+  clientMessageId  String?   @unique
+  replyToMessageId String?   @unique
+  replyToMessage   Message?  @relation("MessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replyMessage     Message?  @relation("MessageReply")
   metadata         Json? // 工具调用、token 消耗等
   promptTokens     Int       @default(0)
   completionTokens Int       @default(0)
@@ -113,6 +121,7 @@ model Message {
   interviewAnswer  InterviewAnswer?
 
   @@index([interviewId, createdAt])
+  @@index([interviewId, clientMessageId])
   @@map("messages")
 }
 
@@ -136,6 +145,11 @@ enum InterviewStatus {
   IN_PROGRESS
   COMPLETED
   ABANDONED
+}
+
+enum InterviewMode {
+  FULL_SIMULATION
+  SKILL_PRACTICE
 }
 
 // 用户级 MCP 工具偏好：用户可独立开关每个工具
@@ -240,6 +254,7 @@ model SkillDefinition {
   assessmentEvidence AssessmentEvidence[]
   candidateSkillStates CandidateSkillState[]
   jobRequirements JobSkillRequirement[]
+  practiceInterviews Interview[] @relation("PracticeInterviewSkill")
 
   @@unique([slug, taxonomyVersion])
   @@index([taxonomyVersion, isActive])
@@ -275,12 +290,15 @@ model InterviewQuestion {
   followUpQuestions InterviewQuestion[] @relation("QuestionFollowUp")
   skillId        String?
   skill          SkillDefinition? @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  subSkill       String?
   externalQuestionId String?
   version        Int      @default(1)
   question       String   @db.Text
   category       String
   difficulty     String
   expectedEvidence Json?
+  followUpPurpose String?
+  selectionMetadata Json?
   source         String
   createdAt      DateTime @default(now())
 

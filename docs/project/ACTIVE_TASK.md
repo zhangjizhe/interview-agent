@@ -4,54 +4,48 @@
 
 ## 任务 ID
 
-TASK-014
+TASK-017
 
 ## 目标
 
-完成 B3：建立目标岗位单活跃约束、岗位档案版本与版本化准备度合同。
+完成 B5：基于正式证据的单技能训练推荐与复测关联。
 
 ## 状态
 
-完成
+进行中
 
 ## 范围
 
-- 用数据库部分唯一索引强制每位用户至多一个活跃岗位。
-- 为 TargetJob 和岗位技能要求保存可递增档案版本，准备度响应必须带版本。
-- 保持现有岗位创建、切换、所有权和无证据不出分语义。
-- 为并发冲突、跨用户拒绝和版本化准备度增加合同测试。
+- 从成功 FINAL EvaluationRun 的 AssessmentEvidence 和岗位技能缺口创建单技能 TrainingRecommendation。
+- 保存推荐状态、训练完成记录与复测面试关联；训练完成本身不得修改 CandidateSkillState。
+- 为候选人提供真实的推荐、完成和重新练习入口，并保留所有权与证据可追溯性。
+- 用 API/Web 合同、数据迁移、回放链路和浏览器验收验证训练不伪造能力提升。
 
 ## 非目标
 
-- 训练推荐、SSE 断点续传、额度或支付。
-- 改变 LangGraph 拓扑、Provider、Prompt、检索和工具执行策略。
-- 使用 LLM 重写 JD 分析或回填旧岗位版本。
+- 多日训练计划、支付、额度或 Agent 自主训练策略。
+- 重写 LangGraph 拓扑、Provider、Prompt、检索或工具执行策略。
+- 手工修改 CandidateSkillState、根据训练完成直接提高分数，或回填旧 AnswerHistory 为正式证据。
 
 ## 相关文件
 
+- `docs/agent/EVALUATION.md`
+- `docs/agent/SKILL_MODEL.md`
+- `docs/product/P0_IMPLEMENTATION_PLAN.md`
+- `apps/api/src/modules/interview/`
 - `apps/api/prisma/schema.prisma`
-- `apps/api/prisma/migrations/`
-- `apps/api/src/modules/interview/services/job-readiness.service.ts`
-- `apps/api/src/modules/interview/controllers/skill-profile.controller.ts`
-- `apps/api/src/__tests__/`
-- `apps/web/src/utils/training.ts`
+- `apps/web/src/pages/`
+- `apps/web/e2e/`
 - `docs/product/REFACTOR_PROGRAM.md`
 
 ## 验收标准
 
-- 数据库拒绝每用户多个活跃岗位，且创建/切换服务将冲突映射为业务错误。
-- 岗位更新后档案版本递增，Readiness API 返回对应 profile version。
-- 无 FINAL 技能证据时仍返回 `overallScore: null` 与缺失原因。
-- API/Web 合同测试、类型检查、构建和迁移验证有记录。
+- 每项推荐可追溯到同一用户、岗位、技能、成功 FINAL Evidence 和岗位档案版本。
+- 训练完成记录不改变 CandidateSkillState；只有关联复测的成功 FINAL Evidence 可改变正式状态。
+- API/Web 合同测试、类型检查、构建和真实浏览器主路径验证有记录。
+- 不调用未受控的真实 Provider；如需要真实 Provider 验证，必须单独满足成本与 Harness 门。
 
 ## 已知风险
 
-- 现有 target_jobs 可能来自 B1 前的 Schema，migration 必须先检查重复 active 记录。
-- Prisma datamodel 无法表达 PostgreSQL 部分唯一索引，物理约束必须保留在加性 SQL migration 和测试中。
-
-## 交付结果
-
-- `target_jobs_one_active_per_user_key` 部分唯一索引强制每位用户最多一个活跃岗位。
-- TargetJob 更新会递增 `profileVersion`；准备度响应和 Web 合同携带该版本。
-- 创建或切换中的数据库唯一冲突会返回可重试的业务冲突，不依赖 UI 隐藏。
-- 加性 migration 已在隔离 Baseline 与本机开发库执行，且 Prisma 状态正常。
+- TrainingRecommendation 不能从自由文本 Report 或旧 AnswerHistory 推导，必须消费受用户/岗位范围约束的成功 FINAL Evidence。
+- 训练完成与复测的关联必须是加性事实，不能覆盖历史面试或绕过 B4 的稳定题目、SSE 和成本边界。

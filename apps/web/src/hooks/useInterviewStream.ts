@@ -32,6 +32,8 @@ export function useInterviewStream(): UseInterviewStreamReturn {
   const send = useCallback(
     async (interviewId: string, userId: string, content: string) => {
       const store = useInterviewStore.getState();
+      const clientMessageId = globalThis.crypto?.randomUUID?.()
+        || `message-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 
       // 1) 把用户消息和空的 assistant 占位压入 store
       store.addMessage({ role: 'user', content, streaming: false });
@@ -71,13 +73,8 @@ export function useInterviewStream(): UseInterviewStreamReturn {
         if (attempt > 0) {
           reconnectingRef.current = true;
           store.setReconnecting(true);
-          // R-P1-9 已知限制：项目 SSE 协议未设计 offset / Last-Event-ID 字段，
-          // server 端不存消息状态，所以无法做真正的断点续传。
-          // 当前降级处理：依赖 store.appendToLastMessage 的 dedup 逻辑
-          // （MAX_OVERLAP=200，R-P2-14 修复）检测 lastContent 末尾与 delta
-          // 开头的重叠，server 完全重发时 200 字符上限足够覆盖 token 级重复。
-          // 用户感知：极少见重复 token（最多 200 字符），不会看到明显重复内容。
-          // 真断点续传需要 server-side 支持（详见未来 ADR）。
+          // 重试复用同一个客户端请求 ID。服务端只会重放已经持久化的回复，
+          // 或等待原请求完成，因此不会再创建重复回答或触发第二次模型调用。
 
           store.forceRender();
           await sleep(RETRY_DELAY_MS * Math.pow(2, attempt - 1));
@@ -91,7 +88,7 @@ export function useInterviewStream(): UseInterviewStreamReturn {
           const res = await fetch(`/api/interview/${interviewId}/message`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, content }),
+            body: JSON.stringify({ userId, content, clientMessageId }),
             signal: controller.signal,
           });
 

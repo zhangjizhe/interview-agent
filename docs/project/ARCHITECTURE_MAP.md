@@ -39,11 +39,12 @@
 ```text
 认证用户回答
   -> 资源归属与面试状态校验
+  -> 客户端消息 ID 幂等声明（重放已完成回复或等待首次请求）
   -> 简历上下文与题目检索
   -> Agent Engine 选择
   -> 流式模型/Agent 事件
   -> SSE 返回浏览器
-  -> 持久化 Message、Question、Answer、兼容 History、Task/Checkpoint、Cost 和 Trace 信号
+  -> 持久化 Message、模式/岗位版本快照、Question 选择元数据、Answer、兼容 History、Task/Checkpoint、Cost 和 Trace 信号
   -> 结束面试 -> 创建不可变 FINAL EvaluationRun / AssessmentEvidence
   -> 显式切换 Report 当前展示快照
 ```
@@ -89,6 +90,8 @@ Agent/Prompt Version Registry
 - 管理员题库/知识写入和 MCP 管理必须保持服务端授权。
 - Provider Key 和外部 MCP 配置不能进入源码。
 - `EvaluationRun` 是完整评价历史；`Report` 仅是当前候选人展示快照。PREVIEW/PRACTICE 不得写入正式 Report 或技能状态。
+- `Interview` 记录完整模拟或单技能练习；单技能练习必须引用用户拥有的 TargetJob 技能。Question 保存选择快照和追问目的，避免依赖自由文本重建面试事实。
+- 重试的 `clientMessageId` 由数据库唯一约束保护：完成请求重放已保存回复且不再调用 Agent。它不是逐 token 断点协议，Event ID/Offset 仍是后续工作。
 - `JobReadinessService` 只读取当前目标岗位、可检索简历、成功 FINAL EvaluationRun 和其正式技能状态；JD 使用本地有界关键词映射，不调用模型。
 - API Docker 镜像必须在 Nest 编译前运行 `prisma generate`，使新增模型和枚举进入编译时 Prisma Client。DDL 仅由独立 migration job 执行；API entrypoint 不执行 `db push`、`migrate deploy` 或 checkpoint setup。
 - `/api/health/ready` 必须同时验证 PostgreSQL、Redis 和已完成的 Baseline；依赖或 migration 不可用时返回 503，不能将原始错误发送给客户端。

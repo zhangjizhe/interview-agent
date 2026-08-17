@@ -11,6 +11,15 @@ export interface TargetJob {
 }
 
 export interface ReadinessSummary {
+  targetJob?: {
+    id: string;
+    profileVersion: number;
+    skillRequirements: Array<{
+      skill: { id: string; slug: string; name: string };
+      importance: number;
+      expectedLevel: string | null;
+    }>;
+  };
   available: boolean;
   overallScore: number | null;
   confidence: number;
@@ -36,6 +45,9 @@ export interface InterviewRecord {
   startedAt: string;
   endedAt: string | null;
   targetJobId: string | null;
+  mode?: 'FULL_SIMULATION' | 'SKILL_PRACTICE';
+  practiceSkillId?: string | null;
+  targetJobProfileVersion?: number | null;
   report: { overallScore: number } | null;
 }
 

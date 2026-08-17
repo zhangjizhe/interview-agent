@@ -57,6 +57,11 @@ export interface AgentContext {
   level: string;
   provider?: string; // P0-3 修复：按 provider 取 maxTokens 配置
   answerMessageId?: string;
+  interviewMode?: 'FULL_SIMULATION' | 'SKILL_PRACTICE';
+  targetJobId?: string;
+  targetJobProfileVersion?: number;
+  practiceSkillId?: string;
+  practiceSkillName?: string;
 }
 
 @Injectable()
@@ -123,7 +128,13 @@ export class InterviewAgentService {
 
       // ===== 动态任务队列驱动（统一题号追踪）=====
       // 初始化队列（幂等操作）
-      await this.taskQueue.initializeQueue(ctx.sessionId, ctx.position, ctx.level);
+      await this.taskQueue.initializeQueue(ctx.sessionId, ctx.position, ctx.level, {
+        mode: ctx.interviewMode || 'FULL_SIMULATION',
+        targetJobId: ctx.targetJobId,
+        targetJobProfileVersion: ctx.targetJobProfileVersion,
+        practiceSkillId: ctx.practiceSkillId,
+        practiceSkillName: ctx.practiceSkillName,
+      });
       
       // 获取当前任务（支持动态出题、follow-up、自适应）
       const currentTask = await this.taskQueue.getNextTask(ctx.sessionId);
@@ -152,6 +163,9 @@ export class InterviewAgentService {
         `【参考答案】\n${currentQuestion.referenceAnswer}\n` +
         `（请基于以上要点评估候选人的回答，必要时追问或过渡到下一题）`
         : `\n\n【题目已问完，进入收尾阶段】可以总结候选人表现并询问他有什么想问你的。`;
+      const modeContext = ctx.interviewMode === 'SKILL_PRACTICE'
+        ? `\n【本场模式】单技能练习，围绕「${ctx.practiceSkillName || '当前技能'}」提问与追问，不要将练习反馈当作正式评价。`
+        : '\n【本场模式】完整模拟面试，在结束前不要向候选人展示评分或评价结论。';
 
       const systemPrompt =
         `你是一位专业的 AI 面试官小面，正在面试【${ctx.position}】岗位（${ctx.level}）的候选人。\n\n` +
@@ -159,6 +173,7 @@ export class InterviewAgentService {
         `【对话原则】每次只问一个题，候选人回答后先简要认可或追问，再进入下一题。\n` +
         `【风格】专业、友好、像真人面试官，不要用 Markdown 标题。\n` +
         `【候选人历史】\n${context.longTermContext || '暂无'}` +
+        modeContext +
         questionContext;
 
       // ===== 按用户偏好过滤工具 =====

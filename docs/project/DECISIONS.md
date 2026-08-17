@@ -74,3 +74,13 @@
 - 原因：数据库事实可恢复、可验证且不能被静默同步。Checkpoint 是运行前置，不得依赖 API 请求路径临时建表。
 - 替代方案：继续使用旧 migration 链、以 `migrate resolve` 标记旧文件、保留 API `db push`、让 MultiAgentService 在启动时调用 checkpoint setup。
 - 取舍：本机已有库需在备份、恢复、指纹与数据对账后显式登记 Baseline；后续 datamodel 与历史物理约束的差异必须以加性 migration 收敛。
+
+## ADR-CTX-005：候选人流式请求幂等与完成回复重放
+
+- 日期：2026-08-15
+- 状态：已接受
+- 背景：浏览器在断流后重试同一 POST 会创建重复用户消息，并可能再次进入 Agent 和成本路径。当前 SSE 未持久化 token 事件，不能安全提供逐 token offset 恢复。
+- 决策：浏览器为一次提交生成并复用 `clientMessageId`；数据库唯一约束将其关联到候选人 Message。已完成请求只重放已保存的 assistant Message，处理中请求不再次进入 Agent。
+- 原因：在不改变 LangGraph、Gateway 或候选 SSE 白名单的前提下，先保证回答与成本不会被客户端重试重复写入。
+- 替代方案：仅依赖前端文本去重、在控制器内存中去重、立即建设 Event Log + `Last-Event-ID`。
+- 取舍：连接在生成中断开时只能等待原请求完成后重放最终内容；逐 token 续传需以单独的事件持久化、保留和成本对账设计处理。

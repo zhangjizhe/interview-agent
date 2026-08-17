@@ -25,6 +25,8 @@ interface StartInterviewDto {
   level?: string;
   resumeText?: string;
   targetJobId?: string;
+  mode?: 'FULL_SIMULATION' | 'SKILL_PRACTICE';
+  practiceSkillId?: string;
 }
 
 /**
@@ -108,6 +110,13 @@ export class InterviewLifecycleController {
   @Post('start')
   async startInterview(@Body() dto: StartInterviewDto, @Req() req: any) {
     const userId = req.user.userId;
+    const mode = dto.mode || 'FULL_SIMULATION';
+    if (mode !== 'FULL_SIMULATION' && mode !== 'SKILL_PRACTICE') {
+      throw new BadRequestException('Unsupported interview mode');
+    }
+    if (mode === 'FULL_SIMULATION' && dto.practiceSkillId) {
+      throw new BadRequestException('Practice skill is only valid for skill practice');
+    }
     const resumes = await this.resumeRag.searchByUser(userId, 1).catch(() => []);
     if (resumes.length === 0) {
       throw new BadRequestException(
@@ -115,15 +124,30 @@ export class InterviewLifecycleController {
       );
     }
 
-    let targetJob: { id: string; title: string; level: string | null } | null = null;
+    let targetJob: { id: string; title: string; level: string | null; profileVersion: number } | null = null;
     if (dto.targetJobId) {
       targetJob = await this.prisma.targetJob.findFirst({
         where: { id: dto.targetJobId, userId },
-        select: { id: true, title: true, level: true },
+        select: { id: true, title: true, level: true, profileVersion: true },
       });
       if (!targetJob) {
         throw new BadRequestException('Target job not found');
       }
+    }
+
+    let practiceSkillId: string | null = null;
+    if (mode === 'SKILL_PRACTICE') {
+      if (!targetJob || !dto.practiceSkillId) {
+        throw new BadRequestException('Skill practice requires a target job and selected skill');
+      }
+      const requirement = await this.prisma.jobSkillRequirement.findFirst({
+        where: { targetJobId: targetJob.id, skillId: dto.practiceSkillId },
+        include: { skill: { select: { id: true, isActive: true } } },
+      });
+      if (!requirement?.skill.isActive) {
+        throw new BadRequestException('Selected skill is not available for this target job');
+      }
+      practiceSkillId = requirement.skillId;
     }
 
     const position = targetJob?.title || dto.position;
@@ -133,7 +157,10 @@ export class InterviewLifecycleController {
         userId,
         position,
         level,
+        mode,
         targetJobId: targetJob?.id,
+        targetJobProfileVersion: targetJob?.profileVersion,
+        practiceSkillId,
         status: 'IN_PROGRESS',
         summary: resumes[0]?.name ? `候选：${resumes[0].name}` : null,
       },
