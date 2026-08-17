@@ -17,6 +17,7 @@ import { ScoringService } from '../services/scoring.service';
 import type { InterviewQuestion } from '../services/question-generator.service';
 import { extractKeywordsFromQuestion } from './keyword-extract.util';
 import { requireOwnedInterview } from '../../../common/ownership.util';
+import { InterviewLabBridgeService } from '../../agent-lab/interview-lab-bridge.service';
 
 interface MessageDto {
   userId: string;
@@ -44,6 +45,7 @@ export class InterviewFlowController {
     private resumeParser: ResumeParserService,
     private scoring: ScoringService,
     private prisma: PrismaService,
+    private interviewLab: InterviewLabBridgeService,
   ) {}
 
   /**
@@ -203,6 +205,16 @@ export class InterviewFlowController {
       data: { interviewId, role: 'user', content: dto.content },
     });
 
+    // 旧 SSE 流程仍负责生成和持久化 Interview 业务数据；Bridge 只建立统一 Lab Run。
+    // Bridge 不可用不应阻断候选人的面试，因此失败时继续既有流程。
+    let labRunId: string | null = null;
+    try {
+      const labRun = await this.interviewLab.startTurn(req.user.userId, interview, dto.content);
+      labRunId = labRun.id;
+    } catch {
+      labRunId = null;
+    }
+
     const ctx: AgentContext = {
       userId: interview.userId,
       sessionId: interviewId,
@@ -254,6 +266,10 @@ export class InterviewFlowController {
         });
       }
 
+      if (labRunId) {
+        await this.interviewLab.completeTurn(labRunId, fullResponse);
+      }
+
       // 2026-06-23 修复：等 [DONE] 真正 flush 到 TCP 再 res.end()
       // 之前的 res.end() 是异步的,不等 res.write 完成,客户端可能 fetch done=true
       // 早于 [DONE] 到达,前端 setStreaming(false) 路径失效,按钮一直 loading。
@@ -264,6 +280,9 @@ export class InterviewFlowController {
         res.end(() => resolve());
       });
     } catch (err: any) {
+      if (labRunId) {
+        await this.interviewLab.failTurn(labRunId, err);
+      }
       // 错误路径也要等 flush 完成
       await new Promise<void>((resolve) => {
         res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);

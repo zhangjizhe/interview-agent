@@ -40,6 +40,7 @@ model Workspace {
   datasets       EvaluationDataset[]
   evaluators     Evaluator[]
   evaluationRuns EvaluationRun[]
+  applications   Application[]
 
   @@index([ownerId])
   @@map("workspaces")
@@ -82,6 +83,7 @@ model Agent {
   currentVersion AgentVersion?  @relation("CurrentAgentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
   runs           Run[]
   evaluationRuns EvaluationRun[]
+  applications   Application[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, updatedAt])
@@ -157,6 +159,7 @@ model Run {
   traceEvents    TraceEvent[]
   evaluationResults EvaluationResult[]
   toolApprovals ToolApproval[]
+  applicationRuns ApplicationRun[]
 
   @@index([workspaceId, createdAt])
   @@index([agentId, createdAt])
@@ -201,6 +204,49 @@ enum RunStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum ApplicationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Application {
+  id          String            @id @default(cuid())
+  workspaceId String
+  agentId     String
+  key         String
+  name        String
+  type        String
+  status      ApplicationStatus @default(ACTIVE)
+  config      Json?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent     Agent            @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  runs      ApplicationRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@index([agentId])
+  @@map("applications")
+}
+
+model ApplicationRun {
+  id             String   @id @default(cuid())
+  applicationId  String
+  runId          String   @unique
+  externalSessionId String?
+  turn           Int?
+  createdAt      DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  run         Run         @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@index([externalSessionId, createdAt])
+  @@map("application_runs")
 }
 
 enum ToolApprovalStatus {

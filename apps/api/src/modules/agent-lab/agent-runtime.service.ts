@@ -149,6 +149,114 @@ export class AgentRuntimeService {
     }
   }
 
+  /**
+   * 为已有 Application 流程建立 Lab Run，但不接管该流程的执行。
+   * Interview SSE 仍由既有服务负责，完成后通过 completeExternalRun 回写统一 Run/Trace。
+   */
+  async startExternalRun(userId: string, agentId: string, dto: RunAgentDto) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    const agent = await this.prisma.agent.findFirst({
+      where: { id: agentId, workspaceId: workspace.id },
+      include: { currentVersion: true },
+    });
+    if (!agent) throw new NotFoundException('Agent 不存在或无权访问');
+    const version = await this.resolveVersion(agent, dto.agentVersionId);
+    const message = dto.input.message;
+    if (typeof message !== 'string' || message.trim().length === 0) {
+      throw new BadRequestException('Application Run 要求 input.message 为非空字符串');
+    }
+    const runtimeConfig = (version.runtimeConfig || {}) as Record<string, unknown>;
+    const startedAt = new Date();
+    const run = await this.prisma.run.create({
+      data: {
+        workspaceId: workspace.id,
+        agentId: agent.id,
+        agentVersionId: version.id,
+        application: dto.application,
+        externalRunId: dto.externalRunId,
+        input: dto.input as any,
+        status: 'RUNNING',
+        startedAt,
+      },
+    });
+    // 用户消息属于模型可见历史，不能降级为尽力而为遥测。
+    await this.trace.append(run.id, {
+      type: 'user.message',
+      name: 'Application User Message',
+      step: 'application-bridge',
+      payload: { content: message },
+    });
+    await this.writeTrace(run.id, {
+      type: 'turn.start',
+      name: 'Application Run Started',
+      step: 'application-bridge',
+      input: dto.input,
+      payload: {
+        application: dto.application ?? null,
+        adapter: runtimeConfig.adapter ?? 'external',
+      },
+    });
+    return run;
+  }
+
+  async completeExternalRun(runId: string, output: Record<string, unknown>) {
+    const run = await this.prisma.run.findUnique({
+      where: { id: runId },
+      select: { id: true, startedAt: true },
+    });
+    if (!run) throw new NotFoundException('Run 不存在');
+    const completedAt = new Date();
+    const latencyMs = run.startedAt ? completedAt.getTime() - run.startedAt.getTime() : undefined;
+    const response = typeof output.response === 'string' ? output.response : JSON.stringify(output);
+    await this.trace.append(runId, {
+      type: 'assistant.message',
+      name: 'Application Assistant Message',
+      step: 'application-bridge',
+      payload: { content: response },
+    });
+    const completed = await this.prisma.run.update({
+      where: { id: runId },
+      data: {
+        status: 'COMPLETED',
+        output: output as any,
+        latencyMs,
+        completedAt,
+      },
+    });
+    await this.writeTrace(runId, {
+      type: 'turn.end',
+      name: 'Application Run Completed',
+      step: 'application-bridge',
+      output,
+      payload: { status: 'COMPLETED', output },
+      latencyMs,
+    });
+    return completed;
+  }
+
+  async failExternalRun(runId: string, message: string) {
+    const completedAt = new Date();
+    const existing = await this.prisma.run.findUnique({
+      where: { id: runId },
+      select: { startedAt: true },
+    });
+    if (!existing) throw new NotFoundException('Run 不存在');
+    const latencyMs = existing.startedAt ? completedAt.getTime() - existing.startedAt.getTime() : undefined;
+    const failed = await this.prisma.run.update({
+      where: { id: runId },
+      data: { status: 'FAILED', error: message, latencyMs, completedAt },
+    });
+    await this.writeTrace(runId, {
+      type: 'run.failed',
+      name: 'Application Run Failed',
+      step: 'application-bridge',
+      payload: { status: 'FAILED', error: message },
+      error: message,
+      latencyMs,
+    });
+    return failed;
+  }
+
   async listRuns(userId: string, agentId?: string) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     if (agentId) {

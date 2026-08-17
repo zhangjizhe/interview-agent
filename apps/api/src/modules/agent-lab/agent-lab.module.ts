@@ -14,10 +14,13 @@ import { TraceBundleService } from './trace-bundle.service';
 import { PluginRegistryService } from './plugin-registry.service';
 import { SubRunService } from './sub-run.service';
 import { RunBudgetService } from './run-budget.service';
+import { ApplicationController } from './application.controller';
+import { ApplicationService } from './application.service';
+import { InterviewLabBridgeService } from './interview-lab-bridge.service';
 
 @Module({
   imports: [PrismaModule, AgentModule],
-  controllers: [AgentRegistryController, AgentRuntimeController, EvaluationController],
+  controllers: [AgentRegistryController, AgentRuntimeController, EvaluationController, ApplicationController],
   providers: [
     AgentRegistryService,
     AgentRuntimeService,
@@ -29,6 +32,8 @@ import { RunBudgetService } from './run-budget.service';
     PluginRegistryService,
     SubRunService,
     RunBudgetService,
+    ApplicationService,
+    InterviewLabBridgeService,
   ],
   exports: [
     AgentRegistryService,
@@ -41,6 +46,8 @@ import { RunBudgetService } from './run-budget.service';
     PluginRegistryService,
     SubRunService,
     RunBudgetService,
+    ApplicationService,
+    InterviewLabBridgeService,
   ],
 })
 export class AgentLabModule {}
