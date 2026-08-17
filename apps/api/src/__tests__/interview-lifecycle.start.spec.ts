@@ -50,6 +50,7 @@ describe('InterviewLifecycleController start', () => {
       {} as any,
       resumeRag as any,
       {} as any,
+      {} as any,
     );
   }
 

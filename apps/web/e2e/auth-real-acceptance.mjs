@@ -171,6 +171,13 @@ try {
   );
   await userPage.screenshot({ path: join(outputDir, '09-interview-mode-selection.png'), fullPage: true });
 
+  await userPage.goto(`${webUrl}/training`, { waitUntil: 'networkidle' });
+  check(
+    'training page does not fabricate recommendations without final evidence',
+    await userPage.getByText('当前没有可追溯的训练建议。完成带技能证据的正式面试后，系统会基于能力缺口生成下一步。').count() === 1,
+  );
+  await userPage.screenshot({ path: join(outputDir, '10-training-empty-state.png'), fullPage: true });
+
   const foreignUserId = `browser-foreign-${suffix}`;
   const foreignRegister = await requestJson('/auth/register', {
     method: 'POST',
@@ -227,6 +234,7 @@ const report = {
     '07-real-admin-mcp.png',
     '08-real-login-mobile.png',
     '09-interview-mode-selection.png',
+    '10-training-empty-state.png',
   ],
 };
 writeFileSync(join(outputDir, 'real-results.json'), `${JSON.stringify(report, null, 2)}\n`);

@@ -1,10 +1,11 @@
-import { Briefcase, ClipboardList, Home, LogOut } from 'lucide-react';
+import { Briefcase, ClipboardList, Dumbbell, Home, LogOut } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clearSession, getSession } from '../utils/auth';
 
 const navigation = [
   { to: '/', label: '首页', icon: Home, end: true },
   { to: '/interviews', label: '面试记录', icon: ClipboardList, end: false },
+  { to: '/training', label: '训练', icon: Dumbbell, end: false },
   { to: '/settings', label: '岗位设置', icon: Briefcase, end: false },
 ];
 

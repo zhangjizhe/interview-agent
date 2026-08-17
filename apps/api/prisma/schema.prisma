@@ -21,6 +21,8 @@ model User {
   reflectionLogs  ReflectionLog[]
   targetJobs      TargetJob[]
   candidateSkillStates CandidateSkillState[]
+  trainingRecommendations TrainingRecommendation[]
+  trainingAttempts TrainingAttempt[]
 
   @@map("users")
 }
@@ -58,6 +60,7 @@ model Interview {
   answers        InterviewAnswer[]
   evaluationRuns EvaluationRun[]
   assessmentEvidence AssessmentEvidence[]
+  trainingAttempt TrainingAttempt? @relation("TrainingRetestInterview")
 
   @@index([userId, startedAt])
   @@map("interviews")
@@ -231,6 +234,7 @@ model TargetJob {
   candidateSkillStates CandidateSkillState[]
   skillRequirements JobSkillRequirement[]
   interviews      Interview[]
+  trainingRecommendations TrainingRecommendation[]
 
   @@index([userId, updatedAt])
   @@index([userId, isActive])
@@ -255,6 +259,7 @@ model SkillDefinition {
   candidateSkillStates CandidateSkillState[]
   jobRequirements JobSkillRequirement[]
   practiceInterviews Interview[] @relation("PracticeInterviewSkill")
+  trainingRecommendations TrainingRecommendation[]
 
   @@unique([slug, taxonomyVersion])
   @@index([taxonomyVersion, isActive])
@@ -374,6 +379,7 @@ model EvaluationRun {
   assessmentEvidence   AssessmentEvidence[]
   reportSnapshots      Report[] @relation("ReportCurrentEvaluationRun")
   candidateSkillStates CandidateSkillState[]
+  trainingRecommendations TrainingRecommendation[]
 
   @@unique([interviewId, inputRevision, definitionId, mode])
   @@index([interviewId, createdAt])
@@ -405,6 +411,8 @@ model AssessmentEvidence {
   version              Int      @default(1)
   createdAt            DateTime @default(now())
 
+  trainingRecommendations TrainingRecommendation[]
+
   @@unique([evaluationRunId, answerId])
   @@index([interviewId, createdAt])
   @@index([skillId, createdAt])
@@ -433,6 +441,50 @@ model CandidateSkillState {
   @@index([userId, lastAssessedAt])
   @@index([sourceRunId])
   @@map("candidate_skill_states")
+}
+
+model TrainingRecommendation {
+  id                      String   @id @default(cuid())
+  userId                  String
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetJobId             String
+  targetJob               TargetJob @relation(fields: [targetJobId], references: [id], onDelete: Cascade)
+  targetJobProfileVersion Int
+  skillId                 String
+  skill                   SkillDefinition @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  sourceRunId             String
+  sourceRun               EvaluationRun @relation(fields: [sourceRunId], references: [id], onDelete: Restrict)
+  sourceEvidenceId        String
+  sourceEvidence          AssessmentEvidence @relation(fields: [sourceEvidenceId], references: [id], onDelete: Restrict)
+  evidenceIds             Json
+  objective               String   @db.Text
+  prompts                 Json
+  expectedEvidence        Json
+  status                  TrainingRecommendationStatus @default(READY)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  attempts TrainingAttempt[]
+
+  @@unique([userId, targetJobId, skillId, sourceRunId])
+  @@index([userId, targetJobId, status])
+  @@map("training_recommendations")
+}
+
+model TrainingAttempt {
+  id               String   @id @default(cuid())
+  recommendationId String
+  recommendation   TrainingRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status           TrainingAttemptStatus @default(COMPLETED)
+  completedAt      DateTime @default(now())
+  retestInterviewId String? @unique
+  retestInterview   Interview? @relation("TrainingRetestInterview", fields: [retestInterviewId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+
+  @@index([userId, completedAt])
+  @@map("training_attempts")
 }
 
 // ADR #10 Phase 1：Reviewer 反思日志
@@ -491,4 +543,14 @@ enum EvaluationRunStatus {
   FAILED
   DEGRADED
   SUPERSEDED
+}
+
+enum TrainingRecommendationStatus {
+  READY
+  COMPLETED
+  RETEST_STARTED
+}
+
+enum TrainingAttemptStatus {
+  COMPLETED
 }

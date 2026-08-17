@@ -12,6 +12,7 @@
      -> 独立 Migration Job 完成 Baseline / Checkpoint 初始化
      -> JWT Guard、RBAC、资源归属、校验、限流/成本边界
      -> Interview Lifecycle 与 SSE Flow Controller
+  -> Interview Orchestration / Training Recommendations
   -> InterviewAgentService
         -> LangGraph Multi-Agent Runtime（默认）
         -> DeepAgents 降级或 Direct LLM 降级
@@ -91,6 +92,7 @@ Agent/Prompt Version Registry
 - Provider Key 和外部 MCP 配置不能进入源码。
 - `EvaluationRun` 是完整评价历史；`Report` 仅是当前候选人展示快照。PREVIEW/PRACTICE 不得写入正式 Report 或技能状态。
 - `Interview` 记录完整模拟或单技能练习；单技能练习必须引用用户拥有的 TargetJob 技能。Question 保存选择快照和追问目的，避免依赖自由文本重建面试事实。
+- TrainingRecommendation 只关联同一用户/岗位的 FINAL Evidence、技能和岗位档案版本；TrainingAttempt 记录完成与复测关联，不能直接修改 CandidateSkillState。
 - 重试的 `clientMessageId` 由数据库唯一约束保护：完成请求重放已保存回复且不再调用 Agent。它不是逐 token 断点协议，Event ID/Offset 仍是后续工作。
 - `JobReadinessService` 只读取当前目标岗位、可检索简历、成功 FINAL EvaluationRun 和其正式技能状态；JD 使用本地有界关键词映射，不调用模型。
 - API Docker 镜像必须在 Nest 编译前运行 `prisma generate`，使新增模型和枚举进入编译时 Prisma Client。DDL 仅由独立 migration job 执行；API entrypoint 不执行 `db push`、`migrate deploy` 或 checkpoint setup。

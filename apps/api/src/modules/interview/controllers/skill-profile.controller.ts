@@ -1,13 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { requireOwnedInterview } from '../../../common/ownership.util';
 import { JobReadinessService, type UpsertTargetJobInput } from '../services/job-readiness.service';
+import { TrainingService } from '../services/training.service';
 
 @Controller('interview')
 export class SkillProfileController {
   constructor(
     private prisma: PrismaService,
     private jobReadiness: JobReadinessService,
+    private training: TrainingService,
   ) {}
 
   @Post('target-jobs')
@@ -52,6 +54,21 @@ export class SkillProfileController {
       },
       orderBy: { lastAssessedAt: 'desc' },
     });
+  }
+
+  @Post('target-jobs/:targetJobId/training-recommendations/refresh')
+  async refreshTrainingRecommendations(@Param('targetJobId') targetJobId: string, @Req() req: any) {
+    return this.training.refresh(req.user.userId, targetJobId);
+  }
+
+  @Get('training-recommendations')
+  async listTrainingRecommendations(@Query('targetJobId') targetJobId: string | undefined, @Req() req: any) {
+    return this.training.list(req.user.userId, targetJobId);
+  }
+
+  @Post('training-recommendations/:recommendationId/complete')
+  async completeTrainingRecommendation(@Param('recommendationId') recommendationId: string, @Req() req: any) {
+    return this.training.complete(req.user.userId, recommendationId);
   }
 
   @Get(':interviewId/evaluation-runs')

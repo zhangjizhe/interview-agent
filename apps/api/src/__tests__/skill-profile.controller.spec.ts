@@ -21,7 +21,7 @@ describe('SkillProfileController', () => {
   });
 
   it('filters target jobs and skill states by the authenticated user', async () => {
-    const controller = new SkillProfileController(prisma as any, {} as any);
+    const controller = new SkillProfileController(prisma as any, {} as any, {} as any);
 
     await controller.listTargetJobs(req);
     await controller.listSkillStates(req);
@@ -36,7 +36,7 @@ describe('SkillProfileController', () => {
 
   it('does not read evidence for a foreign interview', async () => {
     prisma.interview.findFirst.mockResolvedValueOnce(null);
-    const controller = new SkillProfileController(prisma as any, {} as any);
+    const controller = new SkillProfileController(prisma as any, {} as any, {} as any);
 
     await expect(controller.listAssessmentEvidence('interview-b', req))
       .rejects.toBeInstanceOf(NotFoundException);

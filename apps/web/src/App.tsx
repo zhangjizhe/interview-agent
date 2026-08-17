@@ -29,6 +29,9 @@ async function safeJson(res: Response): Promise<any> {
 const InterviewPage = lazy(() =>
   import('./pages/InterviewPage').then((m) => ({ default: m.InterviewPage })),
 );
+const TrainingPage = lazy(() =>
+  import('./pages/TrainingPage').then((m) => ({ default: m.TrainingPage })),
+);
 const QuestionBankPage = lazy(() =>
   import('./pages/QuestionBankPage').then((m) => ({ default: m.QuestionBankPage })),
 );
@@ -138,6 +141,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route path="/" element={<HomePage />} />
               <Route path="/interviews" element={<HomePage view="interviews" />} />
+              <Route path="/training" element={<TrainingPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/question-bank" element={<QuestionBankPage />} />
               <Route path="/tools" element={<ToolsPage />} />

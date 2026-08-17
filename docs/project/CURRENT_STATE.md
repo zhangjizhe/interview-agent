@@ -1,6 +1,6 @@
 # 当前状态
 
-最后审计：2026-08-15
+最后审计：2026-08-17
 事实来源：仓库代码、Package Manifest、Prisma Schema 和 2026-08-12 验收证据。状态只描述已交付代码，不描述未来设计。
 
 | 领域 | 状态 | 当前事实 |
@@ -57,3 +57,4 @@
 - 2026-08-15 已完成 B2 FINAL 技能状态聚合：`EvaluationService` 在成功 FINAL 运行的同一事务中写入 Evidence、运行快照、CandidateSkillState 和 Report；聚合只查询同一用户/岗位的成功 FINAL Evidence，非正式、失败和降级运行不改变技能状态。
 - 2026-08-15 已完成 B3 岗位版本与准备度合同：TargetJob 有可递增 `profileVersion`，PostgreSQL 部分唯一索引保证每用户至多一个活跃岗位，准备度响应返回对应档案版本；Docker 真实 JWT 浏览器验收覆盖创建、读取、编辑、激活、无证据准备度和跨用户拒绝，19/19 通过。
 - 2026-08-15 已完成 B4 面试模式与候选人 SSE 合同：Interview 持久化完整模拟/单技能练习、岗位档案版本快照和所选技能；题目保存稳定技能、追问目的与选择元数据。客户端重试复用消息 ID，完成的请求只重放已保存回复，不重复写回答或进入 Agent 成本路径；当前仍未提供 Event ID/Offset 逐 token 续传。加性 migration、API 27 suites / 249 tests、Web 75 tests、Docker 和真实浏览器验收 21/21 通过。
+- 2026-08-17 已完成 B5 单技能训练推荐与复测关联：TrainingRecommendation 只由活跃岗位中成功 FINAL 运行的低分正式技能状态生成，绑定岗位档案版本、来源运行和 Evidence；TrainingAttempt 记录完成与复测 Interview。训练完成不改变 CandidateSkillState。加性 migration、API 29 suites / 256 tests、Web 76 tests、Docker 和真实浏览器验收 22/22 通过。

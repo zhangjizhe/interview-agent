@@ -132,6 +132,12 @@ Web
 - 候选人提交具有数据库唯一的客户端消息 ID。完成请求重放持久化 assistant 回复，不重新调用 Agent；处理中请求不产生重复回答或成本。
 - 加性 migration、API 27 suites / 249 tests、Web 75 tests、Docker rebuild 和真实 JWT 浏览器验收 21/21 通过。当前未实现 Event ID/Offset 逐 token 续传，真实 Provider 验收仍受 Harness 门控制。
 
+### B5 验收记录（2026-08-17）
+
+- 活跃岗位的成功 FINAL Evidence 和低分 CandidateSkillState 生成可追溯的单技能推荐；推荐保存岗位档案版本、来源运行和来源 Evidence。
+- 训练完成只创建 TrainingAttempt。复测只能从已完成 Attempt、未变更的当前岗位版本和匹配的单技能练习开始；训练本身不修改 CandidateSkillState。
+- API 29 suites / 256 tests、Web 76 tests、加性 migration、Docker rebuild 和真实 JWT 浏览器验收 22/22 通过。浏览器验收只验证无证据空状态，不调用 Provider。
+
 ## 团队交叉验收
 
 | 责任 | 审核内容 |

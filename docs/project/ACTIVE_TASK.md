@@ -4,11 +4,11 @@
 
 ## 任务 ID
 
-TASK-017
+TASK-018
 
 ## 目标
 
-完成 B5：基于正式证据的单技能训练推荐与复测关联。
+完成 B6：使用量与发布平面最小边界。
 
 ## 状态
 
@@ -16,36 +16,37 @@ TASK-017
 
 ## 范围
 
-- 从成功 FINAL EvaluationRun 的 AssessmentEvidence 和岗位技能缺口创建单技能 TrainingRecommendation。
-- 保存推荐状态、训练完成记录与复测面试关联；训练完成本身不得修改 CandidateSkillState。
-- 为候选人提供真实的推荐、完成和重新练习入口，并保留所有权与证据可追溯性。
-- 用 API/Web 合同、数据迁移、回放链路和浏览器验收验证训练不伪造能力提升。
+- 基于已有 SessionCost 建立用户/周期 Usage Ledger 与服务端额度策略点。
+- 在面试和评价的高成本入口执行额度检查，保留 JWT、资源归属和 Gateway 成本归集。
+- 为候选人提供只读使用量摘要，不暴露模型、Token、工具或 Provider 内部信息。
+- 用服务端绕过测试、成本上限合同和浏览器验收验证 Web 不能绕过额度。
 
 ## 非目标
 
-- 多日训练计划、支付、额度或 Agent 自主训练策略。
+- Payment、订阅套餐、团队计费、完整商业化 Entitlement 或 Agent 自主预算策略。
 - 重写 LangGraph 拓扑、Provider、Prompt、检索或工具执行策略。
-- 手工修改 CandidateSkillState、根据训练完成直接提高分数，或回填旧 AnswerHistory 为正式证据。
+- 依赖前端隐藏执行额度、硬编码商业套餐，或将未验证 Agent 变更发布到默认运行时。
 
 ## 相关文件
 
-- `docs/agent/EVALUATION.md`
-- `docs/agent/SKILL_MODEL.md`
-- `docs/product/P0_IMPLEMENTATION_PLAN.md`
+- `docs/harness/RELEASE_GATE.md`
+- `docs/harness/HARNESS.md`
+- `docs/product/REFACTOR_PROGRAM.md`
 - `apps/api/src/modules/interview/`
 - `apps/api/prisma/schema.prisma`
+- `apps/api/src/modules/llm/`
 - `apps/web/src/pages/`
 - `apps/web/e2e/`
 - `docs/product/REFACTOR_PROGRAM.md`
 
 ## 验收标准
 
-- 每项推荐可追溯到同一用户、岗位、技能、成功 FINAL Evidence 和岗位档案版本。
-- 训练完成记录不改变 CandidateSkillState；只有关联复测的成功 FINAL Evidence 可改变正式状态。
+- Usage Ledger 按用户、周期和请求类型准确归集；服务端拒绝超额入口调用。
+- Web 只显示用户可用的摘要，不能直接跳过 API/Gateway 策略。
 - API/Web 合同测试、类型检查、构建和真实浏览器主路径验证有记录。
 - 不调用未受控的真实 Provider；如需要真实 Provider 验证，必须单独满足成本与 Harness 门。
 
 ## 已知风险
 
-- TrainingRecommendation 不能从自由文本 Report 或旧 AnswerHistory 推导，必须消费受用户/岗位范围约束的成功 FINAL Evidence。
-- 训练完成与复测的关联必须是加性事实，不能覆盖历史面试或绕过 B4 的稳定题目、SSE 和成本边界。
+- 现有 SessionCost 是按会话聚合，需避免重复入账、跨用户归集和因重试重复扣减。
+- Provider 调用成本必须继续在 Gateway 归集；额度拒绝不能通过浏览器参数绕过。

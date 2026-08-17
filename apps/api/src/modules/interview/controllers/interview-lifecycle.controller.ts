@@ -16,6 +16,7 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { MemoryService } from '../../memory/memory.service';
 import { ResumeRAGService } from '../services/resume-rag.service';
 import { EvaluationService } from '../services/evaluation.service';
+import { TrainingService } from '../services/training.service';
 import type { ChatMessage } from '../../llm/providers/types';
 import { requireOwnedInterview } from '../../../common/ownership.util';
 
@@ -27,6 +28,7 @@ interface StartInterviewDto {
   targetJobId?: string;
   mode?: 'FULL_SIMULATION' | 'SKILL_PRACTICE';
   practiceSkillId?: string;
+  trainingRecommendationId?: string;
 }
 
 /**
@@ -52,6 +54,7 @@ export class InterviewLifecycleController {
     private memory: MemoryService,
     private resumeRag: ResumeRAGService,
     private evaluation: EvaluationService,
+    private training: TrainingService,
   ) {}
 
   // ===== 静态路由（必须在 :interviewId 之前）=====
@@ -117,6 +120,9 @@ export class InterviewLifecycleController {
     if (mode === 'FULL_SIMULATION' && dto.practiceSkillId) {
       throw new BadRequestException('Practice skill is only valid for skill practice');
     }
+    if (dto.trainingRecommendationId && mode !== 'SKILL_PRACTICE') {
+      throw new BadRequestException('Training retest requires skill practice mode');
+    }
     const resumes = await this.resumeRag.searchByUser(userId, 1).catch(() => []);
     if (resumes.length === 0) {
       throw new BadRequestException(
@@ -165,6 +171,20 @@ export class InterviewLifecycleController {
         summary: resumes[0]?.name ? `候选：${resumes[0].name}` : null,
       },
     });
+    if (dto.trainingRecommendationId && practiceSkillId && targetJob) {
+      try {
+        await this.training.attachRetest(
+          userId,
+          dto.trainingRecommendationId,
+          interview.id,
+          targetJob.id,
+          practiceSkillId,
+        );
+      } catch (error) {
+        await this.prisma.interview.delete({ where: { id: interview.id } });
+        throw error;
+      }
+    }
     return {
       interviewId: interview.id,
       interview,

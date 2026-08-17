@@ -12,6 +12,7 @@
 - B2 成功 FINAL 评价到 CandidateSkillState 的事务性、可追溯聚合。
 - B3 TargetJob profile version 与数据库级单活跃岗位约束。
 - B4 Interview Mode、目标岗位技能练习、题目选择快照、候选人消息幂等和完成回复重放。
+- B5 基于 FINAL Evidence 的单技能 TrainingRecommendation、TrainingAttempt 和关联复测入口。
 
 变更：
 
@@ -21,6 +22,7 @@
 - 正式技能状态只由成功 FINAL Evidence 重算；非正式、失败或降级评价不影响候选人准备度。
 - 准备度现在属于明确的岗位档案版本；活跃岗位并发冲突由服务端拒绝。
 - 候选人流式重试复用客户端消息 ID，已完成请求不会重复写入回答或进入 Agent 成本路径；逐 token Event ID/Offset 续传仍未实现。
+- 训练完成只记录 Attempt，不能直接提高 CandidateSkillState；正式变化仍依赖后续成功 FINAL 评价。
 
 ## 2026-08-14
 

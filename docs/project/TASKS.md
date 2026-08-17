@@ -4,15 +4,24 @@
 
 ## 当前
 
-### TASK-017：B5 单技能训练推荐与复测关联
+### TASK-018：B6 使用量与发布平面最小边界
 
 - 状态：进行中
+- 目标：从现有 SessionCost 建立最小 Usage Ledger、服务端额度策略点和候选人摘要。
+- 范围：用量模型、额度检查、API、候选人摘要、服务端绕过测试和成本验收。
+- 非目标：Payment、订阅、团队套餐、完整 Entitlement 或通过 UI 强制额度。
+- 依赖：SessionCost、JWT/Ownership、B4 幂等流、B5 训练/复测和 Gateway 成本归集。
+
+## 已完成
+
+### TASK-017：B5 单技能训练推荐与复测关联
+
+- 状态：2026-08-17 完成
 - 目标：基于成功 FINAL Evidence 为当前岗位技能缺口生成可追溯的单技能训练推荐，并关联训练完成与复测。
 - 范围：TrainingRecommendation/Attempt 数据合同、受保护 API、候选人训练入口、复测关联和验收。
 - 非目标：多日计划、支付、额度、Agent 自主训练策略或直接提高 CandidateSkillState。
-- 依赖：TASK-013 FINAL 技能状态聚合、TASK-014 岗位版本、TASK-016 稳定面试模式/题目/SSE 合同。
-
-## 已完成
+- 验证：加性 migration 和 Prisma 状态正常；API 29 suites / 256 tests、Web 11 files / 76 tests、API/Web typecheck/build、Docker migration/API health 和真实 JWT 浏览器验收 22/22 通过。
+- 结果：训练推荐只消费成功 FINAL Evidence；训练完成只写 Attempt，不改 CandidateSkillState。
 
 ### TASK-016：B4 受控面试模式与稳定题目合同
 
