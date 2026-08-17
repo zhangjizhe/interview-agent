@@ -33,7 +33,9 @@
 
 评测 API 位于 `/api/agent-lab`：创建 Dataset 与 Case、创建 Evaluator 后，可调用 `POST /agents/:agentId/evaluations` 同步执行已发布版本；`GET /agents/:agentId/evaluations` 查看汇总，`GET /evaluations/:evaluationId` 查看逐用例结果。输入用例必须满足目标 Agent 的输入契约，首个 Interview 适配器要求 `input.message` 非空。
 
-当前阶段不会替换既有 Interview 接口和 LangGraph 面试流程。Run 已记录状态、输入、输出、耗时和错误；Token 与成本仍依赖现有 Interview 会话统计，独立 Run 会明确标记该指标暂不可用。评测不以不稳定的 LLM Judge 作为基础契约，尚未导入现有 Golden Dataset JSON。新增的 `20260817100000_add_agent_lab_applications` migration 尚未在数据库应用，部署前必须运行 `pnpm db:deploy`。
+当前阶段不会替换既有 Interview 接口和 LangGraph 面试流程。Run 已记录状态、输入、输出、耗时和错误；Token 与成本仍依赖现有 Interview 会话统计，独立 Run 会明确标记该指标暂不可用。评测不以不稳定的 LLM Judge 作为基础契约，尚未导入现有 Golden Dataset JSON。部署前必须运行 `pnpm db:deploy`。
+
+Docker API 启动时只执行 `prisma migrate deploy`，迁移失败会阻止服务接收流量，不再使用 `db push --accept-data-loss` 或吞掉 schema 错误。`20260817110000_add_interview_workflow_persistence` 为历史上由 `db push` 创建的面试任务、答题历史、反思日志与简历确认字段补齐版本化契约，对已存在对象保持幂等。升级已有开发库前应先比对当前 schema，再使用 `prisma migrate resolve --applied` 登记已验证存在的历史 migration；不要以删除业务表的方式强行对齐。
 
 Web 端新增 `/lab` 工作台，包含概览、Application、Agent、Run/Trace 和离线评测视图；Trace 的 JSONL 导出仍使用受 JWT 保护的 API 请求。数据集可从页面创建并录入 Interview 输入用例，评测器仅支持 `KEYWORD`、`JSON_SCHEMA`、`LATENCY` 三种确定性规则。当前工作台不提供版本编辑器、批量导入或 LLM Judge，这些能力不能被视为已交付。
 
