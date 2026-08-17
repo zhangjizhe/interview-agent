@@ -1,7 +1,7 @@
-import { Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useState, lazy, Suspense, useEffect } from 'react';
-import { Cpu, Database } from 'lucide-react';
+import { Boxes, Cpu, Database } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { HomePage } from './pages/HomePage';
 import { initWebVitals } from './utils/web-vitals';
@@ -37,6 +37,9 @@ const ToolsPage = lazy(() =>
 );
 const AdminMcpPage = lazy(() =>
   import('./pages/AdminMcpPage').then((m) => ({ default: m.AdminMcpPage })),
+);
+const AgentLabPage = lazy(() =>
+  import('./pages/AgentLabPage').then((m) => ({ default: m.AgentLabPage })),
 );
 
 function PageSpinner() {
@@ -101,6 +104,15 @@ function TopBar() {
         </Link>
 
         <div className="flex items-center gap-2 md:gap-4">
+          <Link
+            to="/lab"
+            className="hidden items-center gap-1.5 bg-cyan-50 px-2.5 py-1.5 text-xs text-cyan-800 transition hover:bg-cyan-100 md:flex"
+            title="AgentLab 工作台"
+          >
+            <Boxes className="h-3.5 w-3.5" />
+            <span className="font-medium">Lab</span>
+          </Link>
+
           {/* 工具/MCP 状态指示 */}
           <ToolsIndicator />
 
@@ -285,8 +297,18 @@ export default function App() {
 
   return (
     <AuthGate>
-      <div className="min-h-screen">
-        <TopBar />
+      <AppContent />
+    </AuthGate>
+  );
+}
+
+function AppContent() {
+  const location = useLocation();
+  const isLab = location.pathname === '/lab' || location.pathname.startsWith('/lab/');
+
+  return (
+    <div className="min-h-screen">
+      {!isLab && <TopBar />}
         <main>
           <ErrorBoundary>
             <Suspense fallback={<PageSpinner />}>
@@ -296,11 +318,15 @@ export default function App() {
                 <Route path="/question-bank" element={<QuestionBankPage />} />
                 <Route path="/tools" element={<ToolsPage />} />
                 <Route path="/admin/mcp" element={<AdminRoute><AdminMcpPage /></AdminRoute>} />
+                <Route path="/lab" element={<AgentLabPage />} />
+                <Route path="/lab/applications" element={<AgentLabPage view="applications" />} />
+                <Route path="/lab/agents" element={<AgentLabPage view="agents" />} />
+                <Route path="/lab/runs" element={<AgentLabPage view="runs" />} />
+                <Route path="/lab/evaluations" element={<AgentLabPage view="evaluations" />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>
         </main>
-      </div>
-    </AuthGate>
+    </div>
   );
 }
