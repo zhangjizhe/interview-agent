@@ -21,6 +21,16 @@
 - API 运行时不再运行 `db push` 或 checkpoint DDL；readiness 现在要求 Baseline、PostgreSQL 和 Redis 均可用。
 - 正式技能状态只由成功 FINAL Evidence 重算；非正式、失败或降级评价不影响候选人准备度。
 - 准备度现在属于明确的岗位档案版本；活跃岗位并发冲突由服务端拒绝。
+
+## 2026-08-19
+
+新增：
+
+- 独立 `apps/agent-lab` MCP 治理控制台、Docker 服务、管理员登录门和浏览器验收。
+
+变更：
+
+- 候选人工具偏好页不再调用、展示或操作系统级 MCP 管理接口。
 - 候选人流式重试复用客户端消息 ID，已完成请求不会重复写入回答或进入 Agent 成本路径；逐 token Event ID/Offset 续传仍未实现。
 - 训练完成只记录 Attempt，不能直接提高 CandidateSkillState；正式变化仍依赖后续成功 FINAL 评价。
 

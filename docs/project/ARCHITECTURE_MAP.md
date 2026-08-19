@@ -65,6 +65,18 @@
 `/api/interview/target-jobs` 与 `.../:targetJobId/readiness` 是岗位与准备度的唯一前端数据源。
 候选人路由不展示 Token、模型、Prompt、RAG、MCP、工具调用、Agent 事件或内部复核输入。
 
+## Agent Lab 控制面
+
+```text
+管理员
+  -> apps/agent-lab（独立 5175 控制台与登录会话）
+  -> NestJS /api/admin/mcp-servers（ADMIN RBAC）
+  -> McpRegistry
+```
+
+Agent Lab 管理系统级 MCP 状态、启停、服务健康检查与配置重载。它不读取候选人领域数据，也不替代
+Interview 的运行时或数据模型；候选人 Web 只保留用户级工具偏好。
+
 ## 离线评估平面
 
 已实现部分：

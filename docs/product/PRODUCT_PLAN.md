@@ -1,6 +1,19 @@
 # Product Plan
 
-## 正式定位
+## 双产品定位
+
+Agent Lab 是独立的 Agent 编排与控制平台；Interview 是接入该平台的第一个应用层。
+
+```text
+Agent Lab
+  -> Runtime / MCP / Trace / Evaluation / Experiment / Release
+  -> Interview Application
+       -> Candidate Improvement Loop
+```
+
+Agent Lab 管理受控的 Agent 工程闭环，不进入候选人导航或面试房间。Interview 继续是面向候选人的训练产品。
+
+## Interview 正式定位
 
 **AI Interview Training Platform**
 
@@ -28,7 +41,7 @@ Resume
 
 | Phase | 主题 | 目标 | 当前依据 |
 | --- | --- | --- | --- |
-| 0 | Open Source AI Agent Lab | 验证 Agent、RAG、工具、评测、追踪和实验能力 | 已有 LangGraph、RAG、MCP、Golden Dataset、Reflection、Langfuse |
+| 0 | Independent Open Source Agent Lab | 作为独立控制台和平台验证 Agent、RAG、工具、评测、追踪和实验能力 | 首个独立 `apps/agent-lab` 控制台；现有 LangGraph、RAG、MCP、Golden Dataset、Reflection、Langfuse |
 | 1 | AI Interview MVP | 用户完成第一次完整 AI 面试 | 已有 Resume、Question、Interview、SSE、Report；需产品化收口 |
 | 2 | Personal Skill System | 建立 Skill Profile、Skill Gap、Skill Trend | 未来，当前仅有评分与答题历史 |
 | 3 | Adaptive Training | 从评估形成训练与复面闭环 | 未来 |

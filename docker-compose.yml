@@ -224,6 +224,18 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  agent-lab:
+    build:
+      context: .
+      dockerfile: apps/agent-lab/Dockerfile
+    container_name: interview-agent-lab
+    ports:
+      - '5175:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:

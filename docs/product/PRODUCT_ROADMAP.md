@@ -2,7 +2,7 @@
 
 | Version | Goal | Features | Dependencies | Success Metrics | Risks |
 | --- | --- | --- | --- | --- | --- |
-| V0.1 | Open Source Agent Lab | LangGraph、RAG、工具、追踪、Golden Dataset | 当前 NestJS 主路径 | 可复跑评测与真实验收 | 资产分散、文档口径不一致 |
+| V0.1 | Independent Agent Lab Foundation | 独立控制台、MCP 治理、LangGraph、RAG、追踪、Golden Dataset | 当前 NestJS 主路径与稳定的管理 API | 可独立构建、可复跑评测与真实验收 | 控制面与业务域耦合、文档口径不一致 |
 | V0.2 | AI Interview MVP | Resume、目标岗位、面试、报告产品化闭环 | Auth、RAG、SSE | 首次面试完成率 | 面试状态与产品导航不足 |
 | V0.3 | Personal Skill System | Skill Profile、Skill Gap、趋势 | 结构化 Evaluation、历史数据 | 用户可解释能力差距 | 评分一致性不足 |
 | V0.4 | Knowledge + Question Intelligence | 来源生命周期、题目质量、岗位覆盖 | RAG、Question Bank、导入安全 | 召回与题目质量达标 | 注入、版权、来源质量 |

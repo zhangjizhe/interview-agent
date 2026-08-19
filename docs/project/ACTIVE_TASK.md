@@ -1,52 +1,59 @@
 # 当前任务
 
-最后更新：2026-08-15
+最后更新：2026-08-19
 
 ## 任务 ID
 
-TASK-018
+TASK-019
 
 ## 目标
 
-完成 B6：使用量与发布平面最小边界。
+建立独立 Agent Lab 平台的最小可用边界，并将 MCP 管理从候选人 Web 迁入该控制台。
 
 ## 状态
 
-进行中
+完成
 
 ## 范围
 
-- 基于已有 SessionCost 建立用户/周期 Usage Ledger 与服务端额度策略点。
-- 在面试和评价的高成本入口执行额度检查，保留 JWT、资源归属和 Gateway 成本归集。
-- 为候选人提供只读使用量摘要，不暴露模型、Token、工具或 Provider 内部信息。
-- 用服务端绕过测试、成本上限合同和浏览器验收验证 Web 不能绕过额度。
+- 将“Agent Lab 是独立 Agent 编排与控制平台，Interview 是其应用层”写入项目宪法、Agent Lab Charter 与架构决策。
+- 新建独立可构建、可部署的 `apps/agent-lab` 管理员控制台。
+- 为 Agent Lab 定义独立控制台 UI 与操作系统，不复用候选人训练导航或交互语义。
+- 将 MCP 服务查看、系统级启停、健康检查与配置重载迁入 Agent Lab。
+- 修复 MCP 管理操作的错误反馈、请求状态和按服务健康检查结果。
+- 候选人 Web 保持用户级工具偏好，不再承载 MCP 系统管理入口。
 
 ## 非目标
 
-- Payment、订阅套餐、团队计费、完整商业化 Entitlement 或 Agent 自主预算策略。
-- 重写 LangGraph 拓扑、Provider、Prompt、检索或工具执行策略。
-- 依赖前端隐藏执行额度、硬编码商业套餐，或将未验证 Agent 变更发布到默认运行时。
+- 立即拆分或重写 NestJS、LangGraph、Provider、Prompt、检索、成本归集或 Interview 领域数据。
+- Agent Lab 完整运行时 API、Prompt Registry、实验 UI、自动优化或跨应用多租户。
+- 在候选人界面暴露 Prompt、思维链、检索、工具、模型或 Token 内部数据。
 
 ## 相关文件
 
-- `docs/harness/RELEASE_GATE.md`
+- `docs/agent-lab/CHARTER.md`
+- `docs/agent/AGENT_RUNTIME.md`
 - `docs/harness/HARNESS.md`
-- `docs/product/REFACTOR_PROGRAM.md`
-- `apps/api/src/modules/interview/`
-- `apps/api/prisma/schema.prisma`
-- `apps/api/src/modules/llm/`
-- `apps/web/src/pages/`
-- `apps/web/e2e/`
-- `docs/product/REFACTOR_PROGRAM.md`
+- `apps/agent-lab/`
+- `apps/api/src/modules/interview/admin-mcp.controller.ts`
+- `apps/web/src/pages/ToolsPage.tsx`
 
 ## 验收标准
 
-- Usage Ledger 按用户、周期和请求类型准确归集；服务端拒绝超额入口调用。
-- Web 只显示用户可用的摘要，不能直接跳过 API/Gateway 策略。
-- API/Web 合同测试、类型检查、构建和真实浏览器主路径验证有记录。
-- 不调用未受控的真实 Provider；如需要真实 Provider 验证，必须单独满足成本与 Harness 门。
+- Agent Lab 有独立 package、开发端口、生产镜像和部署服务，能独立构建。
+- MCP 管理仅由管理员控制台调用现有受 RBAC 保护的 API；候选人 Web 不保留系统级操作。
+- 管理页对加载、操作中、成功和失败状态有准确反馈；服务级健康检查不会串卡。
+- API/Web/Agent Lab 的相关测试和构建通过，且不调用真实 Provider。
 
 ## 已知风险
 
-- 现有 SessionCost 是按会话聚合，需避免重复入账、跨用户归集和因重试重复扣减。
-- Provider 调用成本必须继续在 Gateway 归集；额度拒绝不能通过浏览器参数绕过。
+- 当前控制面 API 暂由 NestJS Interview 模块承载；独立前端不等于已完成运行时拆分，必须在后续 API 合同稳定后迁移。
+- MCP 的系统级启停目前是进程内状态；重启与配置重载的持久化策略不属于本次范围。
+- 管理员令牌不得进入候选人 Web、静态配置或构建产物。
+
+## 交付结果
+
+- `apps/agent-lab` 已作为独立 Vite/React 控制台、Docker 镜像和 Compose 服务交付，端口为 `5175`。
+- 控制台使用独立管理员登录门，仅通过现有受 RBAC 保护的 MCP API 执行状态、启停、健康检查和配置重载。
+- 候选人 `ToolsPage` 已移除 MCP 系统状态、系统级启停和管理入口，只保留个人工具偏好。
+- Agent Lab 本地管理员/普通用户浏览器验收、独立 build/typecheck、候选人 Web typecheck、Docker 静态入口和 API readiness 均通过。

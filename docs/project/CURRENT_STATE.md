@@ -21,6 +21,7 @@
 | Mobile/小程序 | 计划中 | 当前 Web 有响应式；没有独立小程序客户端。 |
 | 自动化测试 | 已实现 | API Jest/Unit Test、Web Vitest、Playwright/浏览器和 Content Workflow 验收资产已配置；B0 真实登录与岗位创建浏览器验收已可执行。 |
 | 产品设计包 | 已实现 | 2026-08-13 已审计并建立 P0 产品、Agent、Harness 规格；未改变运行时行为。 |
+| Agent Lab 控制面 | 已实现 | 独立 `apps/agent-lab` 管理员控制台已提供 MCP 服务查看、启停、健康检查和配置重载；Interview 仍保留领域事实与 NestJS 运行时。 |
 
 ## 已验证基线
 

@@ -4,14 +4,15 @@
 
 ## 上一任务
 
-TASK-017：B5 单技能训练推荐与复测关联
+TASK-019：Agent Lab 独立控制台与 MCP 治理
 
 ## 已完成
 
-- TrainingRecommendation 只由活跃岗位、成功 FINAL Evidence 和低分正式技能状态生成。
-- TrainingAttempt 记录训练完成和关联复测；训练完成不修改 CandidateSkillState。
-- 复测使用现有单技能 Interview 路径，并检查目标岗位版本和技能归属。
-- 2026-08-17 本地 Docker migration、API/Web build、全量回归和真实 JWT 浏览器验收 22/22 通过；未触发 Provider 调用。
+- 新建独立 `apps/agent-lab` Vite/React 控制台、Docker 镜像和 Compose 服务。
+- Agent Lab 使用独立管理员登录会话，并调用现有 NestJS ADMIN RBAC MCP 管理 API。
+- MCP 服务查看、系统级启停、健康检查和配置重载已迁入 Agent Lab。
+- 候选人 `ToolsPage` 只保留用户级工具偏好，不再请求或显示系统 MCP 控制面。
+- Agent Lab 管理员登录、MCP 控制台加载与普通用户拒绝浏览器验收通过。
 
 ## 改动文件
 
