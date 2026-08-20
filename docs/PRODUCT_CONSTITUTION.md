@@ -27,42 +27,108 @@ flowchart LR
 
 产品不得把模型输出、工具调用或 Trace 本身当作用户价值。用户价值是“基于真实岗位约束得到可信、连续、可解释的面试体验”。
 
-## 3. 默认核心架构
+## 3. 双架构与职责边界
+
+系统包含两个产品架构，复用同一套运行时与基础设施：
+
+- **Interview**：面向候选人的业务应用，目标是完成可靠、有针对性的模拟面试闭环。
+- **AgentLab**：面向开发者和运营者的平台，目标是管理 Agent、验证版本、审计运行和控制工具执行。
+
+它们不是两个独立后端，也不是互相调用的“上下游产品”。Interview 通过明确的 Application Adapter 使用共享运行时；AgentLab 通过只追加的运行记录观察和治理该运行时。
+
+### 3.1 Interview 业务架构
+
+```mermaid
+flowchart LR
+  Candidate[候选人] --> Web[Interview Web]
+  Web -->|JWT + POST SSE| InterviewAPI[Interview API]
+
+  subgraph InterviewDomain["Interview 业务域：候选人体验"]
+    InterviewAPI --> Lifecycle[面试生命周期\n创建、简历确认、结束]
+    InterviewAPI --> Conversation[会话控制\n输入、SSE、恢复]
+    Lifecycle --> Context[面试上下文\n岗位、职级、简历、题目]
+    Conversation --> Context
+    Context --> TaskQueue[动态题目与追问]
+    TaskQueue --> Adapter[Interview Application Adapter]
+    Adapter --> Report[答题历史、评分、报告]
+  end
+
+  Adapter -->|RunInput| Runtime[共享 Agent Runtime]
+  Runtime -->|token / tool / heartbeat / done| Conversation
+  Report --> Candidate
+```
+
+**Interview 的唯一责任**：候选人、简历、目标岗位、面试状态、题目、回答、评分、报告与 SSE 交互。它拥有这些业务数据的最终写入权。
+
+Interview 不负责管理 Agent 版本、维护评测集、安排后台执行器，或直接操作平台的 Trace/审批表。
+
+### 3.2 AgentLab 平台架构
+
+```mermaid
+flowchart LR
+  Operator[开发者 / 管理员] --> LabWeb[AgentLab Web]
+  LabWeb -->|JWT REST| LabAPI[AgentLab API]
+
+  subgraph LabControl["控制面：定义与发布"]
+    LabAPI --> Registry[Workspace / Agent / Version]
+    Registry --> Release[发布、激活、回滚]
+    LabAPI --> Dataset[Dataset / Evaluator]
+    Dataset --> Evaluation[Evaluation Run / Result]
+  end
+
+  subgraph LabObserve["运行治理面：审计与安全"]
+    LabAPI --> RunStore[Run / Trace / 子 Run]
+    LabAPI --> ToolPolicy[ToolRunner\n预算、Guard、Approval]
+    RunStore --> Replay[回放、导出、诊断]
+  end
+
+  Release -.已发布运行配置.-> Runtime[共享 Agent Runtime]
+  Runtime -.追加运行事件.-> RunStore
+  ToolPolicy --> Runtime
+```
+
+**AgentLab 的唯一责任**：Agent 定义和版本、评测、发布门禁、运行审计、工具预算与审批。它拥有平台对象和审计对象的最终写入权。
+
+AgentLab 不拥有候选人业务状态，不生成面试报告，不决定面试题，也不直接向候选人浏览器输出 SSE。
+
+### 3.3 共享运行时与基础设施
 
 ```mermaid
 flowchart TB
-  Web[React Web\n候选人面试端 / 管理端 / AgentLab] -->|JWT REST + POST SSE| API[NestJS API]
+  InterviewAdapter[Interview Application Adapter] --> Runtime[Agent Runtime\n输入契约、事件契约、取消]
+  LabAdapter[AgentLab Run Adapter] --> Runtime
 
-  subgraph Runtime["默认产品运行时"]
-    API --> Auth[鉴权、RBAC、资源归属]
-    API --> Interview[面试工作流\n简历、题目、任务队列、报告]
-    Interview --> Agent[InterviewAgentService]
-    Agent --> Graph[LangGraph\nSupervisor / Planner / Executor / Reviewer]
-    Graph --> Tools[MCP Registry / ToolRunner]
-    Agent --> Gateway[LLM Gateway\n路由、缓存、熔断、成本]
-  end
+  Runtime --> Graph[LangGraph 编排]
+  Runtime --> Gateway[LLM Gateway]
+  Runtime --> Tools[MCP Provider / ToolRunner]
+  Runtime --> Retrieval[检索与记忆接口]
 
-  subgraph State["状态、检索与审计"]
-    API --> PG[(PostgreSQL\n业务数据、Checkpoint、Run、Trace)]
-    API --> Redis[(Redis\n会话、缓存、HITL)]
-    Interview --> RAG[RAG\nDense + BM25 + RRF + Rerank]
-    RAG --> Milvus[(Milvus)]
-    RAG --> Qdrant[(Qdrant)]
-    Agent --> Memory[Mem0 / 长期记忆]
-    API --> Lab[AgentLab\nVersion / Run / Trace / Evaluation]
-  end
-
-  Gateway --> Qwen[Qwen 主模型]
-  Gateway -.受健康状态约束的降级.-> Fallback[备用 Provider]
-  Graph -->|token / tool / heartbeat / done| Web
+  Gateway --> Qwen[Qwen]
+  Gateway -.健康降级.-> Fallback[备用 Provider]
+  Retrieval --> Vector[(Milvus / Qdrant)]
+  Runtime --> State[(PostgreSQL Checkpoint / Redis)]
 ```
 
-### 3.1 默认路径
+共享运行时只接受标准化输入并输出标准化事件；它不应知道“简历页面”“报告页面”或“评测工作台”。业务语义由 Application Adapter 注入，平台治理由 AgentLab Adapter 订阅。
 
-1. React Web 是候选人和管理员的产品入口；NestJS `apps/api` 是唯一默认产品后端。
-2. 面试主链路由 `InterviewAgentService` 统一进入；默认使用 LangGraph 多 Agent，DeepAgents 和直接 LLM 仅作为显式可配置的降级路径。
-3. Interview Agent 的岗位、职级、当前题目和题库范围必须作为运行时上下文进入 Agent 图。不得仅靠用户输入“开始面试”推测岗位，也不得把 AI Agent 岗位降级为通用前端题。
-4. AgentLab 通过 Application、Run 和追加式 Trace 旁路接入现有面试流程；在未完成等价验收前，不得替换已稳定的 Interview API。
+### 3.4 所有权矩阵
+
+| 能力 | 责任方 | 输入 | 输出 | 禁止跨界 |
+| --- | --- | --- | --- | --- |
+| 候选人面试 | Interview | 简历、岗位、职级、回答 | SSE、题目、报告 | AgentLab 不修改面试业务状态 |
+| Agent 运行 | Shared Runtime | `RunInput`、运行配置 | 标准事件、终态 | 不直接操作业务页面或业务表 |
+| Agent 版本与发布 | AgentLab | Agent 定义、版本、评测结果 | 已发布配置 | Interview 不直接编辑平台版本 |
+| Trace 与审计 | AgentLab | 运行事件 | Run、Trace、回放包 | Trace 写入失败不能阻断面试 |
+| 工具审批与预算 | AgentLab / ToolRunner | `tool.call`、策略、审批决定 | `tool.result` | 工具不得绕过审批直接执行 |
+| 模型、缓存、存储 | Shared Infrastructure | 规范化请求 | 可用性、数据访问 | 不承载候选人业务流程判断 |
+
+### 3.5 依赖规则
+
+1. **候选人主链路优先**：AgentLab 的 Trace、遥测或评测失败不得阻断 Interview SSE、回答持久化或报告。
+2. **单向审计**：Interview 通过 Adapter 产生运行事件，AgentLab 只追加记录和读取；平台不得反向篡改已完成的候选人面试。
+3. **版本受控接入**：未来 Interview 只能使用 AgentLab 已发布且通过门禁的版本；当前固定面试运行时在完成等价验收前保持不变。
+4. **数据单写**：Interview 表由 Interview 写入，AgentLab 表由 AgentLab 写入。跨域只传 ID、版本和显式事件，不跨域直接写表。
+5. **运行时无业务耦合**：岗位、题目和简历由 Interview Adapter 组装后传入 Runtime，运行时不得猜测或硬编码前端、AI Agent 等岗位。
 
 ## 4. 不可破坏的产品规则
 
