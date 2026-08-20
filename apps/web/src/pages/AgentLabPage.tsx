@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { agentLabRequest, downloadAgentLabTrace, formatDate, formatDuration, outputPreview } from '../agent-lab/api';
 import type {
+  AgentVersion,
   EvaluationDataset,
   EvaluationDatasetDetail,
   EvaluationRun,
@@ -123,6 +124,7 @@ function Metric({
 }
 
 function LabShell({ view, children }: { view: LabView; children: React.ReactNode }) {
+  const sessionUser = localStorage.getItem('ia_userId') || '当前用户';
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
@@ -134,6 +136,20 @@ function LabShell({ view, children }: { view: LabView; children: React.ReactNode
           <Link to="/" className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-950">
             进入 Interview <ArrowUpRight className="h-4 w-4" />
           </Link>
+          <div className="hidden items-center gap-3 border-l border-slate-200 pl-4 text-xs text-slate-500 sm:flex">
+            <span className="max-w-32 truncate font-mono">{sessionUser}</span>
+            <button
+              onClick={() => {
+                localStorage.removeItem('ia_access_token');
+                localStorage.removeItem('ia_userId');
+                localStorage.removeItem('ia_user_role');
+                window.location.href = '/';
+              }}
+              className="text-slate-500 hover:text-rose-700"
+            >
+              退出
+            </button>
+          </div>
         </div>
       </header>
       <div className="mx-auto grid max-w-7xl md:grid-cols-[184px_minmax(0,1fr)]">
@@ -316,8 +332,29 @@ function Agents() {
   const client = useQueryClient();
   const [searchParams] = useSearchParams();
   const [showCreate, setShowCreate] = useState(false);
+  const [showVersion, setShowVersion] = useState(false);
+  const [runMessage, setRunMessage] = useState('');
+  const [runOutput, setRunOutput] = useState('');
   const [form, setForm] = useState({ key: '', name: '', type: 'custom', description: '' });
+  const [versionForm, setVersionForm] = useState({
+    version: '',
+    systemPrompt: '',
+    runtimeConfig: '{"adapter":"interview-multi-agent"}',
+    modelConfig: '{}',
+    changelog: '',
+  });
   const { agents } = useLabData();
+  const selectedAgentId = searchParams.get('agent');
+  const selectedAgent = useMemo(
+    () => (agents.data || []).find((agent) => agent.id === selectedAgentId) || null,
+    [agents.data, selectedAgentId],
+  );
+  const selectedAgentDetail = useQuery({
+    queryKey: ['agent-lab', 'agent', selectedAgentId],
+    queryFn: () => agentLabRequest<LabAgent>(`/agents/${selectedAgentId}`),
+    enabled: Boolean(selectedAgentId),
+  });
+  const versions = selectedAgentDetail.data?.versions || [];
   const create = useMutation({
     mutationFn: () => agentLabRequest<LabAgent>('/agents', { method: 'POST', body: JSON.stringify(form) }),
     onSuccess: () => {
@@ -333,13 +370,58 @@ function Agents() {
     },
     onSuccess: () => client.invalidateQueries({ queryKey: ['agent-lab', 'agents'] }),
   });
-  const selectedAgentId = searchParams.get('agent');
+  const createVersion = useMutation({
+    mutationFn: () => agentLabRequest<AgentVersion>(`/agents/${selectedAgentId}/versions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        version: versionForm.version,
+        systemPrompt: versionForm.systemPrompt,
+        runtimeConfig: JSON.parse(versionForm.runtimeConfig),
+        modelConfig: JSON.parse(versionForm.modelConfig),
+        changelog: versionForm.changelog,
+      }),
+    }),
+    onSuccess: () => {
+      setShowVersion(false);
+      setVersionForm({ version: '', systemPrompt: '', runtimeConfig: '{"adapter":"interview-multi-agent"}', modelConfig: '{}', changelog: '' });
+      client.invalidateQueries({ queryKey: ['agent-lab', 'agent', selectedAgentId] });
+      client.invalidateQueries({ queryKey: ['agent-lab', 'agents'] });
+    },
+  });
+  const publishVersion = useMutation({
+    mutationFn: (versionId: string) => agentLabRequest<AgentVersion>(`/agents/${selectedAgentId}/versions/${versionId}/publish`, { method: 'POST' }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['agent-lab', 'agent', selectedAgentId] });
+      client.invalidateQueries({ queryKey: ['agent-lab', 'agents'] });
+    },
+  });
+  const activateVersion = useMutation({
+    mutationFn: (versionId: string) => agentLabRequest<AgentVersion>(`/agents/${selectedAgentId}/versions/${versionId}/activate`, { method: 'POST' }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['agent-lab', 'agent', selectedAgentId] });
+      client.invalidateQueries({ queryKey: ['agent-lab', 'agents'] });
+    },
+  });
+  const runAgent = useMutation({
+    mutationFn: () => agentLabRequest<LabRun>(`/agents/${selectedAgentId}/run`, {
+      method: 'POST',
+      body: JSON.stringify({
+        input: {
+          message: runMessage,
+          position: '后端工程师',
+          level: 'P6',
+        },
+        application: 'agent-lab-playground',
+      }),
+    }),
+    onSuccess: (run) => setRunOutput(run.output ? outputPreview(run.output) : run.error || '运行完成，但没有输出。'),
+  });
 
   return (
     <LabShell view="agents">
       <SectionHeader title="Agent 注册表" detail="每个 Agent 通过发布版本、运行记录和评测结果形成可追溯交付。" action={<button onClick={() => setShowCreate(true)} className="inline-flex items-center gap-2 bg-cyan-700 px-3 py-2 text-sm font-medium text-white hover:bg-cyan-800"><Plus className="h-4 w-4" />新建 Agent</button>} />
       <div className="mt-6 space-y-4">
-        <RequestError error={agents.error || create.error || clone.error} />
+        <RequestError error={agents.error || create.error || clone.error || selectedAgentDetail.error || createVersion.error || publishVersion.error || activateVersion.error || runAgent.error} />
         {showCreate && (
           <form onSubmit={(event) => { event.preventDefault(); create.mutate(); }} className="grid gap-3 border border-cyan-200 bg-cyan-50 p-4 md:grid-cols-2">
             <label className="text-sm text-slate-700">标识<input required value={form.key} onChange={(event) => setForm({ ...form, key: event.target.value })} placeholder="example-agent" pattern="[a-z][a-z0-9-]{1,63}" className="mt-1 w-full border border-slate-300 bg-white px-3 py-2 outline-none focus:border-cyan-600" /></label>
@@ -350,14 +432,57 @@ function Agents() {
           </form>
         )}
         {agents.isLoading ? <div className="grid place-items-center py-24"><Loader2 className="h-6 w-6 animate-spin text-cyan-700" /></div> : (agents.data || []).length === 0 ? <EmptyState title="尚未注册 Agent" detail="先引导 Interview，或创建新的 Agent 定义。" /> : (
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="grid gap-3 lg:grid-cols-2">
             {agents.data?.map((agent) => (
               <article key={agent.id} className={`border bg-white p-4 ${agent.id === selectedAgentId ? 'border-cyan-500 ring-1 ring-cyan-500' : 'border-slate-200'}`}>
                 <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><Bot className="h-4 w-4 shrink-0 text-violet-700" /><h2 className="truncate font-medium text-slate-900">{agent.name}</h2></div><p className="mt-1 font-mono text-xs text-slate-500">{agent.key}</p></div><StatusBadge status={agent.currentVersion?.status || agent.status} /></div>
                 <p className="mt-4 min-h-10 text-sm text-slate-600">{agent.description || '未填写说明'}</p>
-                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">版本 <span className="font-mono text-slate-900">{agent.currentVersion?.version || '-'}</span> · {agent._count?.versions || 0} 个</span><button onClick={() => clone.mutate(agent)} disabled={clone.isPending} title="克隆 Agent" className="inline-flex items-center gap-1.5 text-cyan-700 hover:text-cyan-900 disabled:text-cyan-300"><Copy className="h-4 w-4" />克隆</button></div>
+                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm"><span className="text-slate-500">版本 <span className="font-mono text-slate-900">{agent.currentVersion?.version || '-'}</span> · {agent._count?.versions || 0} 个</span><div className="flex items-center gap-3"><Link to={`/lab/agents?agent=${agent.id}`} className="text-cyan-700 hover:text-cyan-900">管理</Link><button onClick={() => clone.mutate(agent)} disabled={clone.isPending} title="克隆 Agent" className="inline-flex items-center gap-1.5 text-cyan-700 hover:text-cyan-900 disabled:text-cyan-300"><Copy className="h-4 w-4" />克隆</button></div></div>
               </article>
             ))}
+            </div>
+            {!selectedAgent ? (
+              <div className="grid min-h-72 place-items-center border border-dashed border-slate-300 bg-white px-6 text-center text-sm text-slate-500">
+                选择一个 Agent，管理版本并在沙盒中试跑。
+              </div>
+            ) : (
+              <aside className="border border-slate-200 bg-white">
+                <div className="border-b border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="font-semibold text-slate-900">{selectedAgent.name}</h2>
+                      <p className="mt-1 font-mono text-xs text-slate-500">{selectedAgent.key}</p>
+                    </div>
+                    <button onClick={() => setShowVersion((value) => !value)} className="inline-flex items-center gap-1.5 bg-cyan-700 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-cyan-800"><Plus className="h-3.5 w-3.5" />新版本</button>
+                  </div>
+                </div>
+                {showVersion && (
+                  <form onSubmit={(event) => { event.preventDefault(); createVersion.mutate(); }} className="space-y-3 border-b border-cyan-100 bg-cyan-50 p-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs text-slate-700">版本号<input required pattern="\d+\.\d+\.\d+.*" value={versionForm.version} onChange={(event) => setVersionForm({ ...versionForm, version: event.target.value })} placeholder="1.1.0" className="mt-1 w-full border border-slate-300 bg-white px-2.5 py-2 text-sm" /></label>
+                      <label className="text-xs text-slate-700">变更说明<input value={versionForm.changelog} onChange={(event) => setVersionForm({ ...versionForm, changelog: event.target.value })} placeholder="新增追问策略" className="mt-1 w-full border border-slate-300 bg-white px-2.5 py-2 text-sm" /></label>
+                    </div>
+                    <label className="block text-xs text-slate-700">系统提示词<textarea required rows={4} value={versionForm.systemPrompt} onChange={(event) => setVersionForm({ ...versionForm, systemPrompt: event.target.value })} placeholder="定义 Agent 的行为边界、输出格式和判断标准" className="mt-1 w-full border border-slate-300 bg-white px-2.5 py-2 text-sm" /></label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs text-slate-700">运行时 JSON<textarea rows={2} value={versionForm.runtimeConfig} onChange={(event) => setVersionForm({ ...versionForm, runtimeConfig: event.target.value })} className="mt-1 w-full border border-slate-300 bg-white px-2.5 py-2 font-mono text-xs" /></label>
+                      <label className="text-xs text-slate-700">模型 JSON<textarea rows={2} value={versionForm.modelConfig} onChange={(event) => setVersionForm({ ...versionForm, modelConfig: event.target.value })} className="mt-1 w-full border border-slate-300 bg-white px-2.5 py-2 font-mono text-xs" /></label>
+                    </div>
+                    <button disabled={createVersion.isPending} className="inline-flex items-center gap-1.5 bg-cyan-700 px-3 py-2 text-xs font-medium text-white disabled:bg-cyan-300"><Check className="h-3.5 w-3.5" />保存草稿</button>
+                  </form>
+                )}
+                <div className="border-b border-slate-200 p-4">
+                  <div className="flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">版本发布</h3><span className="font-mono text-xs text-slate-400">{versions.length} versions</span></div>
+                  {selectedAgentDetail.isLoading ? <div className="py-6 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-cyan-700" /></div> : versions.length === 0 ? <p className="py-5 text-sm text-slate-500">还没有版本，先创建一个草稿。</p> : <div className="mt-3 space-y-2">{versions.map((version) => <div key={version.id} className="border border-slate-200 p-3"><div className="flex items-center justify-between gap-2"><div><span className="font-mono text-sm text-slate-900">v{version.version}</span><span className="ml-2"><StatusBadge status={version.status} /></span></div>{selectedAgent.currentVersion?.id === version.id && <span className="text-xs font-medium text-cyan-700">当前</span>}</div><p className="mt-1 truncate text-xs text-slate-500">{version.changelog || '暂无变更说明'}</p><div className="mt-2 flex gap-3 text-xs">{version.status === 'DRAFT' && <button onClick={() => publishVersion.mutate(version.id)} disabled={publishVersion.isPending} className="text-cyan-700 hover:text-cyan-900">发布</button>}{version.status === 'PUBLISHED' && selectedAgent.currentVersion?.id !== version.id && <button onClick={() => activateVersion.mutate(version.id)} disabled={activateVersion.isPending} className="text-cyan-700 hover:text-cyan-900">设为当前</button>}</div></div>)}</div>}
+                </div>
+                <div className="p-4">
+                  <div className="flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">试跑 Agent</h3><Play className="h-4 w-4 text-violet-600" /></div>
+                  <textarea value={runMessage} onChange={(event) => setRunMessage(event.target.value)} rows={3} placeholder="输入一条面试回答，验证当前版本的行为..." className="mt-3 w-full border border-slate-300 px-3 py-2 text-sm" />
+                  <button onClick={() => runAgent.mutate()} disabled={!runMessage.trim() || !selectedAgent.currentVersion || runAgent.isPending} className="mt-2 inline-flex w-full items-center justify-center gap-2 bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:bg-slate-300">{runAgent.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}运行当前版本</button>
+                  {runOutput && <div className="mt-3 border border-emerald-200 bg-emerald-50 p-3 text-sm text-slate-700"><div className="mb-1 text-xs font-semibold text-emerald-800">最近输出</div><pre className="max-h-48 overflow-auto whitespace-pre-wrap font-sans">{runOutput}</pre></div>}
+                </div>
+              </aside>
+            )}
           </div>
         )}
       </div>

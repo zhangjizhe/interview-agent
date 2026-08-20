@@ -82,6 +82,16 @@ export function InterviewPage() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  const resetComposerHeight = () => {
+    if (composerRef.current) composerRef.current.style.height = '';
+  };
+
+  const resizeComposer = (target: HTMLTextAreaElement) => {
+    target.style.height = 'auto';
+    target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+  };
 
   const { pullDistance, refreshing, pullRef } = usePullToRefresh({
     onRefresh: async () => {
@@ -177,16 +187,18 @@ export function InterviewPage() {
     }
     const content = input.trim();
     setInput('');
+    resetComposerHeight();
     await send(interviewId, userId, content);
     // 估算并累积 token 数（仅 UI 展示用）
     addTokens(Math.ceil(content.length / 2));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // 只在移动端（小屏）允许回车发送，PC 端避免误触
-    if (e.key === 'Enter' && !e.shiftKey && window.innerWidth < 768) {
+    if (e.nativeEvent.isComposing) return;
+    // Preserve plain Enter for multi-line interview answers on every device.
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
@@ -869,8 +881,12 @@ export function InterviewPage() {
                   )}
                 </button>
                 <textarea
+                  ref={composerRef}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    resizeComposer(e.currentTarget);
+                  }}
                   onKeyDown={handleKeyDown}
                   placeholder={
                     isReadOnly
@@ -883,7 +899,7 @@ export function InterviewPage() {
                   }
                   rows={1}
                   disabled={streaming || !resumeConfirmed || isReadOnly}
-                  className="flex-1 px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none disabled:bg-slate-50 max-h-32"
+                  className="flex-1 min-h-10 px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none overflow-y-auto disabled:bg-slate-50 max-h-32"
                 />
                 <button
                   onClick={handleSend}

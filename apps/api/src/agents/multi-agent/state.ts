@@ -66,6 +66,12 @@ export type ReviewVerdict = z.infer<typeof ReviewVerdictSchema>;
  */
 export const InterviewAgentState = Annotation.Root({
     /**
+     * 当前面试的岗位约束。它独立于 messages 持久化，避免把业务配置当作
+     * 候选人对话内容，又能让每个图节点按同一岗位范围工作。
+     */
+    interview_context: Annotation<string>(),
+
+    /**
      * 对话历史。
      * reducer = messagesStateReducer（addMessages）：每次更新时追加新消息，不丢失历史。
      */

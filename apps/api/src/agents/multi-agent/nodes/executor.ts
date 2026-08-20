@@ -140,6 +140,9 @@ export function createExecutorNode(model: BaseChatModel) {
                             content: `${specialistPrompt}
 
 ${roundHint}
+【面试上下文】
+${state.interview_context || '未提供岗位上下文。'}
+
 【已收集信息】
 ${contextFromPastSteps || '（无）'}
 

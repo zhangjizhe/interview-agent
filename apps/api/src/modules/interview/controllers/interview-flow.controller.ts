@@ -164,6 +164,19 @@ export class InterviewFlowController {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
+    // 图编排和模型首 token 可能超过几十秒。用轻量 SSE 心跳保持连接，
+    // 防止前端把“仍在处理”误判成断流。
+    const writeHeartbeat = () => {
+      if (res.writableEnded) return;
+      res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
+      (res as any).flush?.();
+    };
+    // Emit once immediately so the client and any intermediary know the stream
+    // is active before expensive interview setup starts.
+    writeHeartbeat();
+    const heartbeat = setInterval(writeHeartbeat, 15_000);
+    const stopHeartbeat = () => clearInterval(heartbeat);
+    res.once('close', stopHeartbeat);
 
     // R-P2-20 修复：user message 长度上限 10000 字符（约 2000-3000 tokens）。
     // 原 Prisma @db.Text 无限制，恶意用户可发超长消息导致 DB / LLM 上下文压力。
@@ -172,12 +185,14 @@ export class InterviewFlowController {
     if (!dto.content || typeof dto.content !== 'string' || dto.content.length === 0) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: '消息内容不能为空' })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
     if (dto.content.length > MAX_USER_MESSAGE_CHARS) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: `消息超过 ${MAX_USER_MESSAGE_CHARS} 字符限制（当前 ${dto.content.length}）` })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -188,6 +203,7 @@ export class InterviewFlowController {
     if (!interview) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: 'Interview not found' })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -197,6 +213,7 @@ export class InterviewFlowController {
     if (interview.status === 'COMPLETED') {
       res.write(`data: ${JSON.stringify({ type: 'error', error: '此面试已结束,不能继续发送消息' })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -277,6 +294,7 @@ export class InterviewFlowController {
       await new Promise<void>((resolve) => {
         res.write('data: [DONE]\n\n');
         (res as any).flush?.();
+        stopHeartbeat();
         res.end(() => resolve());
       });
     } catch (err: any) {
@@ -287,6 +305,7 @@ export class InterviewFlowController {
       await new Promise<void>((resolve) => {
         res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
         (res as any).flush?.();
+        stopHeartbeat();
         res.end(() => resolve());
       });
     }

@@ -20,6 +20,7 @@ export class QwenProvider extends BaseLLMProvider {
     this.client = new OpenAI({
       apiKey: this.config.get<string>('qwen.apiKey'),
       baseURL: this.config.get<string>('qwen.baseUrl'),
+      timeout: 30_000,
     });
   }
 

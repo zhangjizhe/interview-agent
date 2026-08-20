@@ -181,14 +181,19 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     return this.enabled;
   }
 
-  async run(userMessage: string, threadId: string, history: BaseMessageLike[] = []) {
+  async run(
+    userMessage: string,
+    threadId: string,
+    history: BaseMessageLike[] = [],
+    interviewContext = '',
+  ) {
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
     const isFirstTurn = history.length === 0;
     const input: Partial<InterviewAgentStateType> = isFirstTurn
-      ? { messages: [new HumanMessage(userMessage)] }
-      : { messages: [new HumanMessage(userMessage)] };
+      ? { messages: [new HumanMessage(userMessage)], interview_context: interviewContext }
+      : { messages: [new HumanMessage(userMessage)], interview_context: interviewContext };
 
     // 用 AsyncLocalStorage 包装，让 _generate 拿到真实 threadId
     // （LangChain v1.x _generate 拿到的 options.configurable 已被剥离）
@@ -206,7 +211,12 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async *stream(userMessage: string, threadId: string, userId?: string): AsyncGenerator<any, void, unknown> {
+  async *stream(
+    userMessage: string,
+    threadId: string,
+    userId?: string,
+    interviewContext = '',
+  ): AsyncGenerator<any, void, unknown> {
     this.logger.debug(`[stream-v6] ENTER threadId=${threadId} userId=${userId} content="${userMessage.slice(0, 30)}..."`);
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
@@ -260,7 +270,10 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
           let stream: any;
           try {
             stream = await self.graph!.stream(
-              { messages: [new HumanMessage(userMessage)] } as any,
+              {
+                messages: [new HumanMessage(userMessage)],
+                interview_context: interviewContext,
+              } as any,
               { ...config, streamMode: 'messages' as const, recursionLimit: INTERVIEW_GRAPH_RECURSION_LIMIT },
             );
             this.logger.debug(`[stream-v6] graph.stream returned: ${typeof stream}, has Symbol.asyncIterator=${typeof stream?.[Symbol.asyncIterator]}`);

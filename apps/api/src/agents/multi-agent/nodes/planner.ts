@@ -86,6 +86,8 @@ export function createPlannerNode(model: BaseChatModel, config?: PlannerConfig) 
 
 【用户意图】${state.user_intent}
 【意图目标】${intentPrompt[state.user_intent] || '通用处理'}
+【面试上下文】
+${state.interview_context || '未提供岗位上下文；只能进行通用问答，不能假设是前端岗位。'}
 
 【可用工具】（用于 step.tool 字段，**只能选下面列出的**，不要自创）
 ${toolsPrompt}

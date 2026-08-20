@@ -296,7 +296,18 @@ export class InterviewAgentService {
       if (useMultiAgent) {
         // 多 Agent（LangGraph Supervisor 拓扑）：planner → executor → replanner → reviewer
         // 注意：history 由 MultiAgentService 通过 PostgresSaver checkpointer 自动维护（thread_id = sessionId）
-        for await (const chunk of this.multiAgent.stream(userInput, ctx.sessionId, ctx.userId)) {
+        const interviewContext =
+          `【面试岗位】${ctx.position}（${ctx.level}）\n` +
+          `【出题范围】${bank === 'agent' ? 'AI Agent / LLM 工程' : '前端开发'}\n` +
+          `【当前题目】${currentQuestion?.question || '请生成一题与岗位强相关的开场题'}\n` +
+          `【首轮规则】当候选人说“开始面试”时，直接提出与上述岗位和出题范围匹配的问题。` +
+          `不得将 AI Agent / LLM 工程岗位误问为前端项目。`;
+        for await (const chunk of this.multiAgent.stream(
+          userInput,
+          ctx.sessionId,
+          ctx.userId,
+          interviewContext,
+        )) {
           if (chunk.type === 'token' && chunk.content) {
             fullResponse += chunk.content;
             yield { type: 'token', content: chunk.content };

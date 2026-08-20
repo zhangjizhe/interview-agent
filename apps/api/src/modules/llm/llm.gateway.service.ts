@@ -78,6 +78,18 @@ export class LlmGatewayService {
       /代码|code|implement|算法|function|class|实现|写一个/i.test(lastMessage) ||
       params.tools?.some((t) => t.function.name.includes('code'));
 
+    // 技术题优先 DeepSeek，但余额不足/凭据失效后不能继续选中已禁用的 provider。
+    // 否则每一轮都会先打一次必失败请求，再等待 fallback，放大首字延迟。
+    if (isCoding) {
+      if (this.providerEnabled.get('deepseek')) return this.deepseek;
+      if (this.providerEnabled.get('qwen')) return this.qwen;
+    } else {
+      if (this.providerEnabled.get('qwen')) return this.qwen;
+      if (this.providerEnabled.get('deepseek')) return this.deepseek;
+    }
+
+    // 两个 provider 都被禁用时仍返回一个实例，让原始错误继续向上抛出，
+    // 而不是把问题变成一个难以诊断的 undefined 调用。
     return isCoding ? this.deepseek : this.qwen;
   }
 

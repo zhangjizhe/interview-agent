@@ -25,11 +25,17 @@ interface UseInterviewStreamReturn {
 export function useInterviewStream(): UseInterviewStreamReturn {
   const abortRef = useRef<AbortController | null>(null);
   const reconnectingRef = useRef(false);
+  const requestIdRef = useRef(0);
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const send = useCallback(
     async (interviewId: string, userId: string, content: string) => {
+      // Each send owns its own lifecycle. A stale timeout or aborted reader from
+      // an earlier turn must never finalize the newer turn's placeholder message.
+      abortRef.current?.abort();
+      const requestId = ++requestIdRef.current;
+      const isCurrentRequest = () => requestIdRef.current === requestId;
       const store = useInterviewStore.getState();
 
       // 1) 把用户消息和空的 assistant 占位压入 store
@@ -45,92 +51,106 @@ export function useInterviewStream(): UseInterviewStreamReturn {
 
       let lastError: Error | null = null;
 
-      // 2026-06-23 修复：loading 兜底 — 即使后端 SSE 没正常发 [DONE]，
-      // 60 秒无新事件就强制 setStreaming(false)，避免按钮永久转圈。
-      // 后端已经在 controller 加了 [DONE] flush 等待，这里是最后防线。
+      // Only start this after fetch has received the SSE response headers.
+      // Server-side validation, queueing, and graph setup happen before that
+      // point and must not consume this turn's stream inactivity budget.
       const STREAM_IDLE_TIMEOUT_MS = 60_000;
       let streamIdleTimer: ReturnType<typeof setTimeout> | null = null;
-      const resetStreamIdleTimer = () => {
+      const clearStreamIdleTimer = () => {
         if (streamIdleTimer) clearTimeout(streamIdleTimer);
+        streamIdleTimer = null;
+      };
+      const resetStreamIdleTimer = () => {
+        clearStreamIdleTimer();
         streamIdleTimer = setTimeout(() => {
-          // 60 秒没新事件 + 还在 streaming → 强制兜底
-          const currentStreaming = useInterviewStore.getState().streaming;
-          if (currentStreaming) {
+          if (isCurrentRequest() && useInterviewStore.getState().streaming) {
             useInterviewStore.getState().appendAgentEvent({
               type: 'error',
-              error: 'SSE 流式超时（60 秒无事件），已强制结束流式',
+              error: 'SSE 流式超时（60 秒无事件），已结束本次请求，请重试',
             });
             useInterviewStore.getState().finalizeLastMessage();
             useInterviewStore.getState().setStreaming(false);
+            controller.abort();
             useInterviewStore.getState().forceRender();
           }
         }, STREAM_IDLE_TIMEOUT_MS);
       };
-      resetStreamIdleTimer();
 
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        if (controller.signal.aborted) break;
+      try {
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          if (controller.signal.aborted || !isCurrentRequest()) break;
 
-        if (attempt > 0) {
-          reconnectingRef.current = true;
-          store.setReconnecting(true);
-          store.appendAgentEvent({
-            type: 'meta',
-            content: `连接断开，第 ${attempt} 次重连中...`,
-          });
+          if (attempt > 0) {
+            clearStreamIdleTimer();
+            reconnectingRef.current = true;
+            store.setReconnecting(true);
+            store.appendAgentEvent({
+              type: 'meta',
+              content: `连接断开，第 ${attempt} 次重连中...`,
+            });
 
-          // R-P1-9 已知限制：项目 SSE 协议未设计 offset / Last-Event-ID 字段，
-          // server 端不存消息状态，所以无法做真正的断点续传。
-          // 当前降级处理：依赖 store.appendToLastMessage 的 dedup 逻辑
-          // （MAX_OVERLAP=200，R-P2-14 修复）检测 lastContent 末尾与 delta
-          // 开头的重叠，server 完全重发时 200 字符上限足够覆盖 token 级重复。
-          // 用户感知：极少见重复 token（最多 200 字符），不会看到明显重复内容。
-          // 真断点续传需要 server-side 支持（详见未来 ADR）。
+            // R-P1-9 已知限制：项目 SSE 协议未设计 offset / Last-Event-ID 字段，
+            // server 端不存消息状态，所以无法做真正的断点续传。
+            // 当前降级处理：依赖 store.appendToLastMessage 的 dedup 逻辑
+            // （MAX_OVERLAP=200，R-P2-14 修复）检测 lastContent 末尾与 delta
+            // 开头的重叠，server 完全重发时 200 字符上限足够覆盖 token 级重复。
+            // 用户感知：极少见重复 token（最多 200 字符），不会看到明显重复内容。
+            // 真断点续传需要 server-side 支持（详见未来 ADR）。
 
-          store.forceRender();
-          await sleep(RETRY_DELAY_MS * Math.pow(2, attempt - 1));
-          if (controller.signal.aborted) break;
-        }
-
-        try {
-          reconnectingRef.current = false;
-          store.setReconnecting(false);
-
-          const res = await fetch(`/api/interview/${interviewId}/message`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, content }),
-            signal: controller.signal,
-          });
-
-          if (!res.ok || !res.body) {
-            throw new Error(`HTTP ${res.status}`);
+            store.forceRender();
+            await sleep(RETRY_DELAY_MS * Math.pow(2, attempt - 1));
+            if (controller.signal.aborted || !isCurrentRequest()) break;
           }
 
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
+          try {
+            reconnectingRef.current = false;
+            store.setReconnecting(false);
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+            const res = await fetch(`/api/interview/${interviewId}/message`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId, content }),
+              signal: controller.signal,
+            });
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+            if (!res.ok || !res.body) {
+              throw new Error(`HTTP ${res.status}`);
+            }
+            if (!isCurrentRequest()) return;
 
-            for (const line of lines) {
-              if (!line.startsWith('data:')) continue;
-              const data = line.slice(5).trim();
-              if (data === '[DONE]') {
-                store.finalizeLastMessage();
-                store.setStreaming(false);
-                store.forceRender();
-                return;
-              }
+            // This is a fresh SSE connection (including reconnects), so it gets
+            // a fresh 60-second inactivity window.
+            resetStreamIdleTimer();
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-              try {
-                const event: AgentEvent = JSON.parse(data);
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                if (!line.startsWith('data:')) continue;
+                const data = line.slice(5).trim();
+                if (data === '[DONE]') {
+                  store.finalizeLastMessage();
+                  store.setStreaming(false);
+                  store.forceRender();
+                  return;
+                }
+
+                let event: AgentEvent;
+                try {
+                  event = JSON.parse(data);
+                } catch {
+                  // The SSE payload may be split across browser stream chunks.
+                  // Keep waiting for the next complete event.
+                  continue;
+                }
 
                 // 收到任何有效事件都重置 idle timer（说明 SSE 还活着）
                 resetStreamIdleTimer();
@@ -154,65 +174,81 @@ export function useInterviewStream(): UseInterviewStreamReturn {
                     type: 'error',
                     error: event.error || 'LLM 调用失败',
                   });
+                  store.setError(event.error || 'LLM 调用失败');
+                  store.finalizeLastMessage();
+                  store.setStreaming(false);
                   store.forceRender();
-                  throw new Error(event.error || 'LLM 调用失败');
+                  return;
+                } else if (event.type === 'heartbeat') {
+                  // 心跳只用于刷新 idle timer，不展示在思考过程里。
                 } else if (event.type === 'done') {
                   store.finalizeLastMessage();
                   store.setStreaming(false);
                   store.forceRender();
                   return;
                 }
-              } catch (e) {
-                // JSON 解析失败，忽略（SSE 中间 chunk）
-                // P2-15 修复：移除 console.error 调试残留。
-                // Unexpected 错误（SSE chunk 不完整）静默跳过是预期行为。
-                // 其他错误由外层重试逻辑处理（不再静默吞）。
               }
             }
-          }
 
-          // 正常读完流但无 [DONE] 标记
-          store.finalizeLastMessage();
-          store.setStreaming(false);
-          store.forceRender();
-          return;
-        } catch (err) {
-          if ((err as Error).name === 'AbortError') {
+            // 正常读完流但无 [DONE] 标记
             store.setStreaming(false);
             store.finalizeLastMessage();
             store.forceRender();
             return;
+          } catch (err) {
+            if ((err as Error).name === 'AbortError' || !isCurrentRequest()) {
+              return;
+            }
+            clearStreamIdleTimer();
+            lastError = err as Error;
+            // P2-15 修复：移除 console.error 调试残留，错误由外层 lastError + appendAgentEvent 处理
+            if (attempt < MAX_RETRIES) {
+              store.appendAgentEvent({
+                type: 'meta',
+                content: `SSE 连接第 ${attempt + 1} 次失败：${lastError.message}`,
+              });
+              store.forceRender();
+            }
           }
-          lastError = err as Error;
-          // P2-15 修复：移除 console.error 调试残留，错误由外层 lastError + appendAgentEvent 处理
-          if (attempt < MAX_RETRIES) {
-            store.appendAgentEvent({
-              type: 'meta',
-              content: `SSE 连接第 ${attempt + 1} 次失败：${lastError.message}`,
-            });
+        }
+
+        // 所有重试耗尽
+        if (isCurrentRequest()) {
+          store.setReconnecting(false);
+          store.setStreaming(false);
+          store.finalizeLastMessage();
+          store.forceRender();
+          if (lastError) {
+            store.appendAgentEvent({ type: 'error', error: lastError.message });
+            store.setError(lastError.message);
             store.forceRender();
           }
         }
+      } finally {
+        clearStreamIdleTimer();
+        if (isCurrentRequest()) {
+          abortRef.current = null;
+          reconnectingRef.current = false;
+          const currentStore = useInterviewStore.getState();
+          currentStore.setReconnecting(false);
+          // Every terminal path must release the composer. This protects the UI
+          // from malformed SSE payloads or an upstream stream ending in an
+          // unexpected state without overriding a newer request.
+          if (currentStore.streaming) {
+            currentStore.finalizeLastMessage();
+            currentStore.setStreaming(false);
+            currentStore.forceRender();
+          }
+        }
       }
-
-      // 所有重试耗尽
-      store.setReconnecting(false);
-      store.setStreaming(false);
-      store.finalizeLastMessage();
-      store.forceRender();
-      if (lastError) {
-        store.appendAgentEvent({ type: 'error', error: lastError.message });
-        store.setError(lastError.message);
-        store.forceRender();
-      }
-      // 清理 idle timer
-      if (streamIdleTimer) clearTimeout(streamIdleTimer);
     },
     [],
   );
 
   const reset = useCallback(() => {
     abortRef.current?.abort();
+    abortRef.current = null;
+    requestIdRef.current += 1;
     reconnectingRef.current = false;
     useInterviewStore.getState().reset();
   }, []);

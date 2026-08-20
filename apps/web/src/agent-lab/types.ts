@@ -5,6 +5,16 @@ export interface AgentVersion {
   version: string;
   status: string;
   createdAt?: string;
+  systemPrompt?: string | null;
+  modelConfig?: JsonObject | null;
+  runtimeConfig?: JsonObject | null;
+  toolBindings?: JsonObject | null;
+  knowledgeBindings?: JsonObject | null;
+  memoryBindings?: JsonObject | null;
+  inputSchema?: JsonObject | null;
+  outputSchema?: JsonObject | null;
+  changelog?: string | null;
+  publishedAt?: string | null;
 }
 
 export interface LabAgent {
@@ -17,6 +27,7 @@ export interface LabAgent {
   updatedAt?: string;
   currentVersion?: AgentVersion | null;
   _count?: { versions: number };
+  versions?: AgentVersion[];
 }
 
 export interface LabApplication {

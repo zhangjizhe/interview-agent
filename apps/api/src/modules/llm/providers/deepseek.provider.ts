@@ -20,6 +20,7 @@ export class DeepseekProvider extends BaseLLMProvider {
     this.client = new OpenAI({
       apiKey: this.config.get<string>('deepseek.apiKey'),
       baseURL: this.config.get<string>('deepseek.baseUrl'),
+      timeout: 30_000,
     });
   }
 

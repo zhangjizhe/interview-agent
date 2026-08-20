@@ -40,6 +40,7 @@ export function ToolsPanel({ activeToolNames = [] }: ToolsPanelProps) {
   });
 
   const [recentUsed, setRecentUsed] = useState<string[]>([]);
+  const tools = Array.isArray(data?.tools) ? data.tools : [];
 
   // 工具被调用时，记录到 recent（最近 3 个）
   useEffect(() => {
@@ -72,7 +73,7 @@ export function ToolsPanel({ activeToolNames = [] }: ToolsPanelProps) {
         <div className="text-xs text-slate-400 py-3 text-center">加载中...</div>
       ) : (
         <div className="space-y-1.5">
-          {data?.tools.map((tool) => {
+          {tools.map((tool) => {
             const isActive = activeToolNames.includes(tool.name);
             const cat = categoryMap[tool.category] || categoryMap.custom;
             const CatIcon = cat.icon;
