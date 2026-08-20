@@ -19,6 +19,9 @@ function createPrismaMock() {
       update: jest.fn(),
       upsert: jest.fn(),
     },
+    evaluationRun: {
+      findFirst: jest.fn(),
+    },
   };
   prisma.$transaction = jest.fn(async (callback: (tx: any) => unknown) => callback(prisma));
   return prisma;
@@ -70,6 +73,15 @@ describe('AgentRegistryService', () => {
       status: 'DRAFT',
       publishedAt: null,
     });
+    prisma.evaluationRun.findFirst.mockResolvedValue({
+      id: 'evaluation-1',
+      status: 'COMPLETED',
+      score: 1,
+      totalCases: 2,
+      passedCases: 2,
+      failedCases: 0,
+      completedAt: new Date(),
+    });
     prisma.agentVersion.update.mockResolvedValue({
       id: 'version-2',
       status: 'PUBLISHED',
@@ -95,6 +107,22 @@ describe('AgentRegistryService', () => {
         currentVersionId: 'version-2',
       },
     });
+  });
+
+  it('没有通过评测的草稿版本不能发布', async () => {
+    const prisma = createPrismaMock();
+    prisma.agentVersion.findFirst.mockResolvedValue({
+      id: 'version-draft',
+      status: 'DRAFT',
+      publishedAt: null,
+    });
+    prisma.evaluationRun.findFirst.mockResolvedValue(null);
+    const service = new AgentRegistryService(prisma);
+
+    await expect(
+      service.publishVersion('user-a', 'agent-1', 'version-draft'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.agentVersion.update).not.toHaveBeenCalled();
   });
 
   it('不允许将未发布版本回滚为当前版本', async () => {

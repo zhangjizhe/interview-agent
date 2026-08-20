@@ -77,6 +77,15 @@ export class AgentRegistryController {
     return this.registry.listVersions(req.user.userId, agentId);
   }
 
+  @Get('agents/:agentId/versions/:versionId/release-gate')
+  getReleaseGate(
+    @Req() req: any,
+    @Param('agentId') agentId: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.registry.getReleaseGate(req.user.userId, agentId, versionId);
+  }
+
   @Post('agents/:agentId/versions/:versionId/publish')
   publishVersion(
     @Req() req: any,

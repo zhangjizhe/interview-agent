@@ -130,6 +130,30 @@ flowchart TB
 4. **数据单写**：Interview 表由 Interview 写入，AgentLab 表由 AgentLab 写入。跨域只传 ID、版本和显式事件，不跨域直接写表。
 5. **运行时无业务耦合**：岗位、题目和简历由 Interview Adapter 组装后传入 Runtime，运行时不得猜测或硬编码前端、AI Agent 等岗位。
 
+### 3.6 本体与推理职责
+
+本体不是图数据库，也不是替代 LLM 的“知识问答系统”。当前采用 TypeScript 受控枚举、Prisma 关系/JSON 和版本化规则集，先使关键对象有统一语义，并使关键决定可解释。
+
+```mermaid
+flowchart LR
+  Position[岗位 / 职级] --> Ontology[Interview Ontology]
+  Question[题目 / 回答证据] --> Ontology
+  Ontology --> Routing[Interview Routing Rules]
+  LLM[LLM 语义理解与题干生成] --> Routing
+  Routing --> Decision[追问 / 进阶 / 队列优先级]
+
+  Version[Agent Version] --> LabOntology[AgentLab Ontology]
+  Evaluation[Evaluation Run / Result] --> LabOntology
+  LabOntology --> Gate[Release Gate Rules]
+  Gate --> Publish[允许 / 阻止发布]
+```
+
+**Interview Ontology** 的核心对象是岗位、能力项、题目、预期要点和回答证据。初始范围包括 Agent Runtime、工具调用、RAG、评测、记忆与可观测性，以及前端、后端、算法的基础能力集合。LLM 负责理解开放回答、抽取证据和生成自然语言题目；路由规则负责去重、队列上限、薄弱证据追问、能力覆盖和进阶时机。
+
+**AgentLab Ontology** 的核心对象是 Agent、AgentVersion、Run、TraceEvent、EvaluationRun、EvaluationResult、ToolCall 与 ReleaseGate。评测结果是版本发布的必要证据：没有完成评测、存在失败用例、分数低于 0.90，均不得发布草稿版本。已发布版本的重复操作保持幂等。
+
+每个推理结果必须携带 `ruleSetVersion`、`matchedRules`、`evidence` 和 `outcome`。当前面试路由结果写入生成题的 `context`；发布门禁通过只读预览接口和发布响应返回。持久化的 `DecisionRecord` / `DecisionEvidence` 是下一阶段工作，不阻塞当前闭环。
+
 ## 4. 不可破坏的产品规则
 
 ### 4.1 面试体验
@@ -160,6 +184,7 @@ flowchart TB
 - TraceEvent 采用追加式、顺序化契约，保留运行、轮次、步骤、调用与终态，不覆盖历史。
 - AgentLab 评测优先采用确定性规则和版本化数据集；LLM Judge 只能作为补充信号，不能成为唯一质量契约。
 - 关键决策应逐步沉淀为“决策 - 证据 - 结果”关系：例如追问、评分、HITL 审批和报告建议都可回溯其输入、规则与版本。
+- 本体与推理先作为业务存储和 RAG 的旁路决策层，不引入 RDF/OWL、图数据库或通用 Datalog 引擎，除非跨实体关系检索和规则维护成本已被真实数据证明。
 
 ## 5. 当前阶段与演进边界
 
@@ -172,8 +197,8 @@ flowchart TB
 ### 下一阶段的优先级
 
 1. **可靠性**：SSE event offset/续传、请求级 Provider 重试与恢复、面试状态机端到端回归。
-2. **可解释性**：在 PostgreSQL 中落地轻量 `DecisionRecord` / `DecisionEvidence`，先服务评分依据与报告追溯。
-3. **评测与发布**：Golden Dataset、批量导入、版本门禁与回归比较。
+2. **可解释性**：在 PostgreSQL 中落地轻量 `DecisionRecord` / `DecisionEvidence`，从题目路由和发布门禁扩展到评分依据与报告追溯。
+3. **评测与发布**：Golden Dataset、批量导入、发布门禁与回归比较。
 4. **受控执行**：将 Interview/MCP 调用逐步纳入 ToolRunner，并接入真正隔离的 Worker。
 5. **企业化**：SSO/OAuth、令牌轮转、审计导出、数据保留/脱敏、备份与容量治理。
 

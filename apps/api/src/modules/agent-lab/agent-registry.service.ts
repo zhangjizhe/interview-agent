@@ -10,6 +10,7 @@ import {
   CreateAgentVersionDto,
   UpdateAgentDto,
 } from './dto/agent.dto';
+import { inferReleaseGate } from '../inference/release-gate-inference';
 
 const INTERVIEW_AGENT_KEY = 'interview-interviewer';
 const INTERVIEW_AGENT_VERSION = '1.0.0';
@@ -223,8 +224,24 @@ export class AgentRegistryService {
   async publishVersion(userId: string, agentId: string, versionId: string) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const version = await this.requireVersion(workspace.id, agentId, versionId);
+    if (version.status === 'PUBLISHED') {
+      return {
+        ...version,
+        releaseGate: {
+          outcome: { allowed: true, reason: '版本已发布，无需重复执行发布门禁。' },
+          ruleSetVersion: 'release-gate/v1',
+          matchedRules: ['RG-000:already-published'],
+          evidence: { agentVersionId: version.id },
+        },
+      };
+    }
 
-    return this.prisma.$transaction(async (tx) => {
+    const releaseGate = await this.getReleaseGateForVersion(version.id);
+    if (!releaseGate.outcome.allowed) {
+      throw new ConflictException(releaseGate.outcome.reason);
+    }
+
+    const published = await this.prisma.$transaction(async (tx) => {
       const published = await tx.agentVersion.update({
         where: { id: version.id },
         data: {
@@ -241,6 +258,14 @@ export class AgentRegistryService {
       });
       return published;
     });
+
+    return { ...published, releaseGate };
+  }
+
+  async getReleaseGate(userId: string, agentId: string, versionId: string) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    const version = await this.requireVersion(workspace.id, agentId, versionId);
+    return this.getReleaseGateForVersion(version.id);
   }
 
   async activateVersion(userId: string, agentId: string, versionId: string) {
@@ -353,5 +378,25 @@ export class AgentRegistryService {
       throw new NotFoundException('Agent 版本不存在或无权访问');
     }
     return version;
+  }
+
+  private async getReleaseGateForVersion(agentVersionId: string) {
+    const evaluation = await this.prisma.evaluationRun.findFirst({
+      where: {
+        agentVersionId,
+        status: 'COMPLETED',
+      },
+      orderBy: { completedAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        score: true,
+        totalCases: true,
+        passedCases: true,
+        failedCases: true,
+        completedAt: true,
+      },
+    });
+    return inferReleaseGate(evaluation);
   }
 }
