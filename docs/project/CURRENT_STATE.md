@@ -1,11 +1,11 @@
 # 当前状态
 
-最后审计：2026-08-17
+最后审计：2026-08-20
 事实来源：仓库代码、Package Manifest、Prisma Schema 和 2026-08-12 验收证据。状态只描述已交付代码，不描述未来设计。
 
 | 领域 | 状态 | 当前事实 |
 | --- | --- | --- |
-| 前端 | 已实现 | React/Vite 应用具有候选人训练首页、面试记录、岗位设置、面试房间、题库、工具和管理员 MCP 路由。候选人主导航只呈现训练闭环，不展示 Token、工具、MCP 或 Agent 内部信息。 |
+| 前端 | 已实现 | Interview 候选人应用采用工作台导航，具有首页、面试记录、训练、岗位设置和面试房间；Agent Lab 是独立管理员控制台。候选人主导航不展示 Token、MCP、模型或 Agent 内部信息。 |
 | 面试流程 | 已实现 | 简历上传/解析、创建面试、确认简历、SSE 消息、HITL、结束和报告均存在。 |
 | Agent Runtime | 已实现 | 默认 `multi` 是 LangGraph；DeepAgents 和 Direct LLM 是降级模式。 |
 | Prompt Registry/Versioning | 部分实现 | Prompt 由源码管理；没有产品级 Registry 或实验 UI。 |
@@ -59,3 +59,4 @@
 - 2026-08-15 已完成 B3 岗位版本与准备度合同：TargetJob 有可递增 `profileVersion`，PostgreSQL 部分唯一索引保证每用户至多一个活跃岗位，准备度响应返回对应档案版本；Docker 真实 JWT 浏览器验收覆盖创建、读取、编辑、激活、无证据准备度和跨用户拒绝，19/19 通过。
 - 2026-08-15 已完成 B4 面试模式与候选人 SSE 合同：Interview 持久化完整模拟/单技能练习、岗位档案版本快照和所选技能；题目保存稳定技能、追问目的与选择元数据。客户端重试复用消息 ID，完成的请求只重放已保存回复，不重复写回答或进入 Agent 成本路径；当前仍未提供 Event ID/Offset 逐 token 续传。加性 migration、API 27 suites / 249 tests、Web 75 tests、Docker 和真实浏览器验收 21/21 通过。
 - 2026-08-17 已完成 B5 单技能训练推荐与复测关联：TrainingRecommendation 只由活跃岗位中成功 FINAL 运行的低分正式技能状态生成，绑定岗位档案版本、来源运行和 Evidence；TrainingAttempt 记录完成与复测 Interview。训练完成不改变 CandidateSkillState。加性 migration、API 29 suites / 256 tests、Web 76 tests、Docker 和真实浏览器验收 22/22 通过。
+- 2026-08-20 已完成 Interview V0.2 候选人无 Provider 主流程验收：注册、岗位、版本化准备度、完整/单技能面试选择、训练空态、跨用户拒绝和移动工作台均经过 Docker 浏览器 23/23 验证。真实 Provider 评价质量仍需独立 Harness canary。

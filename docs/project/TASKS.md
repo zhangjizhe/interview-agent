@@ -6,23 +6,21 @@
 
 当前没有活跃任务。开始后续批次前，必须在 `ACTIVE_TASK.md` 认领且仅认领一个任务。
 
+### TASK-021：Interview V0.2 候选人产品主流程
+
+- 状态：2026-08-20 完成
+- 目标：将注册、岗位、简历前置、面试模式、评价/训练真实状态和移动端体验收敛为可重复候选人主流程。
+- 验证：API 29 suites / 256 tests、Cache 22 tests、Interview Web 13 files / 78 tests、API/Web build、Docker readiness 和浏览器 23/23 通过；未调用 Provider。
+
 ### TASK-019：Agent Lab 独立控制台与 MCP 治理
 
 - 状态：2026-08-19 完成
 - 目标：将 Agent Lab 建立为独立 Agent 控制平面，并将 MCP 系统治理从候选人 Web 迁入管理员控制台。
 - 验证：Agent Lab typecheck/build、候选人 Web typecheck、Docker 独立服务和管理员/普通用户浏览器验收通过。
 
-### TASK-019：独立 Agent Lab 基础与 MCP 管理迁移
-
-- 状态：等待架构确认
-- 目标：将 Agent Lab 作为独立 Agent 编排与控制平台建立最小应用边界，并从候选人 Web 迁出 MCP 系统管理。
-- 范围：第一准则、ADR、独立 `apps/agent-lab`、MCP 管理迁移、操作反馈、相关测试与构建。
-- 非目标：重写运行时、复制认证/领域数据、完整 Agent Lab API、Prompt Registry 或自动优化。
-- 依赖：JWT/RBAC、现有 MCP Registry/Admin API、Langfuse 与 Harness 资产。
-
 ### TASK-018：B6 使用量与发布平面最小边界
 
-- 状态：暂停，等待 TASK-019 建立 Agent Lab 控制面边界。
+- 状态：建议
 - 原因：使用量与发布策略应明确区分候选人摘要和 Agent Lab 控制面后再继续，避免把 Agent 内部信息重新带入产品 Web。
 - 后续：保留原范围、验收标准和风险；TASK-019 完成后恢复。
 

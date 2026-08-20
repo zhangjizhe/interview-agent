@@ -4,46 +4,44 @@
 
 ## 任务 ID
 
-TASK-020
+TASK-021
 
 ## 目标
 
-完成 Agent Lab V0.1 的受控管理员账户引导、独立控制台工作流与验收。
+完成 Interview V0.2 的候选人产品主流程与页面级验收。
 
 ## 状态
 
-进行中
+完成
 
 ## 范围
 
-- 管理员允许名单、注册、登录、普通用户拒绝与会话隔离。
-- 独立控制台的信息架构、受控编排运行视图、MCP 服务治理和错误反馈。
-- 建立 Interview 与 Agent Lab 独立 UI 产品系统，并在当前控制台和候选人应用壳中落地导航、状态和响应式规范。
-- `apps/agent-lab` 独立构建、Docker 部署和浏览器验收。
-- 候选人 Web 保持个人工具偏好，不能调用 MCP 系统级控制 API。
+- 注册、目标岗位、简历上传、完整模拟与单技能练习的可用流程。
+- 面试完成、FINAL 评价、训练推荐、训练完成和复测入口的页面状态。
+- 真实 API 驱动的加载、空、失败、权限和移动端体验。
+- API/Web/浏览器验收覆盖不调用 Provider 的主流程边界。
 
 ## 非目标
 
-- Agent 自助提权、Prompt 自修改、未审计工具写入或候选人原始数据查看。
-- 拆分 NestJS、LangGraph、Provider、Prompt、检索或 Interview 领域数据。
-- Trace、Experiment、Release 的完整后端 API 与数据模型。
+- 修改 Agent Lab 控制面、Provider、Prompt、检索或 LangGraph 拓扑。
+- 将未完成的 Provider 质量验证伪装为产品验收。
+- Payment、订阅、团队、多租户或小程序。
 
 ## 验收标准
 
-- 配置在 `ADMIN_USER_IDS` 的账号能注册并登录 Agent Lab；普通用户被拒绝。
-- 独立控制台提供概览、编排运行视图和 MCP 治理，操作具有空闲、进行中、成功和失败反馈。
-- Agent Lab 仅调用现有受 ADMIN RBAC 保护的控制 API，候选人 Web 不保留 MCP 系统管理操作。
-- Agent Lab/Web build/typecheck、管理员/普通用户浏览器验收和 Docker 部署通过。
+- 候选人可在真实界面完成岗位和简历前置，理解完整模拟与单技能练习差异。
+- 评价、训练与复测入口只在真实后端状态允许时出现；无 Evidence 不显示伪造能力结论。
+- 桌面/移动浏览器路径、API/Web 测试、类型检查和构建通过。
+- 未调用真实 Provider 时，验收记录明确其边界。
 
 ## 已知风险
 
-- 管理员允许名单是部署配置，不得通过浏览器或公开 API 修改。
-- MCP 状态仍是进程内状态；跨重启持久化和操作审计不属于本任务。
-- 编排视图只展示受控阶段，不得暗示已实现实时 Trace 或泄露思维链。
+- 完整 FINAL Evaluation 依赖受控 Provider 或录制响应，不能在普通浏览器验收中无界触发。
+- 已有页面必须保留 JWT、Ownership、SSE 候选人事件边界和训练不直接改分不变量。
 
 ## 交付结果
 
-- Agent Lab 具备独立管理员登录/注册入口；允许名单账号可获得控制面权限，普通账号注册后被明确拒绝。
-- 独立控制台提供概览、编排运行视图和 MCP 治理，候选人 Web 只保留用户级工具偏好。
-- Agent Lab 和候选人 UI 采用各自的信息架构与工作台布局，并有导航与 MCP 边界回归测试。
-- 管理员登录、控制台加载、普通用户拒绝浏览器验收，以及 Agent Lab/Interview Web build/typecheck 均通过。
+- 候选人工作台布局、移动导航、岗位/简历前置、完整模拟/单技能选择、训练空态和权限边界已接入真实 API。
+- 浏览器验证岗位版本、单活跃约束、无 FINAL Evidence 的准备度和训练空态，未伪造能力或训练结论。
+- 2026-08-20 验证：API 29 suites / 256 tests、Cache 22 tests、Interview Web 13 files / 78 tests、API/Web build、Docker readiness 和候选人浏览器 23/23 通过。
+- 未调用真实 Provider；Provider 质量、延迟和成本验收由 Harness canary 独立执行。

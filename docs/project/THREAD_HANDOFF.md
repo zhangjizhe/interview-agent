@@ -4,15 +4,14 @@
 
 ## 上一任务
 
-TASK-019：Agent Lab 独立控制台与 MCP 治理
+TASK-021：Interview V0.2 候选人产品主流程
 
 ## 已完成
 
-- 新建独立 `apps/agent-lab` Vite/React 控制台、Docker 镜像和 Compose 服务。
-- Agent Lab 使用独立管理员登录会话，并调用现有 NestJS ADMIN RBAC MCP 管理 API。
-- MCP 服务查看、系统级启停、健康检查和配置重载已迁入 Agent Lab。
-- 候选人 `ToolsPage` 只保留用户级工具偏好，不再请求或显示系统 MCP 控制面。
-- Agent Lab 管理员登录、MCP 控制台加载与普通用户拒绝浏览器验收通过。
+- 候选人工作台布局收敛为首页、训练、面试记录和岗位设置，并隔离 MCP 控制面。
+- 真实浏览器验证注册、岗位、简历前置、完整/单技能模式、训练空态、所有权与移动端。
+- 无 FINAL Evidence 时准备度和训练入口保持诚实状态，不伪造评分或建议。
+- 2026-08-20 Docker 浏览器验收 23/23 通过，未调用 Provider。
 
 ## 改动文件
 

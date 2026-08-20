@@ -213,6 +213,21 @@ try {
   const mobilePage = await mobileContext.newPage();
   await mobilePage.goto(webUrl, { waitUntil: 'networkidle' });
   check('mobile login gate renders against real API', await mobilePage.getByRole('button', { name: '登录' }).count() === 1);
+  await mobilePage.getByLabel('用户名').fill(userId);
+  await mobilePage.getByLabel('密码').fill(password);
+  await mobilePage.getByRole('button', { name: '登录' }).click();
+  await mobilePage.getByRole('heading', { name: '为目标岗位做准备' }).waitFor({ state: 'visible' });
+  await mobilePage.goto(`${webUrl}/training`, { waitUntil: 'networkidle' });
+  const mobileLayout = await mobilePage.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    hasMcpControlText: document.body.textContent?.includes('MCP 服务运行时状态') || false,
+  }));
+  check(
+    'mobile candidate workflow fits viewport and excludes MCP control plane',
+    mobileLayout.scrollWidth <= mobileLayout.clientWidth && !mobileLayout.hasMcpControlText,
+    JSON.stringify(mobileLayout),
+  );
   await mobilePage.screenshot({ path: join(outputDir, '08-real-login-mobile.png'), fullPage: true });
 
   await adminContext.close();
