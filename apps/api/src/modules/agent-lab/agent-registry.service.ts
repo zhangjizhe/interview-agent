@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -11,6 +12,8 @@ import {
   UpdateAgentDto,
 } from './dto/agent.dto';
 import { inferReleaseGate } from '../inference/release-gate-inference';
+import { DecisionLedgerService } from '../inference/decision-ledger.service';
+import { DecisionDomain } from '@prisma/client';
 
 const INTERVIEW_AGENT_KEY = 'interview-interviewer';
 const INTERVIEW_AGENT_VERSION = '1.0.0';
@@ -71,7 +74,10 @@ const interviewAgentVersion = {
 
 @Injectable()
 export class AgentRegistryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly decisionLedger: DecisionLedgerService,
+  ) {}
 
   async listAgents(userId: string) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
@@ -225,7 +231,7 @@ export class AgentRegistryService {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const version = await this.requireVersion(workspace.id, agentId, versionId);
     if (version.status === 'PUBLISHED') {
-      return {
+      const result = {
         ...version,
         releaseGate: {
           outcome: { allowed: true, reason: '版本已发布，无需重复执行发布门禁。' },
@@ -234,9 +240,12 @@ export class AgentRegistryService {
           evidence: { agentVersionId: version.id },
         },
       };
+      await this.recordReleaseGate(agentId, version.id, userId, result.releaseGate);
+      return result;
     }
 
     const releaseGate = await this.getReleaseGateForVersion(version.id);
+    await this.recordReleaseGate(agentId, version.id, userId, releaseGate);
     if (!releaseGate.outcome.allowed) {
       throw new ConflictException(releaseGate.outcome.reason);
     }
@@ -266,6 +275,27 @@ export class AgentRegistryService {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const version = await this.requireVersion(workspace.id, agentId, versionId);
     return this.getReleaseGateForVersion(version.id);
+  }
+
+  async getVersionDecisionSnapshot(
+    userId: string,
+    agentId: string,
+    versionId: string,
+    asOf?: string,
+  ) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    const version = await this.requireVersion(workspace.id, agentId, versionId);
+    const at = this.parseAsOf(asOf);
+    const [decisions, facts] = await Promise.all([
+      this.decisionLedger.listDecisionsAt(version.id, at),
+      this.decisionLedger.listFactsAt('AGENT_VERSION', version.id, at),
+    ]);
+
+    return {
+      asOf: at.toISOString(),
+      decisions,
+      facts,
+    };
   }
 
   async activateVersion(userId: string, agentId: string, versionId: string) {
@@ -398,5 +428,69 @@ export class AgentRegistryService {
       },
     });
     return inferReleaseGate(evaluation);
+  }
+
+  private async recordReleaseGate(
+    agentId: string,
+    agentVersionId: string,
+    actorId: string,
+    releaseGate: ReturnType<typeof inferReleaseGate>,
+  ) {
+    const evaluation = releaseGate.evidence.evaluation;
+    const evaluationId = this.toRecord(evaluation).id;
+    await this.decisionLedger.record({
+      domain: DecisionDomain.AGENT_LAB,
+      decisionType: 'agent-version.release-gate',
+      subjectType: 'AGENT_VERSION',
+      subjectId: agentVersionId,
+      agentId,
+      agentVersionId,
+      actorId,
+      outcome: releaseGate.outcome,
+      ruleSetVersion: releaseGate.ruleSetVersion,
+      inputSnapshot: {
+        evaluation: evaluation ?? null,
+        minimumScore: releaseGate.evidence.minimumScore ?? null,
+      },
+      facts: [
+        {
+          subjectType: 'AGENT_VERSION',
+          subjectId: agentVersionId,
+          predicate: 'release.gate',
+          value: {
+            allowed: releaseGate.outcome.allowed,
+            reason: releaseGate.outcome.reason,
+          },
+          sourceType: 'EVALUATION_RUN',
+          sourceId: typeof evaluationId === 'string' ? evaluationId : undefined,
+        },
+      ],
+      evidence: [
+        {
+          kind: 'RULE_EVALUATION',
+          sourceType: 'RELEASE_GATE',
+          sourceId: agentVersionId,
+          payload: {
+            matchedRules: releaseGate.matchedRules,
+            evidence: releaseGate.evidence,
+          },
+        },
+      ],
+    });
+  }
+
+  private toRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown>
+      : {};
+  }
+
+  private parseAsOf(value?: string) {
+    if (!value) return new Date();
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('asOf 必须是有效的 ISO 时间');
+    }
+    return parsed;
   }
 }

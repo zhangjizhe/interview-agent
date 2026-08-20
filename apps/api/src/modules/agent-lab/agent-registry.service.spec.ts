@@ -1,6 +1,12 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { AgentRegistryService } from './agent-registry.service';
 
+function createDecisionLedgerMock() {
+  return {
+    record: jest.fn().mockResolvedValue({ id: 'decision-1' }),
+  };
+}
+
 function createPrismaMock() {
   const prisma: any = {
     workspace: {
@@ -35,7 +41,7 @@ describe('AgentRegistryService', () => {
   it('只列出当前用户默认工作区中的 Agent', async () => {
     const prisma = createPrismaMock();
     prisma.agent.findMany.mockResolvedValue([]);
-    const service = new AgentRegistryService(prisma);
+    const service = new AgentRegistryService(prisma, createDecisionLedgerMock() as any);
 
     await expect(service.listAgents('user-a')).resolves.toEqual([]);
 
@@ -54,7 +60,7 @@ describe('AgentRegistryService', () => {
   it('创建版本前校验 Agent 归属当前工作区', async () => {
     const prisma = createPrismaMock();
     prisma.agent.findFirst.mockResolvedValue(null);
-    const service = new AgentRegistryService(prisma);
+    const service = new AgentRegistryService(prisma, createDecisionLedgerMock() as any);
 
     await expect(
       service.createVersion('user-a', 'foreign-agent', {
@@ -90,7 +96,8 @@ describe('AgentRegistryService', () => {
       id: 'agent-1',
       currentVersionId: 'version-2',
     });
-    const service = new AgentRegistryService(prisma);
+    const ledger = createDecisionLedgerMock();
+    const service = new AgentRegistryService(prisma, ledger as any);
 
     await service.publishVersion('user-a', 'agent-1', 'version-2');
 
@@ -107,6 +114,12 @@ describe('AgentRegistryService', () => {
         currentVersionId: 'version-2',
       },
     });
+    expect(ledger.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        decisionType: 'agent-version.release-gate',
+        subjectId: 'version-2',
+      }),
+    );
   });
 
   it('没有通过评测的草稿版本不能发布', async () => {
@@ -117,12 +130,45 @@ describe('AgentRegistryService', () => {
       publishedAt: null,
     });
     prisma.evaluationRun.findFirst.mockResolvedValue(null);
-    const service = new AgentRegistryService(prisma);
+    const ledger = createDecisionLedgerMock();
+    const service = new AgentRegistryService(prisma, ledger as any);
 
     await expect(
       service.publishVersion('user-a', 'agent-1', 'version-draft'),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.agentVersion.update).not.toHaveBeenCalled();
+    expect(ledger.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: expect.objectContaining({ allowed: false }),
+      }),
+    );
+  });
+
+  it('发布审计无法写入时，即使评测通过也不能发布', async () => {
+    const prisma = createPrismaMock();
+    prisma.agentVersion.findFirst.mockResolvedValue({
+      id: 'version-2',
+      status: 'DRAFT',
+      publishedAt: null,
+    });
+    prisma.evaluationRun.findFirst.mockResolvedValue({
+      id: 'evaluation-1',
+      status: 'COMPLETED',
+      score: 1,
+      totalCases: 1,
+      passedCases: 1,
+      failedCases: 0,
+      completedAt: new Date(),
+    });
+    const ledger = createDecisionLedgerMock();
+    ledger.record.mockRejectedValue(new Error('ledger unavailable'));
+    const service = new AgentRegistryService(prisma, ledger as any);
+
+    await expect(
+      service.publishVersion('user-a', 'agent-1', 'version-2'),
+    ).rejects.toThrow('ledger unavailable');
+    expect(prisma.agentVersion.update).not.toHaveBeenCalled();
+    expect(prisma.agent.update).not.toHaveBeenCalled();
   });
 
   it('不允许将未发布版本回滚为当前版本', async () => {
@@ -131,7 +177,7 @@ describe('AgentRegistryService', () => {
       id: 'version-draft',
       status: 'DRAFT',
     });
-    const service = new AgentRegistryService(prisma);
+    const service = new AgentRegistryService(prisma, createDecisionLedgerMock() as any);
 
     await expect(
       service.activateVersion('user-a', 'agent-1', 'version-draft'),
@@ -157,7 +203,7 @@ describe('AgentRegistryService', () => {
       currentVersion: { id: 'version-existing', version: '1.0.0' },
       versions: [{ id: 'version-existing', version: '1.0.0' }],
     });
-    const service = new AgentRegistryService(prisma);
+    const service = new AgentRegistryService(prisma, createDecisionLedgerMock() as any);
 
     const result = await service.bootstrapInterviewAgent('user-a');
 

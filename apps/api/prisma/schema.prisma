@@ -84,6 +84,7 @@ model Agent {
   runs           Run[]
   evaluationRuns EvaluationRun[]
   applications   Application[]
+  decisionRecords DecisionRecord[]
 
   @@unique([workspaceId, key])
   @@index([workspaceId, updatedAt])
@@ -111,6 +112,7 @@ model AgentVersion {
   parentAgent      Agent   @relation("AgentVersions", fields: [agentId], references: [id], onDelete: Cascade)
   runs             Run[]
   evaluationRuns  EvaluationRun[]
+  decisionRecords DecisionRecord[]
 
   @@unique([agentId, version])
   @@index([agentId, createdAt])
@@ -196,6 +198,80 @@ model TraceEvent {
   @@index([runId, seq])
   @@index([runId, callId])
   @@map("trace_events")
+}
+
+enum DecisionDomain {
+  INTERVIEW
+  AGENT_LAB
+}
+
+// 追加式决策账本：记录一次决定在何时、基于哪些输入和哪版规则得出。
+model DecisionRecord {
+  id             String         @id @default(cuid())
+  domain         DecisionDomain
+  decisionType   String
+  subjectType    String
+  subjectId      String
+  outcome        Json
+  ruleSetVersion String
+  inputSnapshot  Json
+  inputHash      String
+  effectiveAt    DateTime       @default(now())
+  recordedAt     DateTime       @default(now())
+  actorId        String?
+  interviewId    String?
+  agentId        String?
+  agentVersionId String?
+
+  interview    Interview?    @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  agent        Agent?        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion AgentVersion? @relation(fields: [agentVersionId], references: [id], onDelete: SetNull)
+  facts        FactAssertion[]
+  evidence     DecisionEvidence[]
+
+  @@index([domain, subjectType, subjectId, recordedAt])
+  @@index([interviewId, recordedAt])
+  @@index([agentVersionId, recordedAt])
+  @@map("decision_records")
+}
+
+// 一条事实永不覆盖；失效或撤销以新的反向 assertion 表达，支持按时间重放。
+model FactAssertion {
+  id         String   @id @default(cuid())
+  decisionId String
+  subjectType String
+  subjectId  String
+  predicate  String
+  value      Json
+  polarity   Boolean  @default(true)
+  validFrom  DateTime @default(now())
+  validTo    DateTime?
+  sourceType String?
+  sourceId   String?
+  recordedAt DateTime @default(now())
+
+  decision DecisionRecord @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId])
+  @@index([subjectType, subjectId, predicate, validFrom])
+  @@map("fact_assertions")
+}
+
+model DecisionEvidence {
+  id         String   @id @default(cuid())
+  decisionId String
+  kind       String
+  sourceType String
+  sourceId   String?
+  payload    Json?
+  contentHash String?
+  createdAt  DateTime @default(now())
+
+  decision DecisionRecord @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId, createdAt])
+  @@index([sourceType, sourceId])
+  @@map("decision_evidence")
 }
 
 enum RunStatus {
@@ -431,6 +507,7 @@ model Interview {
   tasks          InterviewTask[]
   answerHistories AnswerHistory[]
   reflectionLogs ReflectionLog[]
+  decisionRecords DecisionRecord[]
 
   @@index([userId, startedAt])
   @@map("interviews")

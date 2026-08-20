@@ -17,9 +17,10 @@ import { RunBudgetService } from './run-budget.service';
 import { ApplicationController } from './application.controller';
 import { ApplicationService } from './application.service';
 import { InterviewLabBridgeService } from './interview-lab-bridge.service';
+import { InferenceModule } from '../inference/inference.module';
 
 @Module({
-  imports: [PrismaModule, AgentModule],
+  imports: [PrismaModule, AgentModule, InferenceModule],
   controllers: [AgentRegistryController, AgentRuntimeController, EvaluationController, ApplicationController],
   providers: [
     AgentRegistryService,

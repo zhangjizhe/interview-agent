@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { AgentRegistryService } from './agent-registry.service';
@@ -84,6 +85,21 @@ export class AgentRegistryController {
     @Param('versionId') versionId: string,
   ) {
     return this.registry.getReleaseGate(req.user.userId, agentId, versionId);
+  }
+
+  @Get('agents/:agentId/versions/:versionId/decision-snapshot')
+  getVersionDecisionSnapshot(
+    @Req() req: any,
+    @Param('agentId') agentId: string,
+    @Param('versionId') versionId: string,
+    @Query('asOf') asOf?: string,
+  ) {
+    return this.registry.getVersionDecisionSnapshot(
+      req.user.userId,
+      agentId,
+      versionId,
+      asOf,
+    );
   }
 
   @Post('agents/:agentId/versions/:versionId/publish')

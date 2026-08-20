@@ -28,15 +28,13 @@ COPY apps/api/config ./apps/api/config
 COPY apps/api/knowledge-base.json ./apps/api/knowledge-base.json
 COPY packages/shared-types ./packages/shared-types
 
-# nest build
+# Prisma Client 必须先于 Nest 编译生成，否则 schema 新增的模型和 enum 不会进入类型检查。
 WORKDIR /app/apps/api
-RUN ./node_modules/.bin/nest build
-
-# Prisma：先 copy schema，再 generate 生成 client（runtime 需要）
-# 2026-06-26 修：之前只 copy prisma 目录但没 generate，导致 runtime
-# @prisma/client did not initialize yet
 COPY apps/api/prisma ./prisma
 RUN ./node_modules/.bin/prisma generate
+
+# nest build
+RUN ./node_modules/.bin/nest build
 
 # entrypoint
 COPY apps/api/docker-entrypoint.sh /usr/local/bin/

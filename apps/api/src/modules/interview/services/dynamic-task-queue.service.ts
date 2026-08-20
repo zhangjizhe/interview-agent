@@ -1,4 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { createHash } from 'crypto';
+import { DecisionDomain } from '@prisma/client';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { LlmGatewayService } from '../../llm/llm.gateway.service';
 import { QuestionBankService } from './question-bank.service';
@@ -17,6 +19,7 @@ import {
   inferInterviewRouting,
   InterviewRoutingTask,
 } from '../../inference/interview-routing-inference';
+import { DecisionLedgerService } from '../../inference/decision-ledger.service';
 
 export interface InterviewTask {
   id: string;
@@ -113,6 +116,7 @@ export class DynamicTaskQueueService {
     private prisma: PrismaService,
     private llm: LlmGatewayService,
     @Optional() private questionBank?: QuestionBankService,
+    @Optional() private decisionLedger?: DecisionLedgerService,
   ) {}
 
   async initializeQueue(interviewId: string, position: string, level: string): Promise<void> {
@@ -240,7 +244,7 @@ export class DynamicTaskQueueService {
     const decision = await this.agentDecide(interviewId, userId, task.question, answer, task.category, task.difficulty);
 
     // 写入评分记录
-    await this.prisma.answerHistory.create({
+    const answerHistory = await this.prisma.answerHistory.create({
       data: {
         interviewId,
         question: task.question,
@@ -268,6 +272,16 @@ export class DynamicTaskQueueService {
       tasks: routingTasks,
       llmDecision: decision,
     });
+
+    await this.recordRoutingDecision(
+      interviewId,
+      userId,
+      task,
+      answerHistory.id,
+      answer,
+      decision,
+      routing,
+    );
 
     // LLM 负责理解回答和生成候选问题；规则层负责约束是否入队及其优先级。
     await this.executeAgentDecision(interviewId, task, routing);
@@ -459,6 +473,89 @@ export class DynamicTaskQueueService {
       return JSON.parse(context as string);
     } catch {
       return {};
+    }
+  }
+
+  private async recordRoutingDecision(
+    interviewId: string,
+    userId: string,
+    task: any,
+    answerHistoryId: string,
+    answer: string,
+    decision: AgentDecision,
+    routing: ReturnType<typeof inferInterviewRouting>,
+  ) {
+    if (!this.decisionLedger) return;
+
+    const answerHash = createHash('sha256').update(answer).digest('hex');
+    try {
+      await this.decisionLedger.record({
+        domain: DecisionDomain.INTERVIEW,
+        decisionType: 'interview.routing',
+        subjectType: 'INTERVIEW_TASK',
+        subjectId: task.id,
+        interviewId,
+        actorId: userId,
+        outcome: routing.outcome,
+        ruleSetVersion: routing.ruleSetVersion,
+        inputSnapshot: {
+          taskId: task.id,
+          category: task.category,
+          difficulty: task.difficulty,
+          answerHash,
+          score: decision.score,
+          missingPoints: decision.missingPoints,
+        },
+        facts: [
+          {
+            subjectType: 'INTERVIEW_TASK',
+            subjectId: task.id,
+            predicate: 'routing.outcome',
+            value: routing.outcome,
+            sourceType: 'INTERVIEW_TASK',
+            sourceId: task.id,
+          },
+          {
+            subjectType: 'INTERVIEW',
+            subjectId: interviewId,
+            predicate: 'capability.assessed',
+            value: {
+              taskId: task.id,
+              capabilities: routing.evidence.completedCapabilities,
+            },
+            sourceType: 'ANSWER_HISTORY',
+            sourceId: answerHistoryId,
+          },
+        ],
+        evidence: [
+          {
+            kind: 'RULE_EVALUATION',
+            sourceType: 'INTERVIEW_ROUTING',
+            sourceId: task.id,
+            payload: {
+              matchedRules: routing.matchedRules,
+              evidence: routing.evidence,
+            },
+          },
+          {
+            kind: 'ANSWER_SCORE',
+            sourceType: 'ANSWER_HISTORY',
+            sourceId: answerHistoryId,
+            payload: {
+              answerHash,
+              score: decision.score,
+              completeness: decision.completeness,
+              correctness: decision.correctness,
+              depth: decision.depth,
+            },
+          },
+        ],
+      });
+    } catch (error: any) {
+      // 候选人主链路优先：审计存储异常不能阻断答题与 SSE。
+      this.logger.warn(
+        `[TaskQueue] Decision ledger failed for ${interviewId}: ${error?.message || error}`,
+      );
     }
   }
 

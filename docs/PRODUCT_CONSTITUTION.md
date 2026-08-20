@@ -146,13 +146,18 @@ flowchart LR
   Evaluation[Evaluation Run / Result] --> LabOntology
   LabOntology --> Gate[Release Gate Rules]
   Gate --> Publish[允许 / 阻止发布]
+  Decision[DecisionRecord / FactAssertion / Evidence] --> Replay[As-of 查询 / 回放]
+  Routing --> Decision
+  Gate --> Decision
 ```
 
 **Interview Ontology** 的核心对象是岗位、能力项、题目、预期要点和回答证据。初始范围包括 Agent Runtime、工具调用、RAG、评测、记忆与可观测性，以及前端、后端、算法的基础能力集合。LLM 负责理解开放回答、抽取证据和生成自然语言题目；路由规则负责去重、队列上限、薄弱证据追问、能力覆盖和进阶时机。
 
 **AgentLab Ontology** 的核心对象是 Agent、AgentVersion、Run、TraceEvent、EvaluationRun、EvaluationResult、ToolCall 与 ReleaseGate。评测结果是版本发布的必要证据：没有完成评测、存在失败用例、分数低于 0.90，均不得发布草稿版本。已发布版本的重复操作保持幂等。
 
-每个推理结果必须携带 `ruleSetVersion`、`matchedRules`、`evidence` 和 `outcome`。当前面试路由结果写入生成题的 `context`；发布门禁通过只读预览接口和发布响应返回。持久化的 `DecisionRecord` / `DecisionEvidence` 是下一阶段工作，不阻塞当前闭环。
+每个推理结果必须携带 `ruleSetVersion`、`matchedRules`、`evidence` 和 `outcome`。`DecisionRecord`、`FactAssertion`、`DecisionEvidence` 是追加式账本：记录决策、输入快照哈希、规则版本、证据和有效时间，禁止覆盖历史；事实撤销以新的反向 assertion 表达。面试路由审计失败可降级，不阻断候选人主链路；版本发布审计失败必须阻止发布。
+
+AgentLab 通过版本级 `decision-snapshot?asOf=<ISO 时间>` 读取账本，以查看某一时刻已生效的发布决策、事实和证据；该查询不参与运行时决策，也不回写任何业务数据。
 
 ## 4. 不可破坏的产品规则
 
@@ -197,10 +202,12 @@ flowchart LR
 ### 下一阶段的优先级
 
 1. **可靠性**：SSE event offset/续传、请求级 Provider 重试与恢复、面试状态机端到端回归。
-2. **可解释性**：在 PostgreSQL 中落地轻量 `DecisionRecord` / `DecisionEvidence`，从题目路由和发布门禁扩展到评分依据与报告追溯。
-3. **评测与发布**：Golden Dataset、批量导入、发布门禁与回归比较。
-4. **受控执行**：将 Interview/MCP 调用逐步纳入 ToolRunner，并接入真正隔离的 Worker。
-5. **企业化**：SSO/OAuth、令牌轮转、审计导出、数据保留/脱敏、备份与容量治理。
+2. **时间语义**：以账本事实实现 `as-of` 查询和版本快照，完成面试报告与 AgentLab 发布/回滚的可重放证据链。
+3. **声明式规则**：将发布门禁、工具策略和面试路由逐步迁移至受限规则 DSL，并支持规则版本、灰度与冲突检测。
+4. **图谱与企业知识**：在真实跨实体查询需求下，将组织、项目、技能、文档、岗位和制度物化为派生知识图；RAG 保持语义召回职责。
+5. **评测与发布**：Golden Dataset、批量导入、回归比较与质量趋势。
+6. **受控执行**：将 Interview/MCP 调用逐步纳入 ToolRunner，并接入真正隔离的 Worker。
+7. **企业化**：SSO/OAuth、令牌轮转、审计导出、数据保留/脱敏、备份与容量治理。
 
 ## 6. 架构决策准则
 
