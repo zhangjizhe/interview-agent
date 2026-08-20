@@ -231,6 +231,8 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
             </div>
           </section>
 
+          <CandidateJourney activeJob={activeJob} hasResume={hasResume} readiness={readiness} />
+
           {!activeJob ? (
             <section className="border border-slate-200 bg-white p-6 md:p-8">
               <Briefcase className="h-6 w-6 text-blue-600" aria-hidden="true" />
@@ -363,6 +365,31 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
         </div>
       )}
     </div>
+  );
+}
+
+function CandidateJourney({ activeJob, hasResume, readiness }: { activeJob?: TargetJob; hasResume: boolean; readiness?: ReadinessSummary }) {
+  const steps = [
+    { label: '目标岗位', complete: Boolean(activeJob) },
+    { label: '简历', complete: hasResume },
+    { label: '模拟面试', complete: Boolean(readiness?.components.interviewPerformance.evidenceCount) },
+    { label: '训练复测', complete: Boolean(readiness?.available) },
+  ];
+  return (
+    <section className="mb-8 border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+        <h2 className="text-sm font-semibold">当前训练路径</h2>
+        <span className="text-xs text-slate-500">仅在真实证据完成后更新</span>
+      </div>
+      <ol className="grid divide-y divide-slate-100 md:grid-cols-4 md:divide-x md:divide-y-0">
+        {steps.map((step, index) => (
+          <li key={step.label} className="flex items-center gap-3 px-5 py-4">
+            <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${step.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{step.complete ? '✓' : index + 1}</span>
+            <span className={`text-sm font-medium ${step.complete ? 'text-slate-900' : 'text-slate-500'}`}>{step.label}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

@@ -11,14 +11,17 @@ RUN apk add --no-cache openssl python3 make g++ curl
 
 # pnpm
 RUN npm install -g pnpm@9
+ENV npm_config_registry=https://registry.npmjs.org
 
 # 拷贝 monorepo 配置
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
 
-# 装依赖
-RUN pnpm install --frozen-lockfile=false
+# 装依赖。BuildKit cache 让镜像仓库短暂失败后的重试复用已下载包。
+RUN --mount=type=cache,id=interview-agent-pnpm-api,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --frozen-lockfile=false
 
 # Prisma Client 必须在 Nest 编译前根据当前 schema 生成。
 # 否则新增模型或枚举不会出现在 TypeScript 类型中。

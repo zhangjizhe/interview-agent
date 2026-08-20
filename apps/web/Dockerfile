@@ -3,14 +3,17 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 RUN npm install -g pnpm@9
+ENV npm_config_registry=https://registry.npmjs.org
 
 # 拷贝 monorepo 配置
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* .npmrc ./
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared-types/package.json ./packages/shared-types/
 
-# 装依赖
-RUN pnpm install --frozen-lockfile=false
+# BuildKit cache keeps partial downloads across retrying builds.
+RUN --mount=type=cache,id=interview-agent-pnpm-web,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && \
+    pnpm install --frozen-lockfile=false
 
 # 拷贝源码
 COPY apps ./apps
