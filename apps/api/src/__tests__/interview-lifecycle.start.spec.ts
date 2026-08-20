@@ -25,10 +25,13 @@ describe('InterviewLifecycleController start', () => {
     interview: { create: jest.fn() },
   };
   const resumeRag = { searchByUser: jest.fn() };
+  const usage = { assertInterviewAllowed: jest.fn(), recordInterviewStart: jest.fn() };
 
   beforeEach(() => {
     jest.clearAllMocks();
     resumeRag.searchByUser.mockResolvedValue([{ name: 'resume.md' }]);
+    usage.assertInterviewAllowed.mockResolvedValue(undefined);
+    usage.recordInterviewStart.mockResolvedValue(undefined);
     prisma.targetJob.findFirst.mockResolvedValue({
       id: 'job-1',
       title: 'AI Agent Engineer',
@@ -51,6 +54,7 @@ describe('InterviewLifecycleController start', () => {
       resumeRag as any,
       {} as any,
       {} as any,
+      usage as any,
     );
   }
 
@@ -78,6 +82,7 @@ describe('InterviewLifecycleController start', () => {
         practiceSkillId: 'skill-1',
       }),
     });
+    expect(usage.recordInterviewStart).toHaveBeenCalledWith('user-1', 'interview-1');
   });
 
   it('does not allow skill practice without a target-job skill owned by the user', async () => {
@@ -90,6 +95,17 @@ describe('InterviewLifecycleController start', () => {
       mode: 'SKILL_PRACTICE',
       practiceSkillId: 'skill-1',
     }, { user: { userId: 'user-1' } })).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.interview.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects before creating an interview when server quota is exhausted', async () => {
+    usage.assertInterviewAllowed.mockRejectedValueOnce(new BadRequestException('quota exceeded'));
+
+    await expect(controller().startInterview({
+      userId: 'ignored-by-controller',
+      position: 'AI Agent Engineer',
+      targetJobId: 'job-1',
+    }, { user: { userId: 'user-1' } })).rejects.toThrow('quota exceeded');
     expect(prisma.interview.create).not.toHaveBeenCalled();
   });
 });

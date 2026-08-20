@@ -6,6 +6,8 @@ import { PromptCacheInterceptor } from './cache/prompt-cache.interceptor';
 import { SemanticCacheService } from './cache/semantic-cache.service';
 import { SessionCostTracker } from './cost/session-cost.tracker';
 import { SessionCostController } from './cost/session-cost.controller';
+import { UsageService } from './usage/usage.service';
+import { UsageController } from './usage/usage.controller';
 import { QdrantModule } from '../../infra/qdrant/qdrant.module';
 
 /** LLM provider health check bootstrap */
@@ -27,9 +29,10 @@ class LlmHealthBootstrap implements OnApplicationBootstrap {
     PromptCacheInterceptor,
     SemanticCacheService,
     SessionCostTracker,
+    UsageService,
     LlmHealthBootstrap,
   ],
-  controllers: [SessionCostController],
+  controllers: [SessionCostController, UsageController],
   exports: [
     LlmGatewayService,
     QwenProvider,
@@ -37,6 +40,7 @@ class LlmHealthBootstrap implements OnApplicationBootstrap {
     PromptCacheInterceptor,
     SemanticCacheService,
     SessionCostTracker,
+    UsageService,
   ],
 })
 export class LlmModule {}

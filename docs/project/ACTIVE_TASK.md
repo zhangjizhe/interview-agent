@@ -4,44 +4,37 @@
 
 ## 任务 ID
 
-TASK-021
+TASK-018
 
 ## 目标
 
-完成 Interview V0.2 的候选人产品主流程与页面级验收。
+完成 B6：基于 SessionCost 建立最小 Usage Ledger、服务端额度策略与受控发布记录。
 
 ## 状态
 
-完成
+进行中
 
 ## 范围
 
-- 注册、目标岗位、简历上传、完整模拟与单技能练习的可用流程。
-- 面试完成、FINAL 评价、训练推荐、训练完成和复测入口的页面状态。
-- 真实 API 驱动的加载、空、失败、权限和移动端体验。
-- API/Web/浏览器验收覆盖不调用 Provider 的主流程边界。
+- 按用户、自然月和 `INTERVIEW_START` 记录幂等 Usage Ledger。
+- 在创建面试前服务端检查配置化额度，浏览器不能绕过。
+- 候选人只读取面试次数与剩余额度摘要，不显示模型、Token、工具或 Provider 细节。
+- 为 Agent/Harness 发布记录补最小版本、数据集、质量/成本状态合同。
 
 ## 非目标
 
-- 修改 Agent Lab 控制面、Provider、Prompt、检索或 LangGraph 拓扑。
-- 将未完成的 Provider 质量验证伪装为产品验收。
-- Payment、订阅、团队、多租户或小程序。
+- Payment、订阅套餐、团队计费、完整 Entitlement 或 Agent 自主预算策略。
+- 改写 Provider、Prompt、LangGraph、RAG 或候选人 SSE 合同。
+- 用前端隐藏、静态额度或未验证 Agent 变更替代服务端策略。
 
 ## 验收标准
 
-- 候选人可在真实界面完成岗位和简历前置，理解完整模拟与单技能练习差异。
-- 评价、训练与复测入口只在真实后端状态允许时出现；无 Evidence 不显示伪造能力结论。
-- 桌面/移动浏览器路径、API/Web 测试、类型检查和构建通过。
-- 未调用真实 Provider 时，验收记录明确其边界。
+- 同一 Interview 只能创建一条对应 Usage Ledger；重试不会重复消耗额度。
+- 超额用户无法通过 API 直接创建面试，返回结构化额度错误。
+- 候选人使用量摘要经过 JWT 作用域限制，且不暴露内部成本。
+- API/Web 测试、typecheck/build、Docker 与浏览器路径通过；Provider 调用维持为零。
 
 ## 已知风险
 
-- 完整 FINAL Evaluation 依赖受控 Provider 或录制响应，不能在普通浏览器验收中无界触发。
-- 已有页面必须保留 JWT、Ownership、SSE 候选人事件边界和训练不直接改分不变量。
-
-## 交付结果
-
-- 候选人工作台布局、移动导航、岗位/简历前置、完整模拟/单技能选择、训练空态和权限边界已接入真实 API。
-- 浏览器验证岗位版本、单活跃约束、无 FINAL Evidence 的准备度和训练空态，未伪造能力或训练结论。
-- 2026-08-20 验证：API 29 suites / 256 tests、Cache 22 tests、Interview Web 13 files / 78 tests、API/Web build、Docker readiness 和候选人浏览器 23/23 通过。
-- 未调用真实 Provider；Provider 质量、延迟和成本验收由 Harness canary 独立执行。
+- SessionCost 是会话级聚合，Ledger 只能作为访问策略和产品摘要，不能重复统计 Provider 成本。
+- 额度配置必须在服务端读取，不能以套餐/价格硬编码。

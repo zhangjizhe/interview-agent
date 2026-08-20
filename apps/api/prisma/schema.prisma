@@ -23,6 +23,7 @@ model User {
   candidateSkillStates CandidateSkillState[]
   trainingRecommendations TrainingRecommendation[]
   trainingAttempts TrainingAttempt[]
+  usageLedgerEntries UsageLedger[]
 
   @@map("users")
 }
@@ -61,6 +62,7 @@ model Interview {
   evaluationRuns EvaluationRun[]
   assessmentEvidence AssessmentEvidence[]
   trainingAttempt TrainingAttempt? @relation("TrainingRetestInterview")
+  usageLedgerEntries UsageLedger[]
 
   @@index([userId, startedAt])
   @@map("interviews")
@@ -105,6 +107,22 @@ model SessionCost {
 
   @@index([interviewId])
   @@map("session_costs")
+}
+
+model UsageLedger {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  periodStart DateTime
+  type        UsageLedgerType
+  units       Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  @@unique([interviewId, type])
+  @@index([userId, periodStart, type])
+  @@map("usage_ledger")
 }
 
 model Message {
@@ -553,4 +571,8 @@ enum TrainingRecommendationStatus {
 
 enum TrainingAttemptStatus {
   COMPLETED
+}
+
+enum UsageLedgerType {
+  INTERVIEW_START
 }

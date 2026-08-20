@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, Briefcase, CheckCircle2, ChevronRight, FileU
 import { ChangeEvent, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { safeJson } from '../utils/safeJson';
-import { confidenceLabel, getInterviewAction, readinessLabel, type InterviewRecord, type ReadinessSummary, type TargetJob } from '../utils/training';
+import { confidenceLabel, getInterviewAction, readinessLabel, type InterviewRecord, type ReadinessSummary, type TargetJob, type UsageSummary } from '../utils/training';
 import { getSession } from '../utils/auth';
 
 interface ResumeSummary {
@@ -84,6 +84,15 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
       const response = await fetch('/api/interview/empty-rooms?idleMinutes=30');
       const data = await safeJson(response);
       return Array.isArray(data?.emptyRooms) ? data.emptyRooms as EmptyRoom[] : [];
+    },
+  });
+  const usageQuery = useQuery({
+    queryKey: ['usage-summary'],
+    queryFn: async () => {
+      const response = await fetch('/api/usage/summary');
+      const data = await safeJson(response);
+      if (!response.ok || data?._error) throw new Error(data?.message || '无法读取使用量');
+      return data as UsageSummary;
     },
   });
 
@@ -247,7 +256,7 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
               </div>
               <InterviewList interviews={interviews.slice(0, 5)} onRetry={retryEvaluation} retryingId={retryingId} />
             </div>
-            <NextStep hasResume={hasResume} activeJob={activeJob} onUpload={() => fileInputRef.current?.click()} onStart={() => setShowStart(true)} />
+            <NextStep hasResume={hasResume} activeJob={activeJob} usage={usageQuery.data} onUpload={() => fileInputRef.current?.click()} onStart={() => setShowStart(true)} />
           </section>
         </>
       ) : (
@@ -421,7 +430,7 @@ function DashboardReadiness({ readiness, loading, failed, hasResume, onUpload, o
   );
 }
 
-function NextStep({ activeJob, hasResume, onUpload, onStart }: { activeJob?: TargetJob; hasResume: boolean; onUpload: () => void; onStart: () => void }) {
+function NextStep({ activeJob, hasResume, usage, onUpload, onStart }: { activeJob?: TargetJob; hasResume: boolean; usage?: UsageSummary; onUpload: () => void; onStart: () => void }) {
   if (!activeJob) return null;
   return (
     <aside className="border border-slate-200 bg-white p-5">
@@ -432,6 +441,11 @@ function NextStep({ activeJob, hasResume, onUpload, onStart }: { activeJob?: Tar
         {hasResume ? '开始模拟面试' : '上传简历'}
         <ArrowRight className="h-4 w-4" aria-hidden="true" />
       </button>
+      {usage && (
+        <p className="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-500">
+          本月已开始 {usage.interviewsUsed} 场面试{usage.interviewsRemaining === null ? '' : `，剩余 ${usage.interviewsRemaining} 场`}。
+        </p>
+      )}
     </aside>
   );
 }

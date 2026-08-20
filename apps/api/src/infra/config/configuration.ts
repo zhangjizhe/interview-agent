@@ -82,6 +82,9 @@ export interface AppConfig {
     ttl: number;
     limit: number;
   };
+  quota: {
+    monthlyInterviewLimit?: string;
+  };
 }
 
 /**
@@ -249,6 +252,9 @@ export const configuration = (): AppConfig => {
   throttler: {
     ttl: parseInt(process.env.THROTTLER_TTL || '60', 10),
     limit: parseInt(process.env.THROTTLER_LIMIT || '60', 10),
+  },
+  quota: {
+    monthlyInterviewLimit: process.env.QUOTA_MONTHLY_INTERVIEW_LIMIT || undefined,
   },
   };
 }

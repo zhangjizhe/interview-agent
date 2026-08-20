@@ -17,6 +17,7 @@ import { MemoryService } from '../../memory/memory.service';
 import { ResumeRAGService } from '../services/resume-rag.service';
 import { EvaluationService } from '../services/evaluation.service';
 import { TrainingService } from '../services/training.service';
+import { UsageService } from '../../llm/usage/usage.service';
 import type { ChatMessage } from '../../llm/providers/types';
 import { requireOwnedInterview } from '../../../common/ownership.util';
 
@@ -55,6 +56,7 @@ export class InterviewLifecycleController {
     private resumeRag: ResumeRAGService,
     private evaluation: EvaluationService,
     private training: TrainingService,
+    private usage: UsageService,
   ) {}
 
   // ===== 静态路由（必须在 :interviewId 之前）=====
@@ -113,6 +115,7 @@ export class InterviewLifecycleController {
   @Post('start')
   async startInterview(@Body() dto: StartInterviewDto, @Req() req: any) {
     const userId = req.user.userId;
+    await this.usage.assertInterviewAllowed(userId);
     const mode = dto.mode || 'FULL_SIMULATION';
     if (mode !== 'FULL_SIMULATION' && mode !== 'SKILL_PRACTICE') {
       throw new BadRequestException('Unsupported interview mode');
@@ -185,6 +188,7 @@ export class InterviewLifecycleController {
         throw error;
       }
     }
+    await this.usage.recordInterviewStart(userId, interview.id);
     return {
       interviewId: interview.id,
       interview,

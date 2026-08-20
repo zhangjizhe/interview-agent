@@ -51,6 +51,13 @@ export interface InterviewRecord {
   report: { overallScore: number } | null;
 }
 
+export interface UsageSummary {
+  periodStart: string;
+  interviewsUsed: number;
+  interviewLimit: number | null;
+  interviewsRemaining: number | null;
+}
+
 export type InterviewAction = 'CONTINUE' | 'OPEN_REPORT' | 'RETRY_EVALUATION';
 
 export function getInterviewAction(interview: InterviewRecord): InterviewAction {
