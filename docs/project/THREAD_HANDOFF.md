@@ -4,14 +4,14 @@
 
 ## 上一任务
 
-TASK-021：Interview V0.2 候选人产品主流程
+TASK-018：B6 使用量与发布平面最小边界
 
 ## 已完成
 
-- 候选人工作台布局收敛为首页、训练、面试记录和岗位设置，并隔离 MCP 控制面。
-- 真实浏览器验证注册、岗位、简历前置、完整/单技能模式、训练空态、所有权与移动端。
-- 无 FINAL Evidence 时准备度和训练入口保持诚实状态，不伪造评分或建议。
-- 2026-08-20 Docker 浏览器验收 23/23 通过，未调用 Provider。
+- 新增 Usage Ledger，以用户、自然月和 Interview 唯一键记录面试创建访问事实。
+- `QUOTA_MONTHLY_INTERVIEW_LIMIT` 由服务端读取；上限耗尽时 API 在创建前返回 429。
+- 候选人首页只读显示面试使用量摘要，不显示 Token、模型、Provider、工具或成本。
+- Docker 主路径在额度上限 1 时验证 `0/1 -> 1/0 -> 429`，随后恢复默认未配置额度状态。
 
 ## 改动文件
 
@@ -49,11 +49,11 @@ TASK-021：Interview V0.2 候选人产品主流程
 
 ## 推荐下一任务
 
-TASK-B6：基于 SessionCost 的使用量与服务端额度边界。
+TASK-AgentLab-V0.2：Trace、评测、实验和发布合同。
 
 ## 所需上下文
 
-按 `AGENTS.md` 读取核心顺序，再读取 `docs/harness/RELEASE_GATE.md`、`docs/harness/HARNESS.md`、SessionCost/Gateway、鉴权/面试入口、现有浏览器验收和 Docker migration job。
+按 `AGENTS.md` 读取核心顺序，再读取 `docs/agent-lab/CHARTER.md`、`docs/agent-lab/UI_OPERATING_SYSTEM.md`、Harness、Golden Dataset、Agent Lab 控制台和受保护管理 API。
 
 ## 风险
 

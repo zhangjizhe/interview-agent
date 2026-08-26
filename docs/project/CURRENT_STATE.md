@@ -13,10 +13,10 @@
 | RAG 与题库 | 已实现 | Resume RAG、Dense Retrieval、BM25、RRF、Rerank、Milvus 题库、Qdrant 知识库、文件/URL 导入均存在。 |
 | Evaluation/Reporting | 部分实现 | 单次报告、评分、AnswerHistory、ReflectionLog、Golden Dataset 和 Runner 存在；新面试可持久化 Question/Answer/Evidence/EvaluationRun，正式报告改为指向当前不可变运行的展示快照；成功 FINAL 运行会事务性聚合可追溯技能状态。 |
 | Offline Harness | 部分实现 | Golden Dataset 和 Evaluation Runner 存在；版本对比和失败分析流程未完成。 |
-| Observability/Cost | 部分实现 | Langfuse、会话 Token/Cost、Provider Health、Circuit Breaker、Semantic Cache 存在；生产 Metrics Plane 不完整。 |
+| Observability/Cost | 部分实现 | Langfuse、会话 Token/Cost、Provider Health、Circuit Breaker、Semantic Cache、最小 Usage Ledger 和服务端面试次数额度存在；生产 Metrics/Entitlement 平面不完整。 |
 | 数据库 | 已实现 | Prisma 覆盖用户、面试、消息、报告、成本、任务、答题历史、工具偏好和反思日志。 |
 | 鉴权/安全 | 已实现 | Password Login、JWT Default-deny、USER/ADMIN RBAC、Ownership、URL Import SSRF 防护和校验均存在。 |
-| Billing/Quota/Entitlement | 计划中 | 没有 Usage Ledger、Quota Enforcement、Plan Model 或 Payment Integration。 |
+| Billing/Quota/Entitlement | 部分实现 | Usage Ledger、配置化月面试次数额度和候选人使用量摘要已实现；Plan、Entitlement、Payment 和团队计费仍未实现。 |
 | Skill Map 与 Training Plan | 部分实现 | SkillDefinition、TargetJob、JobSkillRequirement、CandidateSkillState Schema 与受保护 API 已存在；目标岗位/JD、准备度 API 和 FINAL 技能状态聚合已实现，训练推荐、用户训练流程和真实趋势比较尚未完成。 |
 | Mobile/小程序 | 计划中 | 当前 Web 有响应式；没有独立小程序客户端。 |
 | 自动化测试 | 已实现 | API Jest/Unit Test、Web Vitest、Playwright/浏览器和 Content Workflow 验收资产已配置；B0 真实登录与岗位创建浏览器验收已可执行。 |
@@ -60,3 +60,4 @@
 - 2026-08-15 已完成 B4 面试模式与候选人 SSE 合同：Interview 持久化完整模拟/单技能练习、岗位档案版本快照和所选技能；题目保存稳定技能、追问目的与选择元数据。客户端重试复用消息 ID，完成的请求只重放已保存回复，不重复写回答或进入 Agent 成本路径；当前仍未提供 Event ID/Offset 逐 token 续传。加性 migration、API 27 suites / 249 tests、Web 75 tests、Docker 和真实浏览器验收 21/21 通过。
 - 2026-08-17 已完成 B5 单技能训练推荐与复测关联：TrainingRecommendation 只由活跃岗位中成功 FINAL 运行的低分正式技能状态生成，绑定岗位档案版本、来源运行和 Evidence；TrainingAttempt 记录完成与复测 Interview。训练完成不改变 CandidateSkillState。加性 migration、API 29 suites / 256 tests、Web 76 tests、Docker 和真实浏览器验收 22/22 通过。
 - 2026-08-20 已完成 Interview V0.2 候选人无 Provider 主流程验收：注册、岗位、版本化准备度、完整/单技能面试选择、训练空态、跨用户拒绝和移动工作台均经过 Docker 浏览器 23/23 验证。真实 Provider 评价质量仍需独立 Harness canary。
+- 2026-08-26 已完成 B6 最小 Usage Ledger 和服务端面试额度：按用户/自然月/面试创建幂等记录，候选人仅读取安全摘要；Docker 主路径在上限 1 时验证 `0/1 -> 1/0 -> 429`，验收后恢复默认未配置额度状态。

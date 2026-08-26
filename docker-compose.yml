@@ -148,6 +148,7 @@ services:
       MEM0_HOST: ${MEM0_HOST:-}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (deploy.sh 自动生成 dev 占位)}
       ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
+      QUOTA_MONTHLY_INTERVIEW_LIMIT: ${QUOTA_MONTHLY_INTERVIEW_LIMIT:-}
       PORT: 3001
       NODE_ENV: production
     env_file:

@@ -12,7 +12,7 @@ try {
   const page = await context.newPage();
   console.log('checking login gate');
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  if (await page.getByRole('heading', { name: 'Agent Lab 管理员登录' }).count() !== 1) throw new Error('admin login gate missing');
+  if (await page.getByRole('heading', { name: '进入控制台' }).count() !== 1) throw new Error('admin login gate missing');
 
   await page.getByLabel('用户名').fill('admin-acceptance');
   await page.getByLabel('密码').fill(password);

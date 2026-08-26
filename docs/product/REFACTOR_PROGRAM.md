@@ -138,6 +138,13 @@ Web
 - 训练完成只创建 TrainingAttempt。复测只能从已完成 Attempt、未变更的当前岗位版本和匹配的单技能练习开始；训练本身不修改 CandidateSkillState。
 - API 29 suites / 256 tests、Web 76 tests、加性 migration、Docker rebuild 和真实 JWT 浏览器验收 22/22 通过。浏览器验收只验证无证据空状态，不调用 Provider。
 
+### B6 验收记录（2026-08-26）
+
+- Usage Ledger 以用户、UTC 自然月、`INTERVIEW_START` 和 Interview 唯一键记录访问事实；同一面试重试不会重复消耗额度。
+- `QUOTA_MONTHLY_INTERVIEW_LIMIT` 是服务端配置。Docker 主路径在上限 1 时验证 `0/1 -> 1/0 -> 429`，验收后恢复默认未配置额度状态。
+- 候选人只读摘要只返回周期、面试次数、额度和剩余次数，不返回模型、Provider、Token、工具或成本。
+- Provider 成本继续由 Gateway/SessionCost 归集；Usage Ledger 不是账单或 Provider 成本替代品。Harness 发布决策仍由独立任务完成。
+
 ## 团队交叉验收
 
 | 责任 | 审核内容 |

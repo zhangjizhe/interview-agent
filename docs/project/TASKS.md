@@ -20,9 +20,9 @@
 
 ### TASK-018：B6 使用量与发布平面最小边界
 
-- 状态：建议
+- 状态：2026-08-26 完成
 - 原因：使用量与发布策略应明确区分候选人摘要和 Agent Lab 控制面后再继续，避免把 Agent 内部信息重新带入产品 Web。
-- 后续：保留原范围、验收标准和风险；TASK-019 完成后恢复。
+- 验证：Usage Ledger 幂等、服务端额度拒绝、候选人安全摘要、API 30 suites / 260 tests、Cache 22 tests、Interview Web 78 tests、Docker migration/API readiness 和 Docker `0/1 -> 1/0 -> 429` 通过；未调用 Provider。
 
 ## 已完成
 
