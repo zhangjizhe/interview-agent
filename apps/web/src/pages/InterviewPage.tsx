@@ -120,10 +120,9 @@ export function InterviewPage() {
         if (data?.status) {
           setInterviewStatus(data.status);
         }
-        // 只展示 status=COMPLETED 的报告，避免 IN_PROGRESS
-        // interview 进入页面就显示报告（应继续聊天）。与后端 GET /:id 双层防御。
-        if (data?.status === 'COMPLETED' && data?.report) {
-          setReport(data.report);
+        // Completed sessions are viewed in the dedicated report/replay route.
+        if (data?.status === 'COMPLETED') {
+          navigate(`/reports/${interviewId}`, { replace: true });
         } else if (data?.status && data.status !== 'COMPLETED') {
           // IN_PROGRESS / PENDING 时显式清空（防止 stale state 残留）
           setReport(null);
@@ -136,7 +135,7 @@ export function InterviewPage() {
         console.error('加载失败:', err);
       }
     })();
-  }, [interviewId, setMessages, setReport, setResume, setResumeConfirmed, setInterviewStatus]);
+  }, [interviewId, navigate, setMessages, setReport, setResume, setResumeConfirmed, setInterviewStatus]);
 
   // 把 scrollRef 和 pullRef 指向同一个节点
   useEffect(() => {
@@ -199,8 +198,8 @@ export function InterviewPage() {
         navigate('/');
         return;
       }
-      setReport(data.report as Report);
       setInterviewStatus('COMPLETED'); // 标记已结束，二次进入会禁用输入
+      navigate(`/reports/${interviewId}`, { replace: true });
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err?.name === 'AbortError') {

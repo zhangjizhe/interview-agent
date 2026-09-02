@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowRight, Briefcase, CheckCircle2, ChevronRight, FileUp, Loader2, Play, RotateCcw, Sparkles, Trash2 } from 'lucide-react';
-import { ChangeEvent, useRef, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { safeJson } from '../utils/safeJson';
 import { confidenceLabel, getInterviewAction, readinessLabel, type InterviewRecord, type ReadinessSummary, type TargetJob, type UsageSummary } from '../utils/training';
@@ -20,7 +20,7 @@ interface EmptyRoom {
   idleMinutes: number;
 }
 
-export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interviews' }) {
+export function HomePage({ view = 'overview', openPractice = false }: { view?: 'overview' | 'interviews'; openPractice?: boolean }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -100,6 +100,10 @@ export function HomePage({ view = 'overview' }: { view?: 'overview' | 'interview
   const interviews = interviewsQuery.data || [];
   const readiness = readinessQuery.data;
   const practiceSkills = readiness?.targetJob?.skillRequirements || [];
+
+  useEffect(() => {
+    if (openPractice && activeJob) setShowStart(true);
+  }, [activeJob, openPractice]);
 
   const uploadResume = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

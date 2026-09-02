@@ -95,11 +95,19 @@ export class SkillProfileController {
 
   @Get(':interviewId/evidence')
   async listAssessmentEvidence(@Param('interviewId') interviewId: string, @Req() req: any) {
-    await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
+    const interview: any = await requireOwnedInterview(this.prisma, interviewId, req.user.userId, {
+      include: { report: { select: { currentEvaluationRunId: true } } },
+    });
+    const evaluationRunId = interview.report?.currentEvaluationRunId;
+    if (!evaluationRunId) return [];
     return this.prisma.assessmentEvidence.findMany({
-      where: { interviewId },
+      where: {
+        interviewId,
+        evaluationRunId,
+        evaluationRun: { mode: 'FINAL', status: 'SUCCEEDED' },
+      },
       include: {
-        question: { select: { question: true, category: true, difficulty: true } },
+        question: { select: { question: true, category: true, difficulty: true, parentQuestionId: true } },
         answer: { select: { content: true, createdAt: true } },
         skill: { select: { slug: true, name: true, taxonomyVersion: true } },
         evaluationRun: {

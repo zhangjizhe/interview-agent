@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Body, Param, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, BadRequestException, Req } from '@nestjs/common';
 import { McpRegistry } from './services/mcp-registry';
 import { Roles } from '../auth/roles.decorator';
+import { PrismaService } from '../../infra/prisma/prisma.service';
 
 /**
  * MCP 服务管理 API（系统级，admin 用）
@@ -22,6 +23,8 @@ interface ToggleDto {
 @Controller('admin/mcp-servers')
 @Roles('ADMIN')
 export class AdminMcpController {
+  constructor(private readonly prisma: PrismaService) {}
+
   @Get()
   list() {
     const servers = McpRegistry.listWithStatus();
@@ -48,9 +51,31 @@ export class AdminMcpController {
   }
 
   @Post('reload')
-  async reload() {
-    const path = require('path').resolve(__dirname, '../../../config/mcp-servers.json');
-    const result = await McpRegistry.loadFromConfig(path);
-    return { ok: true, ...result };
+  async reload(@Req() req: any) {
+    try {
+      const path = require('path').resolve(__dirname, '../../../config/mcp-servers.json');
+      const result = await McpRegistry.loadFromConfig(path);
+      await this.prisma.labOperationLog.create({
+        data: {
+          actorId: req.user.userId,
+          action: 'MCP_CONFIG_RELOAD',
+          objectType: 'MCP_REGISTRY',
+          objectId: 'system-mcp-registry',
+          outcome: 'SUCCEEDED',
+        },
+      });
+      return { ok: true, ...result };
+    } catch (error) {
+      await this.prisma.labOperationLog.create({
+        data: {
+          actorId: req.user.userId,
+          action: 'MCP_CONFIG_RELOAD',
+          objectType: 'MCP_REGISTRY',
+          objectId: 'system-mcp-registry',
+          outcome: 'REJECTED',
+        },
+      }).catch(() => undefined);
+      throw error;
+    }
   }
 }

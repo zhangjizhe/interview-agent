@@ -69,3 +69,4 @@
 - 2026-08-27 已完成 TASK-027 审计保留边界：默认未配置时不删除记录；配置的 30 至 3650 天保留期只能删除过期、未导入的失败/待处理 Receipt 和无 Receipt/Experiment/Decision 引用的 Run。Experiment 和 Release Decision 永久保留。API 32 suites / 274 tests、Golden Dataset 校验、API/Agent Lab build、Docker API health 和默认关闭浏览器验收通过，未调用 Provider。
 - 2026-09-02 已完成 TASK-028 Agent Lab 最小操作日志查询：Receipt 提交/导入、Experiment、Release Decision 和 Retention 操作只记录管理员、固定动作/对象、结果与时间；ADMIN 可白名单筛选查询，USER 被拒绝。API 32 suites / 276 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker migration/API health 和管理员浏览器验收通过，未调用 Provider。
 - 2026-09-02 已完成 TASK-031 双端 UI 适配首轮：Interview 工作台补齐移动导航、真实训练空态和显式刷新；Agent Lab 收敛为高密度无渐变控制台，静态拓扑不再伪装为运行状态。Interview Web 13 files / 78 tests、Agent Lab build、Docker 和两端浏览器验收通过。
+- 2026-09-02 已完成 TASK-032 报告/回放与兼容入口 UI 边界：完成面试进入独立报告页，回放只读取当前 Report 快照绑定的成功 FINAL Evidence；候选人技术兼容路由安全重定向，MCP 重载写固定操作审计。产品经理复审通过；Interview Web 14 files / 79 tests、API/Agent Lab build 和浏览器验收通过。

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, CircleDot, Play, RefreshCw } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { safeJson } from '../utils/safeJson';
 import type { TargetJob } from '../utils/training';
 
@@ -117,6 +117,7 @@ export function TrainingPage() {
           <CircleDot className="h-5 w-5 text-slate-400" aria-hidden="true" />
           <h2 className="mt-3 text-base font-semibold">还没有可开始的训练</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">当前没有可追溯的训练建议。完成带技能证据的正式面试后，更新建议以查看下一步。</p>
+          <Link to="/practice" className="mt-4 inline-flex h-10 items-center gap-2 bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700"><Play className="h-4 w-4" aria-hidden="true" />开始完整模拟</Link>
         </section>
       ) : (
         <div className="space-y-3">

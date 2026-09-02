@@ -1,9 +1,10 @@
-import { Briefcase, ClipboardList, Dumbbell, Home, LogOut, PanelLeft } from 'lucide-react';
+import { Briefcase, ClipboardList, Dumbbell, Home, LogOut, PanelLeft, Play } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clearSession, getSession } from '../utils/auth';
 
 const navigation = [
   { to: '/', label: '首页', icon: Home, end: true },
+  { to: '/practice', label: '练习', icon: Play, end: false },
   { to: '/interviews', label: '面试记录', icon: ClipboardList, end: false },
   { to: '/training', label: '训练', icon: Dumbbell, end: false },
   { to: '/settings', label: '岗位设置', icon: Briefcase, end: false },
@@ -39,8 +40,8 @@ export function AppShell() {
         </header>
         <main><Outlet /></main>
       </div>
-      <nav aria-label="候选人移动导航" className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-4 border-t border-slate-200 bg-white px-1 md:hidden">
-        {navigation.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `flex min-w-0 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-medium ${isActive ? 'text-blue-700' : 'text-slate-500'}`}><Icon className="h-4 w-4" aria-hidden="true" /><span className="truncate">{label}</span></NavLink>)}
+      <nav aria-label="候选人移动导航" className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-slate-200 bg-white px-1 md:hidden">
+        {navigation.map(({ to, label, icon: Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `flex min-w-0 flex-col items-center justify-center gap-1 rounded-md text-[10px] font-medium ${isActive ? 'text-blue-700' : 'text-slate-500'}`}><Icon className="h-4 w-4" aria-hidden="true" /><span className="truncate">{label}</span></NavLink>)}
       </nav>
     </div>
   );

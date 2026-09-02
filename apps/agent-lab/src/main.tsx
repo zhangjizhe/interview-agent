@@ -75,9 +75,9 @@ type LabAuditResponse = {
   hasMore: boolean;
   items: Array<Record<string, any>>;
 };
-type OperationAction = 'RECORDED_IMPORT_SUBMIT' | 'RECORDED_IMPORT_EXECUTE' | 'EXPERIMENT_CREATE' | 'RELEASE_DECISION_RECORD' | 'RETENTION_EXECUTE';
+type OperationAction = 'MCP_CONFIG_RELOAD' | 'RECORDED_IMPORT_SUBMIT' | 'RECORDED_IMPORT_EXECUTE' | 'EXPERIMENT_CREATE' | 'RELEASE_DECISION_RECORD' | 'RETENTION_EXECUTE';
 type OperationOutcome = 'SUCCEEDED' | 'REJECTED';
-type OperationObject = 'RECORDED_IMPORT' | 'EXPERIMENT' | 'RELEASE_DECISION' | 'RETENTION_POLICY';
+type OperationObject = 'MCP_REGISTRY' | 'RECORDED_IMPORT' | 'EXPERIMENT' | 'RELEASE_DECISION' | 'RETENTION_POLICY';
 type LabOperationLogResponse = {
   page: number;
   limit: number;
@@ -339,20 +339,21 @@ function titleFor(view: View) {
 }
 
 function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void }) {
+  const latestDecision = lab.decisions[0];
   return <div className="agent-page-grid">
     <section className="agent-hero">
       <p className="agent-eyebrow">SYSTEM STATUS</p>
       <h2>受控运行，而不是不可见自动化。</h2>
-      <p>Golden Dataset {lab.dataset.version} 已校验 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。控制面只显示脱敏摘要、指标和发布证据。</p>
+      <p>数据源：Golden Dataset {lab.dataset.version}，已校验 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。控制面只显示脱敏摘要、指标和发布证据。</p>
       <div className="agent-hero-actions"><button onClick={onRuntime}><Workflow size={16}/>查看编排</button><button className="quiet" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button></div>
     </section>
     <section className="agent-metric-grid">
       <article><span>MCP 服务</span><strong>{data.runningCount} / {data.count}</strong><small>当前可用</small></article>
       <article><span>运行编排</span><strong>受控</strong><small>阶段可见，内部推理不可见</small></article>
-      <article><span>评测发布</span><strong>{lab.summary.latestDecision || '无记录'}</strong><small>{lab.summary.runCount} 次运行，{lab.summary.experimentCount} 个实验</small></article>
+      <article><span>最新发布记录</span><strong>{lab.summary.latestDecision || '无记录'}</strong><small>{latestDecision ? `${new Date(latestDecision.createdAt).toLocaleString()} · 仅记录人工决定，不触发部署` : '尚无人工发布决定'}</small></article>
     </section>
     <section className="lab-summary-grid">
-      <article><span>数据集</span><strong>{lab.dataset.validationStatus}</strong><small>{lab.dataset.version}</small></article>
+      <article><span>数据集</span><strong>{lab.dataset.validationStatus}</strong><small>{lab.dataset.version} · {lab.runs[0] ? new Date(lab.runs[0].startedAt).toLocaleString() : '当前控制面读取'}</small></article>
       <article><span>失败运行</span><strong>{lab.summary.failedRunCount}</strong><small>最近 20 条运行</small></article>
       <article><span>发布门</span><strong>{Math.round(lab.thresholds.qualityScore * 100)}%</strong><small>质量最低阈值</small></article>
     </section>
@@ -500,9 +501,9 @@ function OperationLogWorkspace({ logs, filters, onFilters }: {
   const data = logs.data as LabOperationLogResponse | undefined;
   return <div className="agent-page-grid">
     <section className="lab-audit-filters operation-log-filters">
-      <label>动作<select aria-label="Operation action" value={filters.action} onChange={(event) => update({ action: event.target.value })}><option value="">全部</option><option value="RECORDED_IMPORT_SUBMIT">Receipt 提交</option><option value="RECORDED_IMPORT_EXECUTE">Receipt 导入</option><option value="EXPERIMENT_CREATE">创建实验</option><option value="RELEASE_DECISION_RECORD">发布决策</option><option value="RETENTION_EXECUTE">保留清理</option></select></label>
+      <label>动作<select aria-label="Operation action" value={filters.action} onChange={(event) => update({ action: event.target.value })}><option value="">全部</option><option value="MCP_CONFIG_RELOAD">重新加载 MCP</option><option value="RECORDED_IMPORT_SUBMIT">Receipt 提交</option><option value="RECORDED_IMPORT_EXECUTE">Receipt 导入</option><option value="EXPERIMENT_CREATE">创建实验</option><option value="RELEASE_DECISION_RECORD">发布决策</option><option value="RETENTION_EXECUTE">保留清理</option></select></label>
       <label>结果<select aria-label="Operation outcome" value={filters.outcome} onChange={(event) => update({ outcome: event.target.value })}><option value="">全部</option><option value="SUCCEEDED">成功</option><option value="REJECTED">拒绝</option></select></label>
-      <label>对象<select aria-label="Operation object type" value={filters.objectType} onChange={(event) => update({ objectType: event.target.value })}><option value="">全部</option><option value="RECORDED_IMPORT">Receipt</option><option value="EXPERIMENT">Experiment</option><option value="RELEASE_DECISION">Decision</option><option value="RETENTION_POLICY">Retention</option></select></label>
+      <label>对象<select aria-label="Operation object type" value={filters.objectType} onChange={(event) => update({ objectType: event.target.value })}><option value="">全部</option><option value="MCP_REGISTRY">MCP Registry</option><option value="RECORDED_IMPORT">Receipt</option><option value="EXPERIMENT">Experiment</option><option value="RELEASE_DECISION">Decision</option><option value="RETENTION_POLICY">Retention</option></select></label>
     </section>
     {logs.isLoading ? <EmptyState title="正在读取操作日志" text="请稍候" /> : logs.isError ? <EmptyState title="无法读取操作日志" text={(logs.error as Error).message} /> : <OperationLogList data={data} onPage={(page) => update({ page })} />}
   </div>;

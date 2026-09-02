@@ -25,21 +25,15 @@ async function safeJson(res: Response): Promise<any> {
   }
 }
 
-// 路由级懒加载 — 首屏不加载 InterviewPage / QuestionBankPage / ToolsPage / AdminMcpPage
+// 路由级懒加载 — 首屏不加载面试房间、评价和管理兼容页面
 const InterviewPage = lazy(() =>
   import('./pages/InterviewPage').then((m) => ({ default: m.InterviewPage })),
 );
+const ReportPage = lazy(() =>
+  import('./pages/ReportPage').then((m) => ({ default: m.ReportPage })),
+);
 const TrainingPage = lazy(() =>
   import('./pages/TrainingPage').then((m) => ({ default: m.TrainingPage })),
-);
-const QuestionBankPage = lazy(() =>
-  import('./pages/QuestionBankPage').then((m) => ({ default: m.QuestionBankPage })),
-);
-const ToolsPage = lazy(() =>
-  import('./pages/ToolsPage').then((m) => ({ default: m.ToolsPage })),
-);
-const AdminMcpPage = lazy(() =>
-  import('./pages/AdminMcpPage').then((m) => ({ default: m.AdminMcpPage })),
 );
 
 function PageSpinner() {
@@ -125,10 +119,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   );
 }
 
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  return getSession()?.role === 'ADMIN' ? <>{children}</> : <Navigate to="/" replace />;
-}
-
 export default function App() {
   // 初始化 Web Vitals 性能监控
   useEffect(() => { initWebVitals(); }, []);
@@ -140,12 +130,14 @@ export default function App() {
           <Routes>
             <Route element={<AppShell />}>
               <Route path="/" element={<HomePage />} />
+              <Route path="/practice" element={<HomePage openPractice />} />
               <Route path="/interviews" element={<HomePage view="interviews" />} />
               <Route path="/training" element={<TrainingPage />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/question-bank" element={<QuestionBankPage />} />
-              <Route path="/tools" element={<ToolsPage />} />
-              <Route path="/admin/mcp" element={<AdminRoute><AdminMcpPage /></AdminRoute>} />
+              <Route path="/question-bank" element={<Navigate to="/" replace />} />
+              <Route path="/tools" element={<Navigate to="/settings" replace />} />
+              <Route path="/admin/mcp" element={<Navigate to="/" replace />} />
+              <Route path="/reports/:id" element={<ReportPage />} />
             </Route>
             <Route path="/interview/:id" element={<InterviewPage />} />
           </Routes>

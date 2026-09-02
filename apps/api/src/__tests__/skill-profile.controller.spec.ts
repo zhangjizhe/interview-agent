@@ -42,4 +42,22 @@ describe('SkillProfileController', () => {
       .rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.assessmentEvidence.findMany).not.toHaveBeenCalled();
   });
+
+  it('reads only the report-bound successful final evidence', async () => {
+    prisma.interview.findFirst.mockResolvedValueOnce({
+      id: 'interview-a',
+      report: { currentEvaluationRunId: 'final-run-a' },
+    });
+    const controller = new SkillProfileController(prisma as any, {} as any, {} as any);
+
+    await controller.listAssessmentEvidence('interview-a', req);
+
+    expect(prisma.assessmentEvidence.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        interviewId: 'interview-a',
+        evaluationRunId: 'final-run-a',
+        evaluationRun: { mode: 'FINAL', status: 'SUCCEEDED' },
+      },
+    }));
+  });
 });

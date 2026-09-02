@@ -816,6 +816,7 @@ enum LabRecordedImportStatus {
 }
 
 enum LabOperationAction {
+  MCP_CONFIG_RELOAD
   RECORDED_IMPORT_SUBMIT
   RECORDED_IMPORT_EXECUTE
   EXPERIMENT_CREATE
@@ -824,6 +825,7 @@ enum LabOperationAction {
 }
 
 enum LabOperationObject {
+  MCP_REGISTRY
   RECORDED_IMPORT
   EXPERIMENT
   RELEASE_DECISION

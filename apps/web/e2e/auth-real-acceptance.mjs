@@ -205,9 +205,8 @@ try {
   await adminPage.goto(webUrl, { waitUntil: 'networkidle' });
   await loginExisting(adminPage, 'admin-acceptance', 'ADMIN');
   await adminPage.goto(`${webUrl}/admin/mcp`, { waitUntil: 'networkidle' });
-  const heading = adminPage.getByRole('heading', { name: 'MCP 服务管理' });
-  check('administrator can access MCP management page', await heading.count() === 1);
-  await adminPage.screenshot({ path: join(outputDir, '07-real-admin-mcp.png'), fullPage: true });
+  check('candidate application redirects legacy MCP route to the training workspace', new URL(adminPage.url()).pathname === '/');
+  await adminPage.screenshot({ path: join(outputDir, '07-legacy-admin-redirect.png'), fullPage: true });
 
   const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const mobilePage = await mobileContext.newPage();
@@ -246,7 +245,7 @@ const report = {
   screenshots: [
     '05-real-login-desktop.png',
     '06-real-user-home.png',
-    '07-real-admin-mcp.png',
+    '07-legacy-admin-redirect.png',
     '08-real-login-mobile.png',
     '09-interview-mode-selection.png',
     '10-training-empty-state.png',

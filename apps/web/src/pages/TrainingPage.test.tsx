@@ -54,6 +54,7 @@ describe('TrainingPage', () => {
     expect(await screen.findByText('还没有可开始的训练'))
       .toBeInTheDocument();
     expect(screen.getByRole('button', { name: '更新建议' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '开始完整模拟' })).toHaveAttribute('href', '/practice');
     expect((global.fetch as any).mock.calls.some(([url]: [string]) =>
       url === '/api/interview/target-jobs/job-1/training-recommendations/refresh',
     )).toBe(false);
