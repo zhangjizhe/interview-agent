@@ -13,6 +13,18 @@
 - 范围：调度声明、执行状态、并发/超时边界、操作日志和 mock 验收。
 - 非目标：真实 Provider 批量调用、自动发布、候选人内容读取或自动导入 Receipt。
 
+### TASK-033：双端 UI 最终交付
+
+- 状态：2026-09-03 完成
+- 验证：设计审查与产品经理复审通过；Interview Web 14 files / 79 tests、API 控制器测试、API/Interview/Agent Lab build、Prisma migration、报告桌面/移动回放、候选人与 Agent Lab 浏览器验收通过；未调用 Provider。
+
+### TASK-029：Agent Lab 离线评测调度合同
+
+- 状态：建议
+- 目标：为离线录制/mock 评测建立可暂停、幂等、受审计的调度合同。
+- 范围：调度声明、执行状态、并发/超时边界、操作日志和 mock 验收。
+- 非目标：真实 Provider 批量调用、自动发布、候选人内容读取或自动导入 Receipt。
+
 ### TASK-032：报告/回放与兼容入口 UI 边界
 
 - 状态：2026-09-02 完成

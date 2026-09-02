@@ -19,7 +19,7 @@ export const ChatBubble = memo(function ChatBubble({
     <div className={`flex gap-2 md:gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
       <div
         className={`flex-shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center ${
-          isUser ? 'bg-blue-600' : 'bg-gradient-to-br from-violet-500 to-purple-600'
+          isUser ? 'bg-blue-600' : 'bg-slate-700'
         }`}
       >
         {isUser ? (
@@ -29,7 +29,7 @@ export const ChatBubble = memo(function ChatBubble({
         )}
       </div>
       <div
-        className={`rounded-2xl px-3 py-2 md:px-4 md:py-3 text-sm md:text-base break-words whitespace-pre-wrap max-w-[85%] md:max-w-[70%] ${
+        className={`rounded-md px-3 py-2 md:px-4 md:py-3 text-sm md:text-base break-words whitespace-pre-wrap max-w-[85%] md:max-w-[70%] ${
           isUser
             ? 'bg-blue-600 text-white'
             : 'bg-white border border-slate-200 text-slate-900'
