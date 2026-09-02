@@ -1,6 +1,6 @@
 # 架构地图
 
-最后更新：2026-08-15
+最后更新：2026-08-26
 权威范围：当前默认 NestJS 路径。本文件区分已交付架构和规划能力，不将 `apps/py-api` 视为生产依赖。
 
 ## 在线运行时
@@ -72,10 +72,31 @@
   -> apps/agent-lab（独立 5175 控制台与登录会话）
   -> NestJS /api/admin/mcp-servers（ADMIN RBAC）
   -> McpRegistry
+  -> NestJS /api/agent-lab（ADMIN RBAC）
+     -> Dataset / Agent Version / Run / Failure / Experiment / Release Decision / Operation Log
+     -> PostgreSQL
 ```
 
-Agent Lab 管理系统级 MCP 状态、启停、服务健康检查与配置重载。它不读取候选人领域数据，也不替代
-Interview 的运行时或数据模型；候选人 Web 只保留用户级工具偏好。
+Agent Lab 管理系统级 MCP 状态、启停、服务健康检查、配置重载和版本化评测发布事实。运行只保存
+数据集版本、输入 Hash、阶段摘要、质量/结构化有效性/延迟/Token/成本指标和 Failure Taxonomy；
+候选人原文、Prompt、检索内容、工具原始输入与思维链不能进入控制面。`RECORDED` 运行自动需要
+人工发布审查；管理员显式记录的决策不触发自动部署。它不读取候选人领域数据，也不替代 Interview
+的运行时或数据模型；候选人 Web 只保留用户级工具偏好。
+
+离线 `EvalReport` 经显式 CLI 脱敏为 Receipt 后，提交为 `LabRecordedImport`。控制台只允许管理员
+对 `PENDING` Receipt 执行一次导入；服务器通过原子状态声明防重，并审计提交者、执行者、Run 引用
+与失败状态。浏览器从不接收报告本机路径或原始报告内容。
+
+管理员可从同一 Dataset 的不同 Agent Version Run 组成 Control/Treatment Experiment。人工发布决策只
+接收固定理由代码并保存成受限审计说明；`APPROVE`、`NEEDS_REVIEW`、`REJECT` 均不调用部署、模型或
+运行时写路径。
+
+`/api/agent-lab/audit` 是管理员只读审计入口。它只允许 Kind、精确 Dataset/Agent 标识、Kind 对应
+状态、日期范围和固定上限分页；服务端按模型映射安全摘要，拒绝任意字段、JSON/文本搜索和候选人数据
+检索。
+
+`/api/agent-lab/operation-logs` 独立记录受控管理请求的主体、固定动作、固定对象、结果和时间。它不
+保存请求正文、自由文本对象、错误详情、候选人数据或 Prompt，也不替代现有领域审计记录。
 
 ## 离线评估平面
 
@@ -84,18 +105,14 @@ Interview 的运行时或数据模型；候选人 Web 只保留用户级工具�
 ```text
 Golden Dataset + Schema
   -> Eval Runner / Reporter
-  -> API Test 与 Benchmark Script
-  -> 验收截图与 JSON 证据
+  -> 版本化 Agent Lab Dataset / Run / Failure
+  -> 成对 Experiment Comparison
+  -> Release Decision Audit Record
+  -> API Test 与 Browser Acceptance
 ```
 
-计划中部分：
-
-```text
-Agent/Prompt Version Registry
-  -> 可复现实验记录
-  -> 失败分析
-  -> Agent 改动发布批准
-```
+现有离线 Runner 已可显式提交脱敏 Receipt；自动调度和报告保留策略仍需单独任务，不能用静态 UI
+数据或无界 Provider 调用替代。
 
 ## 边界
 

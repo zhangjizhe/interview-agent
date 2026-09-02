@@ -28,6 +28,178 @@ model User {
   @@map("users")
 }
 
+model LabDataset {
+  id             String          @id @default(cuid())
+  version        String          @unique
+  name           String
+  sourceHash     String
+  caseCount      Int
+  responseCount  Int
+  validationStatus LabValidationStatus
+  createdAt      DateTime        @default(now())
+  runs           LabRun[]
+  experiments    LabExperiment[]
+  releaseDecisions LabReleaseDecision[]
+
+  @@index([validationStatus, createdAt])
+  @@map("lab_datasets")
+}
+
+model LabAgentVersion {
+  id                 String          @id @default(cuid())
+  agentKey           String
+  version            String
+  runtimeVersion     String
+  promptVersion      String?
+  modelProvider      String?
+  modelVersion       String?
+  toolPolicyVersion  String?
+  createdAt          DateTime        @default(now())
+  runs               LabRun[]
+  controlExperiments LabExperiment[] @relation("LabExperimentControl")
+  treatmentExperiments LabExperiment[] @relation("LabExperimentTreatment")
+  releaseDecisions   LabReleaseDecision[]
+
+  @@unique([agentKey, version])
+  @@index([agentKey, createdAt])
+  @@map("lab_agent_versions")
+}
+
+model LabRun {
+  id                    String          @id @default(cuid())
+  agentVersionId        String
+  agentVersion          LabAgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  datasetId             String
+  dataset               LabDataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  runType               LabRunType
+  status                LabRunStatus    @default(PENDING)
+  traceRef              String?
+  inputHash             String
+  metrics               Json
+  traceSummary          Json
+  startedAt             DateTime        @default(now())
+  completedAt           DateTime?
+  durationMs            Int?
+  inputTokens           Int             @default(0)
+  outputTokens          Int             @default(0)
+  estimatedCostCny      Float           @default(0)
+  failures              LabFailure[]
+  experiments           LabExperimentRun[]
+  releaseDecisions     LabReleaseDecision[]
+  recordedImport       LabRecordedImport?
+
+  @@index([datasetId, startedAt])
+  @@index([agentVersionId, startedAt])
+  @@index([status, startedAt])
+  @@map("lab_runs")
+}
+
+model LabRecordedImport {
+  id              String          @id @default(cuid())
+  receiptHash     String          @unique
+  status          LabRecordedImportStatus @default(PENDING)
+  recordedRun     Json
+  submittedBy     String
+  importedBy      String?
+  runId           String?         @unique
+  run             LabRun?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+  error           String?         @db.Text
+  createdAt       DateTime        @default(now())
+  importedAt      DateTime?
+
+  @@index([status, createdAt])
+  @@map("lab_recorded_imports")
+}
+
+model LabFailure {
+  id              String       @id @default(cuid())
+  runId           String
+  run             LabRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  caseId          String
+  category        LabFailureCategory
+  severity        LabFailureSeverity
+  evidenceSummary String?
+  createdAt       DateTime     @default(now())
+
+  @@index([runId, severity])
+  @@index([category, createdAt])
+  @@map("lab_failures")
+}
+
+model LabExperiment {
+  id                 String          @id @default(cuid())
+  name               String
+  hypothesis         String
+  controlVersionId   String
+  controlVersion     LabAgentVersion @relation("LabExperimentControl", fields: [controlVersionId], references: [id], onDelete: Restrict)
+  treatmentVersionId String
+  treatmentVersion   LabAgentVersion @relation("LabExperimentTreatment", fields: [treatmentVersionId], references: [id], onDelete: Restrict)
+  datasetId          String
+  dataset            LabDataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  status             LabExperimentStatus @default(DRAFT)
+  comparison        Json?
+  createdBy         String
+  createdAt          DateTime        @default(now())
+  completedAt       DateTime?
+  runs               LabExperimentRun[]
+  releaseDecisions  LabReleaseDecision[]
+
+  @@index([datasetId, createdAt])
+  @@index([status, createdAt])
+  @@map("lab_experiments")
+}
+
+model LabExperimentRun {
+  id           String        @id @default(cuid())
+  experimentId String
+  experiment   LabExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  runId        String
+  run          LabRun        @relation(fields: [runId], references: [id], onDelete: Restrict)
+  arm          LabExperimentArm
+
+  @@unique([experimentId, runId])
+  @@index([experimentId, arm])
+  @@map("lab_experiment_runs")
+}
+
+model LabReleaseDecision {
+  id                 String          @id @default(cuid())
+  agentVersionId     String
+  agentVersion       LabAgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  datasetId          String
+  dataset            LabDataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  runId              String?
+  run                LabRun?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+  experimentId       String?
+  experiment         LabExperiment?  @relation(fields: [experimentId], references: [id], onDelete: SetNull)
+  decision           LabReleaseDecisionStatus
+  thresholdSnapshot  Json
+  metricsSnapshot    Json
+  rationale          String
+  approvedBy         String
+  createdAt          DateTime        @default(now())
+
+  @@index([agentVersionId, createdAt])
+  @@index([decision, createdAt])
+  @@map("lab_release_decisions")
+}
+
+model LabOperationLog {
+  id         String              @id @default(cuid())
+  actorId    String
+  action     LabOperationAction
+  objectType LabOperationObject
+  objectId   String
+  outcome    LabOperationOutcome
+  createdAt  DateTime            @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([objectType, objectId])
+  @@index([outcome, createdAt])
+  @@map("lab_operation_logs")
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -575,4 +747,90 @@ enum TrainingAttemptStatus {
 
 enum UsageLedgerType {
   INTERVIEW_START
+}
+
+enum LabValidationStatus {
+  VALID
+  INVALID
+}
+
+enum LabRunType {
+  RECORDED
+  REPLAY
+}
+
+enum LabRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum LabFailureCategory {
+  WRONG_QUESTION
+  BAD_FOLLOWUP
+  MISSING_EVIDENCE
+  HALLUCINATION
+  CONTEXT_MISS
+  MEMORY_MISS
+  RAG_MISS
+  DIFFICULTY_MISMATCH
+  REPETITIVE
+  OVER_SCORING
+  UNDER_SCORING
+  WRONG_SKILL
+  STRUCTURED_OUTPUT
+  SAFETY
+  UNKNOWN
+}
+
+enum LabFailureSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum LabExperimentStatus {
+  DRAFT
+  RUNNING
+  COMPLETED
+}
+
+enum LabExperimentArm {
+  CONTROL
+  TREATMENT
+}
+
+enum LabReleaseDecisionStatus {
+  APPROVE
+  NEEDS_REVIEW
+  REJECT
+}
+
+enum LabRecordedImportStatus {
+  PENDING
+  IMPORTING
+  IMPORTED
+  FAILED
+}
+
+enum LabOperationAction {
+  RECORDED_IMPORT_SUBMIT
+  RECORDED_IMPORT_EXECUTE
+  EXPERIMENT_CREATE
+  RELEASE_DECISION_RECORD
+  RETENTION_EXECUTE
+}
+
+enum LabOperationObject {
+  RECORDED_IMPORT
+  EXPERIMENT
+  RELEASE_DECISION
+  RETENTION_POLICY
+}
+
+enum LabOperationOutcome {
+  SUCCEEDED
+  REJECTED
 }

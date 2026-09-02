@@ -1,6 +1,6 @@
 # 当前状态
 
-最后审计：2026-08-20
+最后审计：2026-09-02
 事实来源：仓库代码、Package Manifest、Prisma Schema 和 2026-08-12 验收证据。状态只描述已交付代码，不描述未来设计。
 
 | 领域 | 状态 | 当前事实 |
@@ -12,16 +12,16 @@
 | Memory | 已实现 | Redis 短期记忆及 Mem0/Milvus 长期存储已存在。 |
 | RAG 与题库 | 已实现 | Resume RAG、Dense Retrieval、BM25、RRF、Rerank、Milvus 题库、Qdrant 知识库、文件/URL 导入均存在。 |
 | Evaluation/Reporting | 部分实现 | 单次报告、评分、AnswerHistory、ReflectionLog、Golden Dataset 和 Runner 存在；新面试可持久化 Question/Answer/Evidence/EvaluationRun，正式报告改为指向当前不可变运行的展示快照；成功 FINAL 运行会事务性聚合可追溯技能状态。 |
-| Offline Harness | 部分实现 | Golden Dataset 和 Evaluation Runner 存在；版本对比和失败分析流程未完成。 |
+| Offline Harness | 部分实现 | Golden Dataset、Runner、版本化 Dataset/Agent Run、失败分类、实验比较和发布决策合同已存在；CLI 可提交脱敏录制 Receipt，管理员可在 Agent Lab 显式导入，尚未提供自动化调度。 |
 | Observability/Cost | 部分实现 | Langfuse、会话 Token/Cost、Provider Health、Circuit Breaker、Semantic Cache、最小 Usage Ledger 和服务端面试次数额度存在；生产 Metrics/Entitlement 平面不完整。 |
-| 数据库 | 已实现 | Prisma 覆盖用户、面试、消息、报告、成本、任务、答题历史、工具偏好和反思日志。 |
+| 数据库 | 已实现 | Prisma 覆盖用户、面试、消息、报告、成本、任务、答题历史、工具偏好、反思日志及 Agent Lab 的数据集、版本、运行、失败、实验、发布决策和录制报告导入审计。 |
 | 鉴权/安全 | 已实现 | Password Login、JWT Default-deny、USER/ADMIN RBAC、Ownership、URL Import SSRF 防护和校验均存在。 |
 | Billing/Quota/Entitlement | 部分实现 | Usage Ledger、配置化月面试次数额度和候选人使用量摘要已实现；Plan、Entitlement、Payment 和团队计费仍未实现。 |
 | Skill Map 与 Training Plan | 部分实现 | SkillDefinition、TargetJob、JobSkillRequirement、CandidateSkillState Schema 与受保护 API 已存在；目标岗位/JD、准备度 API 和 FINAL 技能状态聚合已实现，训练推荐、用户训练流程和真实趋势比较尚未完成。 |
 | Mobile/小程序 | 计划中 | 当前 Web 有响应式；没有独立小程序客户端。 |
 | 自动化测试 | 已实现 | API Jest/Unit Test、Web Vitest、Playwright/浏览器和 Content Workflow 验收资产已配置；B0 真实登录与岗位创建浏览器验收已可执行。 |
 | 产品设计包 | 已实现 | 2026-08-13 已审计并建立 P0 产品、Agent、Harness 规格；未改变运行时行为。 |
-| Agent Lab 控制面 | 已实现 | 独立 `apps/agent-lab` 管理员控制台已提供 MCP 服务查看、启停、健康检查和配置重载；Interview 仍保留领域事实与 NestJS 运行时。 |
+| Agent Lab 控制面 | 已实现 | 独立 `apps/agent-lab` 管理员控制台提供 MCP 治理、Receipt 导入、同数据集实验比较、人工发布决策、白名单领域审计和最小操作日志查询；全部受 RBAC 保护且只展示脱敏摘要，Interview 仍保留候选人领域事实与 NestJS 运行时。 |
 
 ## 已验证基线
 
@@ -61,3 +61,10 @@
 - 2026-08-17 已完成 B5 单技能训练推荐与复测关联：TrainingRecommendation 只由活跃岗位中成功 FINAL 运行的低分正式技能状态生成，绑定岗位档案版本、来源运行和 Evidence；TrainingAttempt 记录完成与复测 Interview。训练完成不改变 CandidateSkillState。加性 migration、API 29 suites / 256 tests、Web 76 tests、Docker 和真实浏览器验收 22/22 通过。
 - 2026-08-20 已完成 Interview V0.2 候选人无 Provider 主流程验收：注册、岗位、版本化准备度、完整/单技能面试选择、训练空态、跨用户拒绝和移动工作台均经过 Docker 浏览器 23/23 验证。真实 Provider 评价质量仍需独立 Harness canary。
 - 2026-08-26 已完成 B6 最小 Usage Ledger 和服务端面试额度：按用户/自然月/面试创建幂等记录，候选人仅读取安全摘要；Docker 主路径在上限 1 时验证 `0/1 -> 1/0 -> 429`，验收后恢复默认未配置额度状态。
+- 2026-08-26 已完成 Agent Lab V0.2 最小评测与发布合同：加性 Prisma migration 提供 Dataset、AgentVersion、Run、Failure、Experiment 和 ReleaseDecision 审计事实。管理员只能记录脱敏的 Hash、阶段摘要、指标和失败分类；`RECORDED` 结果自动进入 `NEEDS_REVIEW` 或 `REJECT`，显式 `APPROVE` 只记录人工决策，不会自动部署。API 31 suites / 263 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker migration/API health 和管理员浏览器验收均通过，未调用 Provider。
+- 2026-08-26 已完成 TASK-023 录制 Harness 导入：`EvalReport` 显式映射为数据集版本、Hash、有界评测指标和 Failure Taxonomy；CLI 必须提供管理员 JWT 与 API 地址才会写入控制面。原始题目、回答、反馈、Prompt、Provider 凭据和检索内容均不会进入导入负载。API 32 suites / 265 tests、Golden Dataset 校验、API/Agent Lab build、Docker API health 和浏览器验收通过，未调用 Provider。
+- 2026-08-27 已完成 TASK-024 录制报告管理员工作流：CLI 只提交已校验的脱敏 Receipt，管理员在 Agent Lab 中显式执行一次性导入。审计保存提交者、执行者、状态、Receipt Hash 与关联 Run；普通用户 API 请求被拒绝，浏览器不能读取任意本机路径。API 32 suites / 267 tests、Golden Dataset 校验、API/Agent Lab build、Docker migration/API health 和浏览器导入验收通过，未调用 Provider。
+- 2026-08-27 已完成 TASK-025 实验与发布决策操作：管理员可从同一 Dataset 的不同 Agent Version Run 创建 Experiment，并以固定审计理由记录 `APPROVE`、`NEEDS_REVIEW` 或 `REJECT`。`APPROVE` 只写决策记录，不触发部署；API 32 suites / 269 tests、Golden Dataset 校验、API/Agent Lab build、Docker API health 和浏览器实验/人工决策/USER 拒绝验收通过，未调用 Provider。
+- 2026-08-27 已完成 TASK-026 控制面审计查询：管理员可按 Run、Import、Experiment 或 Decision，以及精确数据集/Agent Version、状态、日期和分页读取脱敏审计摘要。服务端拒绝任意字段、文本和不匹配状态的过滤；API 32 suites / 271 tests、Golden Dataset 校验、API/Agent Lab build、Docker API health 和浏览器审计筛选/USER 拒绝验收通过，未调用 Provider。
+- 2026-08-27 已完成 TASK-027 审计保留边界：默认未配置时不删除记录；配置的 30 至 3650 天保留期只能删除过期、未导入的失败/待处理 Receipt 和无 Receipt/Experiment/Decision 引用的 Run。Experiment 和 Release Decision 永久保留。API 32 suites / 274 tests、Golden Dataset 校验、API/Agent Lab build、Docker API health 和默认关闭浏览器验收通过，未调用 Provider。
+- 2026-09-02 已完成 TASK-028 Agent Lab 最小操作日志查询：Receipt 提交/导入、Experiment、Release Decision 和 Retention 操作只记录管理员、固定动作/对象、结果与时间；ADMIN 可白名单筛选查询，USER 被拒绝。API 32 suites / 276 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker migration/API health 和管理员浏览器验收通过，未调用 Provider。

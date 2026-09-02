@@ -15,6 +15,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "eval:validate": "tsx src/evals/eval-runner.ts --validate",
+    "eval:import-agent-lab": "tsx src/evals/import-agent-lab-recording.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init --skip-seed",
     "prisma:deploy": "prisma migrate deploy",

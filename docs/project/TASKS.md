@@ -1,10 +1,53 @@
 # 任务列表
 
-最后更新：2026-08-19
+最后更新：2026-09-02
 
 ## 当前
 
-当前没有活跃任务。开始后续批次前，必须在 `ACTIVE_TASK.md` 认领且仅认领一个任务。
+当前活跃任务：TASK-029。该任务为 Agent Lab 离线评测定义受控调度与 mock 执行合同，不改变 Provider、发布或候选人边界。
+
+### TASK-029：Agent Lab 离线评测调度合同
+
+- 状态：进行中
+- 目标：为离线录制/mock 评测建立可暂停、幂等、受审计的调度合同。
+- 范围：调度声明、执行状态、并发/超时边界、操作日志和 mock 验收。
+- 非目标：真实 Provider 批量调用、自动发布、候选人内容读取或自动导入 Receipt。
+
+### TASK-028：Agent Lab 操作日志查询
+
+- 状态：2026-09-02 完成
+- 验证：加性 migration、API 32 suites / 276 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker migration/API health 和管理员浏览器操作日志/USER 拒绝验收通过；未调用 Provider。
+
+### TASK-027：Agent Lab 审计保留边界
+
+- 状态：2026-08-27 完成
+- 验证：API 32 suites / 274 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker API health 和默认关闭浏览器验收通过；未调用 Provider。
+
+### TASK-026：Agent Lab 控制面审计查询
+
+- 状态：2026-08-27 完成
+- 验证：API 32 suites / 271 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker API health 和管理员审计筛选/USER 拒绝浏览器验收通过；未调用 Provider。
+
+### TASK-025：Agent Lab 实验与发布决策操作
+
+- 状态：2026-08-27 完成
+- 验证：API 32 suites / 269 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker API health 和管理员 Receipt 导入/Experiment/APPROVE/USER 拒绝浏览器验收通过；未调用 Provider。
+
+### TASK-024：Agent Lab 录制报告管理员工作流
+
+- 状态：2026-08-27 完成
+- 验证：加性 migration、API 32 suites / 267 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker migration/API health 和管理员导入/普通用户拒绝浏览器验收通过；未调用 Provider。
+
+### TASK-023：Agent Lab 录制 Harness 导入
+
+- 状态：2026-08-26 完成
+- 验证：API 32 suites / 265 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker API health 和管理员浏览器验收通过；未调用 Provider。
+
+### TASK-022：Agent Lab V0.2 评测与发布合同
+
+- 状态：2026-08-26 完成
+- 目标：将现有 Golden Dataset、Harness、Trace 和成本资产收敛为版本化的 Agent Lab 控制面事实。
+- 验证：加性 Prisma migration、API 31 suites / 263 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker migration/API health 和管理员浏览器验收通过；未调用 Provider。
 
 ### TASK-021：Interview V0.2 候选人产品主流程
 

@@ -69,6 +69,7 @@ COPY --from=builder /app/apps/api/package.json /app/apps/api/package.json
 COPY --from=builder /app/apps/api/config /app/apps/api/config
 COPY --from=builder /app/apps/api/scripts /app/apps/api/scripts
 COPY --from=builder /app/apps/api/knowledge-base.json /app/apps/api/knowledge-base.json
+COPY --from=builder /app/apps/api/src/evals/golden-dataset.json /app/apps/api/evals/golden-dataset.json
 COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/packages /app/packages
 COPY --from=builder /app/pnpm-workspace.yaml /app/

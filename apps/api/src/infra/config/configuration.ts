@@ -85,6 +85,9 @@ export interface AppConfig {
   quota: {
     monthlyInterviewLimit?: string;
   };
+  agentLab: {
+    retentionDays?: string;
+  };
 }
 
 /**
@@ -255,6 +258,9 @@ export const configuration = (): AppConfig => {
   },
   quota: {
     monthlyInterviewLimit: process.env.QUOTA_MONTHLY_INTERVIEW_LIMIT || undefined,
+  },
+  agentLab: {
+    retentionDays: process.env.AGENT_LAB_RETENTION_DAYS || undefined,
   },
   };
 }

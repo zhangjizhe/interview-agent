@@ -1,6 +1,17 @@
 # 上下文变更日志
 
-最后更新：2026-08-26
+最后更新：2026-09-02
+
+## 2026-09-02
+
+新增：
+
+- Agent Lab Receipt 导入、实验、发布决策与 retention 请求的固定字段操作日志。
+- 管理员操作日志筛选/分页视图及普通用户拒绝验收。
+
+变更：
+
+- 控制面请求只保存主体、动作、对象、结果和时间，不保存原始请求体、异常文本、候选人内容、Prompt 或凭据。
 
 ## 2026-08-26
 
@@ -8,11 +19,20 @@
 
 - B6 Usage Ledger、配置化服务端月面试额度和候选人安全使用量摘要。
 - Docker API 主路径额度验收与 B6 发布报告。
+- Agent Lab V0.2 的 Dataset、Agent Version、Run、Failure、Experiment 与 Release Decision 加性数据合同。
+- 管理员 Trace、评测、实验和发布决策 API/控制台，以及 Golden Dataset 运行摘要和发布门展示。
+- Agent Lab 录制报告 Receipt 提交、管理员一次性导入审计和浏览器验收。
+- Agent Lab 同数据集实验比较和受限人工发布决策操作。
+- Agent Lab 对 Run、Import、Experiment 和 Decision 的白名单审计筛选与分页。
 
 变更：
 
 - 面试创建在服务端额度耗尽时返回 `429`；浏览器不能绕过。
 - Docker 镜像构建使用 BuildKit pnpm 持久缓存和官方 registry，减少网络重试的重复下载。
+- 控制面只保存输入 Hash、受限引用、阶段摘要和有界指标；`RECORDED` 结果必须人工审查，显式决策不触发自动发布。
+- 浏览器不读取本机报告文件；CLI 提交的脱敏 Receipt 必须由管理员显式导入。
+- `APPROVE`、`NEEDS_REVIEW` 和 `REJECT` 只写审计事实，不触发发布、Provider 或运行时改写。
+- 审计查询不支持原始 Trace、Prompt、候选人内容、JSON 或任意文本字段搜索。
 
 ## 2026-08-15
 
