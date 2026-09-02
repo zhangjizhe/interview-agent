@@ -35,3 +35,4 @@ TASK-029：Agent Lab 离线评测调度合同
 
 - 调度只能消费录制/mock 输入，不能触发真实 Provider 或绕过已有 Receipt、Experiment 和 Release Decision 边界。
 - 调度的暂停、超时和并发控制必须可审计，且不得导致重复 Run 或自动发布。
+- `origin/agent-lab` 是从旧基线分叉的重叠控制面分支；必须由 TASK-030 在隔离工作树审计后才可整合，不能直接 merge 到当前分支。
