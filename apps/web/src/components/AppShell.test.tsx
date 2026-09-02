@@ -22,8 +22,9 @@ describe('AppShell', () => {
     );
 
     expect(screen.getByRole('navigation', { name: '候选人导航' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '首页' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '训练' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: '候选人移动导航' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '首页' })).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: '训练' })).toHaveLength(2);
     expect(screen.queryByText('MCP 服务运行时状态')).not.toBeInTheDocument();
   });
 });

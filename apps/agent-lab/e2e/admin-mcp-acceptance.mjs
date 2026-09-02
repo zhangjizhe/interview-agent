@@ -19,7 +19,7 @@ try {
   await page.getByRole('button', { name: '登录控制台' }).click();
   console.log('checking admin control plane');
   await page.getByRole('heading', { name: '控制中心' }).waitFor({ state: 'visible' });
-  if (await page.getByRole('button', { name: '重载配置' }).count() !== 1) throw new Error('MCP control action missing');
+  if (await page.getByRole('button', { name: '重新加载 MCP' }).count() !== 1) throw new Error('MCP control action missing');
   if (await page.getByRole('button', { name: 'Trace' }).count() !== 1) throw new Error('Trace control view missing');
   if (await page.getByRole('button', { name: '评测' }).count() !== 1) throw new Error('Evaluation control view missing');
   console.log('checking recorded report import');

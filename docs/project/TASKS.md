@@ -4,11 +4,23 @@
 
 ## 当前
 
-当前活跃任务：TASK-029。该任务为 Agent Lab 离线评测定义受控调度与 mock 执行合同，不改变 Provider、发布或候选人边界。
+当前活跃任务：TASK-032。该任务审计 Interview 报告/回放分离和候选人兼容技术路由迁移，不改变领域行为或安全边界。
+
+### TASK-032：报告/回放与兼容入口 UI 边界审计
+
+- 状态：进行中
+- 目标：为第二轮 UI 实施明确报告/回放路由和候选人技术兼容入口的安全迁移方案。
+- 范围：生命周期、路由、RBAC、数据合同、测试和回滚审计。
+- 非目标：本轮直接改写领域 API/Schema、Provider、Agent Runtime、RAG 或 Billing。
+
+### TASK-031：双端 UI 适配与设计系统
+
+- 状态：2026-09-02 完成
+- 验证：Interview Web 13 files / 78 tests、Interview/Agent Lab typecheck/build、Docker rebuild、候选人与 Agent Lab 浏览器验收通过；未调用 Provider。
 
 ### TASK-029：Agent Lab 离线评测调度合同
 
-- 状态：进行中
+- 状态：建议
 - 目标：为离线录制/mock 评测建立可暂停、幂等、受审计的调度合同。
 - 范围：调度声明、执行状态、并发/超时边界、操作日志和 mock 验收。
 - 非目标：真实 Provider 批量调用、自动发布、候选人内容读取或自动导入 Receipt。

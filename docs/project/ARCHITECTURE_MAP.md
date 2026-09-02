@@ -83,6 +83,9 @@ Agent Lab 管理系统级 MCP 状态、启停、服务健康检查、配置重�
 人工发布审查；管理员显式记录的决策不触发自动部署。它不读取候选人领域数据，也不替代 Interview
 的运行时或数据模型；候选人 Web 只保留用户级工具偏好。
 
+Interview 与 Agent Lab 共享响应式、可访问性和状态语义，但使用独立 Shell、导航和内容密度。候选人
+移动端导航只进入训练闭环；Agent Lab 的静态架构图不代表正在运行的 Agent。
+
 离线 `EvalReport` 经显式 CLI 脱敏为 Receipt 后，提交为 `LabRecordedImport`。控制台只允许管理员
 对 `PENDING` Receipt 执行一次导入；服务器通过原子状态声明防重，并审计提交者、执行者、Run 引用
 与失败状态。浏览器从不接收报告本机路径或原始报告内容。

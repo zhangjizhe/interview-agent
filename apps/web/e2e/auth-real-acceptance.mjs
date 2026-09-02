@@ -174,7 +174,7 @@ try {
   await userPage.goto(`${webUrl}/training`, { waitUntil: 'networkidle' });
   check(
     'training page does not fabricate recommendations without final evidence',
-    await userPage.getByText('当前没有可追溯的训练建议。完成带技能证据的正式面试后，系统会基于能力缺口生成下一步。').count() === 1,
+    await userPage.getByRole('heading', { name: '还没有可开始的训练' }).count() === 1,
   );
   await userPage.screenshot({ path: join(outputDir, '10-training-empty-state.png'), fullPage: true });
 

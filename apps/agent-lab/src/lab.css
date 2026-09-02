@@ -370,3 +370,187 @@
     margin-top: 14px !important;
   }
 }
+
+/* Shared control-plane tokens override the early prototype styling. */
+:root {
+  --lab-canvas: #10161d;
+  --lab-surface: #151e27;
+  --lab-surface-raised: #1b2732;
+  --lab-border: #304151;
+  --lab-text: #e7edf4;
+  --lab-muted: #9baaba;
+  --lab-primary: #3a8bff;
+  --lab-success: #42b883;
+  --lab-warning: #d6a63d;
+  --lab-danger: #e06767;
+}
+
+.agent-shell {
+  background: var(--lab-canvas);
+}
+
+.agent-sidebar {
+  background: #121a23;
+  border-color: var(--lab-border);
+  padding: 16px 12px;
+}
+
+.agent-brand {
+  border-bottom: 1px solid #263746;
+  margin: 0 4px 16px;
+  padding: 8px 6px 18px;
+}
+
+.agent-brand svg,
+.agent-eyebrow,
+.agent-nav-item.is-active {
+  color: var(--lab-success);
+}
+
+.agent-nav-item {
+  border-radius: 4px;
+  min-height: 40px;
+}
+
+.agent-nav-item.is-active {
+  background: #173d35;
+}
+
+.agent-workspace {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 28px 36px 56px;
+}
+
+.agent-topbar {
+  align-items: center;
+  border-color: var(--lab-border);
+  gap: 16px;
+  padding-bottom: 20px;
+}
+
+.agent-topbar h1 {
+  font-size: 24px;
+}
+
+.agent-command,
+.mcp-actions button,
+.agent-hero-actions button,
+.agent-access form button {
+  border-radius: 4px;
+  min-height: 40px;
+  background: #1a2e42;
+  border-color: #36536e;
+}
+
+.agent-command:hover,
+.mcp-actions button:hover,
+.agent-hero-actions button:hover {
+  background: #233f58;
+}
+
+.agent-hero,
+.agent-metric-grid article,
+.runtime-canvas,
+.mcp-workspace,
+.lab-summary-grid article,
+.lab-list,
+.lab-thresholds,
+.lab-imports,
+.lab-command-form,
+.lab-release-commands,
+.lab-audit-filters,
+.lab-empty {
+  background: var(--lab-surface);
+  border-color: var(--lab-border);
+  border-radius: 4px;
+}
+
+.agent-hero {
+  background: var(--lab-surface);
+  border-left: 3px solid var(--lab-primary);
+  padding: 22px;
+}
+
+.agent-hero h2 {
+  font-size: 21px;
+}
+
+.runtime-flow {
+  margin: 24px 0;
+}
+
+.runtime-node {
+  min-width: 128px;
+  background: var(--lab-surface-raised);
+  border-color: #405568;
+}
+
+.runtime-step i,
+.runtime-step i::after {
+  animation: none;
+  background: #4b6073;
+}
+
+.runtime-foot {
+  border-top: 1px solid #263746;
+  padding-top: 12px;
+}
+
+.lab-row,
+.lab-import-row,
+.mcp-row,
+.lab-release-row {
+  border-color: #263746;
+}
+
+.lab-row:hover,
+.lab-import-row:hover,
+.mcp-row:hover {
+  background: #18232e;
+}
+
+.lab-row-metrics span,
+.lab-failures span {
+  border-radius: 3px;
+}
+
+@media (max-width: 900px) {
+  .agent-sidebar {
+    padding: 10px 12px 12px;
+  }
+
+  .agent-brand {
+    margin-bottom: 10px;
+    padding-bottom: 12px;
+  }
+
+  .agent-section-label {
+    display: none;
+  }
+
+  .agent-sidebar nav {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .agent-nav-item {
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  .agent-workspace {
+    padding: 20px 16px 40px;
+  }
+
+  .agent-topbar {
+    align-items: flex-start;
+  }
+
+  .agent-topbar h1 {
+    font-size: 21px;
+  }
+}

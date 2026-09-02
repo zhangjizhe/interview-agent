@@ -68,3 +68,4 @@
 - 2026-08-27 已完成 TASK-026 控制面审计查询：管理员可按 Run、Import、Experiment 或 Decision，以及精确数据集/Agent Version、状态、日期和分页读取脱敏审计摘要。服务端拒绝任意字段、文本和不匹配状态的过滤；API 32 suites / 271 tests、Golden Dataset 校验、API/Agent Lab build、Docker API health 和浏览器审计筛选/USER 拒绝验收通过，未调用 Provider。
 - 2026-08-27 已完成 TASK-027 审计保留边界：默认未配置时不删除记录；配置的 30 至 3650 天保留期只能删除过期、未导入的失败/待处理 Receipt 和无 Receipt/Experiment/Decision 引用的 Run。Experiment 和 Release Decision 永久保留。API 32 suites / 274 tests、Golden Dataset 校验、API/Agent Lab build、Docker API health 和默认关闭浏览器验收通过，未调用 Provider。
 - 2026-09-02 已完成 TASK-028 Agent Lab 最小操作日志查询：Receipt 提交/导入、Experiment、Release Decision 和 Retention 操作只记录管理员、固定动作/对象、结果与时间；ADMIN 可白名单筛选查询，USER 被拒绝。API 32 suites / 276 tests、Golden Dataset 30 Case 校验、API/Agent Lab build、Docker migration/API health 和管理员浏览器验收通过，未调用 Provider。
+- 2026-09-02 已完成 TASK-031 双端 UI 适配首轮：Interview 工作台补齐移动导航、真实训练空态和显式刷新；Agent Lab 收敛为高密度无渐变控制台，静态拓扑不再伪装为运行状态。Interview Web 13 files / 78 tests、Agent Lab build、Docker 和两端浏览器验收通过。

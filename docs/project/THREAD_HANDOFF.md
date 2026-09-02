@@ -4,35 +4,32 @@
 
 ## 上一任务
 
-TASK-028：Agent Lab 操作日志查询
+TASK-031：双端 UI 适配与设计系统
 
 ## 已完成
 
-- 新增 `LabOperationLog`，仅保存管理员 ID、固定动作、固定对象、结果和时间。
-- Receipt 提交/导入、Experiment 创建、人工 Release Decision 和 Retention 请求均记录成功或拒绝，不保存原始请求、异常、候选人内容、Prompt 或凭据。
-- 管理员可通过白名单枚举筛选与分页只读查询操作日志；普通用户 API 请求被拒绝。
-- 新增独立 Agent Lab 操作日志视图和浏览器验收。
+- 交付 Interview 与 Agent Lab 双端 UI 规格，明确两端信息架构、组件状态、视觉 token 和响应式边界。
+- Interview 补齐移动底部导航，训练建议刷新改为显式用户操作，空态不伪造建议。
+- Agent Lab 移除渐变 Hero 与静态运行假象，强化高密度分区、响应式导航和控制操作确认。
 
 ## 验证
 
-- API typecheck/build 通过。
-- API Jest：32 suites / 276 tests 通过。
-- Golden Dataset：30 Case 结构校验通过。
-- Agent Lab build 通过。
-- Docker：API healthy。
-- Browser：管理员操作日志查询与普通用户拒绝通过。
+- Interview Web：13 files / 78 tests、typecheck/build 通过。
+- Agent Lab：typecheck/build 通过。
+- Docker：Interview Web、API 与 Agent Lab healthy。
+- Browser：候选人桌面/移动路径与 Agent Lab 管理员/普通用户路径通过。
 - Provider：未调用。
 
 ## 推荐下一任务
 
-TASK-029：Agent Lab 离线评测调度合同
+TASK-032：报告/回放与兼容入口 UI 边界审计
 
 ## 所需上下文
 
-按 `AGENTS.md` 读取核心顺序，再阅读 `docs/agent-lab/CHARTER.md`、`docs/harness/RELEASE_GATE.md`、`apps/api/src/modules/agent-lab/`、Prisma Schema、操作日志合同和控制面浏览器验收。
+按 `AGENTS.md` 读取核心顺序，再阅读 `docs/product/SCREEN_SPEC.md`、`docs/product/DUAL_APPLICATION_UI_ADAPTATION.md`、面试生命周期、报告/评价 API、App 路由与候选人兼容技术入口。
 
 ## 风险
 
-- 调度只能消费录制/mock 输入，不能触发真实 Provider 或绕过已有 Receipt、Experiment 和 Release Decision 边界。
-- 调度的暂停、超时和并发控制必须可审计，且不得导致重复 Run 或自动发布。
+- 报告拆分不能使未完成面试显示为已完成，也不能改变 FINAL Evidence/Report 快照边界。
+- 迁移候选人技术入口时必须保留 ADMIN 治理能力与现有书签的安全重定向。
 - `origin/agent-lab` 是从旧基线分叉的重叠控制面分支；必须由 TASK-030 在隔离工作树审计后才可整合，不能直接 merge 到当前分支。

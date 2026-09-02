@@ -8,10 +8,20 @@
   --sab: env(safe-area-inset-bottom);
   --sal: env(safe-area-inset-left);
   --sar: env(safe-area-inset-right);
+  --canvas: #f7f8fa;
+  --surface: #ffffff;
+  --ink: #16202a;
+  --muted: #5e6b76;
+  --primary: #1769e0;
+  --verified: #197a52;
+  --warning: #a56a00;
+  --danger: #c23838;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
   -webkit-tap-highlight-color: transparent; /* 移除 iOS 点击高亮 */
   overscroll-behavior-y: contain; /* 防止下拉刷新生效 */
 }
@@ -31,6 +41,22 @@ textarea,
 input {
   -webkit-appearance: none;
   appearance: none;
+}
+
+button,
+input,
+select,
+textarea,
+a {
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary);
 }
 
 /* 隐藏 iOS 滚动条但保留功能 */

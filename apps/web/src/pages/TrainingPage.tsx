@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, CircleDot, Play, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { safeJson } from '../utils/safeJson';
@@ -46,13 +46,18 @@ export function TrainingPage() {
     queryKey: ['training-recommendations', activeJob?.id],
     enabled: Boolean(activeJob),
     queryFn: async () => {
-      await requireJson(
-        await fetch(`/api/interview/target-jobs/${activeJob!.id}/training-recommendations/refresh`, { method: 'POST' }),
-        '无法更新训练建议',
-      );
       const response = await fetch(`/api/interview/training-recommendations?targetJobId=${encodeURIComponent(activeJob!.id)}`);
       const data = await requireJson(response, '无法读取训练建议');
       return Array.isArray(data) ? data as TrainingRecommendation[] : [];
+    },
+  });
+  const refreshRecommendations = useMutation({
+    mutationFn: async () => requireJson(
+      await fetch(`/api/interview/target-jobs/${activeJob!.id}/training-recommendations/refresh`, { method: 'POST' }),
+      '无法更新训练建议',
+    ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['training-recommendations', activeJob?.id] });
     },
   });
 
@@ -94,15 +99,24 @@ export function TrainingPage() {
   const recommendations = recommendationsQuery.data || [];
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-10">
-      <header className="mb-7 border-b border-slate-200 pb-5">
-        <p className="text-sm font-medium text-blue-700">定向训练</p>
-        <h1 className="mt-1 text-2xl font-semibold">训练建议</h1>
-        <p className="mt-2 text-sm text-slate-600">{activeJob.title}{activeJob.level ? ` · ${activeJob.level}` : ''}</p>
+      <header className="mb-7 flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
+        <div>
+          <p className="text-sm font-medium text-blue-700">定向训练</p>
+          <h1 className="mt-1 text-2xl font-semibold">训练建议</h1>
+          <p className="mt-2 text-sm text-slate-600">{activeJob.title}{activeJob.level ? ` · ${activeJob.level}` : ''}</p>
+        </div>
+        <button type="button" onClick={() => refreshRecommendations.mutate()} disabled={refreshRecommendations.isPending} className="inline-flex h-10 items-center gap-2 border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400">
+          <RefreshCw className={`h-4 w-4 ${refreshRecommendations.isPending ? 'animate-spin' : ''}`} aria-hidden="true" />
+          {refreshRecommendations.isPending ? '更新中' : '更新建议'}
+        </button>
       </header>
+      {refreshRecommendations.isError && <p role="alert" className="mb-5 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">暂时无法更新训练建议，请稍后重试。</p>}
 
       {recommendations.length === 0 ? (
-        <section className="border border-slate-200 bg-white p-6 text-sm text-slate-600">
-          当前没有可追溯的训练建议。完成带技能证据的正式面试后，系统会基于能力缺口生成下一步。
+        <section className="border border-slate-200 bg-white p-6">
+          <CircleDot className="h-5 w-5 text-slate-400" aria-hidden="true" />
+          <h2 className="mt-3 text-base font-semibold">还没有可开始的训练</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">当前没有可追溯的训练建议。完成带技能证据的正式面试后，更新建议以查看下一步。</p>
         </section>
       ) : (
         <div className="space-y-3">

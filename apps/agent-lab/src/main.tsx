@@ -287,8 +287,10 @@ function ControlCenter() {
       <main className="agent-workspace">
         <header className="agent-topbar">
           <div><p className="agent-eyebrow">AGENT OPERATIONS</p><h1>{titleFor(view)}</h1></div>
-          <button className="agent-command" onClick={() => reload.mutate()} disabled={reload.isPending}>
-            <RefreshCw size={16} className={reload.isPending ? 'spin' : ''}/>{reload.isPending ? '重载中' : '重载配置'}
+          <button className="agent-command" onClick={() => {
+            if (window.confirm('重新加载 MCP 配置不会发布或修改运行结果。继续吗？')) reload.mutate();
+          }} disabled={reload.isPending}>
+            <RefreshCw size={16} className={reload.isPending ? 'spin' : ''}/>{reload.isPending ? '重载中' : '重新加载 MCP'}
           </button>
         </header>
 
@@ -333,7 +335,7 @@ function ControlCenter() {
 }
 
 function titleFor(view: View) {
-  return { overview: '控制中心', runtime: '运行编排', mcp: 'MCP 与工具治理', trace: 'Trace 运行记录', evaluation: '评测证据', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
+  return { overview: '控制中心', runtime: '架构视图', mcp: 'MCP 与工具治理', trace: 'Trace 运行记录', evaluation: '评测证据', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
 }
 
 function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void }) {
@@ -526,12 +528,12 @@ function RuntimeCanvas({ compact = false }: { compact?: boolean }) {
     <div className="runtime-flow">
       {['请求边界', '规划', '执行', '复核', '受控输出'].map((label, index) => (
         <div className="runtime-step" key={label}>
-          <div className={`runtime-node ${index < 3 ? 'running' : ''}`}><span>{String(index + 1).padStart(2, '0')}</span><strong>{label}</strong></div>
+          <div className="runtime-node"><span>{String(index + 1).padStart(2, '0')}</span><strong>{label}</strong></div>
           {index < 4 && <i aria-hidden="true"/>}
         </div>
       ))}
     </div>
-    <div className="runtime-foot"><span>工具调用受 MCP 策略约束</span><span>候选人数据默认不进入控制台</span></div>
+    <div className="runtime-foot"><span>静态架构示意，不表示正在运行</span><span>候选人数据默认不进入控制台</span></div>
   </section>;
 }
 

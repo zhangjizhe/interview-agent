@@ -51,7 +51,11 @@ describe('TrainingPage', () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByText('当前没有可追溯的训练建议。完成带技能证据的正式面试后，系统会基于能力缺口生成下一步。'))
+    expect(await screen.findByText('还没有可开始的训练'))
       .toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '更新建议' })).toBeInTheDocument();
+    expect((global.fetch as any).mock.calls.some(([url]: [string]) =>
+      url === '/api/interview/target-jobs/job-1/training-recommendations/refresh',
+    )).toBe(false);
   });
 });
