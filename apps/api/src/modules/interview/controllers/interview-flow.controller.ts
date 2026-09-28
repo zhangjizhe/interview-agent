@@ -1,3 +1,4 @@
+import { RateLimitPolicy } from '../../auth/security-throttler.guard';
 import {
   BadRequestException,
   Body,
@@ -155,6 +156,7 @@ export class InterviewFlowController {
     };
   }
 
+  @RateLimitPolicy('sse')
   @Post(':interviewId/message')
   async streamMessage(
     @Param('interviewId') interviewId: string,

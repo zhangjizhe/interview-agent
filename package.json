@@ -8,7 +8,7 @@
     "dev:api": "pnpm --filter @interview-agent/api run start:dev",
     "dev:web": "pnpm --filter @interview-agent/web run dev",
     "build": "pnpm -r run build",
-    "lint": "pnpm -r run lint",
+    "lint": "eslint apps/*/src packages/*/src",
     "typecheck": "pnpm -r run typecheck",
     "infra:up": "docker compose up -d postgres redis qdrant",
     "infra:down": "docker compose down",
@@ -27,5 +27,9 @@
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "8",
+    "eslint": "9"
   }
 }

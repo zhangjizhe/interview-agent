@@ -12,10 +12,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: any = 'Internal server error';
+    let code: string | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
+      if (typeof res === 'object' && typeof (res as any).code === 'string') code = (res as any).code;
       message = typeof res === 'string' ? res : (res as any).message || res;
     } else if (exception instanceof Error) {
       message = exception.message;
@@ -52,6 +54,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (!headersSent) {
       response.status(status).json({
         statusCode: status,
+        ...(code ? { code } : {}),
         timestamp: new Date().toISOString(),
         path: request.url,
         message,

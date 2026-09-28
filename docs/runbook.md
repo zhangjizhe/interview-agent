@@ -611,3 +611,13 @@ docker compose logs --tail 100 -f
 # 清空所有数据（警告：删 KB / 记忆）
 docker compose down -v
 ```
+
+## NestJS 主路径安全配置（2026-09-29）
+
+以上历史 Python 排查示例不代表当前默认部署；默认产品 API 为 NestJS。
+全局限流按端点/IP 计数：`THROTTLER_TTL` 单位为秒（默认 60），`THROTTLER_LIMIT` 默认 100，
+登录/注册由 `THROTTLER_AUTH_LIMIT` 默认 10 限制，SSE 新请求由 `THROTTLER_SSE_LIMIT` 默认 20 限制。
+超限在控制器执行前返回 HTTP 429、`code: RATE_LIMIT_EXCEEDED` 和 `Retry-After`；
+已建立的 SSE 连接不会因为窗口到期或 token/心跳输出被中断。
+当前计数为进程内存，多实例需在可信网关统一限流。应用默认不信任 X-Forwarded-For，
+反代上线前应验证真实 IP 策略，不可直接信任任意客户端转发头。

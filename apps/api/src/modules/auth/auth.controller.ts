@@ -17,6 +17,7 @@
 import { Controller, Post, Get, Body, UseGuards, Req, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService, LoginDto } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { RateLimitPolicy } from './security-throttler.guard';
 import { Public } from './public.decorator';
 
 @Controller('auth')
@@ -28,6 +29,7 @@ export class AuthController {
    * 已存在 → 409 Conflict
    * 格式不合法 / 保留名 → 400 Bad Request
    */
+  @RateLimitPolicy('auth')
   @Post('register')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -50,6 +52,7 @@ export class AuthController {
    * demo 简化：userId 传进来即登录（自动 upsert user）
    * 不需要密码验证
    */
+  @RateLimitPolicy('auth')
   @Post('login')
   @Public()
   @HttpCode(HttpStatus.OK)

@@ -81,6 +81,8 @@ export interface AppConfig {
   throttler: {
     ttl: number;
     limit: number;
+    authLimit: number;
+    sseLimit: number;
   };
   quota: {
     monthlyInterviewLimit?: string;
@@ -253,8 +255,11 @@ export const configuration = (): AppConfig => {
       .filter(Boolean),
   },
   throttler: {
-    ttl: parseInt(process.env.THROTTLER_TTL || '60', 10),
-    limit: parseInt(process.env.THROTTLER_LIMIT || '60', 10),
+    // 环境变量保持秒单位，throttler v6 接收毫秒。
+    ttl: parseSafeInt(process.env.THROTTLER_TTL, 60) * 1000,
+    limit: parseSafeInt(process.env.THROTTLER_LIMIT, 100),
+    authLimit: parseSafeInt(process.env.THROTTLER_AUTH_LIMIT, 10),
+    sseLimit: parseSafeInt(process.env.THROTTLER_SSE_LIMIT, 20),
   },
   quota: {
     monthlyInterviewLimit: process.env.QUOTA_MONTHLY_INTERVIEW_LIMIT || undefined,
