@@ -65,3 +65,8 @@ scripts/clean-ebook.py
 
 # 第三方 vendor 源码（不随仓库分发，改用 image 拉取）
 docker/mem0/
+
+# 本地依赖缓存及新生成的浏览器截图（已提交的验收证据保留）
+.pnpm-store/
+/apps/web/e2e/screenshots/**/*.png
+/apps/web/e2e/acceptance/**/*.png

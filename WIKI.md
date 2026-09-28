@@ -4,7 +4,7 @@
 >
 > **建议评审维度**：架构合理性 / 工程化程度 / 代码质量 / 可观测性 / 性能优化 / 测试覆盖 / 文档完整度 / 商用化潜力
 >
-> **最后更新**：2026-06-22（9 项 P0 安全修复完成 + 105 单测 + Agent 决策接入主流程 + Citation 幻觉检测 + Langfuse 确定性采样）
+> **文档口径更新：2026-09-28**。以下规模与压测表保留 2026-06 历史快照，不代表当前分支；本次测试结果统一见 [测试基线](docs/TESTING.md)，当前能力以 [README](README.md) 为准。
 
 ---
 
@@ -24,7 +24,7 @@
 |------|------|
 | 后端代码量 | **15,000+ 行** TypeScript（99 个 .ts 文件，不含 .d.ts / .spec.ts） |
 | 前端代码量 | **3,075 行** TypeScript / TSX |
-| 单元测试 | **105/105 passed**（Jest 83 + node:test 22，6.8s）|
+| 单元测试（2026-06 历史） | **105/105 passed**（Jest 83 + node:test 22，6.8s）；当前结果见 [测试基线](docs/TESTING.md) |
 | RAG 召回基准 | **30 Case P@5 = 1.0, MRR = 1.0, Recall = 1.0**（Golden Dataset v2，2026-06-21 升级）|
 | **Cost Panel 响应** | **9–10 ms**（实测，Redis Hash + Postgres 双写） |
 | **50 轮 LLM Bench** | **3 次真调用 / 840 tokens / ¥0.0052 / 892.6s wall** |
@@ -308,7 +308,7 @@ DYNAMIC      → 对话历史（永远不进）
 ```
 
 - **确定性**：同一 traceId 始终采样 or 始终跳过，不依赖随机数
-- **成本节省**：trace 10% 采样 → Langfuse 上报量降 90%
+- **采样效果**：trace 10% 采样减少该类上报量；不能据此推导整体上报量或费用下降 90%
 - **完整性**：gen 100% 保证所有 LLM 调用都有记录
 
 ### 6.11 安全加固（**9 项 P0 修复**）
@@ -338,56 +338,17 @@ DYNAMIC      → 对话历史（永远不进）
 
 ---
 
-## 七、已知短板（**诚实列出来**）
+## 七、Roadmap / 后续演进方向
 
-> 运维审计时请把这些当作待优化项。
+完整“现状 → 原因 → 下一步”已统一维护到 [Roadmap](docs/ROADMAP.md)，避免 README 与 WIKI 重复维护导致口径分叉。
 
-### 7.1 测试覆盖
+- **P0**：Langfuse 本次增加出口脱敏；自由文本 PII、其他日志、Mem0 第三方数据流、租户隔离与会话撤销仍需完善。JWT/RBAC 已落地，不能继续写作“RBAC 待补”。
+- **P1**：恢复两组被排除测试，保留其余历史测试债务清单；补 Provider 指数退避/429、Qdrant 启动策略及 SSE offset 恢复。前端现已有 React Testing Library 测试。
+- **P2**：缓存逐节点归因、Milvus 容量与备份、APM/错误聚合/运维指标面板、隔离 worker 和 Trace 数据生命周期。
 
-- **后端 105 个单测**（Jest 83 + node:test 22），覆盖 Agent 决策 / Citation 幻觉检测 / ContextManager / Langfuse 采样 / JSON 容错解析 / configuration / question-bank / reviewer 等核心模块
-- **7 个 Jest spec 因依赖未对齐暂 skip**：llm-gateway.fallback / memory.dual-write / interview.sse / dynamic-task-queue.followup / context-manager.watermark / golden-dataset.eval / resume-parser
-- **前端测试覆盖待补充**：未集成 React Testing Library
-- **集成测试**：`scripts/bench-p0.ts`（50 轮 benchmark 脚本）+ `tests/cache.spec.ts`（缓存命中基准测试）
-- **改造方向**：对齐 skip 的 7 个 spec + Playwright e2e
+历史缓存证据保留：2026-06 prompt cache 为 0%（当时记录 Provider 未识别 `prompt_cache_key`）；semantic cache 为 0%（50 轮未触发白名单节点）；Exact Cache 的 <1ms 是 Redis 层响应。2026-08-12 的后续基准记录 46 次缓存命中，但总 Token 比直接 Qwen 高 30.01%。这些测量场景不同，不应合并成“缓存已节省成本”。更换 Provider 是否有效需要重新验证。
 
-### 7.2 错误处理
-
-- **Module init 失败行为不一致**：Mem0 失败时仅日志，Qdrant 失败时**整个模块启动不了**（实测 Qdrant URL 配错就崩）
-- **retry 机制缺失**：当前只有 fallback（Provider 级），**单次调用内部没有指数退避重试**
-- **rate limit 处理**：未实现 Qwen / DeepSeek 的 429 退避
-
-### 7.3 安全
-
-- **认证机制**：JWT HS256 + userId 格式校验已落地（9 项 P0 安全修复完成），OAuth2 + RBAC 待补充
-- **SSRF 风险**：已加 SSRF guard，但 Bocha 搜索 key 在前端可见（实际是后端调，但配置 doc 不全）
-- **PII 处理**：Mem0 Cloud 把候选人画像传到第三方 SaaS，**GDPR 合规存疑**
-- **日志脱敏**：API key 在 Langfuse metadata 中**未脱敏**
-
-### 7.4 性能 / 扩展性
-
-- **Prompt Prefix Cache 依赖底层 Provider**：Qwen dashscope OpenAI 兼容层不识别 `prompt_cache_key`，生产环境需切至 OpenAI 直连或 Anthropic Claude 方可生效
-- **SSE 单连接**：未实现连接复用，每个浏览器 tab 一个长连接
-- **Milvus 单机**：未上分布式（数据量 < 100K 时足够，> 1M 要考虑分片）
-- **Mem0 Cloud 单租户**：所有用户混在一个 namespace（商用需要 per-tenant）
-
-### 7.5 可观测性
-
-- **Langfuse 采样已落地**：djb2 确定性三层采样（trace 10% / span 50% / gen 100%），成本降 90%
-- **无 APM**（application performance monitoring）：CPU / 内存 / DB query 慢查询无监控
-- **error tracking 缺失**：无 Sentry 类工具
-- **metric 面板**：自建 Cost Panel（SessionCostTracker），**没有 dashboard**（Prometheus / Grafana）
-
-### 7.6 Cache 命中率诚实标注
-
-| Cache 层级 | 实测命中率 | 根因 |
-|---|---|---|
-| Prompt Prefix Cache | 0% | Qwen dashscope 不识别 `prompt_cache_key`（provider 层限制） |
-| Semantic Cache | 0% | 50 轮调用未触发白名单节点（`interview_question` 实际未命中） |
-| Exact Cache (Redis) | < 1ms 响应 | ✅ 工作（hash 碰撞检查） |
-
-**结论**：Cache 工程代码完整（727 行），但底层 provider 与测试场景均未让 Cache 真正生效。生产环境需：
-1. 切换 provider 至 OpenAI 直连 / Anthropic Claude
-2. 设计触发 Semantic Cache 白名单节点的 query pattern
+采样率同样不能直接推导费用：trace 10% 采样仅表示该类上报减少，generation 等其他事件仍产生开销。
 
 ---
 
@@ -406,7 +367,7 @@ curl http://localhost:3001/api/health  # 应返 {"status":"ok",...}
 ```bash
 cd apps/api
 npm test
-# Jest 期望：105/105 passed (Jest 83 + node:test 22)
+# 当前结果与默认排除项见 docs/TESTING.md，不硬编码历史用例数
 ```
 
 ### 8.3 跑 KB 召回 benchmark
@@ -463,8 +424,8 @@ curl -s "http://localhost:3001/api/knowledge-base/recall?q=LangGraph%20checkpoin
 | **代码质量** | TS 严格模式 / 类型安全 / JSDoc | 0 新错误（除遗留 3 个 Milvus） |
 | **性能优化** | 缓存 / 上下文压缩 / Rerank | 三层缓存工程 + 4 级水位线 + Milvus RRF |
 | **可观测性** | Trace / 埋点 / 成本监控 | Langfuse + 自建 Cost Panel（9-10ms）+ 双写 |
-| **测试覆盖** | 单测 / e2e / benchmark | 105 单测 + 30 Case RAG benchmark + 50 轮 LLM Bench |
-| **商用化潜力** | 健壮性 / 扩展性 / 安全 | 已知短板（见 §七）是主要扣分项 |
+| **测试覆盖** | 单测 / e2e / benchmark | 当前见 docs/TESTING.md；历史 benchmark 保留各自日期与场景 |
+| **商用化潜力** | 健壮性 / 扩展性 / 安全 | 后续演进与未完成边界见 §七 |
 | **AI 工程深度** | Agent 编排 / Tool 设计 / RAG | Multi-Agent + 4 层记忆 + 双引擎 RAG |
 
 ---

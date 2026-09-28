@@ -1,10 +1,29 @@
-# Interview Agent
+# Interview Agent · AgentLab
 
-面向技术招聘场景的开源 AI 面试平台。候选人上传简历后，系统会解析候选人信息、生成岗位相关题目，并通过流式对话完成追问、评估与报告；管理员可以维护题库，并从文件或公开技术文档导入内容。
+面向技术招聘的 AI 面试平台，用可追溯的 Agent 流程连接简历、追问与评估报告。
 
-项目默认采用 NestJS + React 技术路线，面向企业内部验证和受控上线设计。系统将模型编排、检索、持久化状态、权限控制、可观测性和验收测试组合为完整的面试业务闭环。
+[![API CI](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml/badge.svg)](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Node >=20](https://img.shields.io/badge/node-%3E%3D20-green)
+![pnpm >=9](https://img.shields.io/badge/pnpm-%3E%3D9-orange)
 
-[产品目标宪法](docs/PRODUCT_CONSTITUTION.md) 定义了长期产品目标、默认核心架构、不可破坏的运行时规则与 AgentLab 演进边界。具体技术方案和 ADR 见 [架构设计决策记录](docs/architecture-decisions.md)。
+- **解析简历**：从 PDF、Markdown、TXT 提取候选人信息与检索上下文。
+- **生成题目**：结合岗位、简历与题库生成面试问题。
+- **流式追问**：通过 SSE 展示多节点编排结果，支持人工审批。
+- **输出报告**：基于持久化回答与评分信号生成评估报告。
+
+| 工程支点 | 实现与入口 |
+| --- | --- |
+| 编排 | LangGraph 多节点、checkpoint 与任务队列：`apps/api/src/agents/multi-agent/`、`apps/api/src/modules/interview/services/` |
+| 检索 | Milvus + BM25、RRF 与 rerank，导入后 flush：`apps/api/src/modules/knowledge-base/` |
+| 网关 | Qwen / DeepSeek 路由、健康检查、永久错误熔断与成本统计：`apps/api/src/modules/llm/` |
+| 平台 | AgentVersion → Application → Run → TraceEvent → Evaluation：`apps/api/src/modules/agent-lab/` |
+
+**首次运行**：准备 Docker，复制 `.env.example` 为 `.env`，配置 `QWEN_API_KEY` 和随机 `JWT_SECRET`，运行 `docker compose up -d --build`，打开 http://localhost:5173。首次拉取镜像和构建需要数分钟；完整步骤见[快速开始](#快速开始)。
+
+> 当前本地开发分支为 `agent-lab`。截至本次核对，本地 `main` 尚未包含平台模块；查看 GitHub 默认分支时请确认分支，不要把开发分支能力视为已发布版本。
+
+[架构](#系统架构) · [测试与验收](#测试与验收链路) · [Roadmap](docs/ROADMAP.md) · [产品目标](docs/PRODUCT_CONSTITUTION.md) · [架构决策](docs/architecture-decisions.md)
 
 ## 核心能力
 
@@ -16,40 +35,11 @@
 - **安全控制**：使用 `scrypt` 密码哈希、默认拒绝的 JWT 鉴权、`USER`/`ADMIN` RBAC 和资源归属校验。
 - **交付与验证**：提供 Docker Compose、健康检查、Prisma migration、API/Web 测试、浏览器验收和真实模型内容工作流验收。
 
-## AgentLab 迁移状态
+## AgentLab 平台能力
 
-本项目正在从 AI 面试应用逐步演化为 AgentLab。Interview Agent 是 AgentLab 的第一个真实应用，而不是平台边界。
+Interview Agent 是平台的第一个应用。`apps/api/src/modules/agent-lab/` 提供 Agent 版本化注册、Application / Run / Sub-run、追加式 TraceEvent、工具审批、运行预算、插件注册及确定性评测。Web `/lab` 支持查看应用、运行与追踪，创建数据集并执行评测。
 
-当前已完成 Phase 1、Phase 2 与 Phase 3 的基础能力：
-
-- 以 NestJS `apps/api` 作为唯一主线。
-- 新增默认 Workspace、Agent、AgentVersion 的领域模型和数据库迁移。
-- 提供 Agent Registry：创建、查看、编辑、删除、克隆 Agent；创建、发布和回滚 AgentVersion。
-- 通过 `POST /api/agent-lab/bootstrap/interview-agent` 幂等注册当前 `Interview Agent v1.0.0`。
-- 新增 `Application` 与 `ApplicationRun`：`POST /api/agent-lab/applications/bootstrap/interview` 幂等注册 Interview Application。每轮既有 Interview SSE 在不改变 RAG、记忆、任务队列和流式响应的前提下，旁路创建和完成对应的 Lab Run，并通过 `externalRunId` / `externalSessionId` 关联原始面试。
-- 提供独立运行接口 `POST /api/agent-lab/agents/:agentId/run`，并持久化 Run 与有序 TraceEvent。
-- 提供 Run 列表、详情和 Trace 查询接口。首个适配器复用现有 `MultiAgentService`，不改变 Interview 控制器。
-- TraceEvent 采用追加式事件契约：包含 `formatVersion`、单调 `seq`、`turnId`、`step`、`callId`、JSON-safe payload 与模型可见标记。支持 `turn.start/end`、`user.message`、`assistant.message`、`tool.call/result`、审批与失败事件。
-- 提供版本化 `EvaluationDataset`、`EvaluationCase`、`Evaluator`、`EvaluationRun` 和 `EvaluationResult`。评测结果关联实际 Agent Run，按 AgentVersion 与 Dataset 版本可回溯。
-- 首版评测器为确定性规则：`KEYWORD` 检查输出关键词、`JSON_SCHEMA` 检查输出字段、`LATENCY` 检查运行耗时。每条结果保存分数、阈值、断言明细、输出摘要和失败原因。
-
-评测 API 位于 `/api/agent-lab`：创建 Dataset 与 Case、创建 Evaluator 后，可调用 `POST /agents/:agentId/evaluations` 同步执行已发布版本；`GET /agents/:agentId/evaluations` 查看汇总，`GET /evaluations/:evaluationId` 查看逐用例结果。输入用例必须满足目标 Agent 的输入契约，首个 Interview 适配器要求 `input.message` 非空。
-
-当前阶段不会替换既有 Interview 接口和 LangGraph 面试流程。Run 已记录状态、输入、输出、耗时和错误；Token 与成本仍依赖现有 Interview 会话统计，独立 Run 会明确标记该指标暂不可用。评测不以不稳定的 LLM Judge 作为基础契约，尚未导入现有 Golden Dataset JSON。部署前必须运行 `pnpm db:deploy`。
-
-Docker API 启动时只执行 `prisma migrate deploy`，迁移失败会阻止服务接收流量，不再使用 `db push --accept-data-loss` 或吞掉 schema 错误。`20260817110000_add_interview_workflow_persistence` 为历史上由 `db push` 创建的面试任务、答题历史、反思日志与简历确认字段补齐版本化契约，对已存在对象保持幂等。升级已有开发库前应先比对当前 schema，再使用 `prisma migrate resolve --applied` 登记已验证存在的历史 migration；不要以删除业务表的方式强行对齐。
-
-Web 端新增 `/lab` 工作台，包含概览、Application、Agent、Run/Trace 和离线评测视图；Trace 的 JSONL 导出仍使用受 JWT 保护的 API 请求。数据集可从页面创建并录入 Interview 输入用例，评测器仅支持 `KEYWORD`、`JSON_SCHEMA`、`LATENCY` 三种确定性规则。当前工作台不提供版本编辑器、批量导入或 LLM Judge，这些能力不能被视为已交付。
-
-Trace 查询继续使用 `GET /api/agent-lab/runs/:runId/trace`，并新增 `GET /api/agent-lab/runs/:runId/trace.jsonl` 供离线回放。运行时只追加事件，不会原地覆盖历史；模型历史只从 `user.message`、`assistant.message`、`tool.result` 事件投影，标准模型可见事件不能被静默标记为不可见。当前保留策略遵循数据库生命周期，尚未提供归档或脱敏清理任务；大 payload 仍存于 PostgreSQL JSON 字段，尚未接入对象存储引用。
-
-AgentLab 新增独立 `ToolRunner` 契约，供后续 MCP、插件和工作区 provider 接入：每次调用均写入 `tool.call`，依次经过只读 hook、只可拒绝的 guard、强制审批和 provider，最终无论成功、拒绝、取消、超时或异常均写入唯一 `tool.result`。审批默认拒绝，缺少处理器、超时或处理异常不会放行；审批请求和决定持久化到 `ToolApproval` 并通过 `callId` 关联。
-
-首版本地执行能力只提供 `plan`（只读）和 `workspace-write`（受控工作区写入）预设，使用最小环境变量、受控临时目录、相对路径与符号链接边界检查、超时和输出大小上限。它不是 OS 级沙箱，网络放行默认拒绝，本地部署不应将其用于不受信任的任意命令；生产环境应改用受限容器或远程 worker。现有 Interview/MCP 调用尚未迁移到该管道，以避免改变已有业务流程。
-
-可观测性与扩展前置能力：`GET /api/agent-lab/runs/:runId/trace.bundle` 导出带运行元数据、按序事件和大 payload 引用的本地 Trace bundle，可由离线 reducer 还原模型会话、工具调用/结果、终态与错误关联。生命周期遥测尽力写入，不会因为遥测异常中断 Agent Run；模型可见历史和 ToolRunner 安全审计仍为强制事件。插件使用版本化 manifest 与 capability provider，可卸载/重载且不会遗留注册；MCP 仅作为 provider，必须由调用方交给 ToolRunner 后才会执行。
-
-子 Agent 或后台任务必须创建独立的子 Run，保存 `parentRunId`、独立 `budget`、状态和取消时间，并通过父子 Trace 事件投递创建、结果、取消或失败。`budget.maxToolCalls` 由 ToolRunner 基于已追加的 `tool.call` 事件强制执行，父 Run 和子 Run 均适用。当前仅提供状态与审计契约，不包含队列调度器、远程 worker 或自动重试；这些能力将在真实隔离执行环境完成后接入。新的迁移尚未在数据库应用，部署前必须执行 `pnpm db:deploy`。
+平台目前提供执行与审计契约；尚未交付 OS 级沙箱、后台调度器、远程 worker、自动重试或 LLM Judge。独立 Run 的 token / 成本指标仍不可用。完整接口、数据库升级要求和运行边界见 [AgentLab 能力与迁移说明](docs/agent-lab-status.md)。
 
 ## 系统架构
 
@@ -73,15 +63,15 @@ AgentLab 新增独立 `ToolRunner` 契约，供后续 MCP、插件和工作区 p
 
 ### 持久化、可审查的 Agent 执行
 
-面试流程不是无状态 Prompt 拼接。LangGraph 协调 planner、executor、reviewer 和 specialist handoff；checkpoint 使长流程可检查、可恢复。持久化任务队列和 `AnswerHistory` 保存候选人的真实回答与评分信号，报告生成从这些结构化记录读取数据，而不是根据聊天顺序猜测问答角色。
+面试流程不是无状态 Prompt 拼接。LangGraph 协调 planner、executor、reviewer 和 specialist handoff；checkpoint 使长流程可检查、可恢复。持久化任务队列和 `AnswerHistory` 保存候选人的真实回答与评分信号，报告生成从这些结构化记录读取数据，而不是根据聊天顺序猜测问答角色。实现：`apps/api/src/agents/multi-agent/`、`apps/api/src/modules/interview/services/`。
 
 ### 兼顾召回与写后可见性的检索设计
 
-题库检索组合 dense vector search、BM25 sparse search、RRF 融合和 rerank。简历按用户独立写入检索上下文。题库导入完成前会显式 flush 向量写入，因此成功响应意味着数据可立即检索，避免向量索引异步物化带来的“写入成功但搜索不到”问题。
+题库检索组合 dense vector search、BM25 sparse search、RRF 融合和 rerank。简历按用户独立写入检索上下文。题库导入完成前会显式 flush 向量写入，因此成功响应意味着数据可立即检索，避免向量索引异步物化带来的“写入成功但搜索不到”问题。实现：`apps/api/src/modules/knowledge-base/`。
 
 ### 多模型容错与成本可见性
 
-模型网关优先调用 Qwen，必要时切换到 DeepSeek。Provider 健康检查会区分永久性凭据/账单错误与临时错误；永久错误会被熔断，避免无效重复请求。精确缓存和语义缓存用于减少重复调用，会话级 token 与成本记录用于后续运营分析。
+模型网关优先调用 Qwen，必要时切换到 DeepSeek。Provider 健康检查会区分永久性凭据/账单错误与临时错误；永久错误会被熔断，避免无效重复请求。精确缓存和语义缓存提供复用机制，会话级 token 与成本记录用于核验实际收益；当前基准未证明总 Token 节省。实现：`apps/api/src/modules/llm/`。
 
 ### 多 Agent 与缓存 Token 基准
 
@@ -129,8 +119,8 @@ AgentLab 新增独立 `ToolRunner` 契约，供后续 MCP、插件和工作区 p
 
 ### 前置要求
 
-- Node.js 20+
-- pnpm 9+
+- Node.js 20+（仅本地源码开发需要）
+- pnpm 9+（仅本地源码开发需要；纯 Docker 路径不需要本机安装 Node / pnpm）
 - Docker Desktop / Docker Compose
 - Qwen API Key，用于简历解析、embedding、出题和流式面试
 
@@ -140,12 +130,12 @@ AgentLab 新增独立 `ToolRunner` 契约，供后续 MCP、插件和工作区 p
 cp .env.example .env
 ```
 
-至少需要配置 `QWEN_API_KEY`，且应在任何非本地部署中替换 `JWT_SECRET`。`DEEPSEEK_API_KEY` 可选，但配置后可启用 Provider 降级。需要初始化管理员时，请在管理员注册前通过 `ADMIN_USER_IDS` 配置受控的用户 ID 列表。
+必须配置 `QWEN_API_KEY` 和 `JWT_SECRET`（示例文件中的 JWT 值为空，Compose 会拒绝启动）。可运行 `openssl rand -base64 48` 生成随机 JWT 密钥，写入 `.env`；不要提交该文件。`DEEPSEEK_API_KEY` 可选，但配置后可启用 Provider 降级。需要初始化管理员时，请在管理员注册前通过 `ADMIN_USER_IDS` 配置受控的用户 ID 列表。
 
 ```bash
-pnpm install
-pnpm docker:up
-pnpm db:deploy
+docker compose up -d --build
+# 镜像内生成 Prisma Client；API 入口执行 prisma migrate deploy 后才启动。
+# 已有数据库升级前先备份，并阅读 docs/agent-lab-status.md。
 ```
 
 | 服务 | 地址 |
@@ -198,7 +188,7 @@ Authorization: Bearer <accessToken>
 
 ## 测试与验收链路
 
-质量门禁按“静态检查 -> 回归测试 -> 生产构建 -> Docker 健康检查 -> 浏览器验收 -> 真实 Provider 内容工作流 -> 截图与 JSON 证据”推进。当前验证数据见上方的“当前质量门禁与验收证据”图；缓存命中数据受 Provider 能力影响，不能脱离特定模型和负载单独解读。
+当前测试结果、命令和未纳入默认执行的测试统一记录在 [测试基线](docs/TESTING.md)。测试文件数、测试用例数和覆盖率是不同指标；未生成覆盖率报告时不声明覆盖率。下方 2026-08-12 数据是历史验收，不代表本次重新运行了 Docker 或真实 Provider。
 
 | 验证层级 | 覆盖内容 |
 | --- | --- |
@@ -224,7 +214,7 @@ Authorization: Bearer <accessToken>
 
 内容工作流验证了简历上传与 RAG 写入、个性化问题生成、面试创建与确认、题库文件导入、从技术文档 URL 生成题目并立即检索、用户数据隔离和 SSRF 拒绝。
 
-可查看完整的[验收报告](docs/ACCEPTANCE-REPORT-2026-08-12.md)、[内容工作流 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/content-workflow-results.json)和[浏览器验收 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/real-results.json)。验收脚本会将截图和 JSON 结果提交到仓库，便于评审者在不先复跑真实 Provider 链路的情况下检查证据。
+可查看完整的[验收报告](docs/ACCEPTANCE-REPORT-2026-08-12.md)、[内容工作流 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/content-workflow-results.json)和[浏览器验收 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/real-results.json)。已提交的截图与 JSON 保留为历史验收证据；新生成截图默认忽略，后续通过 CI artifact 分享。不要自动提交含候选人数据的运行产物。
 
 ### 浏览器验收截图
 
@@ -277,7 +267,7 @@ pnpm db:studio
 apps/
   api/                 NestJS API 与 Prisma schema
     src/agents/        LangGraph 编排与 Agent 工具
-    src/modules/       auth、interview、llm、memory、knowledge-base、mcp
+    src/modules/       agent-lab、auth、interview、llm、memory、knowledge-base、mcp
     prisma/            数据库 schema 与 migration
   web/                 React 应用与浏览器验收脚本
   py-api/              实验性替代后端，默认不启用
@@ -287,15 +277,11 @@ docs/
   ACCEPTANCE-REPORT-2026-08-12.md
 ```
 
-## 已知边界与后续商用工作
+## Roadmap / 后续演进
 
-- 尚未提供 refresh token rotation、token revocation list、邮箱验证、OAuth/SSO、MFA 和审计导出。
-- Provider fallback 已实现，但临时 Provider 错误尚未提供请求级指数退避。
-- 语义缓存和 prompt cache 的实际收益依赖具体模型与真实流量，应在目标业务中单独压测后再形成成本结论。
-- Langfuse 与 Mem0 是可选集成；将候选人数据发送到第三方服务前，需要独立进行隐私与合规评估。
-- 当前 Milvus 为单机 Compose 部署；多租户、高数据量场景需要容量规划、备份方案和托管或集群化向量数据库。
-- SSE 断线重连尚无服务端 event offset，无法恢复已部分传输的流式响应。
-- `apps/py-api` 与默认 NestJS 产品路径暂未保持功能完全一致。
+以“现状 → 原因 → 下一步”维护 [Roadmap](docs/ROADMAP.md)：P0 为隐私与凭据治理，P1 为测试债务、Provider 退避和 SSE 恢复，P2 为隔离执行与容量规划。未完成能力明确保留，不以重命名隐藏问题。
+
+本地审查改动与待发布事项见 [审查落实记录](docs/REVIEW-FOLLOWUP.md)，尚无已发布的 v1.0.0；变更记录使用 [Unreleased](CHANGELOG.md)。
 
 ## License
 
