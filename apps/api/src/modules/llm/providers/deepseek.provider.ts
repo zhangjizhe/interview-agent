@@ -20,6 +20,7 @@ export class DeepseekProvider extends BaseLLMProvider {
     this.client = new OpenAI({
       apiKey: this.config.get<string>('deepseek.apiKey'),
       baseURL: this.config.get<string>('deepseek.baseUrl'),
+      timeout: 30_000,
     });
   }
 
@@ -53,7 +54,7 @@ export class DeepseekProvider extends BaseLLMProvider {
         model: response.model,
       };
     } catch (err) {
-      this.logger.error(`DeepSeek chat failed: ${err.message}`);
+      this.logger.error({ event: 'provider_chat_failed', provider: this.name, status: err?.status });
       throw err;
     }
   }
@@ -88,8 +89,7 @@ export class DeepseekProvider extends BaseLLMProvider {
         }
       }
     } catch (err) {
-      this.logger.error(`DeepSeek stream failed: ${err.message}`);
-      yield { finishReason: 'error' };
+      this.logger.error({ event: 'provider_stream_failed', provider: this.name, status: err?.status });
       throw err;
     }
   }

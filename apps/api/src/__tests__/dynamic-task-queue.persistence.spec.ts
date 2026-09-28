@@ -11,6 +11,7 @@ import { DynamicTaskQueueService } from '../modules/interview/services/dynamic-t
 describe('DynamicTaskQueueService persistence', () => {
   const prisma = {
     interviewTask: {
+      findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
       update: jest.fn(),
       create: jest.fn(),

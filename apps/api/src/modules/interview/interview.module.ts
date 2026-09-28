@@ -27,9 +27,10 @@ import { SkillStateAggregationService } from './services/skill-state-aggregation
 import { StreamMessageDeliveryService } from './services/stream-message-delivery.service';
 import { TrainingService } from './services/training.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { AgentLabModule } from '../agent-lab/agent-lab.module';
 
 @Module({
-  imports: [AgentModule, MemoryModule, LlmModule, TaskQueueModule, AuthModule],
+  imports: [AgentModule, MemoryModule, LlmModule, TaskQueueModule, AuthModule, AgentLabModule],
   // 注册顺序保证：LifecycleController（含 list/stats 等静态路由）必须最先注册，
   // FlowController（含 :interviewId/message 等参数路由）最后注册。
   // NestJS 跨 controller 按注册顺序匹配路由，避免 /interview/list 被

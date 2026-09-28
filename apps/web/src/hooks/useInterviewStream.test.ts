@@ -6,16 +6,41 @@
  * 2. Agent 事件分发到 CoT 面板
  * 3. SSE 解析错误处理
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useInterviewStream } from '../hooks/useInterviewStream';
+import { useInterviewStore } from '../store/interview-store';
 
 // Mock fetch
 global.fetch = vi.fn();
 
+function pendingSseResponse(signal: AbortSignal): Response {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      signal.addEventListener(
+        'abort',
+        () => controller.error(new DOMException('Request aborted', 'AbortError')),
+        { once: true },
+      );
+    },
+  });
+
+  return { ok: true, status: 200, body } as Response;
+}
+
+async function flushAsyncWork() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe('useInterviewStream', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useInterviewStore.getState().reset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('SSE Event Types', () => {
@@ -33,9 +58,11 @@ describe('useInterviewStream', () => {
         'meta',
         'token_usage',
         'done',
+        'heartbeat',
       ];
       expect(validEventTypes).toContain('token');
       expect(validEventTypes).toContain('done');
+      expect(validEventTypes).toContain('heartbeat');
     });
 
     it('should parse SSE data format correctly', () => {
@@ -108,6 +135,90 @@ describe('useInterviewStream', () => {
       expect(delays[0]).toBe(1000);
       expect(delays[1]).toBe(2000);
       expect(delays[2]).toBe(4000);
+    });
+  });
+
+  describe('SSE timeout lifecycle', () => {
+    it('starts the 60-second inactivity timer only after the SSE response is established', async () => {
+      vi.useFakeTimers();
+      let resolveResponse!: (response: Response) => void;
+      let requestSignal!: AbortSignal;
+      vi.mocked(global.fetch).mockImplementation((_input, init) => {
+        requestSignal = init!.signal as AbortSignal;
+        return new Promise<Response>((resolve) => {
+          resolveResponse = resolve;
+        });
+      });
+
+      const { result } = renderHook(() => useInterviewStream());
+      let sendPromise!: Promise<void>;
+      act(() => {
+        sendPromise = result.current.send('interview-1', 'user-1', 'first answer');
+      });
+      await act(flushAsyncWork);
+
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(requestSignal.aborted).toBe(false);
+      expect(useInterviewStore.getState().streaming).toBe(true);
+
+      resolveResponse(pendingSseResponse(requestSignal));
+      await act(flushAsyncWork);
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+
+      expect(requestSignal.aborted).toBe(true);
+      expect(useInterviewStore.getState().streaming).toBe(false);
+      await act(async () => {
+        await sendPromise;
+      });
+    });
+
+    it('does not let an earlier turn timeout finalize a newer turn', async () => {
+      vi.useFakeTimers();
+      const requestSignals: AbortSignal[] = [];
+      vi.mocked(global.fetch).mockImplementation((_input, init) => {
+        const signal = init!.signal as AbortSignal;
+        requestSignals.push(signal);
+        return Promise.resolve(pendingSseResponse(signal));
+      });
+
+      const { result } = renderHook(() => useInterviewStream());
+      let firstSend!: Promise<void>;
+      act(() => {
+        firstSend = result.current.send('interview-1', 'user-1', 'first answer');
+      });
+      await act(flushAsyncWork);
+
+      act(() => {
+        vi.advanceTimersByTime(59_000);
+      });
+
+      let secondSend!: Promise<void>;
+      act(() => {
+        secondSend = result.current.send('interview-1', 'user-1', 'second answer');
+      });
+      await act(flushAsyncWork);
+
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
+
+      expect(requestSignals[0].aborted).toBe(true);
+      expect(requestSignals[1].aborted).toBe(false);
+      expect(useInterviewStore.getState().streaming).toBe(true);
+
+      act(() => {
+        vi.advanceTimersByTime(59_000);
+      });
+      expect(requestSignals[1].aborted).toBe(true);
+      expect(useInterviewStore.getState().streaming).toBe(false);
+
+      await act(async () => {
+        await Promise.all([firstSend, secondSend]);
+      });
     });
   });
 });

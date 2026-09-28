@@ -1,8 +1,29 @@
-# Interview Agent
+# Interview Agent · AgentLab
 
-面向技术招聘场景的开源 AI 面试平台。候选人上传简历后，系统会解析候选人信息、生成岗位相关题目，并通过流式对话完成追问、评估与报告；管理员可以维护题库，并从文件或公开技术文档导入内容。
+面向技术招聘的 AI 面试平台，用可追溯的 Agent 流程连接简历、追问与评估报告。
 
-项目默认采用 NestJS + React 技术路线，面向企业内部验证和受控上线设计。系统将模型编排、检索、持久化状态、权限控制、可观测性和验收测试组合为完整的面试业务闭环。
+[![API CI](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml/badge.svg)](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Node >=20](https://img.shields.io/badge/node-%3E%3D20-green)
+![pnpm >=9](https://img.shields.io/badge/pnpm-%3E%3D9-orange)
+
+- **解析简历**：从 PDF、Markdown、TXT 提取候选人信息与检索上下文。
+- **生成题目**：结合岗位、简历与题库生成面试问题。
+- **流式追问**：通过 SSE 展示多节点编排结果，支持人工审批。
+- **输出报告**：基于持久化回答与评分信号生成评估报告。
+
+| 工程支点 | 实现与入口 |
+| --- | --- |
+| 编排 | LangGraph 多节点、checkpoint 与任务队列：`apps/api/src/agents/multi-agent/`、`apps/api/src/modules/interview/services/` |
+| 检索 | Milvus + BM25、RRF 与 rerank，导入后 flush：`apps/api/src/modules/knowledge-base/` |
+| 网关 | Qwen / DeepSeek 路由、健康检查、永久错误熔断与成本统计：`apps/api/src/modules/llm/` |
+| 平台 | AgentVersion → Application → Run → TraceEvent → Evaluation：`apps/api/src/modules/agent-lab/` |
+
+**首次运行**：准备 Docker，复制 `.env.example` 为 `.env`，配置 `QWEN_API_KEY` 和随机 `JWT_SECRET`，运行 `docker compose up -d --build`，打开 http://localhost:5173。首次拉取镜像和构建需要数分钟；完整步骤见[快速开始](#快速开始)。
+
+> 当前本地开发分支为 `agent-lab`。截至本次核对，本地 `main` 尚未包含平台模块；查看 GitHub 默认分支时请确认分支，不要把开发分支能力视为已发布版本。
+
+[架构](#系统架构) · [测试与验收](#测试与验收链路) · [Roadmap](docs/ROADMAP.md) · [产品目标](docs/PRODUCT_CONSTITUTION.md) · [架构决策](docs/architecture-decisions.md)
 
 ## 开发规范
 
@@ -17,6 +38,12 @@
 - **Agent 编排**：基于 LangGraph 提供状态图、checkpoint、持久化任务队列、答题历史与多角色 handoff。
 - **安全控制**：使用 `scrypt` 密码哈希、默认拒绝的 JWT 鉴权、`USER`/`ADMIN` RBAC 和资源归属校验。
 - **交付与验证**：提供 Docker Compose、健康检查、Prisma migration、API/Web 测试、浏览器验收和真实模型内容工作流验收。
+
+## AgentLab 平台能力
+
+Interview Agent 是平台的第一个应用。`apps/api/src/modules/agent-lab/` 提供 Agent 版本化注册、Application / Run / Sub-run、追加式 TraceEvent、工具审批、运行预算、插件注册及确定性评测。Web `/lab` 支持查看应用、运行与追踪，创建数据集并执行评测。
+
+平台目前提供执行与审计契约；尚未交付 OS 级沙箱、后台调度器、远程 worker、自动重试或 LLM Judge。独立 Run 的 token / 成本指标仍不可用。完整接口、数据库升级要求和运行边界见 [AgentLab 能力与迁移说明](docs/agent-lab-status.md)。
 
 ## 系统架构
 
@@ -40,15 +67,15 @@
 
 ### 持久化、可审查的 Agent 执行
 
-面试流程不是无状态 Prompt 拼接。LangGraph 协调 planner、executor、reviewer 和 specialist handoff；checkpoint 使长流程可检查、可恢复。持久化任务队列和 `AnswerHistory` 保存候选人的真实回答与评分信号，报告生成从这些结构化记录读取数据，而不是根据聊天顺序猜测问答角色。
+面试流程不是无状态 Prompt 拼接。LangGraph 协调 planner、executor、reviewer 和 specialist handoff；checkpoint 使长流程可检查、可恢复。持久化任务队列和 `AnswerHistory` 保存候选人的真实回答与评分信号，报告生成从这些结构化记录读取数据，而不是根据聊天顺序猜测问答角色。实现：`apps/api/src/agents/multi-agent/`、`apps/api/src/modules/interview/services/`。
 
 ### 兼顾召回与写后可见性的检索设计
 
-题库检索组合 dense vector search、BM25 sparse search、RRF 融合和 rerank。简历按用户独立写入检索上下文。题库导入完成前会显式 flush 向量写入，因此成功响应意味着数据可立即检索，避免向量索引异步物化带来的“写入成功但搜索不到”问题。
+题库检索组合 dense vector search、BM25 sparse search、RRF 融合和 rerank。简历按用户独立写入检索上下文。题库导入完成前会显式 flush 向量写入，因此成功响应意味着数据可立即检索，避免向量索引异步物化带来的“写入成功但搜索不到”问题。实现：`apps/api/src/modules/knowledge-base/`。
 
 ### 多模型容错与成本可见性
 
-模型网关优先调用 Qwen，必要时切换到 DeepSeek。Provider 健康检查会区分永久性凭据/账单错误与临时错误；永久错误会被熔断，避免无效重复请求。精确缓存和语义缓存用于减少重复调用，会话级 token 与成本记录用于后续运营分析。
+模型网关优先调用 Qwen，必要时切换到 DeepSeek。Provider 健康检查会区分永久性凭据/账单错误与临时错误；永久错误会被熔断，避免无效重复请求。精确缓存和语义缓存提供复用机制，会话级 token 与成本记录用于核验实际收益；当前基准未证明总 Token 节省。实现：`apps/api/src/modules/llm/`。
 
 ### 多 Agent 与缓存 Token 基准
 
@@ -96,8 +123,8 @@
 
 ### 前置要求
 
-- Node.js 20+
-- pnpm 9+
+- Node.js 20+（仅本地源码开发需要）
+- pnpm 9+（仅本地源码开发需要；纯 Docker 路径不需要本机安装 Node / pnpm）
 - Docker Desktop / Docker Compose
 - Qwen API Key，用于简历解析、embedding、出题和流式面试
 
@@ -107,12 +134,12 @@
 cp .env.example .env
 ```
 
-至少需要配置 `QWEN_API_KEY`，且应在任何非本地部署中替换 `JWT_SECRET`。`DEEPSEEK_API_KEY` 可选，但配置后可启用 Provider 降级。需要初始化管理员时，请在管理员注册前通过 `ADMIN_USER_IDS` 配置受控的用户 ID 列表。
+必须配置 `QWEN_API_KEY` 和 `JWT_SECRET`（示例文件中的 JWT 值为空，Compose 会拒绝启动）。可运行 `openssl rand -base64 48` 生成随机 JWT 密钥，写入 `.env`；不要提交该文件。`DEEPSEEK_API_KEY` 可选，但配置后可启用 Provider 降级。需要初始化管理员时，请在管理员注册前通过 `ADMIN_USER_IDS` 配置受控的用户 ID 列表。
 
 ```bash
-pnpm install
-pnpm docker:up
-pnpm db:deploy
+docker compose up -d --build
+# 镜像内生成 Prisma Client；API 入口执行 prisma migrate deploy 后才启动。
+# 已有数据库升级前先备份，并阅读 docs/agent-lab-status.md。
 ```
 
 | 服务 | 地址 |
@@ -165,7 +192,7 @@ Authorization: Bearer <accessToken>
 
 ## 测试与验收链路
 
-质量门禁按“静态检查 -> 回归测试 -> 生产构建 -> Docker 健康检查 -> 浏览器验收 -> 真实 Provider 内容工作流 -> 截图与 JSON 证据”推进。当前验证数据见上方的“当前质量门禁与验收证据”图；缓存命中数据受 Provider 能力影响，不能脱离特定模型和负载单独解读。
+当前测试结果、命令和未纳入默认执行的测试统一记录在 [测试基线](docs/TESTING.md)。测试文件数、测试用例数和覆盖率是不同指标；未生成覆盖率报告时不声明覆盖率。下方 2026-08-12 数据是历史验收，不代表本次重新运行了 Docker 或真实 Provider。
 
 | 验证层级 | 覆盖内容 |
 | --- | --- |
@@ -191,7 +218,7 @@ Authorization: Bearer <accessToken>
 
 内容工作流验证了简历上传与 RAG 写入、个性化问题生成、面试创建与确认、题库文件导入、从技术文档 URL 生成题目并立即检索、用户数据隔离和 SSRF 拒绝。
 
-可查看完整的[验收报告](docs/ACCEPTANCE-REPORT-2026-08-12.md)、[内容工作流 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/content-workflow-results.json)和[浏览器验收 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/real-results.json)。验收脚本会将截图和 JSON 结果提交到仓库，便于评审者在不先复跑真实 Provider 链路的情况下检查证据。
+可查看完整的[验收报告](docs/ACCEPTANCE-REPORT-2026-08-12.md)、[内容工作流 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/content-workflow-results.json)和[浏览器验收 JSON 结果](apps/web/e2e/screenshots/acceptance-2026-08-12/real-results.json)。已提交的截图与 JSON 保留为历史验收证据；新生成截图默认忽略，后续通过 CI artifact 分享。不要自动提交含候选人数据的运行产物。
 
 ### 浏览器验收截图
 
@@ -244,7 +271,7 @@ pnpm db:studio
 apps/
   api/                 NestJS API 与 Prisma schema
     src/agents/        LangGraph 编排与 Agent 工具
-    src/modules/       auth、interview、llm、memory、knowledge-base、mcp
+    src/modules/       agent-lab、auth、interview、llm、memory、knowledge-base、mcp
     prisma/            数据库 schema 与 migration
   web/                 React 应用与浏览器验收脚本
   py-api/              实验性替代后端，默认不启用
@@ -254,15 +281,11 @@ docs/
   ACCEPTANCE-REPORT-2026-08-12.md
 ```
 
-## 已知边界与后续商用工作
+## Roadmap / 后续演进
 
-- 尚未提供 refresh token rotation、token revocation list、邮箱验证、OAuth/SSO、MFA 和审计导出。
-- Provider fallback 已实现，但临时 Provider 错误尚未提供请求级指数退避。
-- 语义缓存和 prompt cache 的实际收益依赖具体模型与真实流量，应在目标业务中单独压测后再形成成本结论。
-- Langfuse 与 Mem0 是可选集成；将候选人数据发送到第三方服务前，需要独立进行隐私与合规评估。
-- 当前 Milvus 为单机 Compose 部署；多租户、高数据量场景需要容量规划、备份方案和托管或集群化向量数据库。
-- SSE 断线重连尚无服务端 event offset，无法恢复已部分传输的流式响应。
-- `apps/py-api` 与默认 NestJS 产品路径暂未保持功能完全一致。
+以“现状 → 原因 → 下一步”维护 [Roadmap](docs/ROADMAP.md)：P0 为隐私与凭据治理，P1 为测试债务、Provider 退避和 SSE 恢复，P2 为隔离执行与容量规划。未完成能力明确保留，不以重命名隐藏问题。
+
+本地审查改动与待发布事项见 [审查落实记录](docs/REVIEW-FOLLOWUP.md)，尚无已发布的 v1.0.0；变更记录使用 [Unreleased](CHANGELOG.md)。
 
 ## License
 

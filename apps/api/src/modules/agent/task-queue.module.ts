@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DynamicTaskQueueService } from '../interview/services/dynamic-task-queue.service';
 import { LlmModule } from '../llm/llm.module';
 import { MemoryModule } from '../memory/memory.module';
+import { InferenceModule } from '../inference/inference.module';
 
 /**
  * TaskQueueModule - 抽取 DynamicTaskQueueService
@@ -10,7 +11,7 @@ import { MemoryModule } from '../memory/memory.module';
  * 解法：单独建模块，双方都导入这个
  */
 @Module({
-  imports: [LlmModule, MemoryModule],
+  imports: [LlmModule, MemoryModule, InferenceModule],
   providers: [DynamicTaskQueueService],
   exports: [DynamicTaskQueueService],
 })

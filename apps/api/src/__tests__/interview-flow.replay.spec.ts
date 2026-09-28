@@ -1,3 +1,6 @@
+jest.mock('../modules/agent-lab/interview-lab-bridge.service', () => ({
+  InterviewLabBridgeService: class InterviewLabBridgeService {},
+}));
 jest.mock('../modules/agent/interview-agent.service', () => ({
   InterviewAgentService: class InterviewAgentService {},
 }));
@@ -39,6 +42,7 @@ describe('InterviewFlowController stream replay', () => {
     };
     const writes: string[] = [];
     const response = {
+      once: jest.fn(),
       status: jest.fn(),
       setHeader: jest.fn(),
       flushHeaders: jest.fn(),
@@ -56,6 +60,7 @@ describe('InterviewFlowController stream replay', () => {
       {} as any,
       prisma as any,
       delivery as any,
+      { startTurn: jest.fn() } as any,
     );
 
     await controller.streamMessage(
@@ -72,6 +77,7 @@ describe('InterviewFlowController stream replay', () => {
     );
     expect(agent.processMessage).not.toHaveBeenCalled();
     expect(writes).toEqual([
+      'data: {"type":"heartbeat"}\n\n',
       'data: {"type":"token","content":"已持久化的面试官回复"}\n\n',
       'data: [DONE]\n\n',
     ]);

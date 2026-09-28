@@ -57,7 +57,8 @@ export interface AgentEvent {
     | 'meta'
     | 'thinking'
     | 'searching'
-    | 'recalling';
+    | 'recalling'
+    | 'heartbeat';
   content?: string;
   toolName?: string;
   toolResult?: any;

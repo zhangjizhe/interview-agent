@@ -25,6 +25,8 @@ export interface CacheWrapOptions {
   protocol: CacheProtocol;
   /** system prompt 版本号，部署升级时改这个强制失效缓存 */
   systemVersion: string;
+  provider?: string;
+  model?: string;
 }
 
 @Injectable()
@@ -48,7 +50,7 @@ export class PromptCacheInterceptor {
    *  4. 记录埋点
    */
   async wrapChat(
-    call: () => Promise<ChatResponse>,
+    call: (prepared: ChatParams) => Promise<ChatResponse>,
     params: ChatParams & {
       interviewId: string;
       userId: string;
@@ -80,12 +82,12 @@ export class PromptCacheInterceptor {
     const start = Date.now();
     let response: ChatResponse;
     try {
-      response = await call();
+      response = await call(params);
     } catch (err) {
-      await this.cost.recordLlmCall({
+      await this.recordMetric({
         interviewId: params.interviewId,
-        provider: 'unknown',
-        model: 'unknown',
+        provider: opts.provider || 'unknown',
+        model: opts.model || 'unknown',
         promptTokens: 0,
         completionTokens: 0,
         cachedTokens: 0,
@@ -99,9 +101,9 @@ export class PromptCacheInterceptor {
     }
 
     const usage = extractCacheUsage(response.usage);
-    await this.cost.recordLlmCall({
+    await this.recordMetric({
       interviewId: params.interviewId,
-      provider: response.model,
+      provider: opts.provider || response.model,
       model: response.model,
       promptTokens: response.usage.promptTokens,
       completionTokens: response.usage.completionTokens,
@@ -119,7 +121,7 @@ export class PromptCacheInterceptor {
    * 流式版本 - 用法和同步类似，但埋点延迟到流结束
    */
   async *wrapStream(
-    call: () => AsyncGenerator<StreamChunk, void, void>,
+    call: (prepared: ChatParams) => AsyncGenerator<StreamChunk, void, void>,
     params: ChatParams & { interviewId: string; userId: string; isFallback?: boolean },
     opts: CacheWrapOptions,
     semanticResult?: { hit: boolean; cacheId?: string },
@@ -142,19 +144,25 @@ export class PromptCacheInterceptor {
     const start = Date.now();
     let totalContent = '';
     let usage: any;
-    let model = 'unknown';
+    const model = opts.model || 'unknown';
     let success = false;
     let errored = false;
     let promptTokens = 0;
     let completionTokens = 0;
 
     try {
-      for await (const chunk of call()) {
+      for await (const chunk of call(params)) {
         if (chunk.content) totalContent += chunk.content;
-        if (chunk.usage) usage = chunk.usage;
-        if (chunk.finishReason === 'stop' || chunk.finishReason === 'length') success = true;
+        if (chunk.usage) {
+          usage = chunk.usage;
+          promptTokens = usage.promptTokens || 0;
+          completionTokens = usage.completionTokens || 0;
+        }
+        if (chunk.finishReason === 'error') throw new Error('Provider reported a stream error');
+        if (chunk.finishReason === 'stop' || chunk.finishReason === 'length' || chunk.finishReason === 'tool_calls') success = true;
         yield chunk;
       }
+      if (!success) throw new Error('Provider stream ended without a completion event');
       if (usage) {
         promptTokens = usage.promptTokens || 0;
         completionTokens = usage.completionTokens || 0;
@@ -165,9 +173,9 @@ export class PromptCacheInterceptor {
     } finally {
       // 流式埋点
       const u = extractCacheUsage(usage);
-      await this.cost.recordLlmCall({
+      await this.recordMetric({
         interviewId: params.interviewId,
-        provider: model,
+        provider: opts.provider || model,
         model,
         promptTokens,
         completionTokens,
@@ -178,6 +186,15 @@ export class PromptCacheInterceptor {
         isError: errored,
         durationMs: Date.now() - start,
       });
+    }
+  }
+
+  // 成本遥测失败不能把已经成功的模型调用变成失败或触发 fallback。
+  private async recordMetric(metric: Parameters<SessionCostTracker['recordLlmCall']>[0]): Promise<void> {
+    try {
+      await this.cost.recordLlmCall(metric);
+    } catch {
+      this.logger.warn({ event: 'cost_metric_unavailable', provider: metric.provider });
     }
   }
 

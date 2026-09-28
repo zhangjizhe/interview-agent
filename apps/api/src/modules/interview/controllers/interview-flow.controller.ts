@@ -19,6 +19,7 @@ import { extractKeywordsFromQuestion } from './keyword-extract.util';
 import { requireOwnedInterview } from '../../../common/ownership.util';
 import { toCandidateStreamEvent } from '../services/candidate-stream-event.util';
 import { StreamMessageDeliveryService } from '../services/stream-message-delivery.service';
+import { InterviewLabBridgeService } from '../../agent-lab/interview-lab-bridge.service';
 
 interface MessageDto {
   userId: string;
@@ -48,6 +49,7 @@ export class InterviewFlowController {
     private scoring: ScoringService,
     private prisma: PrismaService,
     private streamDelivery: StreamMessageDeliveryService,
+    private interviewLab: InterviewLabBridgeService,
   ) {}
 
   /**
@@ -166,6 +168,19 @@ export class InterviewFlowController {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
+    // 图编排和模型首 token 可能超过几十秒。用轻量 SSE 心跳保持连接，
+    // 防止前端把“仍在处理”误判成断流。
+    const writeHeartbeat = () => {
+      if (res.writableEnded) return;
+      res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
+      (res as any).flush?.();
+    };
+    // Emit once immediately so the client and any intermediary know the stream
+    // is active before expensive interview setup starts.
+    writeHeartbeat();
+    const heartbeat = setInterval(writeHeartbeat, 15_000);
+    const stopHeartbeat = () => clearInterval(heartbeat);
+    res.once('close', stopHeartbeat);
 
     // R-P2-20 修复：user message 长度上限 10000 字符（约 2000-3000 tokens）。
     // 原 Prisma @db.Text 无限制，恶意用户可发超长消息导致 DB / LLM 上下文压力。
@@ -174,12 +189,14 @@ export class InterviewFlowController {
     if (!dto.content || typeof dto.content !== 'string' || dto.content.length === 0) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: '消息内容不能为空' })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
     if (dto.content.length > MAX_USER_MESSAGE_CHARS) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: `消息超过 ${MAX_USER_MESSAGE_CHARS} 字符限制（当前 ${dto.content.length}）` })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -193,6 +210,7 @@ export class InterviewFlowController {
     if (!interview) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: 'Interview not found' })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -202,6 +220,7 @@ export class InterviewFlowController {
     if (interview.status === 'COMPLETED') {
       res.write(`data: ${JSON.stringify({ type: 'error', error: '此面试已结束,不能继续发送消息' })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -212,6 +231,7 @@ export class InterviewFlowController {
     ) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: '请求标识无效，请重新发送。' })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -230,11 +250,13 @@ export class InterviewFlowController {
     );
     if (claim.state === 'conflict') {
       await writeEvent({ type: 'error', error: '请求标识与已有消息不匹配，请重新发送。' });
+      stopHeartbeat();
       res.end();
       return;
     }
     if (claim.state === 'pending') {
       await writeEvent({ type: 'error', error: '上一次回答仍在处理中，请稍后重试。' });
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -243,11 +265,19 @@ export class InterviewFlowController {
       await new Promise<void>((resolve) => {
         res.write('data: [DONE]\n\n');
         (res as any).flush?.();
+        stopHeartbeat();
         res.end(() => resolve());
       });
       return;
     }
     const candidateMessage = claim.message;
+    let labRunId: string | null = null;
+    try {
+      const labRun = await this.interviewLab.startTurn(req.user.userId, interview, dto.content);
+      labRunId = labRun.id;
+    } catch {
+      // Lab observability must not block candidate delivery.
+    }
 
     const ctx: AgentContext = {
       userId: interview.userId,
@@ -301,6 +331,10 @@ export class InterviewFlowController {
       assistantPersisted = true;
 
       // Token 用量仅持久化在受保护的成本记录中，不进入候选人 SSE 合同。
+      if (labRunId) {
+        await this.interviewLab.completeTurn(labRunId, fullResponse).catch(() => undefined);
+      }
+
       // 2026-06-23 修复：等 [DONE] 真正 flush 到 TCP 再 res.end()
       // 之前的 res.end() 是异步的,不等 res.write 完成,客户端可能 fetch done=true
       // 早于 [DONE] 到达,前端 setStreaming(false) 路径失效,按钮一直 loading。
@@ -308,16 +342,19 @@ export class InterviewFlowController {
       await new Promise<void>((resolve) => {
         res.write('data: [DONE]\n\n');
         (res as any).flush?.();
+        stopHeartbeat();
         res.end(() => resolve());
       });
     } catch (err: any) {
       if (!assistantPersisted) {
         await this.streamDelivery.releaseUnansweredMessage(candidateMessage.id).catch(() => undefined);
       }
+      if (labRunId) await this.interviewLab.failTurn(labRunId, err).catch(() => undefined);
       // 错误路径也要等 flush 完成
       await new Promise<void>((resolve) => {
         res.write(`data: ${JSON.stringify({ type: 'error', error: '当前回答暂时无法处理，请稍后重试。' })}\n\n`);
         (res as any).flush?.();
+        stopHeartbeat();
         res.end(() => resolve());
       });
     }

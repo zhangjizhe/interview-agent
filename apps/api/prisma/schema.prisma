@@ -24,6 +24,8 @@ model User {
   trainingRecommendations TrainingRecommendation[]
   trainingAttempts TrainingAttempt[]
   usageLedgerEntries UsageLedger[]
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  workspaceMembers WorkspaceMember[]
 
   @@map("users")
 }
@@ -200,6 +202,465 @@ model LabOperationLog {
   @@map("lab_operation_logs")
 }
 
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  ownerId   String
+  owner     User     @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members WorkspaceMember[]
+  agents  Agent[]
+  runs    Run[]
+  datasets       EvaluationDataset[]
+  evaluators     Evaluator[]
+  evaluationRuns AgentEvaluationRun[]
+  applications   Application[]
+
+  @@index([ownerId])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String          @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole  @default(OWNER)
+  createdAt   DateTime        @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+enum WorkspaceRole {
+  OWNER
+  MEMBER
+}
+
+model Agent {
+  id               String      @id @default(cuid())
+  workspaceId      String
+  key              String
+  name             String
+  description      String?     @db.Text
+  type             String
+  status           AgentStatus @default(DRAFT)
+  currentVersionId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  versions       AgentVersion[] @relation("AgentVersions")
+  currentVersion AgentVersion?  @relation("CurrentAgentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  runs           Run[]
+  evaluationRuns AgentEvaluationRun[]
+  applications   Application[]
+  decisionRecords DecisionRecord[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@map("agents")
+}
+
+model AgentVersion {
+  id               String             @id @default(cuid())
+  agentId          String
+  version          String
+  status           AgentVersionStatus @default(DRAFT)
+  modelConfig      Json?
+  systemPrompt     String             @default("") @db.Text
+  runtimeConfig    Json?
+  toolBindings     Json?
+  knowledgeBindings Json?
+  memoryBindings   Json?
+  inputSchema      Json?
+  outputSchema     Json?
+  changelog        String?            @db.Text
+  createdAt        DateTime           @default(now())
+  publishedAt      DateTime?
+
+  currentForAgents Agent[] @relation("CurrentAgentVersion")
+  parentAgent      Agent   @relation("AgentVersions", fields: [agentId], references: [id], onDelete: Cascade)
+  runs             Run[]
+  evaluationRuns  AgentEvaluationRun[]
+  decisionRecords DecisionRecord[]
+
+  @@unique([agentId, version])
+  @@index([agentId, createdAt])
+  @@map("agent_versions")
+}
+
+enum AgentStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum AgentVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Run {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  agentId        String
+  agentVersionId String
+  application    String?
+  externalRunId  String?
+  parentRunId    String?
+  input          Json
+  output         Json?
+  status         RunStatus @default(PENDING)
+  latencyMs      Int?
+  tokenUsage     Json?
+  estimatedCost  Float?
+  error          String?   @db.Text
+  budget         Json?
+  traceSequence  Int       @default(0)
+  createdAt      DateTime  @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  cancelRequestedAt DateTime?
+
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion   AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  parentRun      Run?         @relation("RunChildren", fields: [parentRunId], references: [id], onDelete: SetNull)
+  childRuns      Run[]        @relation("RunChildren")
+  traceEvents    TraceEvent[]
+  evaluationResults EvaluationResult[]
+  toolApprovals ToolApproval[]
+  applicationRuns ApplicationRun[]
+
+  @@index([workspaceId, createdAt])
+  @@index([agentId, createdAt])
+  @@index([agentVersionId, createdAt])
+  @@index([externalRunId])
+  @@index([parentRunId, createdAt])
+  @@map("runs")
+}
+
+model TraceEvent {
+  id            String   @id @default(cuid())
+  formatVersion Int      @default(1)
+  runId         String
+  seq           Int      @map("sequence")
+  turnId        String?
+  step          String?
+  callId        String?
+  type          String
+  name          String
+  modelVisible  Boolean  @default(false)
+  payload       Json?
+  input         Json?
+  output        Json?
+  metadata      Json?
+  latencyMs     Int?
+  tokenUsage    Json?
+  estimatedCost Float?
+  error         String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, seq])
+  @@index([runId, seq])
+  @@index([runId, callId])
+  @@map("trace_events")
+}
+
+enum DecisionDomain {
+  INTERVIEW
+  AGENT_LAB
+}
+
+// 追加式决策账本：记录一次决定在何时、基于哪些输入和哪版规则得出。
+model DecisionRecord {
+  id             String         @id @default(cuid())
+  domain         DecisionDomain
+  decisionType   String
+  subjectType    String
+  subjectId      String
+  outcome        Json
+  ruleSetVersion String
+  inputSnapshot  Json
+  inputHash      String
+  effectiveAt    DateTime       @default(now())
+  recordedAt     DateTime       @default(now())
+  actorId        String?
+  interviewId    String?
+  agentId        String?
+  agentVersionId String?
+
+  interview    Interview?    @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  agent        Agent?        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion AgentVersion? @relation(fields: [agentVersionId], references: [id], onDelete: SetNull)
+  facts        FactAssertion[]
+  evidence     DecisionEvidence[]
+
+  @@index([domain, subjectType, subjectId, recordedAt])
+  @@index([interviewId, recordedAt])
+  @@index([agentVersionId, recordedAt])
+  @@map("decision_records")
+}
+
+// 一条事实永不覆盖；失效或撤销以新的反向 assertion 表达，支持按时间重放。
+model FactAssertion {
+  id         String   @id @default(cuid())
+  decisionId String
+  subjectType String
+  subjectId  String
+  predicate  String
+  value      Json
+  polarity   Boolean  @default(true)
+  validFrom  DateTime @default(now())
+  validTo    DateTime?
+  sourceType String?
+  sourceId   String?
+  recordedAt DateTime @default(now())
+
+  decision DecisionRecord @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId])
+  @@index([subjectType, subjectId, predicate, validFrom])
+  @@map("fact_assertions")
+}
+
+model DecisionEvidence {
+  id         String   @id @default(cuid())
+  decisionId String
+  kind       String
+  sourceType String
+  sourceId   String?
+  payload    Json?
+  contentHash String?
+  createdAt  DateTime @default(now())
+
+  decision DecisionRecord @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId, createdAt])
+  @@index([sourceType, sourceId])
+  @@map("decision_evidence")
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Application {
+  id          String            @id @default(cuid())
+  workspaceId String
+  agentId     String
+  key         String
+  name        String
+  type        String
+  status      ApplicationStatus @default(ACTIVE)
+  config      Json?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent     Agent            @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  runs      ApplicationRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@index([agentId])
+  @@map("applications")
+}
+
+model ApplicationRun {
+  id             String   @id @default(cuid())
+  applicationId  String
+  runId          String   @unique
+  externalSessionId String?
+  turn           Int?
+  createdAt      DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  run         Run         @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@index([externalSessionId, createdAt])
+  @@map("application_runs")
+}
+
+enum ToolApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
+  CANCELLED
+  TIMED_OUT
+  ERROR
+}
+
+model ToolApproval {
+  id             String             @id @default(cuid())
+  runId          String
+  callId         String
+  toolName       String
+  status         ToolApprovalStatus @default(PENDING)
+  request        Json
+  decision       Json?
+  requestedAt    DateTime           @default(now())
+  resolvedAt     DateTime?
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, callId])
+  @@index([runId, status])
+  @@map("tool_approvals")
+}
+
+model EvaluationDataset {
+  id          String   @id @default(cuid())
+  workspaceId String
+  key         String
+  name        String
+  description String?  @db.Text
+  version     String   @default("1.0.0")
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cases          EvaluationCase[]
+  evaluationRuns AgentEvaluationRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@map("evaluation_datasets")
+}
+
+model EvaluationCase {
+  id             String   @id @default(cuid())
+  datasetId      String
+  key            String
+  input          Json
+  expectedOutput Json?
+  metadata       Json?
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  dataset EvaluationDataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  results EvaluationResult[]
+
+  @@unique([datasetId, key])
+  @@index([datasetId, enabled])
+  @@map("evaluation_dataset_cases")
+}
+
+enum EvaluatorType {
+  KEYWORD
+  JSON_SCHEMA
+  LATENCY
+}
+
+model Evaluator {
+  id          String        @id @default(cuid())
+  workspaceId String
+  key         String
+  name        String
+  type        EvaluatorType
+  config      Json?
+  enabled     Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  evaluationRuns AgentEvaluationRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@map("evaluators")
+}
+
+enum EvaluationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model AgentEvaluationRun {
+  id             String           @id @default(cuid())
+  workspaceId    String
+  agentId        String
+  agentVersionId String
+  datasetId      String
+  evaluatorId    String
+  status         EvaluationStatus @default(PENDING)
+  score          Float?
+  totalCases     Int              @default(0)
+  passedCases    Int              @default(0)
+  failedCases    Int              @default(0)
+  metrics        Json?
+  error          String?          @db.Text
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime         @default(now())
+
+  workspace Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent     Agent                 @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion AgentVersion       @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  dataset   EvaluationDataset     @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  evaluator Evaluator             @relation(fields: [evaluatorId], references: [id], onDelete: Restrict)
+  results   EvaluationResult[]
+
+  @@index([workspaceId, createdAt])
+  @@index([agentId, createdAt])
+  @@index([agentVersionId, createdAt])
+  @@map("agent_evaluation_runs")
+}
+
+enum EvaluationCaseStatus {
+  COMPLETED
+  FAILED
+}
+
+model EvaluationResult {
+  id            String               @id @default(cuid())
+  evaluationRunId String
+  datasetCaseId String
+  runId         String?
+  status        EvaluationCaseStatus
+  score         Float?
+  passed        Boolean              @default(false)
+  metrics       Json?
+  evidence      Json?
+  outputSummary String?              @db.Text
+  failureCategory String?
+  failureMessage  String?            @db.Text
+  createdAt     DateTime             @default(now())
+
+  evaluationRun AgentEvaluationRun @relation(fields: [evaluationRunId], references: [id], onDelete: Cascade)
+  datasetCase   EvaluationCase @relation(fields: [datasetCaseId], references: [id], onDelete: Restrict)
+  run           Run?           @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@unique([evaluationRunId, datasetCaseId])
+  @@index([datasetCaseId])
+  @@index([runId])
+  @@map("evaluation_results")
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -235,6 +696,7 @@ model Interview {
   assessmentEvidence AssessmentEvidence[]
   trainingAttempt TrainingAttempt? @relation("TrainingRetestInterview")
   usageLedgerEntries UsageLedger[]
+  decisionRecords DecisionRecord[]
 
   @@index([userId, startedAt])
   @@map("interviews")

@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Langfuse } from 'langfuse';
 import { shouldSampleWith } from './sampling.util';
+import { redactTelemetry } from './redact';
 type Generation = any;
 
 /**
@@ -102,7 +103,7 @@ export class LangfuseService implements OnModuleInit {
       name: params.name,
       userId: params.userId,
       sessionId: params.sessionId,
-      metadata: params.metadata,
+      metadata: redactTelemetry(params.metadata),
     });
   }
 
@@ -122,8 +123,8 @@ export class LangfuseService implements OnModuleInit {
       traceId: params.traceId,
       name: params.name,
       model: params.model,
-      input: params.input,
-      metadata: params.metadata,
+      input: redactTelemetry(params.input),
+      metadata: redactTelemetry(params.metadata),
     });
   }
 
@@ -146,7 +147,7 @@ export class LangfuseService implements OnModuleInit {
    */
   updateGenerationOutput(generation: Generation, output: any): void {
     if (!this.client || !generation) return;
-    generation.update({ output });
+    generation.update({ output: redactTelemetry(output) });
   }
 
   /**
@@ -168,10 +169,10 @@ export class LangfuseService implements OnModuleInit {
       traceId: params.traceId,
       name: params.name,
       model: params.model,
-      input: params.input,
-      output: params.output,
+      input: redactTelemetry(params.input),
+      output: redactTelemetry(params.output),
       usage: params.usage,
-      metadata: params.metadata,
+      metadata: redactTelemetry(params.metadata),
     });
   }
 
@@ -194,9 +195,9 @@ export class LangfuseService implements OnModuleInit {
     this.client.span({
       traceId: params.traceId,
       name: params.name,
-      input: params.input,
-      output: params.output,
-      metadata: params.metadata,
+      input: redactTelemetry(params.input),
+      output: redactTelemetry(params.output),
+      metadata: redactTelemetry(params.metadata),
     });
   }
 
@@ -217,10 +218,10 @@ export class LangfuseService implements OnModuleInit {
     this.client.span({
       traceId: params.traceId,
       name: `tool.${params.name}`,
-      input: params.input,
-      output: params.error ? { error: params.error } : params.output,
+      input: redactTelemetry(params.input),
+      output: redactTelemetry(params.error ? { error: params.error } : params.output),
       metadata: {
-        ...params.metadata,
+        ...redactTelemetry(params.metadata),
         error: !!params.error,
       },
     });

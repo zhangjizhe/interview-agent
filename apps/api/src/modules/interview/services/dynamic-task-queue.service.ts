@@ -1,4 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { createHash } from 'crypto';
+import { DecisionDomain } from '@prisma/client';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { LlmGatewayService } from '../../llm/llm.gateway.service';
 import { QuestionBankService } from './question-bank.service';
@@ -9,6 +11,15 @@ import {
   estimateDepth,
   heuristicDecide,
 } from './heuristic-decide.util';
+import {
+  capabilitiesForQuestion,
+  categoryForPosition,
+} from '../../inference/interview-ontology';
+import {
+  inferInterviewRouting,
+  InterviewRoutingTask,
+} from '../../inference/interview-routing-inference';
+import { DecisionLedgerService } from '../../inference/decision-ledger.service';
 
 export interface InterviewTask {
   id: string;
@@ -52,7 +63,20 @@ const AgentDecisionSchema = z.object({
   advancedQuestion: z.string().nullable().describe('进阶问题（null 则不进阶）'),
 });
 
-type AgentDecision = z.infer<typeof AgentDecisionSchema>;
+type AgentDecision = {
+  score: number;
+  completeness: number;
+  correctness: number;
+  depth: number;
+  feedback: string;
+  keyPoints: string[];
+  missingPoints: string[];
+  shouldFollowUp: boolean;
+  followUpQuestion: string | null;
+  followUpReason: string | null;
+  shouldAdvance: boolean;
+  advancedQuestion: string | null;
+};
 
 /** 本地回退题库（Milvus / LLM 不可用时使用） */
 const LOCAL_QUESTIONS: Record<string, { question: string; difficulty: 'easy' | 'medium' | 'hard' }[]> = {
@@ -77,6 +101,11 @@ const LOCAL_QUESTIONS: Record<string, { question: string; difficulty: 'easy' | '
     { question: '图的最短路径算法有哪些？适用场景？', difficulty: 'medium' },
     { question: '如何设计一个支持大规模数据的近似最近邻搜索系统？', difficulty: 'hard' },
   ],
+  agent: [
+    { question: '请设计一个支持工具调用和状态恢复的 Agent 运行时，重点说明状态、重试和幂等性。', difficulty: 'easy' },
+    { question: 'RAG 系统中如何平衡召回、重排、上下文窗口和答案可追溯性？', difficulty: 'medium' },
+    { question: '如何为生产环境的 Agent 建立离线评测、发布门禁与线上回归机制？', difficulty: 'hard' },
+  ],
 };
 
 @Injectable()
@@ -87,6 +116,7 @@ export class DynamicTaskQueueService {
     private prisma: PrismaService,
     private llm: LlmGatewayService,
     @Optional() private questionBank?: QuestionBankService,
+    @Optional() private decisionLedger?: DecisionLedgerService,
   ) {}
 
   async initializeQueue(
@@ -115,7 +145,13 @@ export class DynamicTaskQueueService {
       category: q.category,
       difficulty: q.difficulty,
       priority: index + 1,
-      context: JSON.stringify({ position, level, questionId: q.questionId, ...selection }),
+            context: JSON.stringify({
+        position,
+        level,
+        ...selection,
+        questionId: q.questionId,
+        capabilities: capabilitiesForQuestion(q.category, q.question),
+      }),
     }));
 
     await this.prisma.interviewTask.createMany({ data: tasksData });
@@ -168,11 +204,7 @@ export class DynamicTaskQueueService {
   }
 
   private getCategoryByPosition(position: string): string {
-    if (position.includes('前端')) return 'frontend';
-    if (position.includes('后端') || position.includes('服务端')) return 'backend';
-    if (position.includes('算法') || position.includes('AI')) return 'algorithm';
-    if (position.includes('测试')) return 'testing';
-    return 'agent';
+    return categoryForPosition(position);
   }
 
   async getNextTask(interviewId: string): Promise<InterviewTask | undefined> {
@@ -241,7 +273,7 @@ export class DynamicTaskQueueService {
     const decision = await this.agentDecide(interviewId, userId, task.question, answer, task.category, task.difficulty);
 
     // 写入评分记录
-    await this.prisma.$transaction(async (tx) => {
+    const answerHistory = await this.prisma.$transaction(async (tx) => {
       const answerRecord = answerMessageId
         ? await tx.interviewAnswer.create({
             data: {
@@ -253,7 +285,7 @@ export class DynamicTaskQueueService {
           })
         : null;
 
-      await tx.answerHistory.create({
+      const history = await tx.answerHistory.create({
         data: {
           interviewId,
           question: task.question,
@@ -273,10 +305,31 @@ export class DynamicTaskQueueService {
         where: { id: taskId },
         data: { status: 'COMPLETED' },
       });
+      return history;
     });
 
-    // 执行 Agent 决策结果（而非规则触发）
-    await this.executeAgentDecision(interviewId, task, decision);
+    const queuedTasks = await this.prisma.interviewTask.findMany({
+      where: { interviewId },
+    });
+    const routingTasks = this.toRoutingTasks(queuedTasks, task);
+    const routing = inferInterviewRouting({
+      completedTask: routingTasks.find((item) => item.id === task.id)!,
+      tasks: routingTasks,
+      llmDecision: decision,
+    });
+
+    await this.recordRoutingDecision(
+      interviewId,
+      userId,
+      task,
+      answerHistory.id,
+      answer,
+      decision,
+      routing,
+    );
+
+    // LLM 负责理解回答和生成候选问题；规则层负责约束是否入队及其优先级。
+    await this.executeAgentDecision(interviewId, task, routing);
   }
 
   private async ensureQuestionRecord(task: any) {
@@ -401,7 +454,7 @@ export class DynamicTaskQueueService {
       });
 
       const parsed = JSON.parse(response.content);
-      const decision: AgentDecision = AgentDecisionSchema.parse(parsed);
+      const decision = AgentDecisionSchema.parse(parsed) as AgentDecision;
       return decision;
     } catch (error: any) {
       this.logger.warn(`[TaskQueue] Agent decision failed, falling back to heuristic: ${error.message}`);
@@ -432,54 +485,164 @@ export class DynamicTaskQueueService {
   private async executeAgentDecision(
     interviewId: string,
     completedTask: any,
-    decision: AgentDecision,
+    routing: ReturnType<typeof inferInterviewRouting>,
   ): Promise<void> {
-    // Agent 决定追问
-    if (decision.shouldFollowUp && decision.followUpQuestion) {
+    const { outcome, ...reasoning } = routing;
+
+    if (outcome.createFollowUp && outcome.followUpQuestion) {
       await this.prisma.interviewTask.create({
         data: {
           interviewId,
           type: 'FOLLOW_UP',
-          question: decision.followUpQuestion,
+          question: outcome.followUpQuestion,
           category: completedTask.category,
           difficulty: completedTask.difficulty,
           priority: 1,
           context: JSON.stringify({
             ...this.parseTaskContext(completedTask.context),
             followUpFrom: completedTask.id,
-            followUpReason: decision.followUpReason,
+            followUpReason: outcome.followUpReason,
+            capabilities: capabilitiesForQuestion(
+              completedTask.category,
+              outcome.followUpQuestion,
+            ),
+            reasoning: { ...reasoning, decision: 'FOLLOW_UP' },
           }),
         },
       });
       this.logger.debug(
-        `[TaskQueue] Agent decided follow-up for ${interviewId}: ${decision.followUpReason}`,
+        `[TaskQueue] Routing inference created follow-up for ${interviewId}: ${outcome.followUpReason}`,
       );
     }
 
-    // Agent 决定进阶
-    if (decision.shouldAdvance && decision.advancedQuestion) {
-      const pendingCount = await this.prisma.interviewTask.count({
-        where: { interviewId, status: 'PENDING' },
-      });
-
-      if (pendingCount < 8) {
-        const difficultyMap: Record<string, string> = { easy: 'medium', medium: 'hard', hard: 'hard' };
-        await this.prisma.interviewTask.create({
-          data: {
-            interviewId,
-            type: 'QUESTION',
-            question: decision.advancedQuestion,
-            category: completedTask.category,
-            difficulty: difficultyMap[completedTask.difficulty] || 'hard',
-          priority: pendingCount + 1,
+    if (outcome.createAdvanced && outcome.advancedQuestion) {
+      const difficultyMap: Record<string, string> = { easy: 'medium', medium: 'hard', hard: 'hard' };
+      await this.prisma.interviewTask.create({
+        data: {
+          interviewId,
+          type: 'QUESTION',
+          question: outcome.advancedQuestion,
+          category: completedTask.category,
+          difficulty: difficultyMap[completedTask.difficulty] || 'hard',
+          priority: 9,
           context: JSON.stringify({
             ...this.parseTaskContext(completedTask.context),
             advanced: true,
+            capabilities: outcome.advancedCapabilities,
+            reasoning: { ...reasoning, decision: 'ADVANCE' },
           }),
+        },
+      });
+      this.logger.debug(`[TaskQueue] Routing inference created advanced task for ${interviewId}`);
+    }
+  }
+
+  private toRoutingTasks(tasks: any[], completedTask: any): InterviewRoutingTask[] {
+    const normalized = tasks.map((task) => ({
+      id: task.id,
+      type: task.type,
+      question: task.question,
+      category: task.category,
+      difficulty: task.difficulty,
+      status: task.id === completedTask.id ? 'COMPLETED' : task.status,
+      context: this.parseTaskContext(task.context),
+    }));
+
+    if (!normalized.some((task) => task.id === completedTask.id)) {
+      normalized.push({
+        id: completedTask.id,
+        type: completedTask.type,
+        question: completedTask.question,
+        category: completedTask.category,
+        difficulty: completedTask.difficulty,
+        status: 'COMPLETED',
+        context: this.parseTaskContext(completedTask.context),
+      });
+    }
+
+    return normalized;
+  }
+
+  private async recordRoutingDecision(
+    interviewId: string,
+    userId: string,
+    task: any,
+    answerHistoryId: string,
+    answer: string,
+    decision: AgentDecision,
+    routing: ReturnType<typeof inferInterviewRouting>,
+  ) {
+    if (!this.decisionLedger) return;
+
+    const answerHash = createHash('sha256').update(answer).digest('hex');
+    try {
+      await this.decisionLedger.record({
+        domain: DecisionDomain.INTERVIEW,
+        decisionType: 'interview.routing',
+        subjectType: 'INTERVIEW_TASK',
+        subjectId: task.id,
+        interviewId,
+        actorId: userId,
+        outcome: routing.outcome,
+        ruleSetVersion: routing.ruleSetVersion,
+        inputSnapshot: {
+          taskId: task.id,
+          category: task.category,
+          difficulty: task.difficulty,
+          answerHash,
+          score: decision.score,
+          missingPoints: decision.missingPoints,
+        },
+        facts: [
+          {
+            subjectType: 'INTERVIEW_TASK',
+            subjectId: task.id,
+            predicate: 'routing.outcome',
+            value: routing.outcome,
+            sourceType: 'INTERVIEW_TASK',
+            sourceId: task.id,
           },
-        });
-        this.logger.debug(`[TaskQueue] Agent decided advance for ${interviewId}`);
-      }
+          {
+            subjectType: 'INTERVIEW',
+            subjectId: interviewId,
+            predicate: 'capability.assessed',
+            value: {
+              taskId: task.id,
+              capabilities: routing.evidence.completedCapabilities,
+            },
+            sourceType: 'ANSWER_HISTORY',
+            sourceId: answerHistoryId,
+          },
+        ],
+        evidence: [
+          {
+            kind: 'RULE_EVALUATION',
+            sourceType: 'INTERVIEW_ROUTING',
+            sourceId: task.id,
+            payload: {
+              matchedRules: routing.matchedRules,
+              evidence: routing.evidence,
+            },
+          },
+          {
+            kind: 'ANSWER_SCORE',
+            sourceType: 'ANSWER_HISTORY',
+            sourceId: answerHistoryId,
+            payload: {
+              answerHash,
+              score: decision.score,
+              completeness: decision.completeness,
+              correctness: decision.correctness,
+              depth: decision.depth,
+            },
+          },
+        ],
+      });
+    } catch (error: any) {
+      // 候选人主链路优先：审计存储异常不能阻断答题与 SSE。
+      this.logger.warn(
+        `[TaskQueue] Decision ledger failed for ${interviewId}: ${error?.message || error}`,
+      );
     }
   }
 

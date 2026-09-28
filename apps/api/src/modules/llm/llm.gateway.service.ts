@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { QwenProvider } from './providers/qwen.provider';
 import { DeepseekProvider } from './providers/deepseek.provider';
 import { BaseLLMProvider } from './providers/base.provider';
@@ -78,7 +78,17 @@ export class LlmGatewayService {
       /代码|code|implement|算法|function|class|实现|写一个/i.test(lastMessage) ||
       params.tools?.some((t) => t.function.name.includes('code'));
 
-    return isCoding ? this.deepseek : this.qwen;
+    // 技术题优先 DeepSeek，但余额不足/凭据失效后不能继续选中已禁用的 provider。
+    // 否则每一轮都会先打一次必失败请求，再等待 fallback，放大首字延迟。
+    if (isCoding) {
+      if (this.providerEnabled.get('deepseek')) return this.deepseek;
+      if (this.providerEnabled.get('qwen')) return this.qwen;
+    } else {
+      if (this.providerEnabled.get('qwen')) return this.qwen;
+      if (this.providerEnabled.get('deepseek')) return this.deepseek;
+    }
+
+    throw new ServiceUnavailableException('所有模型 Provider 暂不可用，请稍后重试');
   }
 
   /**
@@ -150,7 +160,7 @@ export class LlmGatewayService {
       });
       if (sem.hit) {
         // 命中：直接构造响应（埋点 cacheHit）
-        await this.costTracker.recordLlmCall({
+        await this.recordCacheHit({
           interviewId,
           provider: 'semantic_cache',
           model: 'semantic_cache',
@@ -176,51 +186,33 @@ export class LlmGatewayService {
     let response: ChatResponse;
     let isFallback = false;
 
-    try {
-      // ===== P0-1: prompt cache 包装 =====
-      response = await this.promptCache.wrapChat(
-        () => primary.chat(params),
-        { ...params, interviewId, userId },
-        { protocol: 'openai_compat', systemVersion: 'sys-v1' },
-      );
-    } catch (err) {
-      // 永久错（401/403/404）= provider 死了，直接标 disabled 再抛
-      if (this.isPermanentProviderError(err)) {
-        this.disableProvider(primary.name as LLMProviderName, err?.message || 'permanent error');
-        // 找下一个可用的
-        const fallbackName = this.fallbackMap.get(primary.name as LLMProviderName);
-        if (fallbackName && this.providerEnabled.get(fallbackName)) {
-          const fallback = this.providers.get(fallbackName);
-          isFallback = true;
-          response = await this.promptCache.wrapChat(
-            () => fallback.chat(params),
-            { ...params, interviewId, userId, isFallback: true },
-            { protocol: 'openai_compat', systemVersion: 'sys-v1' },
-          );
-        } else {
-          throw err;
+    const invoke = async (provider: BaseLLMProvider, fallback: boolean) => {
+      try {
+        return await this.promptCache.wrapChat(
+          (prepared) => provider.chat(prepared),
+          { ...params, interviewId, userId, isFallback: fallback },
+          { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: provider.name, model: provider.defaultModel },
+        );
+      } catch (err) {
+        if (this.isPermanentProviderError(err)) {
+          this.disableProvider(provider.name as LLMProviderName, 'Provider authentication, billing or model configuration failed');
         }
-      } else {
-        // 临时错（5xx / 429 / 网络）正常 fallback
-        this.logger.warn(`[${primary.name}] failed (transient), fallback...`);
-        const fallbackName = this.fallbackMap.get(primary.name as LLMProviderName);
-        if (fallbackName && this.providerEnabled.get(fallbackName)) {
-          const fallback = this.providers.get(fallbackName);
-          isFallback = true;
-          response = await this.promptCache.wrapChat(
-            () => fallback.chat(params),
-            { ...params, interviewId, userId, isFallback: true },
-            { protocol: 'openai_compat', systemVersion: 'sys-v1' },
-          );
-        } else {
-          throw err;
-        }
+        throw err;
       }
+    };
+    try {
+      response = await invoke(primary, false);
+    } catch (err) {
+      const fallbackName = this.fallbackMap.get(primary.name as LLMProviderName);
+      if (!fallbackName || !this.providerEnabled.get(fallbackName)) throw err;
+      isFallback = true;
+      response = await invoke(this.providers.get(fallbackName), true);
     }
 
     // Langfuse 埋点（保留 v13 原有可观测）
     if (params.traceId) {
-      this.langfuse.logGeneration({
+      try {
+        this.langfuse.logGeneration({
         traceId: params.traceId,
         name: `llm.${primary.name}${isFallback ? '.fallback' : ''}`,
         model: response.model,
@@ -233,7 +225,10 @@ export class LlmGatewayService {
           isFallback,
           interviewId,
         },
-      });
+        });
+      } catch {
+        this.logger.warn({ event: 'llm_telemetry_unavailable' });
+      }
     }
 
     // ===== P0-2: 异步写语义缓存 =====
@@ -276,7 +271,7 @@ export class LlmGatewayService {
         query: queryText,
       });
       if (sem.hit) {
-        await this.costTracker.recordLlmCall({
+        await this.recordCacheHit({
           interviewId,
           provider: 'semantic_cache',
           model: 'semantic_cache',
@@ -295,46 +290,48 @@ export class LlmGatewayService {
     }
 
     const primary = this.selectProvider(params, preferred);
-    const startTime = Date.now();
     let totalContent = '';
-    let isFallback = false;
+    let actualProvider = primary;
+    let hasEmitted = false;
 
     try {
       for await (const chunk of this.promptCache.wrapStream(
-        () => primary.streamChat(params),
+        (prepared) => primary.streamChat(prepared),
         { ...params, interviewId, userId },
-        { protocol: 'openai_compat', systemVersion: 'sys-v1' },
+        { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: primary.name, model: primary.defaultModel },
       )) {
         if (chunk.content) totalContent += chunk.content;
+        if (chunk.content || chunk.toolCall || (chunk.finishReason && chunk.finishReason !== 'error')) hasEmitted = true;
         yield chunk;
       }
     } catch (err) {
       // 永久错 vs 临时错同样处理
       if (this.isPermanentProviderError(err)) {
-        this.disableProvider(primary.name as LLMProviderName, err?.message || 'permanent error');
+        this.disableProvider(primary.name as LLMProviderName, 'Provider authentication, billing or model configuration failed');
       } else {
-        this.logger.warn(`[${primary.name}] stream failed, fallback...`);
+        this.logger.warn({ event: 'provider_stream_failed', provider: primary.name });
       }
+      // 已输出文本、工具调用或终态后不得重放另一模型，避免重复/混合回答。
+      if (hasEmitted) throw err;
       const fallbackName = this.fallbackMap.get(primary.name as LLMProviderName);
       if (fallbackName && this.providerEnabled.get(fallbackName)) {
         const fallback = this.providers.get(fallbackName);
-        isFallback = true;
-        // 修复 P0-8：fallback 触发时 yield 明确的切换信号，让消费者识别到内容不连续。
-        // 已 yield 给消费者的 primary chunk 无法收回（HTTP SSE 已发出），消费者会
-        // 看到"半截主 provider + 完整 fallback"的拼接脏数据。marker 让消费方能
-        // 选择丢弃 primary 已输出内容、或在 UI 提示"已切换"。
-        yield {
-          content: '\n\n[-- 主 provider 异常，已切换到 fallback --]\n\n',
-          isFallbackMarker: true,
-        };
+        actualProvider = fallback;
         totalContent = '';
+        try {
         for await (const chunk of this.promptCache.wrapStream(
-          () => fallback.streamChat(params),
+          (prepared) => fallback.streamChat(prepared),
           { ...params, interviewId, userId, isFallback: true },
-          { protocol: 'openai_compat', systemVersion: 'sys-v1' },
+          { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: fallback.name, model: fallback.defaultModel },
         )) {
           if (chunk.content) totalContent += chunk.content;
           yield chunk;
+        }
+        } catch (fallbackError) {
+          if (this.isPermanentProviderError(fallbackError)) {
+            this.disableProvider(fallback.name as LLMProviderName, 'Provider authentication, billing or model configuration failed');
+          }
+          throw fallbackError;
         }
       } else {
         throw err;
@@ -349,8 +346,16 @@ export class LlmGatewayService {
         cacheType,
         query: lastUserMsg?.content || '',
         response: totalContent,
-        metadata: { interviewId, model: primary.name },
+        metadata: { interviewId, model: actualProvider.name },
       });
+    }
+  }
+
+  private async recordCacheHit(metric: Parameters<SessionCostTracker['recordLlmCall']>[0]): Promise<void> {
+    try {
+      await this.costTracker.recordLlmCall(metric);
+    } catch {
+      this.logger.warn({ event: 'cache_hit_metric_unavailable' });
     }
   }
 

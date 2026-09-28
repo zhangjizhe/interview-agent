@@ -20,6 +20,7 @@ export class QwenProvider extends BaseLLMProvider {
     this.client = new OpenAI({
       apiKey: this.config.get<string>('qwen.apiKey'),
       baseURL: this.config.get<string>('qwen.baseUrl'),
+      timeout: 30_000,
     });
   }
 
@@ -72,7 +73,7 @@ export class QwenProvider extends BaseLLMProvider {
         model: response.model,
       };
     } catch (err) {
-      this.logger.error(`Qwen chat failed: ${err.message}`);
+      this.logger.error({ event: 'provider_chat_failed', provider: this.name, status: err?.status });
       throw err;
     }
   }
@@ -114,8 +115,7 @@ export class QwenProvider extends BaseLLMProvider {
         }
       }
     } catch (err) {
-      this.logger.error(`Qwen stream failed: ${err.message}`);
-      yield { finishReason: 'error' };
+      this.logger.error({ event: 'provider_stream_failed', provider: this.name, status: err?.status });
       throw err;
     }
   }
