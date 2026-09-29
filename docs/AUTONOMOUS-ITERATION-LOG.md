@@ -34,3 +34,11 @@
 - 新增测试：6 条，先确认 3 条泄漏回归失败，再验证修复；完整 pnpm test、lint、build 通过。
 - 风险：业务 HttpException 仍由调用方保证 message 安全；非本任务控制器中的主动业务错误需在对应任务治理，不声称全库日志已完整脱敏。
 - 无 schema、模型调用或前端变更。
+
+## 2026-09-29 · P1-4 题库 SSRF
+
+- 改动文件：external-url.util.ts、question-bank.controller.ts、external-url.security.spec.ts、content-import-regression.spec.ts、docs/runbook.md。
+- 行为：HTTPS/凭据检查、所有 DNS 结果公网上界校验、Agent lookup 固定 IP、每跳重新校验、最多 3 跳、10 秒总时限与 2 MiB 上限；原内容提取与明确失败合同保留。
+- 新增测试：19 条，涵盖 IPv4/IPv6/映射地址、混合解析、rebinding、私网跳转、跳数上限、正常公网、大小和 URL 凭据；先运行失败用例再实现。
+- 验证：针对测试 19/19、typecheck 通过；完整 pnpm test、pnpm lint、pnpm build 退出码均为 0。
+- 风险：没有真实外网抓取或 Provider 调用；地址策略保守拒绝过渡 IPv6/保留地址。知识库与其他外部工具不在本项扩展范围。

@@ -16,7 +16,7 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { QuestionBankService } from '../services/question-bank.service';
 import { QuestionGeneratorService } from '../services/question-generator.service';
 import { ResumeParserService } from '../services/resume-parser.service';
-import { assertSafeExternalUrl } from './external-url.util';
+import { fetchSafeExternalText } from './external-url.util';
 import { Roles } from '../../auth/roles.decorator';
 import { requireOwnedInterview } from '../../../common/ownership.util';
 
@@ -153,22 +153,8 @@ export class QuestionBankController {
     if (!dto.url) throw new BadRequestException('url is required');
     if (!dto.position) throw new BadRequestException('position is required');
 
-    // SSRF 防护：拒绝内网 / loopback / 非 https（修复 P0-3）
-    assertSafeExternalUrl(dto.url);
-
-    // 抓取网页 HTML
-    let html = '';
-    try {
-      const resp = await fetch(dto.url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InterviewBot/1.0)' },
-      });
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
-      }
-      html = await resp.text();
-    } catch (err: any) {
-      throw new BadRequestException(`URL 抓取失败：${err.message}`);
-    }
+    // DNS/IP 固定连接与每跳重定向校验统一由抓取器执行，失败不进入模型导入流程。
+    const html = await fetchSafeExternalText(dto.url);
 
     // HTML → 纯文本（保留 title 和主要文本，供 LLM 从技术文档生成题目）
     const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]

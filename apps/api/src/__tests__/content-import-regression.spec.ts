@@ -1,3 +1,5 @@
+import { fetchSafeExternalText } from '../modules/interview/controllers/external-url.util';
+jest.mock('../modules/interview/controllers/external-url.util', () => ({ fetchSafeExternalText: jest.fn() }));
 import { BadRequestException } from '@nestjs/common';
 
 // QuestionBankController imports the Milvus-backed service. The controller
@@ -51,18 +53,14 @@ describe('content import regressions', () => {
       {} as any,
       {} as any,
     );
-    const originalFetch = global.fetch;
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      text: async () => '<html><head><title>Empty</title></head><body>No useful content</body></html>',
-    }) as any;
+    (fetchSafeExternalText as jest.Mock).mockResolvedValue('<html><head><title>Empty</title></head><body>No useful content</body></html>');
 
     await expect(controller.importQuestionBankUrl({
       url: 'https://example.com/docs',
       position: '前端开发工程师',
     })).rejects.toBeInstanceOf(BadRequestException);
 
-    global.fetch = originalFetch;
+
   });
 
   it('passes title and document content to URL extraction', async () => {
@@ -75,11 +73,7 @@ describe('content import regressions', () => {
       {} as any,
       {} as any,
     );
-    const originalFetch = global.fetch;
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      text: async () => '<html><head><title>TypeScript Union Types</title></head><body><article>Union types model multiple possible values.</article></body></html>',
-    }) as any;
+    (fetchSafeExternalText as jest.Mock).mockResolvedValue('<html><head><title>TypeScript Union Types</title></head><body><article>Union types model multiple possible values.</article></body></html>');
 
     await expect(controller.importQuestionBankUrl({
       url: 'https://example.com/types',
@@ -94,6 +88,6 @@ describe('content import regressions', () => {
       level: 'P5',
       category: 'TypeScript',
     }));
-    global.fetch = originalFetch;
+
   });
 });
