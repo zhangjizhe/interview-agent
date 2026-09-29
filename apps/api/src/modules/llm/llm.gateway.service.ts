@@ -1,3 +1,6 @@
+import { QuotaService } from './usage/quota.service';
+import { requireTenant } from '../organizations/tenant-context';
+import { HttpException } from '@nestjs/common';
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { QwenProvider } from './providers/qwen.provider';
 import { DeepseekProvider } from './providers/deepseek.provider';
@@ -51,6 +54,7 @@ export class LlmGatewayService {
     private promptCache: PromptCacheInterceptor,
     private semanticCache: SemanticCacheService,
     private costTracker: SessionCostTracker,
+    private quota: QuotaService,
   ) {
     this.providers = new Map<LLMProviderName, BaseLLMProvider>([
       ['qwen', this.qwen],
@@ -147,7 +151,8 @@ export class LlmGatewayService {
   ): Promise<ChatResponse> {
     // ===== P0-2: 语义缓存查 =====
     const interviewId = params.interviewId || 'unknown';
-    const userId = params.userId || 'anonymous';
+    const scope = requireTenant();
+    const userId = `${scope.organizationId}:${scope.userId || params.userId || 'anonymous'}`;
     const cacheType = params.semanticCacheType;
 
     if (cacheType) {
@@ -189,7 +194,7 @@ export class LlmGatewayService {
     const invoke = async (provider: BaseLLMProvider, fallback: boolean) => {
       try {
         return await this.promptCache.wrapChat(
-          (prepared) => provider.chat(prepared),
+          (prepared) => this.quotaChat(provider, prepared),
           { ...params, interviewId, userId, isFallback: fallback },
           { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: provider.name, model: provider.defaultModel },
         );
@@ -203,6 +208,7 @@ export class LlmGatewayService {
     try {
       response = await invoke(primary, false);
     } catch (err) {
+      if (err instanceof HttpException) throw err;
       const fallbackName = this.fallbackMap.get(primary.name as LLMProviderName);
       if (!fallbackName || !this.providerEnabled.get(fallbackName)) throw err;
       isFallback = true;
@@ -258,7 +264,8 @@ export class LlmGatewayService {
     preferred?: LLMProviderName,
   ): AsyncGenerator<StreamChunk, void, void> {
     const interviewId = params.interviewId || 'unknown';
-    const userId = params.userId || 'anonymous';
+    const scope = requireTenant();
+    const userId = `${scope.organizationId}:${scope.userId || params.userId || 'anonymous'}`;
     const cacheType = params.semanticCacheType;
 
     // 语义缓存查（流式命中直接 yield 整段）
@@ -296,7 +303,7 @@ export class LlmGatewayService {
 
     try {
       for await (const chunk of this.promptCache.wrapStream(
-        (prepared) => primary.streamChat(prepared),
+        (prepared) => this.quotaStream(primary, prepared),
         { ...params, interviewId, userId },
         { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: primary.name, model: primary.defaultModel },
       )) {
@@ -305,6 +312,7 @@ export class LlmGatewayService {
         yield chunk;
       }
     } catch (err) {
+      if (err instanceof HttpException) throw err;
       // 永久错 vs 临时错同样处理
       if (this.isPermanentProviderError(err)) {
         this.disableProvider(primary.name as LLMProviderName, 'Provider authentication, billing or model configuration failed');
@@ -320,7 +328,7 @@ export class LlmGatewayService {
         totalContent = '';
         try {
         for await (const chunk of this.promptCache.wrapStream(
-          (prepared) => fallback.streamChat(prepared),
+          (prepared) => this.quotaStream(fallback, prepared),
           { ...params, interviewId, userId, isFallback: true },
           { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: fallback.name, model: fallback.defaultModel },
         )) {
@@ -349,6 +357,16 @@ export class LlmGatewayService {
         metadata: { interviewId, model: actualProvider.name },
       });
     }
+  }
+
+  private async quotaChat(provider: BaseLLMProvider, params: ChatParams) {
+    const prepared = await this.quota.reserveLlm(params);
+    return provider.chat(prepared);
+  }
+
+  private async *quotaStream(provider: BaseLLMProvider, params: ChatParams): AsyncGenerator<StreamChunk, void, void> {
+    const prepared = await this.quota.reserveLlm(params);
+    yield* provider.streamChat(prepared);
   }
 
   private async recordCacheHit(metric: Parameters<SessionCostTracker['recordLlmCall']>[0]): Promise<void> {

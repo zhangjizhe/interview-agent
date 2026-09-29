@@ -1,3 +1,5 @@
+import { LlmGatewayService } from '../../llm/llm.gateway.service';
+import { HttpException } from '@nestjs/common';
 import { tenantCollection } from '../../organizations/tenant-context';
 /**
  * 面试题知识库（混合检索 + Rerank，lazy init）
@@ -78,7 +80,7 @@ export class QuestionBankService {
   private get initialized() { return this.initializedCollections.has(this.COLLECTION); }
   private set initialized(value: boolean) { if (value) this.initializedCollections.add(this.COLLECTION); }
 
-  constructor(private config: ConfigService) {
+  constructor(private config: ConfigService, private llm: LlmGatewayService) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
     const qwenKey = this.config.get<string>('qwen.apiKey');
     const qwenBase = this.config.get<string>('qwen.baseUrl');
@@ -546,16 +548,15 @@ export class QuestionBankService {
 ${text.slice(0, 6000)}
 `;
     try {
-      const res = await this.embedder.chat.completions.create({
-        model: 'qwen-plus',
+      const res = await this.llm.chat({
         messages: [
           { role: 'system', content: '你是一个专业的面试题整理 AI，只输出 JSON。' },
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
-        response_format: { type: 'json_object' },
+        maxTokens: 4096,
       });
-      const content = res.choices[0]?.message?.content || '{}';
+      const content = res.content || '{}';
       let parsed: any = {};
       try {
         parsed = JSON.parse(content);
@@ -582,6 +583,7 @@ ${text.slice(0, 6000)}
           tags: (it.tags || []).join('、').slice(0, 200),
         }));
     } catch (err: any) {
+      if (err instanceof HttpException) throw err;
       this.logger.error(`LLM extract questions failed: ${err.message}`);
       return [];
     }

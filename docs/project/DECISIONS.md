@@ -1,6 +1,10 @@
 # 架构决策
 
-## 2026-09-29 · Phase 1 交接（最新）
+## 2026-09-29 · Phase 2 交接（最新）
+
+已接受 ADR 13（组织身份、查询边界、复合外键及向量集合）与 ADR 14（运营套餐、原子额度及 DeepAgents 兼容边界），完整依据见 docs/architecture-decisions.md。次数门禁不等于总费用预算；未经部署验收不宣称商用发布完成。
+
+## 2026-09-29 · Phase 1 交接（历史）
 
 安全边界选择：Redis 会话故障拒绝访问，吊销状态必须持久化；命令白名单只约束入口，生产不可信执行必须容器化。详见 docs/architecture-decisions.md ADR 12 与 docs/agent-sandbox-roadmap.md。
 

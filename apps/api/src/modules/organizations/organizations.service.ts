@@ -18,6 +18,16 @@ export class OrganizationsService {
     return this.prisma.organization.create({ data: { name } });
   }
 
+  async configurePlan(actor: { userId: string; role: string }, id: string, limits: { monthlyInterviews: number; monthlyLlmCalls: number; maxInputBytes: number; maxOutputTokens: number }) {
+    this.assertPlatformAdmin(actor);
+    return this.prisma.plan.update({ where: { id }, data: limits });
+  }
+
+  async assignPlan(actor: { userId: string; role: string }, organizationId: string, planId: string) {
+    this.assertPlatformAdmin(actor);
+    return this.prisma.organization.update({ where: { id: organizationId }, data: { planId }, select: { id: true, planId: true } });
+  }
+
   async assign(actor: { userId: string; role: string }, organizationId: string, userId: string) {
     this.assertPlatformAdmin(actor);
     // 唯一跨组织管理入口。复合外键拒绝带历史资源的成员直接转移，避免私有数据随身份移动。

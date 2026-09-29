@@ -14,6 +14,7 @@ jest.mock('../modules/interview/services/scoring.service', () => ({
   ScoringService: class ScoringService {},
 }));
 
+import { tenantContext, requireTenant } from '../modules/organizations/tenant-context';
 import { InterviewFlowController } from '../modules/interview/controllers/interview-flow.controller';
 
 describe('InterviewFlowController stream replay', () => {
@@ -82,4 +83,32 @@ describe('InterviewFlowController stream replay', () => {
       'data: [DONE]\n\n',
     ]);
   });
+  it('跨组织或无权限资源在发送 SSE 头之前返回 404', async () => {
+    const response = { flushHeaders: jest.fn() };
+    const controller = new InterviewFlowController({} as any, {} as any, {} as any, {} as any,
+      { interview: { findFirst: async () => null } } as any, {} as any, {} as any);
+    await expect(controller.streamMessage('foreign', { userId: 'ignored', content: 'test' }, { user: { userId: 'u' } }, response as any)).rejects.toMatchObject({ status: 404 });
+    expect(response.flushHeaders).not.toHaveBeenCalled();
+  });
+  it('流式额度拒绝返回稳定错误码，不保存兜底回答', async () => {
+    const writes: string[] = [];
+    const response = { status: jest.fn(), setHeader: jest.fn(), flushHeaders: jest.fn(), once: jest.fn(),
+      write: (s: string) => { writes.push(s); return true; }, end: (cb: () => void) => cb?.() };
+    const delivery = { claimCandidateMessage: async () => ({ state: 'new', message: { id: 'm' } }),
+      persistAssistantResponse: jest.fn(), releaseUnansweredMessage: jest.fn().mockResolvedValue(undefined) };
+    const agent = { async *processMessage() {
+      requireTenant().quotaFailure = { status: 429, code: 'QUOTA_EXCEEDED', message: '额度已用完' };
+      yield { type: 'token', content: 'fallback' };
+    } };
+    const controller = new InterviewFlowController(agent as any, {} as any, {} as any, {} as any,
+      { interview: { findFirst: async () => ({ id: 'i', userId: 'u', status: 'IN_PROGRESS' }) } } as any,
+      delivery as any, { startTurn: async () => { throw new Error('disabled'); } } as any);
+    await tenantContext.run({ organizationId: 'o', userId: 'u' }, () => controller.streamMessage('i', { userId: 'u', content: 'test' }, { user: { userId: 'u' } }, response as any));
+    expect(writes.join('')).toContain('"code":"QUOTA_EXCEEDED"');
+    expect(writes.join('')).not.toContain('[DONE]');
+    expect(writes.join('')).not.toContain('fallback');
+    expect(delivery.persistAssistantResponse).not.toHaveBeenCalled();
+    expect(delivery.releaseUnansweredMessage).toHaveBeenCalledWith('m');
+  });
+
 });

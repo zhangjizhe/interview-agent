@@ -161,8 +161,7 @@ export class InterviewLifecycleController {
 
     const position = targetJob?.title || dto.position;
     const level = targetJob?.level || dto.level || 'P5';
-    const interview = await this.prisma.interview.create({
-      data: {
+    const interview = await this.usage.createInterview({
         userId,
         position,
         level,
@@ -172,7 +171,6 @@ export class InterviewLifecycleController {
         practiceSkillId,
         status: 'IN_PROGRESS',
         summary: resumes[0]?.name ? `候选：${resumes[0].name}` : null,
-      },
     });
     if (dto.trainingRecommendationId && practiceSkillId && targetJob) {
       try {
@@ -184,11 +182,10 @@ export class InterviewLifecycleController {
           practiceSkillId,
         );
       } catch (error) {
-        await this.prisma.interview.delete({ where: { id: interview.id } });
+        await this.usage.cancelFailedInterview(interview.id);
         throw error;
       }
     }
-    await this.usage.recordInterviewStart(userId, interview.id);
     return {
       interviewId: interview.id,
       interview,

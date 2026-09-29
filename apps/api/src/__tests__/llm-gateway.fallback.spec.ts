@@ -1,3 +1,5 @@
+jest.mock('../modules/organizations/tenant-context', () => ({ requireTenant: () => ({ organizationId: 'test-org', userId: 'test-user' }) }));
+import { QuotaExceededException } from '../modules/llm/usage/quota.service';
 jest.mock('../infra/langfuse/langfuse.service', () => ({ LangfuseService: class {} }));
 import { LlmGatewayService } from '../modules/llm/llm.gateway.service';
 import { PromptCacheInterceptor } from '../modules/llm/cache/prompt-cache.interceptor';
@@ -6,15 +8,16 @@ import type { StreamChunk } from '../modules/llm/providers/types';
 describe('LLM gateway failure boundaries (offline fault injection)', () => {
   const answer = { content: 'answer', model: 'qwen-test', finishReason: 'stop', usage: { promptTokens: 10, completionTokens: 2 } };
   const params = { messages: [{ role: 'system' as const, content: 'interviewer' }, { role: 'user' as const, content: 'hello' }], interviewId: 'test-session', userId: 'test-user' };
-  let primary: any, fallback: any, metrics: any, telemetry: any, semantic: any, gateway: LlmGatewayService;
+  let primary: any, fallback: any, metrics: any, telemetry: any, semantic: any, quota: any, gateway: LlmGatewayService;
   beforeEach(() => {
+    quota = { reserveLlm: jest.fn(async params => params) };
     primary = { name: 'qwen', defaultModel: 'qwen-test', chat: jest.fn().mockResolvedValue(answer), streamChat: jest.fn(async function* () { yield { content: 'answer' }; yield { finishReason: 'stop' }; }) };
     fallback = { name: 'deepseek', defaultModel: 'deepseek-test', chat: jest.fn().mockResolvedValue({ ...answer, model: 'deepseek-test' }), streamChat: jest.fn(async function* () { yield { content: 'fallback' }; yield { finishReason: 'stop' }; }) };
     metrics = { recordLlmCall: jest.fn().mockResolvedValue(undefined) };
     telemetry = { logGeneration: jest.fn() };
     semantic = { lookup: jest.fn().mockResolvedValue({ hit: false }), setAsync: jest.fn() };
     const cache = new PromptCacheInterceptor({ get: () => undefined } as any, metrics);
-    gateway = new LlmGatewayService(primary, fallback, telemetry, cache, semantic, metrics);
+    gateway = new LlmGatewayService(primary, fallback, telemetry, cache, semantic, metrics, quota);
   });
   async function collect() {
     const chunks: StreamChunk[] = [];
@@ -23,7 +26,7 @@ describe('LLM gateway failure boundaries (offline fault injection)', () => {
   }
   it('passes prepared cache parameters to the provider without mutating caller input', async () => {
     await gateway.chat(params, 'qwen');
-    expect(primary.chat.mock.calls[0][0].__promptCacheKey).toContain('test-user::sys-v1::');
+    expect(primary.chat.mock.calls[0][0].__promptCacheKey).toContain('test-org:test-user::sys-v1::');
     expect(params).not.toHaveProperty('__promptCacheKey');
   });
   it('falls back on primary failure and records the actual provider', async () => {
@@ -92,4 +95,21 @@ describe('LLM gateway failure boundaries (offline fault injection)', () => {
     expect(gateway.getProviderStatus().deepseek.enabled).toBe(false);
   });
 
+  it('quota rejection never calls primary or fallback', async () => {
+    quota.reserveLlm.mockRejectedValue(new QuotaExceededException());
+    await expect(gateway.chat(params)).rejects.toMatchObject({ status: 429 });
+    expect(primary.chat).not.toHaveBeenCalled();
+    expect(fallback.chat).not.toHaveBeenCalled();
+  });
+  it('stream quota rejection never calls providers', async () => {
+    quota.reserveLlm.mockRejectedValue(new QuotaExceededException());
+    await expect(collect()).rejects.toMatchObject({ status: 429 });
+    expect(primary.streamChat).not.toHaveBeenCalled();
+    expect(fallback.streamChat).not.toHaveBeenCalled();
+  });
+  it('each fallback attempt requires a separate reservation', async () => {
+    primary.chat.mockRejectedValue(new Error('provider failed'));
+    await gateway.chat(params);
+    expect(quota.reserveLlm).toHaveBeenCalledTimes(2);
+  });
 });

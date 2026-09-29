@@ -61,3 +61,13 @@
 - 验证：空库及合成存量库 Prisma migrate deploy 成功；隔离回归 33/33；完整 pnpm test（API 467、Cache 22、Web 83）、lint、typecheck、build 通过。默认 test 跳过需专用连接的 10 条集成测试，已单独真实执行。首次全量运行因跳过套件仍初始化空连接而失败，修复测试初始化后通过。
 - 风险：现有业务数据库未迁移；真实向量库/浏览器验收尚未执行；组织数量增长会增加向量集合资源开销；旧控制面全局唯一版本/Receipt 键仍可能冲突。后台调用必须显式设置组织；迁移后不可直接回退旧 API。
 - 数据与成本：无删列或改列类型，无真实模型调用；新组织显式知识导入沿用原 embedding 成本。P2-2 配额任务接续执行，Phase 3 未开始。
+
+## 2026-09-29 · P2-2 月度额度与 Phase 2 收尾
+
+- 改动：Plan 与组织套餐、UsageLedger LLM_CALL 及可空面试关联；新增额度服务、运营配置 API，网关同步/流式/fallback 和 DeepAgents transport 强制记账；题库文本提取复用网关。面试创建与用量同事务，删除不退款。
+- 并发/安全：组织行锁保证检查和记账原子性；90% 预警；输入大小/输出 token 上限；额度故障 fail closed。JSON 和 SSE 均保留 QUOTA_EXCEEDED，资源校验在 SSE 头之前执行。
+- 测试：先编写额度服务和 transport 失败用例再实现；新增 17 条单元回归及 4 条 PostgreSQL 回归。最终 pnpm test：API 484、Cache 22、Web 83；lint/typecheck/build 均退出码 0，lint 4 条历史警告。14 条需专用数据库的测试默认跳过，已在真实隔离 PostgreSQL 单独全部执行。
+- 数据验收：空库和合成存量库 migrate deploy 成功；20 个并发请求/上限 3 恰好 3 次成功、17 次额度拒绝；验证月度与组织独立、删除不退款、创建失败无账单。可复现脚本 scripts/db/verify-phase2.sh。
+- 架构/成本：无新增依赖；复用 NestJS、Prisma、UsageLedger 和 SessionCost。按文本调用尝试次数准入，非精确 token 月预算；embedding、工具、启动探测不计入。DeepAgents 工具协议暂保留兼容 transport，详见 ADR 14。
+- 未完成：业务数据库未迁移、未部署、未调用真实 Provider，未执行本阶段真实向量/浏览器验收；支付、容器隔离与总费用预算不属于已交付能力。模型效果 Benchmark 不适用，本阶段评价依据为隔离、并发和故障回归。
+- Phase 2 代码与本地门禁完成；Phase 3 未开始，等待用户继续。用户原有 UI 等修改未纳入本阶段提交。

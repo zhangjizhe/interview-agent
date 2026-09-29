@@ -1,6 +1,10 @@
 # 当前状态
 
-## 2026-09-29 · Phase 1 交接（最新）
+## 2026-09-29 · Phase 2 交接（最新）
+
+Phase 2 多租户与配额代码已完成。组织边界、独立向量集合、数据化 free/pro 套餐和原子额度门禁已实现；API 484、Cache 22、Web 83 与 lint/typecheck/build 通过，14 条真实 PostgreSQL 回归通过。尚未迁移业务数据库或部署，支付与总费用预算未实现。下方日期较早的状态为历史记录。
+
+## 2026-09-29 · Phase 1 交接（历史）
 
 Phase 1 安全代码已完成：限流、Redis 会话轮换/吊销、异常脱敏、SSRF 固定连接、命令白名单。API 444、Cache 22、Web 83 tests 及 lint/typecheck/build 通过（lint 4 条旧警告）。尚未部署，浏览器自动刷新与容器隔离未实现。
 

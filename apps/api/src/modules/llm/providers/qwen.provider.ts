@@ -21,6 +21,7 @@ export class QwenProvider extends BaseLLMProvider {
       apiKey: this.config.get<string>('qwen.apiKey'),
       baseURL: this.config.get<string>('qwen.baseUrl'),
       timeout: 30_000,
+      maxRetries: 0, // 重试必须通过网关重新检查额度并记账
     });
   }
 

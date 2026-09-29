@@ -1,6 +1,9 @@
+import { tenantContext } from '../../organizations/tenant-context';
+import { HttpException } from '@nestjs/common';
 import { RateLimitPolicy } from '../../auth/security-throttler.guard';
 import {
   BadRequestException,
+  NotFoundException,
   Body,
   Controller,
   HttpStatus,
@@ -164,6 +167,14 @@ export class InterviewFlowController {
     @Req() req: any,
     @Res() res: Response,
   ) {
+    const interview = await this.prisma.interview.findFirst({
+      where: { id: interviewId, userId: req.user.userId },
+      include: {
+        practiceSkill: { select: { id: true, name: true } },
+      },
+    });
+    if (!interview) throw new NotFoundException('Interview not found');
+
     res.status(HttpStatus.OK);
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -197,20 +208,6 @@ export class InterviewFlowController {
     }
     if (dto.content.length > MAX_USER_MESSAGE_CHARS) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: `消息超过 ${MAX_USER_MESSAGE_CHARS} 字符限制（当前 ${dto.content.length}）` })}\n\n`);
-      (res as any).flush?.();
-      stopHeartbeat();
-      res.end();
-      return;
-    }
-
-    const interview = await this.prisma.interview.findFirst({
-      where: { id: interviewId, userId: req.user.userId },
-      include: {
-        practiceSkill: { select: { id: true, name: true } },
-      },
-    });
-    if (!interview) {
-      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Interview not found' })}\n\n`);
       (res as any).flush?.();
       stopHeartbeat();
       res.end();
@@ -305,6 +302,8 @@ export class InterviewFlowController {
     // llm-direct 模式走 LlmGatewayService.streamChat（纯 LLM，无 Agent 拓扑）
     try {
       for await (const event of this.agent.processMessage(ctx, dto.content)) {
+        const quotaFailure = tenantContext.getStore()?.quotaFailure;
+        if (quotaFailure) throw new HttpException(quotaFailure, quotaFailure.status);
         if (event.type === 'error') {
           throw new Error(event.error || 'Interview response failed');
         }
@@ -317,6 +316,8 @@ export class InterviewFlowController {
         }
       }
 
+      const quotaFailure = tenantContext.getStore()?.quotaFailure;
+      if (quotaFailure) throw new HttpException(quotaFailure, quotaFailure.status);
       const totalPrompt = Math.ceil((dto.content.length + fullResponse.length * 0.3) / 2);
       const totalCompletion = Math.ceil(fullResponse.length / 2);
 
@@ -354,7 +355,7 @@ export class InterviewFlowController {
       if (labRunId) await this.interviewLab.failTurn(labRunId, err).catch(() => undefined);
       // 错误路径也要等 flush 完成
       await new Promise<void>((resolve) => {
-        res.write(`data: ${JSON.stringify({ type: 'error', error: '当前回答暂时无法处理，请稍后重试。' })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'error', error: tenantContext.getStore()?.quotaFailure?.message || '当前回答暂时无法处理，请稍后重试。', ...(tenantContext.getStore()?.quotaFailure ? { code: tenantContext.getStore()!.quotaFailure!.code } : {}) })}\n\n`);
         (res as any).flush?.();
         stopHeartbeat();
         res.end(() => resolve());

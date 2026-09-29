@@ -25,13 +25,14 @@ describe('InterviewLifecycleController start', () => {
     interview: { create: jest.fn() },
   };
   const resumeRag = { searchByUser: jest.fn() };
-  const usage = { assertInterviewAllowed: jest.fn(), recordInterviewStart: jest.fn() };
+  const usage = { assertInterviewAllowed: jest.fn(), recordInterviewStart: jest.fn(), createInterview: jest.fn() };
 
   beforeEach(() => {
     jest.clearAllMocks();
     resumeRag.searchByUser.mockResolvedValue([{ name: 'resume.md' }]);
     usage.assertInterviewAllowed.mockResolvedValue(undefined);
     usage.recordInterviewStart.mockResolvedValue(undefined);
+    usage.createInterview.mockImplementation(data => prisma.interview.create({ data }));
     prisma.targetJob.findFirst.mockResolvedValue({
       id: 'job-1',
       title: 'AI Agent Engineer',
@@ -82,7 +83,7 @@ describe('InterviewLifecycleController start', () => {
         practiceSkillId: 'skill-1',
       }),
     });
-    expect(usage.recordInterviewStart).toHaveBeenCalledWith('user-1', 'interview-1');
+    expect(usage.createInterview).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-1' }));
   });
 
   it('does not allow skill practice without a target-job skill owned by the user', async () => {

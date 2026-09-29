@@ -1,11 +1,25 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { requireTenant } from '../../organizations/tenant-context';
+import { QuotaService, QuotaExceededException } from './quota.service';
+import { Prisma } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsageLedgerType } from '@prisma/client';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 
 @Injectable()
 export class UsageService {
-  constructor(private prisma: PrismaService, private config: ConfigService) {}
+  constructor(private prisma: PrismaService, private config: ConfigService, private quota: QuotaService) {}
+
+  createInterview(data: Prisma.InterviewUncheckedCreateInput) {
+    return this.quota.createInterview(data);
+  }
+
+  async cancelFailedInterview(interviewId: string) {
+    await this.prisma.$transaction(async tx => {
+      await tx.usageLedger.deleteMany({ where: { interviewId, type: 'INTERVIEW_START' } });
+      await tx.interview.delete({ where: { id: interviewId } });
+    });
+  }
 
   async assertInterviewAllowed(userId: string): Promise<void> {
     const limit = this.monthlyInterviewLimit();
@@ -15,7 +29,7 @@ export class UsageService {
       _sum: { units: true },
     });
     if ((used._sum.units || 0) >= limit) {
-      throw new HttpException('本月面试额度已用完，请在下个周期后重试。', HttpStatus.TOO_MANY_REQUESTS);
+      throw new QuotaExceededException();
     }
   }
 
@@ -28,14 +42,17 @@ export class UsageService {
   }
 
   async summary(userId: string) {
-    const limit = this.monthlyInterviewLimit();
+    const { organizationId } = requireTenant();
+    const organization = await this.prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, include: { plan: true } });
+    const limit = organization.plan.monthlyInterviews;
     const used = await this.prisma.usageLedger.aggregate({
-      where: { userId, periodStart: this.currentPeriodStart(), type: UsageLedgerType.INTERVIEW_START },
+      where: { organizationId, periodStart: this.currentPeriodStart(), type: UsageLedgerType.INTERVIEW_START },
       _sum: { units: true },
     });
     const interviewsUsed = used._sum.units || 0;
     return {
       periodStart: this.currentPeriodStart(),
+      quotaScope: 'ORGANIZATION',
       interviewsUsed,
       interviewLimit: limit,
       interviewsRemaining: limit === null ? null : Math.max(0, limit - interviewsUsed),

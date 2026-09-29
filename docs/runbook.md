@@ -650,3 +650,20 @@ Redis 不可用时受保护请求返回 503；严禁通过清空 Redis 恢复访
 业务 Prisma 查询必须运行在认证身份的组织上下文中；后台维护任务显式调用 tenantContext.run 并在回调内 await 查询。无上下文返回 503，跨组织资源返回 404。Qdrant/Milvus 旧集合仅用于默认组织；新组织按需创建独立集合，内存缓存也不共享。迁移不复制向量、不调用模型；新组织显式导入会产生原有 embedding 成本。
 
 数据库隔离验收使用 `TENANT_TEST_DATABASE_URL` 指向专用 `phase2_` 合成测试库后运行 `pnpm --filter @interview-agent/api test:jest --runInBand --testPathPatterns=tenant-database`。不得将业务 DATABASE_URL 当作验收库。
+
+### Phase 2 套餐和额度
+
+`20260929001000_organization_quotas` 为第二个迁移，须按顺序 deploy。默认 free：每组织每 UTC 自然月 3 次面试/100 次文本模型尝试，单次 64 KiB 输入/4096 输出 token；pro：20/1000 次、128 KiB/8192 token。这些是种子运营配置，不是承诺价格或模型效果。
+
+平台配置名单内的 ADMIN 可使用：
+
+- `PATCH /api/organizations/plans/:planId`，完整提交 `{monthlyInterviews,monthlyLlmCalls,maxInputBytes,maxOutputTokens}`。修改立即影响所有使用该套餐的组织；次数 0 表示禁用。
+- `PATCH /api/organizations/:organizationId/plan`，提交 `{planId:"pro"}`。只改变套餐，不重置当月用量。
+
+普通用户和仅有组织 ADMIN 角色均不能操作。上线前对默认组织的存量用量、运营上限和备份恢复进行复核；不得把所有历史用户默认额度 3 当作已获商业确认的策略。候选人 summary 是组织面试额度；若仍设置旧 `QUOTA_MONTHLY_INTERVIEW_LIMIT`，用户还受此额外上限约束。
+
+超额：HTTP 429/`QUOTA_EXCEEDED`；单次输入过大：400/`AI_INPUT_TOO_LARGE`；额度数据库不可用：503/`QUOTA_UNAVAILABLE`。已建立的流返回 error 事件及 code，不发送成功完成信号。失败模型尝试也消耗次数；SDK 自动重试已关闭，网关 fallback 各自记账。删除面试保留历史消费，不应手工删账恢复额度。
+
+运行 `bash scripts/db/verify-phase2.sh` 可创建独立 localhost PostgreSQL fixture，验证空库和含合成存量数据的 migrate deploy，再运行 14 条真实数据库组织/并发配额回归，完成后自动清理容器。需要 Docker、pnpm 和已生成的 Prisma Client；不读取业务 DATABASE_URL、不调用模型。
+
+本阶段不覆盖支付、embedding 总费用控制、真实向量服务和浏览器部署验收；商用发布仍需单独受控部署演练。

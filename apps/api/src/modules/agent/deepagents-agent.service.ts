@@ -5,6 +5,8 @@ import { ChatOpenAI } from '@langchain/openai';
 import { tool } from 'langchain';
 import { z } from 'zod';
 import { LangfuseService } from '../../infra/langfuse/langfuse.service';
+import { QuotaService } from '../llm/usage/quota.service';
+import { createQuotaFetch } from '../llm/usage/quota-fetch';
 import { BochaSearchTool } from './tools/bocha-search.tool';
 
 /**
@@ -26,6 +28,7 @@ export class DeepAgentsAgentService implements OnModuleInit {
     private config: ConfigService,
     private langfuse: LangfuseService,
     private bocha: BochaSearchTool,
+    private quota: QuotaService,
   ) {}
 
   onModuleInit() {
@@ -38,7 +41,8 @@ export class DeepAgentsAgentService implements OnModuleInit {
       this.model = new ChatOpenAI({
         modelName: qwenModel,
         apiKey: qwenKey,
-        configuration: { baseURL: qwenBase },
+        configuration: { baseURL: qwenBase, fetch: createQuotaFetch(this.quota), maxRetries: 0 },
+        maxRetries: 0,
         temperature: 0.7,
       });
 

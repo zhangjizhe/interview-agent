@@ -1,6 +1,10 @@
 # 架构地图
 
-## 2026-09-29 · Phase 1 交接（最新）
+## 2026-09-29 · Phase 2 交接（最新）
+
+新增 OrganizationsModule：JWT 解析数据库组织身份 → TenantInterceptor/AsyncLocalStorage → Prisma 查询过滤与复合外键；知识库/题库按组织使用独立 collection。Plan/UsageLedger → QuotaService 组织行锁 → 模型调用前原子消费；默认网关与 DeepAgents transport 共用额度服务。SessionCost 仍负责观测，不用于准入。详情见 ADR 13/14。
+
+## 2026-09-29 · Phase 1 交接（历史）
 
 认证通过 AuthSessionService 使用 Redis 实现轮换与吊销；限流仍为单实例内存。题库 URL 导入使用 DNS 验证并固定 HTTPS Agent 连接。命令 Guard 与执行器共享 command-policy，OS 级容器隔离见 docs/agent-sandbox-roadmap.md（尚未实现）。
 

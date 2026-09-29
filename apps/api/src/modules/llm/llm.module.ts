@@ -1,3 +1,4 @@
+import { QuotaService } from './usage/quota.service';
 import { Module, OnApplicationBootstrap, Injectable } from '@nestjs/common';
 import { QwenProvider } from './providers/qwen.provider';
 import { DeepseekProvider } from './providers/deepseek.provider';
@@ -30,6 +31,7 @@ class LlmHealthBootstrap implements OnApplicationBootstrap {
     SemanticCacheService,
     SessionCostTracker,
     UsageService,
+    QuotaService,
     LlmHealthBootstrap,
   ],
   controllers: [SessionCostController, UsageController],
@@ -41,6 +43,7 @@ class LlmHealthBootstrap implements OnApplicationBootstrap {
     SemanticCacheService,
     SessionCostTracker,
     UsageService,
+    QuotaService,
   ],
 })
 export class LlmModule {}

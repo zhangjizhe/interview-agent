@@ -7,7 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Plan {
+  id String @id
+  name String
+  monthlyInterviews Int
+  monthlyLlmCalls Int
+  maxInputBytes Int
+  maxOutputTokens Int
+  organizations Organization[]
+  @@map("plans")
+}
+
 model Organization {
+  planId String @default("free")
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  quotaRevision Int @default(0)
   id String @id @default(cuid())
   name String
   createdAt DateTime @default(now())
@@ -919,8 +933,8 @@ model UsageLedger {
   id          String   @id @default(cuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  interviewId String
-  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  interviewId String?
+  interview   Interview? @relation(fields: [interviewId], references: [id], onDelete: SetNull)
   periodStart DateTime
   type        UsageLedgerType
   units       Int      @default(1)
@@ -1440,6 +1454,7 @@ enum TrainingAttemptStatus {
 }
 
 enum UsageLedgerType {
+  LLM_CALL
   INTERVIEW_START
 }
 

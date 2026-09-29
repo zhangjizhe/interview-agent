@@ -1,8 +1,10 @@
+import { tenantContext } from '../modules/organizations/tenant-context';
 import { HttpStatus } from '@nestjs/common';
 import { UsageService } from '../modules/llm/usage/usage.service';
 
 describe('UsageService', () => {
   const prisma = {
+    organization: { findUniqueOrThrow: async () => ({ plan: { monthlyInterviews: 2 } }) },
     usageLedger: { aggregate: jest.fn(), upsert: jest.fn() },
   };
   const config = { get: jest.fn() };
@@ -14,7 +16,7 @@ describe('UsageService', () => {
   });
 
   it('records each interview start once', async () => {
-    const service = new UsageService(prisma as any, config as any);
+    const service = new UsageService(prisma as any, config as any, {} as any);
     await service.recordInterviewStart('user-a', 'interview-a');
     await service.recordInterviewStart('user-a', 'interview-a');
     expect(prisma.usageLedger.upsert).toHaveBeenCalledTimes(2);
@@ -25,7 +27,7 @@ describe('UsageService', () => {
 
   it('rejects an exhausted monthly interview quota server-side', async () => {
     prisma.usageLedger.aggregate.mockResolvedValueOnce({ _sum: { units: 2 } });
-    const service = new UsageService(prisma as any, config as any);
+    const service = new UsageService(prisma as any, config as any, {} as any);
     await expect(service.assertInterviewAllowed('user-a')).rejects.toMatchObject({
       status: HttpStatus.TOO_MANY_REQUESTS,
     });
@@ -33,8 +35,8 @@ describe('UsageService', () => {
 
   it('returns a candidate-safe usage summary', async () => {
     prisma.usageLedger.aggregate.mockResolvedValueOnce({ _sum: { units: 1 } });
-    const service = new UsageService(prisma as any, config as any);
-    await expect(service.summary('user-a')).resolves.toMatchObject({
+    const service = new UsageService(prisma as any, config as any, {} as any);
+    await expect(tenantContext.run({ organizationId: 'org-a', userId: 'user-a' }, async () => await service.summary('user-a'))).resolves.toMatchObject({
       interviewsUsed: 1,
       interviewLimit: 2,
       interviewsRemaining: 1,

@@ -616,3 +616,12 @@ await fs.writeFile(`docs/reflect-${formatDate(new Date())}.md`, report);
 - 组织创建与成员指派需要数据库 ADMIN 且在现有 auth.adminUserIds 平台管理名单。禁止带历史资源直接转组织，返回 409；数据迁移另行制定方案。现有个人 ownership 继续有效，不自动开放同组织成员的私人面试。
 - 知识库实际位于 Qdrant/Milvus 而非 PostgreSQL，不创建空置的知识表：新组织使用哈希命名的独立 collection；旧 collection 仅归默认组织；内存兜底和导入标志同样分组织。此方案适合当前小规模部署，组织规模扩大前需评估集合数量和索引成本。
 - 取舍：保留旧全局唯一业务键，跨组织使用相同旧控制面版本/Receipt Hash 可能发生冲突，但不会返回另一组织数据；后续需要单独兼容迁移消除这一可用性限制。Prisma 裸 SQL 不得出现在租户请求中；外部数据库维护工具属于独立特权边界。
+
+## 14. Phase 2：套餐与并发额度
+
+- 日期：2026-09-29。Plan 是运营数据，预置 free/pro；不在业务代码按套餐名分支。平台 ADMIN 可修改上限与指派组织套餐，当前没有支付或订阅自动升级。
+- 复用 UsageLedger；UTC 自然月按组织统计面试次数和文本模型调用尝试次数。每次调用在组织行锁事务内检查并记账，提交后才联网；失败尝试仍占次数，备用模型另计一次。面试创建与记账同事务，普通删除不会返还额度。
+- 单次输入 UTF-8 字节和最大输出 token 同时受套餐限制；这不是精确 token 月账单。SessionCost 继续承担观测用途，不能作为并发准入依据。90% 阈值首次跨越输出结构化警告。
+- 默认 Multi/Direct 与题库提取通过 LlmGateway。现有 DeepAgents 工具协议需要 ChatOpenAI，文本版 Gateway adapter 尚不支持 bindTools：为避免破坏工具循环，在其 HTTP transport 复用同一 QuotaService，每次实际请求计数并限制输出；SDK/LangChain 隐式重试关闭。后续扩展网关工具协议后再合并适配器。
+- 缺失组织/额度数据库不可用时拒绝调用；耗尽返回 429/QUOTA_EXCEEDED，已建立 SSE 返回同名 code 的 error 事件。请求上下文保留额度错误，防止业务兜底将拒绝伪装为成功。
+- 边界：embedding、外部工具、运维启动健康探测和 standalone 离线工厂不属于本次文本调用额度；不能宣称总费用硬预算。共享默认组织的存量用户共用套餐，上线前必须核对历史用量并配置合适套餐。旧环境用户面试上限仍作为额外限制。

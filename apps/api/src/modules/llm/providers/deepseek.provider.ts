@@ -21,6 +21,7 @@ export class DeepseekProvider extends BaseLLMProvider {
       apiKey: this.config.get<string>('deepseek.apiKey'),
       baseURL: this.config.get<string>('deepseek.baseUrl'),
       timeout: 30_000,
+      maxRetries: 0, // 重试必须通过网关重新检查额度并记账
     });
   }
 

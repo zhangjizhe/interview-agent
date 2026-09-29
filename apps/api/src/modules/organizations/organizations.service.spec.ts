@@ -19,4 +19,11 @@ describe('组织管理员指派', () => {
     const service = new OrganizationsService({ organization: { findUnique: async () => ({ id: 'b' }) }, user: { findUnique: async () => ({ id: 'u' }), update: async () => { throw { code: 'P2003' }; } } } as any, config);
     await expect(service.assign(actor, 'b', 'u')).rejects.toMatchObject({ status: 409 });
   });
+  it('套餐配置和指派只允许平台管理员', async () => {
+    const service = new OrganizationsService({} as any, config);
+    const other = { userId: 'other-admin', role: 'ADMIN' };
+    await expect(service.configurePlan(other, 'free', {} as any)).rejects.toMatchObject({ status: 403 });
+    await expect(service.assignPlan(other, 'org', 'pro')).rejects.toMatchObject({ status: 403 });
+  });
+
 });
