@@ -37,3 +37,7 @@ history to `docs/project/archive/` rather than growing the live context indefini
 7. 每次交付必须说明完成内容、验证结果、Benchmark/Evaluation（如适用）、未完成事项和后续建议。
 
 当前默认产品路径为模块化单体：React + NestJS + Prisma + LangGraph + PostgreSQL + Redis + Milvus + Qdrant。`apps/py-api` 是实验性替代实现，不得作为默认产品路径修改的依据。
+
+## 商用交付原则
+
+以工程最佳实践和可商用为目标，优先保证安全、数据完整性、可恢复性与验证证据。未完成部署或真实验收的能力必须明确标注边界。后续修改统一在 `agent-lab` 分支进行；每次迭代通过相关测试、lint/build 并检查 diff 后提交、推送至 `origin/agent-lab`，确认远端结果。失败不得记为交付。分阶段计划每个 Phase 完成后等待用户继续。

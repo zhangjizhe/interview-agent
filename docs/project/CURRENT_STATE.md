@@ -1,5 +1,10 @@
 # 当前状态
 
+## 2026-09-29 · Phase 1 交接（最新）
+
+Phase 1 安全代码已完成：限流、Redis 会话轮换/吊销、异常脱敏、SSRF 固定连接、命令白名单。API 444、Cache 22、Web 83 tests 及 lint/typecheck/build 通过（lint 4 条旧警告）。尚未部署，浏览器自动刷新与容器隔离未实现。
+
+
 最后审计：2026-09-02
 事实来源：仓库代码、Package Manifest、Prisma Schema 和 2026-08-12 验收证据。状态只描述已交付代码，不描述未来设计。
 

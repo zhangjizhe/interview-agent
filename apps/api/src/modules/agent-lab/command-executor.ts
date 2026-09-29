@@ -1,3 +1,4 @@
+import { commandDenial } from './command-policy';
 import { spawn } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -104,6 +105,8 @@ export class LocalCommandExecutor implements CommandExecutor {
     if (this.capability !== 'workspace-write') {
       return this.denied('当前能力预设为 plan，禁止执行命令');
     }
+    const denied = commandDenial(request.command);
+    if (denied) return this.denied(denied);
     if (request.network === 'ALLOW') {
       return this.denied('本地执行器不提供可验证的网络放行能力');
     }
@@ -239,9 +242,14 @@ export class LocalCommandExecutor implements CommandExecutor {
     for (const key of allowedBase) {
       if (process.env[key]) env[key] = process.env[key]!;
     }
+    // 不从当前工作区或相对目录解析二进制文件。服务进程 PATH 必须由可信部署配置提供。
+    env.PATH = (env.PATH || '').split(path.delimiter).filter(entry => path.isAbsolute(entry)
+      && path.resolve(entry) !== path.resolve(this.workspaceRoot)
+      && !path.resolve(entry).startsWith(`${path.resolve(this.workspaceRoot)}${path.sep}`)).join(path.delimiter);
     env.TMPDIR = tempDir;
     for (const [key, value] of Object.entries(requestEnv || {})) {
-      if (/key|token|secret|password/i.test(key)) continue;
+      // 不允许调用者覆盖 PATH/解释器启动选项或动态库加载配置。
+      if (!['LANG', 'LC_ALL', 'TZ', 'TERM'].includes(key)) continue;
       env[key] = value;
     }
     return env;

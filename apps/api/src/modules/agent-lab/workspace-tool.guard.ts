@@ -1,7 +1,7 @@
+import { commandDenial } from './command-policy';
 import * as path from 'path';
 import { ToolCall, ToolGuard, ToolPolicyError } from './tool-runner.service';
 
-const DANGEROUS_COMMANDS = new Set(['rm', 'sudo', 'mkfs', 'shutdown', 'reboot']);
 
 /**
  * 这是 ToolRunner 的纵深防御策略，不是 OS 级沙箱。
@@ -15,17 +15,10 @@ export class WorkspaceToolGuard implements ToolGuard {
     if (typeof args.path === 'string') {
       this.assertInsideWorkspace(args.path);
     }
-    if (typeof args.command === 'string') {
-      const command = args.command.trim().split(/\s+/)[0];
-      if (DANGEROUS_COMMANDS.has(command)) {
-        throw new ToolPolicyError(`危险命令 "${command}" 被策略拒绝`);
-      }
-    }
-    if (Array.isArray(args.command)) {
-      const command = args.command[0];
-      if (typeof command === 'string' && DANGEROUS_COMMANDS.has(command)) {
-        throw new ToolPolicyError(`危险命令 "${command}" 被策略拒绝`);
-      }
+    if (args.command !== undefined) {
+      const command = Array.isArray(args.command) ? args.command[0] : args.command;
+      const denied = commandDenial(command);
+      if (denied) throw new ToolPolicyError(denied);
     }
   }
 

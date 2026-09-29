@@ -1,5 +1,10 @@
 # 架构地图
 
+## 2026-09-29 · Phase 1 交接（最新）
+
+认证通过 AuthSessionService 使用 Redis 实现轮换与吊销；限流仍为单实例内存。题库 URL 导入使用 DNS 验证并固定 HTTPS Agent 连接。命令 Guard 与执行器共享 command-policy，OS 级容器隔离见 docs/agent-sandbox-roadmap.md（尚未实现）。
+
+
 最后更新：2026-08-26
 权威范围：当前默认 NestJS 路径。本文件区分已交付架构和规划能力，不将 `apps/py-api` 视为生产依赖。
 

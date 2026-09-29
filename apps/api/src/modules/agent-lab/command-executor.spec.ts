@@ -39,7 +39,7 @@ describe('Local workspace execution', () => {
     const executor = new LocalCommandExecutor(root);
 
     const result = await executor.execute({
-      command: process.execPath,
+      command: 'node',
       args: ['-e', "process.stdout.write(process.env.TEST_SECRET_TOKEN || 'absent')"],
     });
 
@@ -50,13 +50,13 @@ describe('Local workspace execution', () => {
     const executor = new LocalCommandExecutor(root);
 
     await expect(executor.execute({
-      command: process.execPath,
+      command: 'node',
       args: ['-e', 'process.exit(0)'],
       network: 'ALLOW',
     })).resolves.toMatchObject({ status: 'DENIED' });
 
     await expect(executor.execute({
-      command: process.execPath,
+      command: 'node',
       args: ['-e', 'setInterval(() => {}, 1000)'],
       timeoutMs: 30,
     })).resolves.toMatchObject({ status: 'TIMED_OUT' });

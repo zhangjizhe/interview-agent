@@ -1,5 +1,10 @@
 # 架构决策
 
+## 2026-09-29 · Phase 1 交接（最新）
+
+安全边界选择：Redis 会话故障拒绝访问，吊销状态必须持久化；命令白名单只约束入口，生产不可信执行必须容器化。详见 docs/architecture-decisions.md ADR 12 与 docs/agent-sandbox-roadmap.md。
+
+
 最后更新：2026-08-26
 
 此登记册只记录未来工作需要理解的长期决策。历史实现细节见 `docs/architecture-decisions.md`，不在此重复每个代码级选择。
