@@ -621,3 +621,15 @@ docker compose down -v
 已建立的 SSE 连接不会因为窗口到期或 token/心跳输出被中断。
 当前计数为进程内存，多实例需在可信网关统一限流。应用默认不信任 X-Forwarded-For，
 反代上线前应验证真实 IP 策略，不可直接信任任意客户端转发头。
+
+### JWT 会话与吊销
+
+新 access 默认 `JWT_EXPIRES_IN=30m`，已有 7 天 token 保持签名有效期；主动 logout 或改密码会立即吊销。
+`POST /api/auth/refresh` 接受 `{refreshToken}`，成功返回新 access/refresh，旧 refresh 只能使用一次；并发调用只有一次成功，客户端应串行刷新。
+`POST /api/auth/logout` 使用当前 Bearer access，吊销整个会话；`POST /api/auth/change-password` 接受 `{currentPassword,newPassword}`，成功后全部设备需重新登录。
+现有 Web 尚未自动消费 refresh token，到期会回到登录页；API 集成方不得记录或暴露任何凭据。
+
+Redis 的 `auth:*` 为安全状态而非可丢弃缓存：必须启用持久化、禁止淘汰、限制管理权限。
+Redis 不可用时受保护请求返回 503；严禁通过清空 Redis 恢复访问。状态丢失时轮换 JWT 密钥并要求重新登录。
+若改密过程中进程崩溃导致 `auth:password-changing:<userId>` 保留，先检查对应用户的数据库更新结果、冻结该账号并停止竞争请求，
+再通过受控 Redis 管理操作原子执行用户版本 INCR 与密码锁 DEL；不要仅 DEL 锁，以免恢复旧 token。

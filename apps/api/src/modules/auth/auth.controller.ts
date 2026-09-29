@@ -1,19 +1,3 @@
-/**
- * Auth Controller
- *
- * P0-1 修复：JWT 认证
- * - POST /auth/login - demo 简化登录（userId 传进来即登录，自动 upsert user）
- * - GET /auth/profile - 获取当前用户信息（需 JWT）
- *
- * R-AUTH-1 登录页面化（2026-06-28）：
- * - POST /auth/register - 注册新 ID（已存在 → 409，前端展示"该 ID 已被占用"）
- * - GET /auth/check/:userId - 检查 ID 可用性（前端实时校验）
- *   返回 { userId, available, reason? }
- *
- * ⚠️ /register 与 /login 区别：
- * - /login: 任何合规 userId 都能拿到 token（demo 临时登录 + 已存在 user 自动 upsert）
- * - /register: 严格要求 ID 不存在（创建新身份流程）
- */
 import { Controller, Post, Get, Body, UseGuards, Req, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService, LoginDto } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -49,8 +33,7 @@ export class AuthController {
 
   /**
    * POST /auth/login
-   * demo 简化：userId 传进来即登录（自动 upsert user）
-   * 不需要密码验证
+   * 校验密码，签发 access/refresh token。
    */
   @RateLimitPolicy('auth')
   @Post('login')
@@ -58,6 +41,27 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
+  }
+
+  @Post('refresh')
+  @Public()
+  @RateLimitPolicy('auth')
+  @HttpCode(HttpStatus.OK)
+  refresh(@Body() dto: { refreshToken: string }) {
+    return this.auth.refresh(dto?.refreshToken);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  logout(@Req() req: any) {
+    return this.auth.logout(req.authPayload, req.authToken);
+  }
+
+  @Post('change-password')
+  @RateLimitPolicy('auth')
+  @HttpCode(HttpStatus.OK)
+  changePassword(@Req() req: any, @Body() dto: { currentPassword: string; newPassword: string }) {
+    return this.auth.changePassword(req.user.userId, dto?.currentPassword, dto?.newPassword);
   }
 
   /**

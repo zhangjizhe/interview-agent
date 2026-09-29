@@ -597,3 +597,12 @@ await fs.writeFile(`docs/reflect-${formatDate(new Date())}.md`, report);
 | MCP 第三方 | 必做 | **P1 做 2-3 天接 GitHub MCP** | 差异化亮点，性价比最高 |
 | 幻觉抑制 | 必做 | **P2 看时间** | 工程量大，简历主轴用现有 Langfuse trace 更稳 |
 | 缓存自适应 | 必做 | **P3 不做** | 边际收益低，1-2 天换 5% 命中率提升不划算 |
+
+## 12. Phase 1：可吊销的 JWT 会话
+
+- 日期：2026-09-29；默认产品为 NestJS，不引入新运行时或数据库表。
+- access token 默认 30 分钟，包含随机 jti、会话 sid 与用户版本；refresh token 为 256 位随机值，Redis 仅保存哈希索引及用户/会话版本，7 天过期。
+- refresh 使用 Lua 原子消费，版本校验与下一张白名单写入原子执行；logout 写入剩余有效期的 jti 黑名单并吊销整个 sid。无 jti 的旧 token 使用 SHA-256 索引，未显式吊销时继续自然过期。
+- 修改密码使用 Redis 用户级锁与 Prisma 条件更新，完成后原子递增版本并释放锁，所有设备立即失效。锁不自动过期，异常中断优先拒绝访问，由运维确认数据库结果后恢复。
+- Redis 是认证状态存储，必须持久化、不淘汰 auth:* 键。故障返回 503，不退化为放行。重建/丢失状态需要轮换 JWT 密钥强制重登。
+- 取舍：每个鉴权请求增加 Redis 读取；当前为单 Redis 部署，不宣称 Redis Cluster 兼容。前端自动续期不在此次后端 API 交付范围，现有客户端到期仍重新登录；浏览器后续应采用 HttpOnly/Secure refresh cookie 与 CSRF 防护，不将 refresh token 放入 localStorage。

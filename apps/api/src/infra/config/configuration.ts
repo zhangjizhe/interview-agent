@@ -248,7 +248,7 @@ export const configuration = (): AppConfig => {
       }
       return 'INSECURE-DEV-DO-NOT-USE-IN-PRODUCTION-CHANGE-ME-PLEASE-32-CHARS';
     })(),
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30m',
     adminUserIds: (process.env.ADMIN_USER_IDS || '')
       .split(',')
       .map((userId) => userId.trim().toLowerCase())

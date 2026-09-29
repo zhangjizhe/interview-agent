@@ -1,3 +1,4 @@
+import { AuthSessionService } from './auth-session.service';
 /**
  * Auth Module
  *
@@ -24,7 +25,7 @@ import { RolesGuard } from './roles.guard';
       useFactory: async (config: ConfigService): Promise<any> => ({
         secret: config.get<string>('auth.jwtSecret'),
         signOptions: {
-          expiresIn: config.get<string>('auth.jwtExpiresIn') || '7d',
+          expiresIn: config.get<string>('auth.jwtExpiresIn') || '30m',
         },
       }),
       inject: [ConfigService],
@@ -43,6 +44,7 @@ import { RolesGuard } from './roles.guard';
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthSessionService,
     JwtAuthGuard,
     RolesGuard,
     // 全局 Rate Limiting Guard
