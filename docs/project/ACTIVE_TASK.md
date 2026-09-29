@@ -4,16 +4,16 @@
 
 ## 任务 ID
 
-PHASE-1-SECURITY
+PHASE-2-TENANCY-QUOTA
 
 ## 目标与范围
 
-依次完成 P1-1 限流、P1-2 JWT 会话、P1-3 异常脱敏、P1-4 SSRF、P1-5 命令白名单。完成 Phase 1 后等待用户继续，不进入 Phase 2。
+用户已授权继续 Phase 2。按顺序完成 P2-1 组织模型、存量回填、资源隔离和 ADMIN 指派，再完成 P2-2 数据化套餐、月度用量门禁和 90% 预警。复用 NestJS、Prisma、UsageLedger 与模型网关，不进入 Phase 3。
 
 ## 状态
 
-Phase 1 代码与本地门禁已完成；等待用户继续后才进入 Phase 2。TASK-029 暂缓。部署、真实 Redis 与浏览器刷新验收未完成。
+进行中：审计完成，开始组织隔离失败测试与加性迁移。TASK-029 继续暂缓。原有未提交 UI 修改保留。
 
 ## 验收
 
-测试/lint/build 全绿，新增至少 15 条安全测试，配置与 Runbook 更新；逐任务提交，进度以 docs/AUTONOMOUS-ITERATION-LOG.md 为准。
+空库和模拟存量库迁移 deploy、跨组织 404、并发配额拒绝、完整 test/lint/typecheck/build；逐任务提交推送。进度权威为 docs/AUTONOMOUS-ITERATION-LOG.md。

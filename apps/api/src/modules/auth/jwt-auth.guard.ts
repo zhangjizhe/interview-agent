@@ -1,3 +1,4 @@
+import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AuthSessionService } from './auth-session.service';
 /**
  * JWT Auth Guard
@@ -21,6 +22,7 @@ export class JwtAuthGuard implements CanActivate {
     private config: ConfigService,
     private reflector: Reflector,
     private sessions: AuthSessionService,
+    private prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -43,12 +45,15 @@ export class JwtAuthGuard implements CanActivate {
         algorithms: ['HS256'],
       });
       await this.sessions.assertActive(payload, token);
+      const identity = await this.prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, email: true, role: true, organizationId: true } });
+      if (!identity) throw new UnauthorizedException('Invalid identity');
       (request as any).authPayload = payload;
       (request as any).authToken = token;
       (request as any).user = {
         userId: payload.sub,
-        email: payload.email,
-        role: payload.role,
+        email: identity.email,
+        role: identity.role,
+        organizationId: identity.organizationId,
       };
       return true;
     } catch (error) {

@@ -6,7 +6,7 @@ describe('JWT Guard 吊销检查', () => {
     const jwt = { verifyAsync: jest.fn().mockResolvedValue({ sub: 'user', role: 'USER' }) };
     const sessions = { assertActive: revoked ? jest.fn().mockRejectedValue(new UnauthorizedException()) : jest.fn().mockResolvedValue(undefined) };
     const request: any = { headers: { authorization: 'Bearer token' } };
-    const guard = new JwtAuthGuard(jwt as any, { get: () => 'test' } as any, { getAllAndOverride: () => isPublic } as any, sessions as any);
+    const guard = new JwtAuthGuard(jwt as any, { get: () => 'test' } as any, { getAllAndOverride: () => isPublic } as any, sessions as any, { user: { findUnique: async () => ({ id: 'user', role: 'USER', organizationId: 'org-a' }) } } as any);
     const context: any = { getHandler: () => null, getClass: () => null, switchToHttp: () => ({ getRequest: () => request }) };
     return { guard, context, sessions, request, jwt };
   }

@@ -7,7 +7,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Organization {
+  id String @id @default(cuid())
+  name String
+  createdAt DateTime @default(now())
+  userRecords User[]
+  labDatasetRecords LabDataset[]
+  labAgentVersionRecords LabAgentVersion[]
+  labRunRecords LabRun[]
+  labRecordedImportRecords LabRecordedImport[]
+  labFailureRecords LabFailure[]
+  labExperimentRecords LabExperiment[]
+  labExperimentRunRecords LabExperimentRun[]
+  labReleaseDecisionRecords LabReleaseDecision[]
+  labOperationLogRecords LabOperationLog[]
+  workspaceRecords Workspace[]
+  workspaceMemberRecords WorkspaceMember[]
+  agentRecords Agent[]
+  agentVersionRecords AgentVersion[]
+  runRecords Run[]
+  traceEventRecords TraceEvent[]
+  decisionRecordRecords DecisionRecord[]
+  factAssertionRecords FactAssertion[]
+  decisionEvidenceRecords DecisionEvidence[]
+  applicationRecords Application[]
+  applicationRunRecords ApplicationRun[]
+  toolApprovalRecords ToolApproval[]
+  evaluationDatasetRecords EvaluationDataset[]
+  evaluationCaseRecords EvaluationCase[]
+  evaluatorRecords Evaluator[]
+  agentEvaluationRunRecords AgentEvaluationRun[]
+  evaluationResultRecords EvaluationResult[]
+  interviewRecords Interview[]
+  sessionCostRecords SessionCost[]
+  usageLedgerRecords UsageLedger[]
+  messageRecords Message[]
+  reportRecords Report[]
+  userToolPreferenceRecords UserToolPreference[]
+  interviewTaskRecords InterviewTask[]
+  answerHistoryRecords AnswerHistory[]
+  targetJobRecords TargetJob[]
+  jobSkillRequirementRecords JobSkillRequirement[]
+  interviewQuestionRecords InterviewQuestion[]
+  interviewAnswerRecords InterviewAnswer[]
+  evaluationRunRecords EvaluationRun[]
+  assessmentEvidenceRecords AssessmentEvidence[]
+  candidateSkillStateRecords CandidateSkillState[]
+  trainingRecommendationRecords TrainingRecommendation[]
+  trainingAttemptRecords TrainingAttempt[]
+  reflectionLogRecords ReflectionLog[]
+  @@map("organizations")
+}
+
 model User {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
@@ -31,6 +87,10 @@ model User {
 }
 
 model LabDataset {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String          @id @default(cuid())
   version        String          @unique
   name           String
@@ -48,6 +108,10 @@ model LabDataset {
 }
 
 model LabAgentVersion {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id                 String          @id @default(cuid())
   agentKey           String
   version            String
@@ -68,6 +132,10 @@ model LabAgentVersion {
 }
 
 model LabRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id                    String          @id @default(cuid())
   agentVersionId        String
   agentVersion          LabAgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
@@ -97,6 +165,10 @@ model LabRun {
 }
 
 model LabRecordedImport {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id              String          @id @default(cuid())
   receiptHash     String          @unique
   status          LabRecordedImportStatus @default(PENDING)
@@ -114,6 +186,10 @@ model LabRecordedImport {
 }
 
 model LabFailure {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id              String       @id @default(cuid())
   runId           String
   run             LabRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
@@ -129,6 +205,10 @@ model LabFailure {
 }
 
 model LabExperiment {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id                 String          @id @default(cuid())
   name               String
   hypothesis         String
@@ -152,6 +232,10 @@ model LabExperiment {
 }
 
 model LabExperimentRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id           String        @id @default(cuid())
   experimentId String
   experiment   LabExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
@@ -165,6 +249,10 @@ model LabExperimentRun {
 }
 
 model LabReleaseDecision {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id                 String          @id @default(cuid())
   agentVersionId     String
   agentVersion       LabAgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
@@ -187,6 +275,10 @@ model LabReleaseDecision {
 }
 
 model LabOperationLog {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id         String              @id @default(cuid())
   actorId    String
   action     LabOperationAction
@@ -203,6 +295,10 @@ model LabOperationLog {
 }
 
 model Workspace {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
@@ -224,6 +320,10 @@ model Workspace {
 }
 
 model WorkspaceMember {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id          String          @id @default(cuid())
   workspaceId String
   userId      String
@@ -244,6 +344,10 @@ enum WorkspaceRole {
 }
 
 model Agent {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id               String      @id @default(cuid())
   workspaceId      String
   key              String
@@ -269,6 +373,10 @@ model Agent {
 }
 
 model AgentVersion {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id               String             @id @default(cuid())
   agentId          String
   version          String
@@ -309,6 +417,10 @@ enum AgentVersionStatus {
 }
 
 model Run {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String    @id @default(cuid())
   workspaceId    String
   agentId        String
@@ -349,6 +461,10 @@ model Run {
 }
 
 model TraceEvent {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id            String   @id @default(cuid())
   formatVersion Int      @default(1)
   runId         String
@@ -384,6 +500,10 @@ enum DecisionDomain {
 
 // 追加式决策账本：记录一次决定在何时、基于哪些输入和哪版规则得出。
 model DecisionRecord {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String         @id @default(cuid())
   domain         DecisionDomain
   decisionType   String
@@ -414,6 +534,10 @@ model DecisionRecord {
 
 // 一条事实永不覆盖；失效或撤销以新的反向 assertion 表达，支持按时间重放。
 model FactAssertion {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id         String   @id @default(cuid())
   decisionId String
   subjectType String
@@ -435,6 +559,10 @@ model FactAssertion {
 }
 
 model DecisionEvidence {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id         String   @id @default(cuid())
   decisionId String
   kind       String
@@ -465,6 +593,10 @@ enum ApplicationStatus {
 }
 
 model Application {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id          String            @id @default(cuid())
   workspaceId String
   agentId     String
@@ -487,6 +619,10 @@ model Application {
 }
 
 model ApplicationRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String   @id @default(cuid())
   applicationId  String
   runId          String   @unique
@@ -512,6 +648,10 @@ enum ToolApprovalStatus {
 }
 
 model ToolApproval {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String             @id @default(cuid())
   runId          String
   callId         String
@@ -530,6 +670,10 @@ model ToolApproval {
 }
 
 model EvaluationDataset {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id          String   @id @default(cuid())
   workspaceId String
   key         String
@@ -550,6 +694,10 @@ model EvaluationDataset {
 }
 
 model EvaluationCase {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String   @id @default(cuid())
   datasetId      String
   key            String
@@ -575,6 +723,10 @@ enum EvaluatorType {
 }
 
 model Evaluator {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id          String        @id @default(cuid())
   workspaceId String
   key         String
@@ -601,6 +753,10 @@ enum EvaluationStatus {
 }
 
 model AgentEvaluationRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String           @id @default(cuid())
   workspaceId    String
   agentId        String
@@ -637,6 +793,10 @@ enum EvaluationCaseStatus {
 }
 
 model EvaluationResult {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id            String               @id @default(cuid())
   evaluationRunId String
   datasetCaseId String
@@ -667,6 +827,10 @@ enum UserRole {
 }
 
 model Interview {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id              String          @id @default(cuid())
   userId          String
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -705,6 +869,10 @@ model Interview {
 /// 会话级成本面板（P0 缓存工程）
 /// 每场 interview 一行，累加式写入（llm.call 钩子 + 终态结算）
 model SessionCost {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id          String    @id @default(cuid())
   interviewId String    @unique
   interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -744,6 +912,10 @@ model SessionCost {
 }
 
 model UsageLedger {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id          String   @id @default(cuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -760,6 +932,10 @@ model UsageLedger {
 }
 
 model Message {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id               String    @id @default(cuid())
   interviewId      String
   interview        Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -781,6 +957,10 @@ model Message {
 }
 
 model Report {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id           String    @id @default(cuid())
   interviewId  String    @unique
   interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -810,6 +990,10 @@ enum InterviewMode {
 // 用户级 MCP 工具偏好：用户可独立开关每个工具
 // 商用项目"工具治理"的体现
 model UserToolPreference {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id        String   @id @default(cuid())
   userId    String // email 桥接 demo user（与 User.email 形式一致）
   toolName  String // McpRegistry 的 name
@@ -825,6 +1009,10 @@ model UserToolPreference {
 
 // 动态任务队列 - 面试过程中生成的问题队列
 model InterviewTask {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id        String    @id @default(cuid())
   interviewId String
   interview  Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -845,6 +1033,10 @@ model InterviewTask {
 
 // 答案历史 - 记录面试中的问答及评分
 model AnswerHistory {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id            String    @id @default(cuid())
   interviewId   String
   interview     Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -869,6 +1061,10 @@ model AnswerHistory {
 }
 
 model TargetJob {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id          String   @id @default(cuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -919,6 +1115,10 @@ model SkillDefinition {
 }
 
 model JobSkillRequirement {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String   @id @default(cuid())
   targetJobId    String
   targetJob      TargetJob @relation(fields: [targetJobId], references: [id], onDelete: Cascade)
@@ -937,6 +1137,10 @@ model JobSkillRequirement {
 }
 
 model InterviewQuestion {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String   @id @default(cuid())
   interviewId    String
   interview      Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -970,6 +1174,10 @@ model InterviewQuestion {
 }
 
 model InterviewAnswer {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id             String   @id @default(cuid())
   interviewId    String
   interview      Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -1010,6 +1218,10 @@ model EvaluationDefinition {
 }
 
 model EvaluationRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id                   String   @id @default(cuid())
   interviewId          String
   interview            Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -1040,6 +1252,10 @@ model EvaluationRun {
 }
 
 model AssessmentEvidence {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id                   String   @id @default(cuid())
   evaluationRunId      String
   evaluationRun        EvaluationRun @relation(fields: [evaluationRunId], references: [id], onDelete: Cascade)
@@ -1072,6 +1288,10 @@ model AssessmentEvidence {
 }
 
 model CandidateSkillState {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id              String   @id @default(cuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1096,6 +1316,10 @@ model CandidateSkillState {
 }
 
 model TrainingRecommendation {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id                      String   @id @default(cuid())
   userId                  String
   user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1124,6 +1348,10 @@ model TrainingRecommendation {
 }
 
 model TrainingAttempt {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id               String   @id @default(cuid())
   recommendationId String
   recommendation   TrainingRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
@@ -1144,6 +1372,10 @@ model TrainingAttempt {
 //   - Layer 1: 短期内给 planner 注入 reflection
 //   - Layer 2: cron 聚合高频 issue_tags，定位系统弱点
 model ReflectionLog {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id            String   @id @default(cuid())
   interviewId   String
   interview     Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)

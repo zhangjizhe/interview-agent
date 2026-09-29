@@ -1,3 +1,4 @@
+import { DEFAULT_ORGANIZATION_ID, tenantContext, tenantCollection } from '../organizations/tenant-context';
 /**
  * 知识库服务 - 面试题库 RAG 通道
  *
@@ -6,7 +7,7 @@
  *  - 启动时一次性导入 knowledge-base.json（或 retagged 优先）
  *  - 走 Qwen text-embedding-v3 embedding（与 semantic-cache 复用 client）
  *  - Point ID 用 kb-{qid}，已存在 upsert 模式（幂等）
- *  - 与 Mem0 / Milvus 长期记忆隔离：知识库是"system knowledge"全局共享
+ *  - 与 Mem0 / Milvus 长期记忆隔离：知识库按组织分 collection；旧 collection 仅属于默认组织
  *
  * 面试 Agent 出题时通过 recallByTopic / recallByQuery 召回相关题
  *
@@ -23,7 +24,7 @@ import * as path from 'path';
 import { QdrantService } from '../../infra/qdrant/qdrant.service';
 import { randomUUID } from 'crypto';
 
-const COLLECTION = 'interview_knowledge_base';
+
 const VECTOR_SIZE = 1024; // Qwen text-embedding-v3
 const DEFAULT_KB_JSON = path.resolve(
   process.cwd(),
@@ -59,10 +60,19 @@ export class KnowledgeBaseService implements OnModuleInit {
   private embedder: OpenAI;
   private enabled: boolean;
   private kbJsonPath: string;
-  private imported = false;
-  private importing = false;
-  /** 内存缓存：导入成功后保留一份,recall 不必查 Qdrant 也能 fallback */
-  private memoryCache: KnowledgeItem[] = [];
+  private readonly states = new Map<string, { imported: boolean; importing: boolean; items: KnowledgeItem[] }>();
+  private get collection() { return tenantCollection('interview_knowledge_base'); }
+  private get state() {
+    const key = this.collection;
+    if (!this.states.has(key)) this.states.set(key, { imported: false, importing: false, items: [] });
+    return this.states.get(key)!;
+  }
+  private get imported() { return this.state.imported; }
+  private set imported(value: boolean) { this.state.imported = value; }
+  private get importing() { return this.state.importing; }
+  private set importing(value: boolean) { this.state.importing = value; }
+  private get memoryCache() { return this.state.items; }
+  private set memoryCache(value: KnowledgeItem[]) { this.state.items = value; }
 
   constructor(
     private config: ConfigService,
@@ -80,7 +90,7 @@ export class KnowledgeBaseService implements OnModuleInit {
 
     if (this.enabled) {
       try {
-        await this.ensureCollection();
+        await tenantContext.run({ organizationId: DEFAULT_ORGANIZATION_ID }, () => this.ensureCollection());
       } catch (err: any) {
         this.logger.warn(`Qdrant KB collection init failed: ${err.message}`);
       }
@@ -110,20 +120,20 @@ export class KnowledgeBaseService implements OnModuleInit {
   private async ensureCollection() {
     const client = this.qdrant.getClient();
     const cols = await client.getCollections();
-    const exists = cols.collections?.some((c) => c.name === COLLECTION);
+    const exists = cols.collections?.some((c) => c.name === this.collection);
     if (!exists) {
-      await client.createCollection(COLLECTION, {
+      await client.createCollection(this.collection, {
         vectors: { size: VECTOR_SIZE, distance: 'Cosine' },
       });
-      await client.createPayloadIndex(COLLECTION, {
+      await client.createPayloadIndex(this.collection, {
         field_name: 'topic',
         field_schema: 'keyword',
       });
-      await client.createPayloadIndex(COLLECTION, {
+      await client.createPayloadIndex(this.collection, {
         field_name: 'tags',
         field_schema: 'keyword',
       });
-      this.logger.log(`Created Qdrant collection ${COLLECTION}`);
+      this.logger.log(`Created Qdrant collection ${this.collection}`);
     }
   }
 
@@ -146,6 +156,7 @@ export class KnowledgeBaseService implements OnModuleInit {
       return { total: 0, imported: 0, skipped: 0, failed: 0 };
     }
 
+    await this.ensureCollection();
     this.importing = true;
     let imported = 0;
     let skipped = 0;
@@ -203,7 +214,7 @@ export class KnowledgeBaseService implements OnModuleInit {
         }));
 
         try {
-          await client.upsert(COLLECTION, { wait: false, points });
+          await client.upsert(this.collection, { wait: false, points });
           imported += batch.length;
         } catch (err: any) {
           this.logger.warn(`upsert batch ${i} failed: ${err.message}`);
@@ -237,7 +248,7 @@ export class KnowledgeBaseService implements OnModuleInit {
       let offset: string | number | undefined;
       // eslint-disable-next-line no-constant-condition
       while (true) {
-        const res: any = await client.scroll(COLLECTION, {
+        const res: any = await client.scroll(this.collection, {
           limit: 100,
           with_payload: true,
           with_vector: false,
@@ -283,7 +294,7 @@ export class KnowledgeBaseService implements OnModuleInit {
       if (opts.topic) {
         must.push({ key: 'topic', match: { value: opts.topic } });
       }
-      const search = await client.search(COLLECTION, {
+      const search = await client.search(this.collection, {
         vector,
         limit,
         score_threshold: threshold,
@@ -326,7 +337,7 @@ export class KnowledgeBaseService implements OnModuleInit {
       const filter = topic
         ? { must: [{ key: 'topic', match: { value: topic } }] }
         : undefined;
-      const res: any = await client.scroll(COLLECTION, {
+      const res: any = await client.scroll(this.collection, {
         limit,
         filter,
         with_payload: true,
@@ -356,7 +367,7 @@ export class KnowledgeBaseService implements OnModuleInit {
     }
     try {
       const client = this.qdrant.getClient();
-      const res: any = await client.scroll(COLLECTION, {
+      const res: any = await client.scroll(this.collection, {
         limit,
         filter: { must: [{ key: 'topic', match: { value: topic } }] },
         with_payload: true,
@@ -389,6 +400,7 @@ export class KnowledgeBaseService implements OnModuleInit {
    * 手动添加/更新一条题到 Qdrant KB
    */
   async upsertItem(item: KnowledgeItem): Promise<KnowledgeItem> {
+    await this.ensureCollection();
     // 1. 加到内存缓存
     const idx = this.memoryCache.findIndex((it) => it.id === item.id);
     if (idx >= 0) {
@@ -403,7 +415,7 @@ export class KnowledgeBaseService implements OnModuleInit {
         const text = `${item.title}\n\n${item.body}`.slice(0, 4096);
         const vector = await this.embedOne(text);
         const client = this.qdrant.getClient();
-        await client.upsert(COLLECTION, {
+        await client.upsert(this.collection, {
           wait: true,
           points: [
             {
@@ -493,7 +505,7 @@ export class KnowledgeBaseBootstrap implements OnApplicationBootstrap {
   constructor(private kb: KnowledgeBaseService) { }
   async onApplicationBootstrap() {
     // 异步、不阻塞启动
-    setImmediate(() => {
+    setImmediate(() => tenantContext.run({ organizationId: DEFAULT_ORGANIZATION_ID }, () => {
       this.kb
         .importFromJson()
         .then((stats) => {
@@ -504,6 +516,6 @@ export class KnowledgeBaseBootstrap implements OnApplicationBootstrap {
         .catch((err) => {
           this.logger.warn(`KB import error: ${err.message}`);
         });
-    });
+    }));
   }
 }

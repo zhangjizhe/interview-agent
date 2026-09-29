@@ -1,3 +1,4 @@
+import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { configuration } from './infra/config/configuration';
@@ -26,6 +27,7 @@ import { HealthController } from './common/health.controller';
       envFilePath: ['.env.local', '.env'],
     }),
     PrismaModule,
+    OrganizationsModule,
     RedisModule,
     LangfuseModule,
     QdrantModule,

@@ -1,3 +1,4 @@
+import { tenantCollection } from '../../organizations/tenant-context';
 /**
  * 面试题知识库（混合检索 + Rerank，lazy init）
  *
@@ -67,13 +68,15 @@ export class QuestionBankService {
   private embedder: OpenAI;
 
   /** v2 collection：支持混合检索 */
-  private readonly COLLECTION = 'question_bank_v2';
+  private get COLLECTION() { return tenantCollection('question_bank_v2'); }
   private readonly VECTOR_DIM = 1024;
 
   /** Rerank 开关（默认开启，API Key 缺失时自动关闭） */
   private rerankEnabled = false;
   private dashscopeApiKey = '';
-  private initialized = false;
+  private readonly initializedCollections = new Set<string>();
+  private get initialized() { return this.initializedCollections.has(this.COLLECTION); }
+  private set initialized(value: boolean) { if (value) this.initializedCollections.add(this.COLLECTION); }
 
   constructor(private config: ConfigService) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';

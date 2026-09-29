@@ -151,6 +151,7 @@ export class AuthService {
         name: userId,  // 默认 name = userId（前端可改）
         passwordHash: await this.hashPassword(password),
         role: isBootstrapAdmin ? 'ADMIN' : 'USER',
+        organization: { create: { name: `${lowerUserId} 的组织` } },
       },
     });
 

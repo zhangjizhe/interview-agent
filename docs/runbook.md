@@ -640,3 +640,13 @@ Redis 不可用时受保护请求返回 503；严禁通过清空 Redis 恢复访
 连接使用已验证 IP 并保留原 Host/SNI/TLS 校验；每跳重定向重新执行校验，最多 3 跳。
 总时间 10 秒（含 DNS）、响应最大 2 MiB，不接受压缩响应，超限明确返回 400，不执行后续模型导入。
 该策略是题库导入专用，不代表仓库所有外部联网工具均已完成同等治理。
+
+### Phase 2 组织迁移
+
+先停写、备份及恢复验证，再通过独立 migration job 执行 `prisma migrate deploy`。`20260929000000_organizations` 为加性迁移，存量业务表统一回填 `default-organization`，保留原始归属；不要修改已应用迁移。回滚 SQL 注释位于迁移文件，已有新组织写入后应恢复快照并核对增量，禁止直接启动旧 API。
+
+新注册用户进入独立组织。配置名单中的平台 ADMIN 可调用 `POST /api/organizations`（`{name}`）和 `POST /api/organizations/:organizationId/members`（`{userId}`）。该接口不发送邮箱邀请，不授予 ADMIN，不自动迁移历史数据；已有资源时指派返回 409。
+
+业务 Prisma 查询必须运行在认证身份的组织上下文中；后台维护任务显式调用 tenantContext.run 并在回调内 await 查询。无上下文返回 503，跨组织资源返回 404。Qdrant/Milvus 旧集合仅用于默认组织；新组织按需创建独立集合，内存缓存也不共享。迁移不复制向量、不调用模型；新组织显式导入会产生原有 embedding 成本。
+
+数据库隔离验收使用 `TENANT_TEST_DATABASE_URL` 指向专用 `phase2_` 合成测试库后运行 `pnpm --filter @interview-agent/api test:jest --runInBand --testPathPatterns=tenant-database`。不得将业务 DATABASE_URL 当作验收库。
