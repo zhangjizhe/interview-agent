@@ -1,3 +1,4 @@
+import { redactTelemetry } from '../../infra/langfuse/redact';
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 
@@ -9,6 +10,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    const requestPath = request.path || request.url.split('?')[0];
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: any = 'Internal server error';
@@ -19,13 +21,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const res = exception.getResponse();
       if (typeof res === 'object' && typeof (res as any).code === 'string') code = (res as any).code;
       message = typeof res === 'string' ? res : (res as any).message || res;
-    } else if (exception instanceof Error) {
-      message = exception.message;
     }
 
     this.logger.error(
-      `[${request.method} ${request.url}] ${status} - ${JSON.stringify(message)}`,
-      exception instanceof Error ? exception.stack : undefined,
+      `[${request.method} ${requestPath}] ${status} - ${JSON.stringify(redactTelemetry(exception instanceof Error ? exception.name : exception))}`,
+      exception instanceof Error ? redactTelemetry(exception.stack || exception.message)
+        .replace(/(password|secret|token|api[_-]?key)\s*[=:]\s*[^\s,;]+/gi, '$1=[REDACTED]') : undefined,
     );
 
     // SSE 流检测：headers 已发（Content-Type: text/event-stream）时不能再 setHeader
@@ -41,10 +42,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           type: 'error',
           statusCode: status,
           message,
-          path: request.url,
+          error: message,
+          ...(code ? { code } : {}),
+          path: requestPath,
         })}\n\n`);
       } catch (writeErr) {
-        this.logger.error(`SSE error write failed: ${writeErr.message}`);
+        this.logger.error('SSE error write failed');
       }
       response.end();
       return;
@@ -56,7 +59,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         statusCode: status,
         ...(code ? { code } : {}),
         timestamp: new Date().toISOString(),
-        path: request.url,
+        path: requestPath,
         message,
       });
     } else {

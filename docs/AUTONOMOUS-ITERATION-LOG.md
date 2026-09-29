@@ -26,3 +26,11 @@
 - 验证：先验证缺失实现失败，再通过针对性测试；完整 pnpm test、lint、typecheck、build 通过。lint 保留 4 条历史无效禁用注释警告，不做无关代码格式修改。
 - 数据库：无 schema 变更，无 migration/db push；未调用真实模型。
 - 风险：Redis 认证状态需持久化、不可淘汰；改密锁故障须按 Runbook 恢复。当前客户端没有自动刷新，access 到期重新登录；不宣称浏览器无感续期或完成商用部署验收。
+
+## 2026-09-29 · P1-3 异常信息边界
+
+- 改动文件：apps/api/src/common/filters/global-exception.filter.ts、apps/api/src/__tests__/exception-filter.security.spec.ts。
+- 行为：非 HttpException 统一返回 500 与固定消息，普通/SSE/已发头路径一致；服务端保留脱敏堆栈和不含 query 的 path，避免二次写 header。
+- 新增测试：6 条，先确认 3 条泄漏回归失败，再验证修复；完整 pnpm test、lint、build 通过。
+- 风险：业务 HttpException 仍由调用方保证 message 安全；非本任务控制器中的主动业务错误需在对应任务治理，不声称全库日志已完整脱敏。
+- 无 schema、模型调用或前端变更。
