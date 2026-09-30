@@ -1,6 +1,10 @@
 # 架构地图
 
-## 2026-09-29 · Phase 2 交接（最新）
+## 2026-09-30 · Phase 3 交接（最新）
+
+MetricsModule 提供专用凭据抓取端点；Provider HTTP transport 记录调用、延迟和实际 usage，Guard/Quota/SSRF/SSE 记录固定标签指标。JsonLogger 统一主进程输出，Helmet 设置 API 安全头。Prometheus/Grafana 为可选 profile。API/migration 共用镜像；readiness 校验当前镜像所有迁移。详细决策见 ADR 15。
+
+## 2026-09-29 · Phase 2 交接（历史）
 
 新增 OrganizationsModule：JWT 解析数据库组织身份 → TenantInterceptor/AsyncLocalStorage → Prisma 查询过滤与复合外键；知识库/题库按组织使用独立 collection。Plan/UsageLedger → QuotaService 组织行锁 → 模型调用前原子消费；默认网关与 DeepAgents transport 共用额度服务。SessionCost 仍负责观测，不用于准入。详情见 ADR 13/14。
 

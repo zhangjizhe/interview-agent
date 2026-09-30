@@ -1,4 +1,5 @@
-import { BadRequestException, HttpException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { MetricsService } from '../../metrics/metrics.service';
+import { BadRequestException, HttpException, Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Plan, Prisma, UsageLedgerType } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
@@ -13,7 +14,7 @@ export class QuotaExceededException extends HttpException {
 @Injectable()
 export class QuotaService {
   private readonly logger = new Logger(QuotaService.name);
-  constructor(private prisma: PrismaService, private config: ConfigService) {}
+  constructor(private prisma: PrismaService, private config: ConfigService, @Optional() private metrics?: MetricsService) {}
 
   private periodStart() {
     const now = new Date();
@@ -54,6 +55,7 @@ export class QuotaService {
       const code = response && typeof response === 'object' && 'code' in response ? String(response.code) : 'QUOTA_UNAVAILABLE';
       const status = error instanceof HttpException ? error.getStatus() : 503;
       const message = error instanceof HttpException ? error.message : '额度服务暂不可用，请稍后重试。';
+      if (code === 'QUOTA_EXCEEDED') this.metrics?.reject('quota');
       scope.quotaFailure = { code, status, message };
       throw new HttpException({ code, message }, status);
     }

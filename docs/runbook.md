@@ -667,3 +667,25 @@ Redis 不可用时受保护请求返回 503；严禁通过清空 Redis 恢复访
 运行 `bash scripts/db/verify-phase2.sh` 可创建独立 localhost PostgreSQL fixture，验证空库和含合成存量数据的 migrate deploy，再运行 14 条真实数据库组织/并发配额回归，完成后自动清理容器。需要 Docker、pnpm 和已生成的 Prisma Client；不读取业务 DATABASE_URL、不调用模型。
 
 本阶段不覆盖支付、embedding 总费用控制、真实向量服务和浏览器部署验收；商用发布仍需单独受控部署演练。
+
+### Phase 3 可观测性与本地交付
+
+先运行 `node scripts/setup-observability.mjs` 生成本地抓取凭据和 Grafana 密码；脚本不输出凭据，文件位于 git 忽略的 `.local-backups/observability/`。目录仅当前用户可访问，文件以只读方式挂载给监控容器；生产请改用部署平台的 Secret 管理。
+
+正常启动使用 `docker compose up -d --build api web agent-lab`。API 与 migration 明确共享 `interview-agent-api:latest` 镜像，防止只构建 API 导致 migration 运行旧版本。`/api/health/ready` 检查镜像携带的全部迁移，而非只检查历史 Baseline。现有数据升级前须停写、备份和验证恢复；不使用 db push。
+
+显式启用监控：`docker compose --profile observability up -d prometheus grafana`。Prometheus 为 localhost:9090，Grafana 为 localhost:3000；Grafana 用户名 admin，密码从本机受限文件 `grafana-password` 查看，勿复制到日志/仓库。默认 Compose 不启动这两个服务。关闭监控用 `docker compose --profile observability stop prometheus grafana`，不删除数据卷。
+
+`GET /api/metrics` 需要专用 `Authorization: Bearer <METRICS_TOKEN>`；未设置或错误凭据返回 401，不接受用户 JWT 替代。接口不暴露用户/组织/请求 ID、URL、Prompt 或正文标签。执行 `node scripts/verify-observability.mjs` 验证 readiness、Helmet、抓取鉴权、Prometheus target 和 Grafana dashboard。
+
+指标：
+
+- `llm_requests_total{provider,mode,outcome}`：实际文本模型 HTTP 尝试；包括启动健康探测，缓存命中不计，fallback 分别计数。
+- `llm_request_duration_seconds`：从 HTTP 请求到响应结束或流终止；不是首 token 延迟。
+- `llm_tokens_total`：仅 Provider 报告的 usage；无 usage 的成功响应计入 `llm_usage_missing_total`，不把估算冒充实际 token。embedding/工具费用不在这些指标内。
+- `security_rejections_total{kind}`：rate_limit、ssrf、quota 拦截；SSRF 为 HTTP 异常过滤器实际收到的私网/内部地址拒绝。
+- `sse_active_connections`：当前进程候选人流连接；finish/close 幂等回收。
+
+Nest Logger 与运行中的 console 调用统一输出单行 JSON；包含级别、上下文、脱敏消息，结构化敏感字段被隐藏。已有自由文本日志仍须遵守不记录候选人原文的规则，正则脱敏不能代替隐私审查。指标为进程累计值，重启归零；Prometheus 保留 7 天，Grafana 使用 provisioned dashboard。多副本部署需为每个实例配置 scrape target。
+
+本地浏览器验收复用 `pnpm --filter @interview-agent/web e2e:auth:real` 与 `pnpm --filter @interview-agent/agent-lab e2e`；可设置 `CHROME_PATH` 使用已有 Chrome。这些用例使用合成账号/录制数据，不代表真实模型质量 Benchmark。

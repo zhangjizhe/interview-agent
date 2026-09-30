@@ -70,3 +70,6 @@ docker/mem0/
 .pnpm-store/
 /apps/web/e2e/screenshots/**/*.png
 /apps/web/e2e/acceptance/**/*.png
+
+# Local database recovery snapshots (never commit)
+.local-backups/

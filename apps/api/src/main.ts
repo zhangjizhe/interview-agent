@@ -1,3 +1,6 @@
+import helmet from 'helmet';
+import { JsonLogger } from './common/logging/json-logger';
+import { MetricsService } from './modules/metrics/metrics.service';
 import 'reflect-metadata';
 import * as path from 'path';
 import { NestFactory } from '@nestjs/core';
@@ -9,16 +12,17 @@ import { McpRegistry } from './modules/interview/services/mcp-registry';
 import { ExternalMcpLoader } from './modules/mcp/external-mcp-loader';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['log', 'error', 'warn', 'debug'],
-  });
+  const logger = new JsonLogger();
+  logger.captureConsole();
+  const app = await NestFactory.create(AppModule, { logger });
+  app.use(helmet());
 
   const config = app.get(ConfigService);
   const port = config.get<number>('PORT') || 3001;
   const corsOrigin = config.get<string>('CORS_ORIGIN') || 'http://localhost:5173';
 
   // 全局异常过滤
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter(app.get(MetricsService)));
 
   // 全局参数校验
   app.useGlobalPipes(

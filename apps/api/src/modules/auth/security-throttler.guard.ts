@@ -1,4 +1,5 @@
-import { ExecutionContext, HttpException, HttpStatus, Injectable, SetMetadata } from '@nestjs/common';
+import { MetricsService } from '../metrics/metrics.service';
+import { ExecutionContext, HttpException, HttpStatus, Injectable, Optional, SetMetadata } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { InjectThrottlerOptions, InjectThrottlerStorage, ThrottlerGuard, ThrottlerModuleOptions, ThrottlerStorage } from '@nestjs/throttler';
@@ -14,6 +15,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
     @InjectThrottlerStorage() storage: ThrottlerStorage,
     reflector: Reflector,
     private readonly config: ConfigService,
+    @Optional() private readonly metrics?: MetricsService,
   ) { super(options, storage, reflector); }
 
   protected handleRequest(request: ThrottlerRequest): Promise<boolean> {
@@ -26,6 +28,7 @@ export class SecurityThrottlerGuard extends ThrottlerGuard {
   }
 
   protected async throwThrottlingException(_context: ExecutionContext): Promise<void> {
+    this.metrics?.reject('rate_limit');
     throw new HttpException({ code: 'RATE_LIMIT_EXCEEDED', message: '请求过于频繁，请稍后重试。' }, HttpStatus.TOO_MANY_REQUESTS);
   }
 }

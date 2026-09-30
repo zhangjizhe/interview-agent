@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { MetricsService } from '../../metrics/metrics.service';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { BaseLLMProvider } from './base.provider';
@@ -14,10 +15,11 @@ export class QwenProvider extends BaseLLMProvider {
   private client: OpenAI;
   private readonly logger = new Logger(QwenProvider.name);
 
-  constructor(private config: ConfigService) {
+  constructor(private config: ConfigService, @Optional() metrics?: MetricsService) {
     super();
     this.defaultModel = this.config.get<string>('qwen.model') || 'qwen-plus';
     this.client = new OpenAI({
+      fetch: metrics?.modelFetch('qwen') as any,
       apiKey: this.config.get<string>('qwen.apiKey'),
       baseURL: this.config.get<string>('qwen.baseUrl'),
       timeout: 30_000,

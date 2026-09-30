@@ -3,6 +3,8 @@ import { lookup } from 'dns/promises';
 import { Agent, get } from 'https';
 import { BlockList, isIP } from 'net';
 
+export class SsrfBlockedException extends BadRequestException {}
+
 const blocked = new BlockList();
 for (const [network, prefix] of [
   ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8],
@@ -27,8 +29,8 @@ export function assertSafeExternalUrl(rawUrl: string): void {
   if (url.protocol !== 'https:') throw new BadRequestException('url must use https');
   if (url.username || url.password) throw new BadRequestException('url must not contain credentials');
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
-  if (host === 'localhost' || /\.(localhost|local|internal)$/.test(host)) throw new BadRequestException('url blocked: internal hostname');
-  if (isIP(host) && !isPublicAddress(host)) throw new BadRequestException('url blocked: non-public address');
+  if (host === 'localhost' || /\.(localhost|local|internal)$/.test(host)) throw new SsrfBlockedException('url blocked: internal hostname');
+  if (isIP(host) && !isPublicAddress(host)) throw new SsrfBlockedException('url blocked: non-public address');
 }
 
 type Address = { address: string; family: number };
@@ -44,7 +46,7 @@ async function resolveAddresses(url: URL, remaining: number): Promise<Address[]>
       lookup(host, { all: true, verbatim: true }),
       new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new BadRequestException('URL DNS 解析超时')), remaining); }),
     ]);
-    if (!addresses.length || addresses.some(item => !isPublicAddress(item.address))) throw new BadRequestException('url blocked: DNS contains non-public address');
+    if (!addresses.length || addresses.some(item => !isPublicAddress(item.address))) throw new SsrfBlockedException('url blocked: DNS contains non-public address');
     return addresses;
   } catch (error) {
     if (error instanceof BadRequestException) throw error;

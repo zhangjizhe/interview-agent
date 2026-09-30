@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { MetricsService } from '../../metrics/metrics.service';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { BaseLLMProvider } from './base.provider';
@@ -14,10 +15,11 @@ export class DeepseekProvider extends BaseLLMProvider {
   private client: OpenAI;
   private readonly logger = new Logger(DeepseekProvider.name);
 
-  constructor(private config: ConfigService) {
+  constructor(private config: ConfigService, @Optional() metrics?: MetricsService) {
     super();
     this.defaultModel = this.config.get<string>('deepseek.model') || 'deepseek-chat';
     this.client = new OpenAI({
+      fetch: metrics?.modelFetch('deepseek') as any,
       apiKey: this.config.get<string>('deepseek.apiKey'),
       baseURL: this.config.get<string>('deepseek.baseUrl'),
       timeout: 30_000,
@@ -70,6 +72,7 @@ export class DeepseekProvider extends BaseLLMProvider {
         tools: params.tools as any,
         tool_choice: params.toolChoice as any,
         stream: true,
+        stream_options: { include_usage: true },
       });
 
       for await (const chunk of stream) {

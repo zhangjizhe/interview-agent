@@ -71,3 +71,16 @@
 - 架构/成本：无新增依赖；复用 NestJS、Prisma、UsageLedger 和 SessionCost。按文本调用尝试次数准入，非精确 token 月预算；embedding、工具、启动探测不计入。DeepAgents 工具协议暂保留兼容 transport，详见 ADR 14。
 - 未完成：业务数据库未迁移、未部署、未调用真实 Provider，未执行本阶段真实向量/浏览器验收；支付、容器隔离与总费用预算不属于已交付能力。模型效果 Benchmark 不适用，本阶段评价依据为隔离、并发和故障回归。
 - Phase 2 代码与本地门禁完成；Phase 3 未开始，等待用户继续。用户原有 UI 等修改未纳入本阶段提交。
+
+## 2026-09-30 · Phase 3 可观测性与本地交付验收
+
+- 范围：用户明确选择先完成原 Phase 3，并要求启动、检查 Interview 与 Lab。自进化闭环保留为下一独立任务，本阶段不调整 Agent 策略。
+- 改动文件：metrics 模块与测试、common/logging、main.ts、模型 Provider/DeepAgents transport、限流/配额/SSRF/SSE 计数点、AuthModule 与 HealthController、Docker Compose、infra/observability、setup/verify-observability 脚本、依赖清单/锁文件、环境模板及交接文档。
+- 交付：专用凭据保护的 Prometheus 文本指标；固定低基数标签的模型调用/延迟/错误/真实 usage、安全拒绝与 SSE 活跃连接；JSON 日志、Helmet、可选 Prometheus/Grafana profile 和 7 面板 dashboard。
+- 实测修复：API 首次启动因局部 JWT Guard 无法注入 AuthSessionService 失败，已补 Nest 模块装配回归并导出服务。浏览器发现 migration 仍用旧镜像、readiness 仅验证 Baseline 而误报健康；已统一 API/migration 镜像并验证全部打包迁移。上述失败均未记为交付。
+- 数据库：本阶段无新 schema；停写后备份本机数据库并成功恢复到独立副本，副本迁移通过后实际应用此前三份待执行迁移。备份在忽略目录中保留，不提交个人数据；没有执行 db push。
+- 测试：新增 16 条回归，最终 API 68 suites / 500 tests、Cache 22、Web 83；pnpm test/lint/typecheck/build 全部退出码 0，lint 保留 4 条旧警告。14 条专用数据库测试本次默认跳过，Phase 2 已单独验证，不冒充本次执行。
+- 本地运行：API healthy，PostgreSQL/Redis/Milvus/Qdrant healthy；Interview 24/24 浏览器检查通过；Lab 合成录制导入、实验比较、人工决策、审计、权限与登录流程通过。Playwright 缺少打包浏览器时复用已安装 Chrome。实际指标鉴权、Helmet、Prometheus target UP、Grafana 7 面板和两端 HTTP 检查全部通过；Compose config/promtool 通过。
+- Evaluation/Benchmark：本阶段为故障注入与工程验收，不声称模型质量提升；没有执行真实候选人模型面试或质量 Benchmark，启动沿用已有有界 Provider 健康探测。Lab 用例使用合成录制数据。
+- 风险：本机运行的前端包含用户原有未提交 UI 修改，它们未混入本阶段提交；公开生产发布、真实模型面试端到端、分布式指标/日志与完整自进化闭环尚未完成。prom-client 提示后继包，按原计划保持当前版本，未来单独迁移。自由文本日志仍需语义隐私审查。
+- Phase 3 已完成本地交付门禁；提交推送至 origin/agent-lab 后暂停，不自动执行 Phase 4。

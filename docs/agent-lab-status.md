@@ -20,7 +20,7 @@
 
 当前阶段不会替换既有 Interview 接口和 LangGraph 面试流程。Run 已记录状态、输入、输出、耗时和错误；Token 与成本仍依赖现有 Interview 会话统计，独立 Run 会明确标记该指标暂不可用。评测不以不稳定的 LLM Judge 作为基础契约，尚未导入现有 Golden Dataset JSON。部署前必须运行 `pnpm db:deploy`。
 
-数据库迁移由独立 migration job 在 API 启动前执行；API entrypoint 只启动服务。当前活动迁移以 production baseline 为基础，远端分叉迁移已归档，新增 `20260928000000_agent_lab_branch_integration` 尚未验收部署。已有远端数据库必须先审计迁移历史，不能直接套用本地主基线。
+数据库迁移由独立 migration job 在 API 启动前执行；API entrypoint 只启动服务。当前活动迁移以 production baseline 为基础，远端分叉迁移已归档，新增 `20260928000000_agent_lab_branch_integration` 已于 2026-09-30 在备份/恢复验证后应用到本机数据库，生产部署仍需单独验收。已有远端数据库必须先审计迁移历史，不能直接套用本地主基线。
 
 当前管理员入口为独立 `apps/agent-lab`。远端 `/lab` 工作台源码保留但未挂载到候选人路由；不能宣称该入口已交付。平台评价使用 `AgentEvaluationRun/agent_evaluation_runs`，候选人评价继续使用 `EvaluationRun/evaluation_runs`。新增平台 API 均要求 ADMIN。
 
@@ -32,4 +32,11 @@ AgentLab 新增独立 `ToolRunner` 契约，供后续 MCP、插件和工作区 p
 
 可观测性与扩展前置能力：`GET /api/agent-lab/runs/:runId/trace.bundle` 导出带运行元数据、按序事件和大 payload 引用的本地 Trace bundle，可由离线 reducer 还原模型会话、工具调用/结果、终态与错误关联。生命周期遥测尽力写入，不会因为遥测异常中断 Agent Run；模型可见历史和 ToolRunner 安全审计仍为强制事件。插件使用版本化 manifest 与 capability provider，可卸载/重载且不会遗留注册；MCP 仅作为 provider，必须由调用方交给 ToolRunner 后才会执行。
 
-子 Agent 或后台任务必须创建独立的子 Run，保存 `parentRunId`、独立 `budget`、状态和取消时间，并通过父子 Trace 事件投递创建、结果、取消或失败。`budget.maxToolCalls` 由 ToolRunner 基于已追加的 `tool.call` 事件强制执行，父 Run 和子 Run 均适用。当前仅提供状态与审计契约，不包含队列调度器、远程 worker 或自动重试；这些能力将在真实隔离执行环境完成后接入。新的迁移尚未在数据库应用，部署前必须执行 `pnpm db:deploy`。
+子 Agent 或后台任务必须创建独立的子 Run，保存 `parentRunId`、独立 `budget`、状态和取消时间，并通过父子 Trace 事件投递创建、结果、取消或失败。`budget.maxToolCalls` 由 ToolRunner 基于已追加的 `tool.call` 事件强制执行，父 Run 和子 Run 均适用。当前仅提供状态与审计契约，不包含队列调度器、远程 worker 或自动重试；这些能力将在真实隔离执行环境完成后接入。截至 2026-09-30，当前迁移已应用到本机默认数据库；其他环境部署前仍必须执行独立 migration job。
+
+
+## 2026-09-30 可观测性增量
+
+新增受专用凭据保护的 Prometheus 指标：模型尝试/耗时/真实 usage、安全拒绝和 SSE 活跃连接；JSON 日志与 Helmet 已接入，Prometheus/Grafana 为可选 profile。仅声明监控基础，不声明 Agent 质量改善。
+
+用户要求的 Lab 自进化方向为失败分析 → 改进候选 → 同数据集对比 → 人工批准 → Interview 使用已批准版本。该完整闭环尚未实现；用户已明确优先完成原 Phase 3 可观测性，本轮不自动调整 Prompt、Agent 版本或发布策略。

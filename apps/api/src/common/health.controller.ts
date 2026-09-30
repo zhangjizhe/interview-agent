@@ -1,7 +1,13 @@
+import { readdirSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { Prisma } from '@prisma/client';
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { RedisService } from '../infra/redis/redis.service';
 import { Public } from '../modules/auth/public.decorator';
+
+const migrationsDirectory = resolve(__dirname, '../../prisma/migrations');
+export const REQUIRED_MIGRATIONS = readdirSync(migrationsDirectory).filter(name => /^\d+_/.test(name) && existsSync(resolve(migrationsDirectory, name, 'migration.sql')));
 
 /**
  * 健康检查端点（docker healthcheck / 负载均衡探测用）
@@ -48,13 +54,13 @@ export class HealthController {
 
     try {
       const baseline = await this.prisma.$queryRaw<Array<{ applied: number }>>`
-        SELECT COUNT(*)::int AS "applied"
+        SELECT COUNT(DISTINCT "migration_name")::int AS "applied"
         FROM "_prisma_migrations"
-        WHERE "migration_name" = '20260815000000_production_baseline'
+        WHERE "migration_name" IN (${Prisma.join(REQUIRED_MIGRATIONS)})
           AND "finished_at" IS NOT NULL
           AND "rolled_back_at" IS NULL
       `;
-      if (baseline[0]?.applied === 1) {
+      if (REQUIRED_MIGRATIONS.length > 0 && baseline[0]?.applied === REQUIRED_MIGRATIONS.length) {
         checks.migration = 'ok';
       } else {
         checks.migration = 'fail';

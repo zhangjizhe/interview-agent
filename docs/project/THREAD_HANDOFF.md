@@ -1,6 +1,10 @@
 # 任务交接
 
-## 2026-09-29 · Phase 2 交接（最新）
+## 2026-09-30 · Phase 3 交接（最新）
+
+Phase 3 完成，等待用户继续下一独立阶段。API:3001、Interview:5173、Lab:5175、Grafana:3000、Prometheus:9090 已启动；监控端口仅 loopback。当前 API/migration 共享镜像并校验全部迁移，AuthSessionService 已导出。阅读本次验收报告、Runbook 与自主迭代日志；备份/本地秘密位于忽略目录，不输出或提交。原有 UI/题库注解/截图/旧交接改动仍保留未提交，运行前端含这些修改。继续 agent-lab 分支，逐迭代验证后推送。
+
+## 2026-09-29 · Phase 2 交接（历史）
 
 Phase 2 已完成，接续 Phase 3 需要用户明确继续。P2-1 提交 b9a1269 已推送；P2-2 验证完成后随本次提交推送。读取 docs/AUTONOMOUS-ITERATION-LOG.md、ADR 13/14 和 Runbook；真实数据库回归可运行 bash scripts/db/verify-phase2.sh。仅合成数据库应用迁移，未部署业务服务或调用 Provider。继续在 agent-lab 修改，每次交付验证后提交推送；原有 UI、题库 ADMIN 注解、截图与旧交接编辑保持未提交，不得混入。
 

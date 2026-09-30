@@ -110,6 +110,7 @@ services:
   # Prisma DDL is isolated from the API runtime. It must finish successfully
   # before the API becomes eligible to start.
   migration:
+    image: interview-agent-api:latest
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -127,6 +128,7 @@ services:
   # NestJS 后端（2026-06-26 恢复为默认后端，端口 3001）
   # apps/api/（之前 apps/api-legacy/）git rename 回原路径
   api:
+    image: interview-agent-api:latest
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -237,9 +239,42 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: ["observability"]
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    secrets: [metrics_token]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    profiles: ["observability"]
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    secrets: [grafana_password]
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+
+secrets:
+  metrics_token:
+    file: ./.local-backups/observability/metrics-token
+  grafana_password:
+    file: ./.local-backups/observability/grafana-password
+
 volumes:
   postgres_data:
   redis_data:
   qdrant_data:
   milvus_etcd_data:
   milvus_data:
+  prometheus_data:
+  grafana_data:

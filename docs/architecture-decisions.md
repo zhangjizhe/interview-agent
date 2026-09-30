@@ -625,3 +625,12 @@ await fs.writeFile(`docs/reflect-${formatDate(new Date())}.md`, report);
 - 默认 Multi/Direct 与题库提取通过 LlmGateway。现有 DeepAgents 工具协议需要 ChatOpenAI，文本版 Gateway adapter 尚不支持 bindTools：为避免破坏工具循环，在其 HTTP transport 复用同一 QuotaService，每次实际请求计数并限制输出；SDK/LangChain 隐式重试关闭。后续扩展网关工具协议后再合并适配器。
 - 缺失组织/额度数据库不可用时拒绝调用；耗尽返回 429/QUOTA_EXCEEDED，已建立 SSE 返回同名 code 的 error 事件。请求上下文保留额度错误，防止业务兜底将拒绝伪装为成功。
 - 边界：embedding、外部工具、运维启动健康探测和 standalone 离线工厂不属于本次文本调用额度；不能宣称总费用硬预算。共享默认组织的存量用户共用套餐，上线前必须核对历史用量并配置合适套餐。旧环境用户面试上限仍作为额外限制。
+
+## 15. Phase 3：低基数指标与实际部署就绪
+
+- 日期：2026-09-30；扩展现有 MetricsModule，使用原计划指定的 prom-client 和 Helmet，不引入另一套可观测运行时。
+- 模型指标在 Provider HTTP transport 边界采集，兼容 chat、stream、fallback 和 DeepAgents；不记录正文，仅使用固定 provider/mode/outcome 标签。实际 usage 与缺失 usage 分开，避免以估算支撑成本结论。
+- Prometheus 使用独立凭据抓取，Grafana/Prometheus 仅显式 profile 启用且本地端口绑定 loopback。用户 JWT 不具有跨组织基础设施指标读取权限。
+- 保留 Nest Logger 接口，改用 JSON sink 并接管主进程 console；敏感结构字段和已知字符串凭据脱敏。自由文本日志的语义隐私仍需调用方保证。
+- 部署实测发现两个非单元路径问题：局部 JWT Guard 的 AuthSessionService 未导出；migration 使用了与新 API 不一致的旧镜像。修复模块导出，API/migration 共享镜像，并要求 readiness 校验全部打包迁移。补 Nest 模块装配及旧迁移拒绝回归。
+- 取舍：进程内指标重启归零，由 Prometheus 保留时序；此阶段没有分布式日志存储或总费用账单。安装时 prom-client 元数据提示后继包 @prometheus-io/client，暂按用户明确清单保持当前依赖，后续迁移需独立兼容验收。

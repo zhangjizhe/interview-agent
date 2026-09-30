@@ -1,3 +1,5 @@
+import { MetricsService } from '../../modules/metrics/metrics.service';
+import { SsrfBlockedException } from '../../modules/interview/controllers/external-url.util';
 import { redactTelemetry } from '../../infra/langfuse/redact';
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
@@ -6,7 +8,10 @@ import { Request, Response } from 'express';
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
+  constructor(private metrics?: MetricsService) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
+    if (exception instanceof SsrfBlockedException) this.metrics?.reject('ssrf');
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();

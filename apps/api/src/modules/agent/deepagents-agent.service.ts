@@ -1,4 +1,5 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { MetricsService } from '../metrics/metrics.service';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createDeepAgent, type DeepAgent } from 'deepagents';
 import { ChatOpenAI } from '@langchain/openai';
@@ -29,6 +30,7 @@ export class DeepAgentsAgentService implements OnModuleInit {
     private langfuse: LangfuseService,
     private bocha: BochaSearchTool,
     private quota: QuotaService,
+    @Optional() private metrics?: MetricsService,
   ) {}
 
   onModuleInit() {
@@ -41,7 +43,7 @@ export class DeepAgentsAgentService implements OnModuleInit {
       this.model = new ChatOpenAI({
         modelName: qwenModel,
         apiKey: qwenKey,
-        configuration: { baseURL: qwenBase, fetch: createQuotaFetch(this.quota), maxRetries: 0 },
+        configuration: { baseURL: qwenBase, fetch: createQuotaFetch(this.quota, this.metrics?.modelFetch('deepagents')), maxRetries: 0 },
         maxRetries: 0,
         temperature: 0.7,
       });

@@ -1,9 +1,11 @@
+import { MetricsService } from '../../metrics/metrics.service';
 import { tenantContext } from '../../organizations/tenant-context';
 import { HttpException } from '@nestjs/common';
 import { RateLimitPolicy } from '../../auth/security-throttler.guard';
 import {
   BadRequestException,
   NotFoundException,
+  Optional,
   Body,
   Controller,
   HttpStatus,
@@ -54,6 +56,7 @@ export class InterviewFlowController {
     private prisma: PrismaService,
     private streamDelivery: StreamMessageDeliveryService,
     private interviewLab: InterviewLabBridgeService,
+    @Optional() private metrics?: MetricsService,
   ) {}
 
   /**
@@ -180,6 +183,7 @@ export class InterviewFlowController {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
+    this.metrics?.openSse(res);
     res.flushHeaders();
     // 图编排和模型首 token 可能超过几十秒。用轻量 SSE 心跳保持连接，
     // 防止前端把“仍在处理”误判成断流。
