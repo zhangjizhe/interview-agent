@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-02 · 受控自进化首版（最新）
+
+Lab 已交付失败评测生成草稿候选、草稿隔离评测、同 Dataset/Evaluator 非回归比较、90/100 发布门和 ADMIN 人工发布；Interview 从下一回合读取当前已发布策略。真实浏览器验证了 100 分基线、0 分失败探针、`1.0.1` 草稿及 `REJECT`/禁止发布路径。API 510、Cache 22、Web 83，lint/typecheck/build 通过。没有 schema/依赖变化；尚不声明真实质量提升，Token/成本/稳定延迟门仍待完善。报告见 `docs/ACCEPTANCE-REPORT-2026-10-02-CONTROLLED-EVOLUTION.md`。
+
 ## 2026-09-30 · Phase 3 交接（最新）
 
 Phase 3 已完成本地交付验收：API、Interview、Lab 已运行；Prometheus target UP，Grafana 7 面板可用。API 500、Cache 22、Web 83，lint/typecheck/build 与 Interview 24/24、Lab 浏览器流程通过。旧三份待执行迁移已备份/恢复验证后应用本机。完整自进化闭环、真实模型质量和生产部署仍未验收；报告见 docs/ACCEPTANCE-REPORT-2026-09-30-PHASE-3.md。

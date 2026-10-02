@@ -244,7 +244,7 @@ export class AgentRegistryService {
       return result;
     }
 
-    const releaseGate = await this.getReleaseGateForVersion(version.id);
+    const releaseGate = await this.getReleaseGateForVersion(agentId, version.id);
     await this.recordReleaseGate(agentId, version.id, userId, releaseGate);
     if (!releaseGate.outcome.allowed) {
       throw new ConflictException(releaseGate.outcome.reason);
@@ -274,7 +274,7 @@ export class AgentRegistryService {
   async getReleaseGate(userId: string, agentId: string, versionId: string) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const version = await this.requireVersion(workspace.id, agentId, versionId);
-    return this.getReleaseGateForVersion(version.id);
+    return this.getReleaseGateForVersion(agentId, version.id);
   }
 
   async getVersionDecisionSnapshot(
@@ -410,7 +410,7 @@ export class AgentRegistryService {
     return version;
   }
 
-  private async getReleaseGateForVersion(agentVersionId: string) {
+  private async getReleaseGateForVersion(agentId: string, agentVersionId: string) {
     const evaluation = await this.prisma.agentEvaluationRun.findFirst({
       where: {
         agentVersionId,
@@ -425,9 +425,42 @@ export class AgentRegistryService {
         passedCases: true,
         failedCases: true,
         completedAt: true,
+        datasetId: true,
+        evaluatorId: true,
       },
     });
-    return inferReleaseGate(evaluation);
+    const agent = await this.prisma.agent.findFirst({
+      where: { id: agentId },
+      select: { currentVersionId: true },
+    });
+    const comparisonRequired = Boolean(
+      agent?.currentVersionId && agent.currentVersionId !== agentVersionId,
+    );
+    const baseline = comparisonRequired && evaluation
+      ? await this.prisma.agentEvaluationRun.findFirst({
+          where: {
+            agentId,
+            agentVersionId: agent!.currentVersionId!,
+            datasetId: evaluation.datasetId,
+            evaluatorId: evaluation.evaluatorId,
+            status: 'COMPLETED',
+          },
+          orderBy: { completedAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            score: true,
+            totalCases: true,
+            passedCases: true,
+            failedCases: true,
+            completedAt: true,
+          },
+        })
+      : null;
+    return inferReleaseGate(evaluation, {
+      required: comparisonRequired,
+      baseline,
+    });
   }
 
   private async recordReleaseGate(

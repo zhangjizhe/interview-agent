@@ -275,9 +275,11 @@ export class InterviewFlowController {
     }
     const candidateMessage = claim.message;
     let labRunId: string | null = null;
+    let approvedAgentPolicy = '';
     try {
       const labRun = await this.interviewLab.startTurn(req.user.userId, interview, dto.content);
       labRunId = labRun.id;
+      approvedAgentPolicy = labRun.approvedPolicy;
     } catch {
       // Lab observability must not block candidate delivery.
     }
@@ -295,6 +297,7 @@ export class InterviewFlowController {
       practiceSkillName: interview.practiceSkill?.name,
       targetJobId: interview.targetJobId || undefined,
       targetJobProfileVersion: interview.targetJobProfileVersion || undefined,
+      approvedAgentPolicy,
     };
 
     let fullResponse = '';

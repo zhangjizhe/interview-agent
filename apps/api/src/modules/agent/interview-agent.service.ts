@@ -62,6 +62,7 @@ export interface AgentContext {
   targetJobProfileVersion?: number;
   practiceSkillId?: string;
   practiceSkillName?: string;
+  approvedAgentPolicy?: string;
 }
 
 @Injectable()
@@ -174,7 +175,10 @@ export class InterviewAgentService {
         `【风格】专业、友好、像真人面试官，不要用 Markdown 标题。\n` +
         `【候选人历史】\n${context.longTermContext || '暂无'}` +
         modeContext +
-        questionContext;
+        questionContext +
+        (ctx.approvedAgentPolicy
+          ? `\n\n【已批准的 Agent Lab 版本策略】\n${ctx.approvedAgentPolicy.slice(0, 12_000)}`
+          : '');
 
       // ===== 按用户偏好过滤工具 =====
       const userPrefs = await this.prisma.userToolPreference.findMany({
@@ -317,7 +321,10 @@ export class InterviewAgentService {
           `【出题范围】${bank === 'agent' ? 'AI Agent / LLM 工程' : '前端开发'}\n` +
           `【当前题目】${currentQuestion?.question || '请生成一题与岗位强相关的开场题'}\n` +
           `【首轮规则】当候选人说“开始面试”时，直接提出与上述岗位和出题范围匹配的问题。` +
-          `不得将 AI Agent / LLM 工程岗位误问为前端项目。`;
+          `不得将 AI Agent / LLM 工程岗位误问为前端项目。` +
+          (ctx.approvedAgentPolicy
+            ? `\n【已批准的 Agent Lab 版本策略】\n${ctx.approvedAgentPolicy.slice(0, 12_000)}`
+            : '');
         for await (const chunk of this.multiAgent.stream(
           userInput,
           ctx.sessionId,

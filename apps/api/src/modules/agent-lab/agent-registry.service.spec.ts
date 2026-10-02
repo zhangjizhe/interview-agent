@@ -82,7 +82,7 @@ describe('AgentRegistryService', () => {
     prisma.agentEvaluationRun.findFirst.mockResolvedValue({
       id: 'evaluation-1',
       status: 'COMPLETED',
-      score: 1,
+      score: 100,
       totalCases: 2,
       passedCases: 2,
       failedCases: 0,
@@ -154,7 +154,7 @@ describe('AgentRegistryService', () => {
     prisma.agentEvaluationRun.findFirst.mockResolvedValue({
       id: 'evaluation-1',
       status: 'COMPLETED',
-      score: 1,
+      score: 100,
       totalCases: 1,
       passedCases: 1,
       failedCases: 0,
@@ -169,6 +169,44 @@ describe('AgentRegistryService', () => {
     ).rejects.toThrow('ledger unavailable');
     expect(prisma.agentVersion.update).not.toHaveBeenCalled();
     expect(prisma.agent.update).not.toHaveBeenCalled();
+  });
+
+  it('候选版本低于同集当前版本基线时不能发布', async () => {
+    const prisma = createPrismaMock();
+    prisma.agentVersion.findFirst.mockResolvedValue({
+      id: 'version-2',
+      agentId: 'agent-1',
+      status: 'DRAFT',
+      publishedAt: null,
+    });
+    prisma.agent.findFirst.mockResolvedValue({ currentVersionId: 'version-1' });
+    prisma.agentEvaluationRun.findFirst
+      .mockResolvedValueOnce({
+        id: 'evaluation-candidate',
+        status: 'COMPLETED',
+        score: 94,
+        totalCases: 2,
+        passedCases: 2,
+        failedCases: 0,
+        completedAt: new Date(),
+        datasetId: 'dataset-1',
+        evaluatorId: 'evaluator-1',
+      })
+      .mockResolvedValueOnce({
+        id: 'evaluation-baseline',
+        status: 'COMPLETED',
+        score: 96,
+        totalCases: 2,
+        passedCases: 2,
+        failedCases: 0,
+        completedAt: new Date(),
+      });
+    const service = new AgentRegistryService(prisma, createDecisionLedgerMock() as any);
+
+    await expect(
+      service.publishVersion('user-a', 'agent-1', 'version-2'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.agentVersion.update).not.toHaveBeenCalled();
   });
 
   it('不允许将未发布版本回滚为当前版本', async () => {

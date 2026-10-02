@@ -18,8 +18,9 @@ import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
 import './styles.css';
 import './lab.css';
+import { ControlledEvolutionWorkspace } from './ControlledEvolutionWorkspace';
 
-type View = 'overview' | 'runtime' | 'mcp' | 'trace' | 'evaluation' | 'experiments' | 'release' | 'audit' | 'operations';
+type View = 'overview' | 'runtime' | 'mcp' | 'trace' | 'evaluation' | 'evolution' | 'experiments' | 'release' | 'audit' | 'operations';
 type Server = {
   name: string;
   displayName?: string;
@@ -100,6 +101,7 @@ const CONTROL_NAV: Array<{ id: View; label: string; icon: typeof Gauge; enabled:
   { id: 'mcp', label: 'MCP 与工具', icon: SlidersHorizontal, enabled: true },
   { id: 'trace', label: 'Trace', icon: GitBranch, enabled: true },
   { id: 'evaluation', label: '评测', icon: FlaskConical, enabled: true },
+  { id: 'evolution', label: '自进化', icon: RefreshCw, enabled: true },
   { id: 'experiments', label: '实验', icon: Bot, enabled: true },
   { id: 'release', label: '发布', icon: ShieldAlert, enabled: true },
   { id: 'audit', label: '审计', icon: ScrollText, enabled: true },
@@ -302,6 +304,7 @@ function ControlCenter() {
         {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} />}
         {view === 'trace' && <TraceWorkspace runs={labData.runs} />}
         {view === 'evaluation' && <EvaluationWorkspace data={labData} imports={imports} executeImport={executeImport} />}
+        {view === 'evolution' && <ControlledEvolutionWorkspace />}
         {view === 'experiments' && <ExperimentWorkspace runs={labData.runs} experiments={labData.experiments} createExperiment={createExperiment} />}
         {view === 'release' && <ReleaseWorkspace runs={labData.runs} decisions={labData.decisions} recordDecision={recordDecision} />}
         {view === 'audit' && <AuditWorkspace
@@ -335,7 +338,7 @@ function ControlCenter() {
 }
 
 function titleFor(view: View) {
-  return { overview: '控制中心', runtime: '架构视图', mcp: 'MCP 与工具治理', trace: 'Trace 运行记录', evaluation: '评测证据', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
+  return { overview: '控制中心', runtime: '架构视图', mcp: 'MCP 与工具治理', trace: 'Trace 运行记录', evaluation: '评测证据', evolution: '受控自进化', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
 }
 
 function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void }) {

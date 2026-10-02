@@ -1,19 +1,19 @@
 # 当前任务
 
-最后更新：2026-09-30
+最后更新：2026-10-02
 
 ## 任务 ID
 
-PHASE-3-OBSERVABILITY
+LAB-CONTROLLED-EVOLUTION-1
 
 ## 目标与范围
 
-用户明确选择先完成原计划 Phase 3，并要求启动与检查 Interview / Lab。复用 metrics 模块，接入 Prometheus、JSON 日志、Helmet 和可选 Grafana profile；保留认证、组织及配额边界。Lab 受控自进化闭环作为后续独立任务，不在本阶段修改 Agent 策略或自动发布。
+在已完成 Phase 3 的基础上实现首个可商用的受控自进化闭环：从失败评测生成有边界的草稿候选，允许草稿仅在 Lab 评测通道运行，基于同一 Dataset/Evaluator 比较当前版本与候选版本，并由管理员显式发布后才切换 Interview。候选版本的已批准策略必须进入 Interview 的真实提示词链路，禁止自动发布或绕过现有 RBAC、组织、审计与发布门禁。
 
 ## 状态
 
-已完成：API 与两端运行、监控抓取和浏览器验收通过；当前无执行中任务。详见 docs/ACCEPTANCE-REPORT-2026-09-30-PHASE-3.md。后续自进化闭环与 Phase 4 均未开始。
+已完成。草稿发布前评测、固定失败分类候选、同集非回归比较、90/100 发布门、人工发布与 Interview 已批准策略接入均已实现并通过真实浏览器验收；失败探针候选被正确拒绝。报告见 `docs/ACCEPTANCE-REPORT-2026-10-02-CONTROLLED-EVOLUTION.md`。
 
 ## 验收
 
-test/lint/typecheck/build、Compose 配置、指标格式/计数/鉴权、SSE 回收、日志脱敏；本地数据库迁移与两端浏览器检查。通过后独立提交推送，保留原有未提交修改。
+单元测试覆盖草稿评测隔离、失败分析与候选生成、同集对比、非回归发布门、Interview 仅使用当前已发布策略；运行 API 全量 test/lint/typecheck/build，执行数据库迁移与真实 API/浏览器验收。完成后更新项目上下文、独立提交并推送，保留原有未提交修改。

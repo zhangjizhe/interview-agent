@@ -1,0 +1,78 @@
+.lab-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.lab-section-head {
+  align-items: end;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+
+.lab-section-head h2 {
+  margin: 4px 0 8px;
+}
+
+.lab-section-head p {
+  margin: 0;
+}
+
+.lab-form-grid {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lab-form-grid label {
+  display: grid;
+  gap: 7px;
+}
+
+.lab-form-grid select {
+  min-width: 0;
+}
+
+.lab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lab-feedback {
+  border-left: 3px solid #65b891;
+  margin: 0;
+  padding: 10px 14px;
+}
+
+.evolution-assets {
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.evolution-assets[open] summary {
+  margin-bottom: 12px;
+}
+
+.evolution-assets p {
+  margin: 0 0 12px;
+}
+
+.evolution-assets .lab-form-grid {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+  .lab-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

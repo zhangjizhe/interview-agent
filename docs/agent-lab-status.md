@@ -39,4 +39,8 @@ AgentLab 新增独立 `ToolRunner` 契约，供后续 MCP、插件和工作区 p
 
 新增受专用凭据保护的 Prometheus 指标：模型尝试/耗时/真实 usage、安全拒绝和 SSE 活跃连接；JSON 日志与 Helmet 已接入，Prometheus/Grafana 为可选 profile。仅声明监控基础，不声明 Agent 质量改善。
 
-用户要求的 Lab 自进化方向为失败分析 → 改进候选 → 同数据集对比 → 人工批准 → Interview 使用已批准版本。该完整闭环尚未实现；用户已明确优先完成原 Phase 3 可观测性，本轮不自动调整 Prompt、Agent 版本或发布策略。
+## 2026-10-02 受控自进化首版
+
+失败分析 → 改进候选 → 同数据集对比 → 人工批准 → Interview 使用已批准版本的最小闭环已实现。失败分类只映射到服务端固定改进策略并生成 `DRAFT` AgentVersion；草稿只在 Lab 评测内部显式放行。发布门使用 0–100 分制，要求候选全部 Case 通过、至少 90 分，并具有当前版本在同一 Dataset/Evaluator 的无回归基线。只有 ADMIN 显式发布才更新当前版本，Interview 从下一回合读取该 `PUBLISHED` 策略。
+
+该能力不包含 LLM 自动改写、自动发布或效果声明。真实验收已证明失败候选返回 `REJECT` 且不能发布；独立 Run 的 Token/费用与稳定延迟对比仍待补齐。详见 `docs/ACCEPTANCE-REPORT-2026-10-02-CONTROLLED-EVOLUTION.md`。

@@ -130,7 +130,11 @@ export class EvaluationService {
       throw new NotFoundException('Agent 不存在或无权访问');
     }
 
-    const version = await this.resolveVersion(agent, dto.agentVersionId);
+    const version = await this.resolveVersion(
+      agent,
+      dto.agentVersionId,
+      Boolean(dto.agentVersionId),
+    );
     const dataset = await this.requireDataset(workspace.id, dto.datasetId, {
       cases: { where: { enabled: true }, orderBy: { createdAt: 'asc' } },
     });
@@ -156,12 +160,17 @@ export class EvaluationService {
       const caseResults: Array<{ score: number; passed: boolean }> = [];
       for (const datasetCase of dataset.cases) {
         try {
-          const run = await this.runtime.runAgent(userId, agentId, {
-            agentVersionId: version.id,
-            application: 'agent-lab-evaluation',
-            externalRunId: `evaluation:${evaluation.id}:${datasetCase.id}`,
-            input: datasetCase.input as Record<string, unknown>,
-          });
+          const run = await this.runtime.runAgent(
+            userId,
+            agentId,
+            {
+              agentVersionId: version.id,
+              application: 'agent-lab-evaluation',
+              externalRunId: `evaluation:${evaluation.id}:${datasetCase.id}`,
+              input: datasetCase.input as Record<string, unknown>,
+            },
+            { allowDraftVersion: true },
+          );
           const ruleResult = this.evaluateRule(evaluator, datasetCase, run);
           await this.prisma.evaluationResult.create({
             data: {
@@ -331,7 +340,11 @@ export class EvaluationService {
     };
   }
 
-  private async resolveVersion(agent: any, requestedVersionId?: string) {
+  private async resolveVersion(
+    agent: any,
+    requestedVersionId?: string,
+    allowDraftVersion = false,
+  ) {
     const version = requestedVersionId
       ? await this.prisma.agentVersion.findFirst({
           where: { id: requestedVersionId, agentId: agent.id },
@@ -340,7 +353,10 @@ export class EvaluationService {
     if (!version) {
       throw new NotFoundException('Agent 没有可评测的版本');
     }
-    if (version.status !== 'PUBLISHED') {
+    const draftAllowed = allowDraftVersion
+      && Boolean(requestedVersionId)
+      && version.status === 'DRAFT';
+    if (version.status !== 'PUBLISHED' && !draftAllowed) {
       throw new ConflictException('只能评测已发布的 AgentVersion');
     }
     return version;

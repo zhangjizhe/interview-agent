@@ -40,7 +40,14 @@ export class ApplicationService {
             id: true,
             key: true,
             name: true,
-            currentVersion: { select: { id: true, version: true, status: true } },
+            currentVersion: {
+              select: {
+                id: true,
+                version: true,
+                status: true,
+                systemPrompt: true,
+              },
+            },
           },
         },
       },

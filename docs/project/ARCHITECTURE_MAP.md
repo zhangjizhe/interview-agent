@@ -143,3 +143,7 @@ Golden Dataset + Schema
 - API Docker 镜像必须在 Nest 编译前运行 `prisma generate`，使新增模型和枚举进入编译时 Prisma Client。DDL 仅由独立 migration job 执行；API entrypoint 不执行 `db push`、`migrate deploy` 或 checkpoint setup。
 - `/api/health/ready` 必须同时验证 PostgreSQL、Redis 和已完成的 Baseline；依赖或 migration 不可用时返回 503，不能将原始错误发送给客户端。
 - 架构改动只有在代码和测试证明后才更新本地图。
+
+## 2026-10-02 受控自进化链路
+
+`ControlledEvolutionController -> ControlledEvolutionService` 只从当前已发布版本的失败 `AgentEvaluationRun` 读取固定失败分类，克隆配置并生成 `DRAFT AgentVersion`。`EvaluationService -> AgentRuntimeService` 使用内部 `allowDraftVersion` 能力执行发布前评测，公开 Run 入口仍拒绝草稿。`AgentRegistryService` 发布前查询候选最新评测与当前版本同 Dataset/Evaluator 基线，经纯规则发布门判定后写 Decision Ledger；只有允许结果才更新 `Agent.currentVersionId`。`InterviewLabBridge -> InterviewAgentService` 每回合只传递当前 `PUBLISHED` 版本的有界策略，分别进入直接模型提示词和 LangGraph interview context。

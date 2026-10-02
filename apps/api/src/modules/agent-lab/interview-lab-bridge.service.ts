@@ -32,7 +32,16 @@ export class InterviewLabBridgeService {
         externalSessionId: interview.id,
       },
     });
-    return run;
+    const currentVersion = application.agent.currentVersion;
+    return {
+      ...run,
+      approvedPolicy: currentVersion?.status === 'PUBLISHED'
+        ? currentVersion.systemPrompt.slice(0, 12_000)
+        : '',
+      agentVersion: currentVersion?.status === 'PUBLISHED'
+        ? { id: currentVersion.id, version: currentVersion.version }
+        : null,
+    };
   }
 
   async completeTurn(runId: string, response: string) {

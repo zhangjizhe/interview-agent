@@ -96,7 +96,7 @@ describe('Release gate inference', () => {
     const decision = inferReleaseGate({
       id: 'evaluation-1',
       status: 'COMPLETED',
-      score: 0.95,
+      score: 95,
       totalCases: 2,
       passedCases: 2,
       failedCases: 0,
@@ -104,5 +104,39 @@ describe('Release gate inference', () => {
     });
     expect(decision.outcome.allowed).toBe(true);
     expect(decision.matchedRules).toContain('RG-005:release-approved');
+  });
+
+  it('uses the 0-100 score scale in the rejection reason', () => {
+    const decision = inferReleaseGate({
+      id: 'evaluation-low-score',
+      status: 'COMPLETED',
+      score: 89,
+      totalCases: 2,
+      passedCases: 2,
+      failedCases: 0,
+      completedAt: new Date(),
+    });
+
+    expect(decision.outcome.allowed).toBe(false);
+    expect(decision.outcome.reason).toContain('90 分');
+    expect(decision.outcome.reason).not.toContain('9000');
+  });
+
+  it('denies publication when the candidate regresses against the same-set baseline', () => {
+    const candidate = {
+      id: 'evaluation-candidate',
+      status: 'COMPLETED',
+      score: 94,
+      totalCases: 2,
+      passedCases: 2,
+      failedCases: 0,
+      completedAt: new Date(),
+    };
+    const baseline = { ...candidate, id: 'evaluation-baseline', score: 96 };
+
+    const decision = inferReleaseGate(candidate, { required: true, baseline });
+
+    expect(decision.outcome.allowed).toBe(false);
+    expect(decision.matchedRules).toContain('RG-007:no-score-regression');
   });
 });

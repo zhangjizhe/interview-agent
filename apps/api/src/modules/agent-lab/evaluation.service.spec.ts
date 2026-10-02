@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 
 jest.mock('../../infra/prisma/prisma.service', () => ({
   PrismaService: class PrismaService {},
@@ -103,6 +103,7 @@ describe('EvaluationService', () => {
         agentVersionId: 'version-1',
         application: 'agent-lab-evaluation',
       }),
+      { allowDraftVersion: true },
     );
     expect(prisma.evaluationResult.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -223,5 +224,62 @@ describe('EvaluationService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(runtime.runAgent).not.toHaveBeenCalled();
     expect(prisma.agentEvaluationRun.create).not.toHaveBeenCalled();
+  });
+
+  it('允许显式指定草稿版本进入发布前评测', async () => {
+    const prisma: any = createPrismaMock();
+    prisma.agent.findFirst.mockResolvedValue({
+      id: 'agent-1',
+      currentVersion: publishedVersion,
+    });
+    prisma.agentVersion.findFirst.mockResolvedValue({
+      id: 'version-draft',
+      version: '1.0.1',
+      status: 'DRAFT',
+    });
+    prisma.evaluationDataset.findFirst.mockResolvedValue({
+      id: 'dataset-1',
+      cases: [{ id: 'case-1', input: { message: '开始' }, expectedOutput: {} }],
+    });
+    prisma.evaluator.findFirst.mockResolvedValue({
+      id: 'evaluator-1',
+      type: 'JSON_SCHEMA',
+      config: {},
+    });
+    prisma.agentEvaluationRun.create.mockResolvedValue({ id: 'evaluation-1' });
+    prisma.agentEvaluationRun.update.mockResolvedValue({ id: 'evaluation-1', status: 'COMPLETED' });
+    const runtime = {
+      runAgent: jest.fn().mockResolvedValue({ id: 'run-1', output: {} }),
+    };
+    const service = new EvaluationService(prisma, runtime as any);
+
+    await service.runEvaluation('user-a', 'agent-1', {
+      datasetId: 'dataset-1',
+      evaluatorId: 'evaluator-1',
+      agentVersionId: 'version-draft',
+    });
+
+    expect(runtime.runAgent).toHaveBeenCalledWith(
+      'user-a',
+      'agent-1',
+      expect.objectContaining({ agentVersionId: 'version-draft' }),
+      { allowDraftVersion: true },
+    );
+  });
+
+  it('不允许隐式选择草稿版本', async () => {
+    const prisma: any = createPrismaMock();
+    prisma.agent.findFirst.mockResolvedValue({
+      id: 'agent-1',
+      currentVersion: { id: 'version-draft', status: 'DRAFT' },
+    });
+    const service = new EvaluationService(prisma, { runAgent: jest.fn() } as any);
+
+    await expect(
+      service.runEvaluation('user-a', 'agent-1', {
+        datasetId: 'dataset-1',
+        evaluatorId: 'evaluator-1',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });

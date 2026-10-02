@@ -1,7 +1,7 @@
 import { InferenceDecision } from './inference.types';
 
 export const RELEASE_GATE_RULESET_VERSION = 'release-gate/v1';
-export const MIN_RELEASE_SCORE = 0.9;
+export const MIN_RELEASE_SCORE = 90;
 
 export type ReleaseGateOutcome = {
   allowed: boolean;
@@ -20,6 +20,10 @@ export interface ReleaseGateEvaluation {
 
 export function inferReleaseGate(
   evaluation: ReleaseGateEvaluation | null,
+  comparison: {
+    required: boolean;
+    baseline: ReleaseGateEvaluation | null;
+  } = { required: false, baseline: null },
 ): InferenceDecision<ReleaseGateOutcome> {
   const matchedRules: string[] = [];
 
@@ -45,9 +49,35 @@ export function inferReleaseGate(
   if (evaluation.score === null || evaluation.score < MIN_RELEASE_SCORE) {
     matchedRules.push('RG-004:minimum-score-required');
     return denied(
-      `评测分数必须达到 ${(MIN_RELEASE_SCORE * 100).toFixed(0)} 分。`,
+      `评测分数必须达到 ${MIN_RELEASE_SCORE.toFixed(0)} 分。`,
       matchedRules,
       { evaluation, minimumScore: MIN_RELEASE_SCORE },
+    );
+  }
+
+  if (comparison.required && !comparison.baseline) {
+    matchedRules.push('RG-006:comparable-baseline-required');
+    return denied(
+      '当前版本必须先在同一 Dataset/Evaluator 上完成基线评测。',
+      matchedRules,
+      { evaluation, baselineEvaluation: null, minimumScore: MIN_RELEASE_SCORE },
+    );
+  }
+
+  if (
+    comparison.baseline?.score !== null
+    && comparison.baseline?.score !== undefined
+    && evaluation.score < comparison.baseline.score
+  ) {
+    matchedRules.push('RG-007:no-score-regression');
+    return denied(
+      '候选版本评测分数低于当前版本基线，不能发布。',
+      matchedRules,
+      {
+        evaluation,
+        baselineEvaluation: comparison.baseline,
+        minimumScore: MIN_RELEASE_SCORE,
+      },
     );
   }
 
@@ -56,7 +86,11 @@ export function inferReleaseGate(
     outcome: { allowed: true, reason: '评测完成且全部用例通过，允许发布。' },
     ruleSetVersion: RELEASE_GATE_RULESET_VERSION,
     matchedRules,
-    evidence: { evaluation, minimumScore: MIN_RELEASE_SCORE },
+    evidence: {
+      evaluation,
+      baselineEvaluation: comparison.baseline,
+      minimumScore: MIN_RELEASE_SCORE,
+    },
   };
 }
 

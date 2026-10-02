@@ -52,6 +52,7 @@ const publishedInterviewVersion = {
   version: '1.0.0',
   status: 'PUBLISHED',
   runtimeConfig: { adapter: 'interview-multi-agent' },
+  systemPrompt: '已批准策略',
 };
 
 describe('AgentRuntimeService', () => {
@@ -91,7 +92,12 @@ describe('AgentRuntimeService', () => {
     });
 
     expect(result).toMatchObject({ id: 'run-1', status: 'COMPLETED' });
-    expect(multiAgent.run).toHaveBeenCalledWith('请开始面试', 'run-1');
+    expect(multiAgent.run).toHaveBeenCalledWith(
+      '请开始面试',
+      'run-1',
+      [],
+      '已批准策略',
+    );
     expect(trace.append).toHaveBeenCalledTimes(2);
     expect(prisma.run.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -151,6 +157,56 @@ describe('AgentRuntimeService', () => {
       service.runAgent('user-a', 'foreign-agent', { input: { message: '请开始面试' } }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.run.create).not.toHaveBeenCalled();
+  });
+
+  it('草稿版本只能通过显式的发布前评测选项运行', async () => {
+    const prisma: any = createPrismaMock();
+    prisma.agent.findFirst.mockResolvedValue({
+      id: 'agent-1',
+      currentVersion: publishedInterviewVersion,
+    });
+    prisma.agentVersion.findFirst.mockResolvedValue({
+      ...publishedInterviewVersion,
+      id: 'version-draft',
+      version: '1.0.1',
+      status: 'DRAFT',
+      systemPrompt: '候选策略',
+    });
+    prisma.run.create.mockResolvedValue({ id: 'run-draft' });
+    prisma.run.update.mockResolvedValue({ id: 'run-draft', status: 'COMPLETED' });
+    const multiAgent = {
+      isEnabled: jest.fn().mockReturnValue(true),
+      run: jest.fn().mockResolvedValue({
+        response: '候选回答',
+        plan: [],
+        pastSteps: [],
+        threadId: 'evaluation-1',
+      }),
+    };
+    const service = new AgentRuntimeService(
+      prisma,
+      multiAgent as any,
+      createTraceMock() as any,
+      createTraceBundleMock() as any,
+    );
+    const dto = {
+      agentVersionId: 'version-draft',
+      application: 'agent-lab-evaluation',
+      input: { message: '评测候选' },
+    };
+
+    await expect(service.runAgent('user-a', 'agent-1', dto)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    await expect(
+      service.runAgent('user-a', 'agent-1', dto, { allowDraftVersion: true }),
+    ).resolves.toMatchObject({ id: 'run-draft', status: 'COMPLETED' });
+    expect(multiAgent.run).toHaveBeenCalledWith(
+      '评测候选',
+      'run-draft',
+      [],
+      '候选策略',
+    );
   });
 
   it('拒绝读取不属于当前 Workspace 的 Trace', async () => {

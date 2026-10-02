@@ -22,7 +22,12 @@ export class AgentRuntimeService {
     private readonly traceBundles: TraceBundleService,
   ) {}
 
-  async runAgent(userId: string, agentId: string, dto: RunAgentDto) {
+  async runAgent(
+    userId: string,
+    agentId: string,
+    dto: RunAgentDto,
+    options: { allowDraftVersion?: boolean } = {},
+  ) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const agent = await this.prisma.agent.findFirst({
       where: { id: agentId, workspaceId: workspace.id },
@@ -32,7 +37,11 @@ export class AgentRuntimeService {
       throw new NotFoundException('Agent 不存在或无权访问');
     }
 
-    const version = await this.resolveVersion(agent, dto.agentVersionId);
+    const version = await this.resolveVersion(
+      agent,
+      dto.agentVersionId,
+      options.allowDraftVersion === true,
+    );
     const message = dto.input.message;
     if (typeof message !== 'string' || message.trim().length === 0) {
       throw new BadRequestException('当前 Interview 运行时要求 input.message 为非空字符串');
@@ -86,6 +95,8 @@ export class AgentRuntimeService {
       const graphResult = await this.multiAgent.run(
         message,
         dto.externalRunId || run.id,
+        [],
+        version.systemPrompt,
       );
       const completedAt = new Date();
       const latencyMs = completedAt.getTime() - startedAt.getTime();
@@ -307,7 +318,11 @@ export class AgentRuntimeService {
     return this.traceBundles.buildBundle(run, events);
   }
 
-  private async resolveVersion(agent: any, requestedVersionId?: string) {
+  private async resolveVersion(
+    agent: any,
+    requestedVersionId?: string,
+    allowDraftVersion = false,
+  ) {
     const version = requestedVersionId
       ? await this.prisma.agentVersion.findFirst({
           where: { id: requestedVersionId, agentId: agent.id },
@@ -316,7 +331,10 @@ export class AgentRuntimeService {
     if (!version) {
       throw new NotFoundException('Agent 没有可运行的版本');
     }
-    if (version.status !== 'PUBLISHED') {
+    const draftAllowed = allowDraftVersion
+      && Boolean(requestedVersionId)
+      && version.status === 'DRAFT';
+    if (version.status !== 'PUBLISHED' && !draftAllowed) {
       throw new ConflictException('只能运行已发布的 AgentVersion');
     }
     return version;

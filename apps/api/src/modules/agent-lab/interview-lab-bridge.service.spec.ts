@@ -18,6 +18,14 @@ describe('InterviewLabBridgeService', () => {
       bootstrapInterviewApplication: jest.fn().mockResolvedValue({
         id: 'application-1',
         agentId: 'agent-1',
+        agent: {
+          currentVersion: {
+            id: 'version-1',
+            version: '1.0.0',
+            status: 'PUBLISHED',
+            systemPrompt: '只问与目标岗位相关的问题。',
+          },
+        },
       }),
     };
     const runtime = {
@@ -28,7 +36,7 @@ describe('InterviewLabBridgeService', () => {
     const prisma: any = { applicationRun: { create: jest.fn().mockResolvedValue({ id: 'link-1' }) } };
     const service = new InterviewLabBridgeService(applications as any, runtime as any, prisma);
 
-    await service.startTurn(
+    const result = await service.startTurn(
       'user-a',
       { id: 'interview-1', position: '后端工程师', level: 'P6' },
       '请开始第一题',
@@ -49,6 +57,11 @@ describe('InterviewLabBridgeService', () => {
         runId: 'run-1',
         externalSessionId: 'interview-1',
       },
+    });
+    expect(result).toMatchObject({
+      id: 'run-1',
+      approvedPolicy: '只问与目标岗位相关的问题。',
+      agentVersion: { id: 'version-1', version: '1.0.0' },
     });
   });
 });
