@@ -51,9 +51,17 @@ export interface LlmGatewayChatModelFields extends BaseChatModelParams {
  * MultiAgentService.run/stream 用 threadIdStorage.run({threadId, userId}, ...) 包装，
  * _generate 读这个 store 拿真实 sessionId —— 避免硬编码 'unknown' 触发 session_costs FK 违反
  */
+export interface LlmUsageAccumulator {
+  promptTokens: number;
+  completionTokens: number;
+  calls: number;
+  models: Set<string>;
+}
+
 interface ThreadContext {
   threadId?: string;
   userId?: string;
+  usage?: LlmUsageAccumulator;
 }
 export const threadIdStorage = new AsyncLocalStorage<ThreadContext>();
 
@@ -115,6 +123,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
       },
       this.provider,
     );
+    this.recordUsage(response.usage, response.model);
 
     const aiMessage = new AIMessage(response.content);
     return {
@@ -191,6 +200,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
       }
       // 用量统计：最后一个 chunk 透传给 LangChain 用于 llmOutput.tokenUsage
       if (chunk.usage) {
+        this.recordUsage(chunk.usage);
         yield new ChatGenerationChunk({
           message: new AIMessageChunk({ content: '' }),
           text: '',
@@ -201,6 +211,18 @@ export class LlmGatewayChatModel extends BaseChatModel {
         });
       }
     }
+  }
+
+  private recordUsage(
+    usage?: { promptTokens: number; completionTokens: number },
+    model?: string,
+  ) {
+    const accumulator = threadIdStorage.getStore()?.usage;
+    if (!accumulator || !usage) return;
+    accumulator.promptTokens += usage.promptTokens;
+    accumulator.completionTokens += usage.completionTokens;
+    accumulator.calls += 1;
+    if (model) accumulator.models.add(model);
   }
 
   /**

@@ -1,5 +1,9 @@
 # 架构地图
 
+## 2026-10-04 · 发布证据链补充
+
+`EvaluationDataset` 可显式冻结并保存内容指纹；Serializable 事务与 PostgreSQL trigger 共同保证冻结后 Case 不变。`LlmGatewayChatModel` 在 Multi-Agent 的 AsyncLocalStorage 上聚合真实 usage，`Run` 保存 Token 与配置单价成本估算。`AgentEvaluationRun.metrics` 聚合重复样本的 P50/P95/最大延迟、Token 和成本；`release-gate/v2` 只接受至少 3 次、同指纹、同重复次数且资源回归不超过 20% 的基线/候选证据。
+
 ## 2026-09-30 · Phase 3 交接（最新）
 
 MetricsModule 提供专用凭据抓取端点；Provider HTTP transport 记录调用、延迟和实际 usage，Guard/Quota/SSRF/SSE 记录固定标签指标。JsonLogger 统一主进程输出，Helmet 设置 API 安全头。Prometheus/Grafana 为可选 profile。API/migration 共用镜像；readiness 校验当前镜像所有迁移。详细决策见 ADR 15。

@@ -11,7 +11,7 @@ jest.mock('./agent-runtime.service', () => ({
 import { EvaluationService } from './evaluation.service';
 
 function createPrismaMock() {
-  return {
+  const prisma: any = {
     workspace: {
       upsert: jest.fn().mockResolvedValue({ id: 'workspace-1' }),
     },
@@ -25,6 +25,8 @@ function createPrismaMock() {
       create: jest.fn(),
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      findFirstOrThrow: jest.fn(),
+      updateMany: jest.fn(),
     },
     evaluationCase: {
       create: jest.fn(),
@@ -44,6 +46,8 @@ function createPrismaMock() {
       create: jest.fn(),
     },
   };
+  prisma.$transaction = jest.fn(async (callback: (tx: any) => unknown) => callback(prisma));
+  return prisma;
 }
 
 const publishedVersion = {
@@ -126,6 +130,75 @@ describe('EvaluationService', () => {
         }),
       }),
     );
+  });
+
+  it('冻结 Dataset 时生成内容指纹，冻结后拒绝追加 Case', async () => {
+    const prisma: any = createPrismaMock();
+    prisma.evaluationDataset.findFirst
+      .mockResolvedValueOnce({
+        id: 'dataset-1',
+        frozenAt: null,
+        cases: [{
+          key: 'case-1', input: { message: 'hello' }, expectedOutput: { keywords: ['hello'] },
+          metadata: null, enabled: true,
+        }],
+      })
+      .mockResolvedValueOnce({ id: 'dataset-1', frozenAt: new Date() });
+    prisma.evaluationDataset.updateMany.mockResolvedValue({ count: 1 });
+    const service = new EvaluationService(prisma, { runAgent: jest.fn() } as any);
+
+    await service.freezeDataset('user-a', 'dataset-1');
+    await expect(service.addDatasetCase('user-a', 'dataset-1', {
+      key: 'case-2', input: { message: 'later' },
+    })).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prisma.evaluationDataset.updateMany).toHaveBeenCalledWith({
+      where: { id: 'dataset-1', workspaceId: 'workspace-1', frozenAt: null },
+      data: expect.objectContaining({
+        frozenAt: expect.any(Date),
+        contentHash: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+      }),
+    });
+    expect(prisma.evaluationCase.create).not.toHaveBeenCalled();
+  });
+
+  it('按 repeatCount 重复运行并聚合 P95、Token 与成本证据', async () => {
+    const prisma: any = createPrismaMock();
+    prepareEvaluation(
+      prisma,
+      { id: 'evaluator-1', type: 'KEYWORD', config: { minScore: 100 } },
+      [{ id: 'case-1', input: { message: '开始' }, expectedOutput: { keywords: ['通过'] } }],
+    );
+    const runtime = {
+      runAgent: jest.fn()
+        .mockResolvedValueOnce({ id: 'run-1', latencyMs: 100, tokenUsage: { totalTokens: 10 }, estimatedCost: 0.01, output: { response: '通过' } })
+        .mockResolvedValueOnce({ id: 'run-2', latencyMs: 200, tokenUsage: { totalTokens: 20 }, estimatedCost: 0.02, output: { response: '通过' } })
+        .mockResolvedValueOnce({ id: 'run-3', latencyMs: 300, tokenUsage: { totalTokens: 30 }, estimatedCost: 0.03, output: { response: '通过' } }),
+    };
+    const service = new EvaluationService(prisma, runtime as any);
+
+    await service.runEvaluation('user-a', 'agent-1', {
+      datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount: 3,
+    });
+
+    expect(runtime.runAgent).toHaveBeenCalledTimes(3);
+    expect(prisma.evaluationResult.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        passed: true,
+        metrics: expect.objectContaining({ repeatCount: 3, latency: { p95Ms: 300 } }),
+        evidence: expect.objectContaining({ runIds: ['run-1', 'run-2', 'run-3'] }),
+      }),
+    }));
+    expect(prisma.agentEvaluationRun.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        metrics: expect.objectContaining({
+          repeatCount: 3,
+          latency: expect.objectContaining({ p95Ms: 300 }),
+          tokenUsage: expect.objectContaining({ status: 'available', totalTokens: 60 }),
+          estimatedCost: expect.objectContaining({ status: 'available', totalCny: 0.06 }),
+        }),
+      }),
+    }));
   });
 
   it('保存 JSON_SCHEMA 规则失败的断言证据', async () => {

@@ -425,8 +425,10 @@ export class AgentRegistryService {
         passedCases: true,
         failedCases: true,
         completedAt: true,
+        metrics: true,
         datasetId: true,
         evaluatorId: true,
+        dataset: { select: { frozenAt: true, contentHash: true } },
       },
     });
     const agent = await this.prisma.agent.findFirst({
@@ -454,12 +456,24 @@ export class AgentRegistryService {
             passedCases: true,
             failedCases: true,
             completedAt: true,
+            metrics: true,
+            dataset: { select: { frozenAt: true, contentHash: true } },
           },
         })
       : null;
-    return inferReleaseGate(evaluation, {
+    const candidateEvidence = evaluation ? {
+      ...evaluation,
+      datasetFrozenAt: evaluation.dataset.frozenAt,
+      datasetContentHash: evaluation.dataset.contentHash,
+    } : null;
+    const baselineEvidence = baseline ? {
+      ...baseline,
+      datasetFrozenAt: baseline.dataset.frozenAt,
+      datasetContentHash: baseline.dataset.contentHash,
+    } : null;
+    return inferReleaseGate(candidateEvidence, {
       required: comparisonRequired,
-      baseline,
+      baseline: baselineEvidence,
     });
   }
 

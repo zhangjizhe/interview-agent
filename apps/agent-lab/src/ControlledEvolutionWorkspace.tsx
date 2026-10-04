@@ -59,6 +59,7 @@ export function ControlledEvolutionWorkspace() {
   const [caseKey, setCaseKey] = useState('job-relevance');
   const [caseMessage, setCaseMessage] = useState('请提出一道与当前岗位直接相关的面试题。');
   const [caseKeywords, setCaseKeywords] = useState('问题');
+  const [repeatCount, setRepeatCount] = useState(3);
 
   const agents = useQuery<Agent[]>({
     queryKey: ['registry-agents'],
@@ -93,6 +94,7 @@ export function ControlledEvolutionWorkspace() {
     [evaluations.data],
   );
   const draftVersions = (versions.data || []).filter((item) => item.status === 'DRAFT');
+  const selectedDataset = datasets.data?.find((item) => item.id === datasetId);
 
   useEffect(() => {
     if (!sourceEvaluationId && failedEvaluations[0]) setSourceEvaluationId(failedEvaluations[0].id);
@@ -160,6 +162,14 @@ export function ControlledEvolutionWorkspace() {
     onSuccess: () => setFeedback('评测 Case 已加入 Dataset。'),
     onError: (error: Error) => setFeedback(error.message),
   });
+  const freezeDataset = useMutation({
+    mutationFn: () => api(`/agent-lab/datasets/${datasetId}/freeze`, { method: 'POST' }),
+    onSuccess: async (result) => {
+      setFeedback(`Dataset 已冻结，指纹 ${result.contentHash}。`);
+      await queryClient.invalidateQueries({ queryKey: ['registry-datasets'] });
+    },
+    onError: (error: Error) => setFeedback(error.message),
+  });
   const generate = useMutation({
     mutationFn: () => api(`/agent-lab/agents/${agentId}/evolution/candidates`, {
       method: 'POST',
@@ -176,7 +186,7 @@ export function ControlledEvolutionWorkspace() {
   const runEvaluation = useMutation({
     mutationFn: (versionId: string) => api(`/agent-lab/agents/${agentId}/evaluations`, {
       method: 'POST',
-      body: JSON.stringify({ agentVersionId: versionId, datasetId, evaluatorId }),
+      body: JSON.stringify({ agentVersionId: versionId, datasetId, evaluatorId, repeatCount }),
     }),
     onSuccess: async (result) => {
       setFeedback(`评测完成：${result.score?.toFixed?.(1) ?? result.score ?? 0} 分。`);
@@ -203,7 +213,7 @@ export function ControlledEvolutionWorkspace() {
     onError: (error: Error) => setFeedback(error.message),
   });
 
-  const busy = bootstrap.isPending || createDataset.isPending || createEvaluator.isPending || addCase.isPending || generate.isPending || runEvaluation.isPending || compare.isPending || publish.isPending;
+  const busy = bootstrap.isPending || createDataset.isPending || createEvaluator.isPending || addCase.isPending || freezeDataset.isPending || generate.isPending || runEvaluation.isPending || compare.isPending || publish.isPending;
 
   return <section className="lab-panel">
     <div className="lab-section-head">
@@ -212,7 +222,7 @@ export function ControlledEvolutionWorkspace() {
     </div>
 
     <section className="lab-thresholds">
-      <span>候选自动生成</span><span>草稿隔离评测</span><span>最低 90 分</span><span>人工发布</span>
+      <span>数据集冻结</span><span>3–5 次重复评测</span><span>资源回归 ≤20%</span><span>人工发布</span>
     </section>
 
     <details className="evolution-assets">
@@ -233,7 +243,10 @@ export function ControlledEvolutionWorkspace() {
         <label>输入消息<input value={caseMessage} onChange={(event) => setCaseMessage(event.target.value)} /></label>
         <label>必含关键词（逗号分隔）<input value={caseKeywords} onChange={(event) => setCaseKeywords(event.target.value)} /></label>
       </div>
-      <button onClick={() => addCase.mutate()} disabled={busy || !datasetId || !caseKey || !caseMessage || !caseKeywords}>添加 Case 到当前 Dataset</button>
+      <div className="lab-actions">
+        <button onClick={() => addCase.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt || !caseKey || !caseMessage || !caseKeywords}>添加 Case 到当前 Dataset</button>
+        <button onClick={() => freezeDataset.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt}>冻结当前 Dataset</button>
+      </div>
     </details>
 
     <div className="lab-form-grid">
@@ -244,8 +257,9 @@ export function ControlledEvolutionWorkspace() {
 
     <div className="lab-form-grid">
       <label>候选版本<select value={candidateVersionId} onChange={(event) => { setCandidateVersionId(event.target.value); setComparison(null); }}><option value="">选择草稿</option>{draftVersions.map((version) => <option key={version.id} value={version.id}>{version.version}</option>)}</select></label>
-      <label>Dataset<select value={datasetId} onChange={(event) => setDatasetId(event.target.value)}><option value="">选择 Dataset</option>{datasets.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.version}</option>)}</select></label>
+      <label>Dataset<select value={datasetId} onChange={(event) => setDatasetId(event.target.value)}><option value="">选择 Dataset</option>{datasets.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.version} · {item.frozenAt ? '已冻结' : '可编辑'}</option>)}</select></label>
       <label>Evaluator<select value={evaluatorId} onChange={(event) => setEvaluatorId(event.target.value)}><option value="">选择 Evaluator</option>{evaluators.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.type}</option>)}</select></label>
+      <label>重复次数<select value={repeatCount} onChange={(event) => setRepeatCount(Number(event.target.value))}><option value={3}>3 次</option><option value={4}>4 次</option><option value={5}>5 次</option></select></label>
     </div>
 
     <div className="lab-actions">
@@ -257,7 +271,7 @@ export function ControlledEvolutionWorkspace() {
 
     {comparison && <article className="lab-row">
       <div><p className={`decision-${comparison.releaseRecommendation.toLowerCase()}`}>{comparison.releaseRecommendation}</p><h2>同集评测结果</h2><p>Dataset {comparison.datasetId} · Evaluator {comparison.evaluatorId}</p></div>
-      <div className="lab-row-metrics"><span>基线 {comparison.baseline.score}</span><span>候选 {comparison.candidate.score}</span><span>变化 {comparison.scoreDelta >= 0 ? '+' : ''}{comparison.scoreDelta}</span></div>
+      <div className="lab-row-metrics"><span>基线 {comparison.baseline.score}</span><span>候选 {comparison.candidate.score}</span><span>变化 {comparison.scoreDelta >= 0 ? '+' : ''}{comparison.scoreDelta}</span><span>发布证据 {comparison.releaseGate.ruleSetVersion}</span></div>
     </article>}
     {feedback && <p className="lab-feedback">{feedback}</p>}
   </section>;

@@ -87,6 +87,8 @@ describe('AgentRegistryService', () => {
       passedCases: 2,
       failedCases: 0,
       completedAt: new Date(),
+      dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
+      metrics: { repeatCount: 3, latency: { p95Ms: 100 }, tokenUsage: { status: 'available', totalTokens: 30 }, estimatedCost: { status: 'available', totalCny: 0.01 } },
     });
     prisma.agentVersion.update.mockResolvedValue({
       id: 'version-2',
@@ -159,6 +161,8 @@ describe('AgentRegistryService', () => {
       passedCases: 1,
       failedCases: 0,
       completedAt: new Date(),
+      dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
+      metrics: { repeatCount: 3, latency: { p95Ms: 100 }, tokenUsage: { status: 'available', totalTokens: 30 }, estimatedCost: { status: 'available', totalCny: 0.01 } },
     });
     const ledger = createDecisionLedgerMock();
     ledger.record.mockRejectedValue(new Error('ledger unavailable'));
@@ -191,6 +195,8 @@ describe('AgentRegistryService', () => {
         completedAt: new Date(),
         datasetId: 'dataset-1',
         evaluatorId: 'evaluator-1',
+        dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
+        metrics: { repeatCount: 3, latency: { p95Ms: 100 }, tokenUsage: { status: 'available', totalTokens: 30 }, estimatedCost: { status: 'available', totalCny: 0.01 } },
       })
       .mockResolvedValueOnce({
         id: 'evaluation-baseline',
@@ -200,6 +206,8 @@ describe('AgentRegistryService', () => {
         passedCases: 2,
         failedCases: 0,
         completedAt: new Date(),
+        dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
+        metrics: { repeatCount: 3, latency: { p95Ms: 100 }, tokenUsage: { status: 'available', totalTokens: 30 }, estimatedCost: { status: 'available', totalCny: 0.01 } },
       });
     const service = new AgentRegistryService(prisma, createDecisionLedgerMock() as any);
 

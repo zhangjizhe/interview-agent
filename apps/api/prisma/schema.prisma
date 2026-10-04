@@ -695,6 +695,8 @@ model EvaluationDataset {
   description String?  @db.Text
   version     String   @default("1.0.0")
   metadata    Json?
+  frozenAt    DateTime?
+  contentHash String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -704,6 +706,7 @@ model EvaluationDataset {
 
   @@unique([workspaceId, key])
   @@index([workspaceId, updatedAt])
+  @@index([workspaceId, frozenAt])
   @@map("evaluation_datasets")
 }
 

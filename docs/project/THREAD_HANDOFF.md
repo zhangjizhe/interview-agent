@@ -1,5 +1,9 @@
 # 任务交接
 
+## 2026-10-04 · LAB-EVIDENCE-GATE-2
+
+已完成 Dataset 冻结/指纹、Serializable 冻结事务与数据库 trigger、1–5 次重复评测聚合、Gateway usage 汇总、成本估算和 `release-gate/v2` 资源非回归门。迁移已应用本机；API 70 suites / 515 tests、Cache 22、Web 83、lint/typecheck/build 通过；本地新 API 3002 启动且 Provider health 正常。Docker Hub frontend 解析阻塞 API 镜像重建；管理员写验收因禁止持久化测试 ADMIN 未执行，均已写入验收报告。下一任务建议补管理员浏览器验收及版本化费率表，不自动发布、不声明质量提升。
+
 ## 2026-10-02 · 受控自进化首版交接（最新）
 
 LAB-CONTROLLED-EVOLUTION-1 已完成。新增 ADMIN 自进化 API 与独立 Lab 工作区；草稿只在评测内部运行，发布门要求同 Dataset/Evaluator 基线、全部 Case 通过、至少 90/100 且不回归；显式发布后 Interview 才读取策略。真实验收保留 `Interview Agent 1.0.0` 为当前版本，创建的 `1.0.1` 失败探针草稿未发布。API:3001 与 Lab:5175 已重建运行，迁移无新增。继续前阅读验收报告；下一阶段应先补齐成本/延迟统计门，不能把单次规则评测当成质量改善。

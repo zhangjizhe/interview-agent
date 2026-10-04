@@ -77,6 +77,9 @@ describe('AgentRuntimeService', () => {
         pastSteps: [],
         steps: 0,
         threadId: 'run-1',
+        tokenUsage: { promptTokens: 10, completionTokens: 5, totalTokens: 15, calls: 1, models: ['qwen-plus'] },
+        estimatedCostCny: 0.0001,
+        pricing: { source: 'configured-conservative-estimate' },
       }),
     };
     const trace = createTraceMock();
@@ -102,7 +105,11 @@ describe('AgentRuntimeService', () => {
     expect(prisma.run.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'run-1' },
-        data: expect.objectContaining({ status: 'COMPLETED' }),
+        data: expect.objectContaining({
+          status: 'COMPLETED',
+          tokenUsage: expect.objectContaining({ totalTokens: 15 }),
+          estimatedCost: 0.0001,
+        }),
       }),
     );
   });

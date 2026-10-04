@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { AgentRuntimeService } from './agent-runtime.service';
 import {
@@ -73,7 +74,10 @@ export class EvaluationService {
     dto: CreateEvaluationDatasetCaseDto,
   ) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
-    await this.requireDataset(workspace.id, datasetId);
+    const dataset = await this.requireDataset(workspace.id, datasetId);
+    if (dataset.frozenAt) {
+      throw new ConflictException('Dataset 已冻结，不能再追加 Case；请创建新版本');
+    }
     try {
       return await this.prisma.evaluationCase.create({
         data: {
@@ -88,8 +92,47 @@ export class EvaluationService {
       if (error?.code === 'P2002') {
         throw new ConflictException(`Dataset case key "${dto.key}" 已存在`);
       }
+      if (error?.code === 'P2004' || String(error?.message).includes('evaluation dataset is frozen')) {
+        throw new ConflictException('Dataset 已冻结，不能再追加 Case；请创建新版本');
+      }
       throw error;
     }
+  }
+
+  async freezeDataset(userId: string, datasetId: string) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    return this.prisma.$transaction(async (tx) => {
+      const dataset = await tx.evaluationDataset.findFirst({
+        where: { id: datasetId, workspaceId: workspace.id },
+        include: { cases: { orderBy: { key: 'asc' } } },
+      });
+      if (!dataset) throw new NotFoundException('Dataset 不存在或无权访问');
+      if (dataset.frozenAt) return dataset;
+      if (dataset.cases.length === 0) {
+        throw new BadRequestException('Dataset 至少需要一个 Case 才能冻结');
+      }
+      const contentHash = `sha256:${createHash('sha256')
+        .update(this.stableStringify({
+          version: dataset.version,
+          cases: dataset.cases.map((item: any) => ({
+            key: item.key,
+            input: item.input,
+            expectedOutput: item.expectedOutput,
+            metadata: item.metadata,
+            enabled: item.enabled,
+          })),
+        }))
+        .digest('hex')}`;
+      const frozenAt = new Date();
+      const updated = await tx.evaluationDataset.updateMany({
+        where: { id: datasetId, workspaceId: workspace.id, frozenAt: null },
+        data: { frozenAt, contentHash },
+      });
+      if (updated.count !== 1) {
+        return tx.evaluationDataset.findFirstOrThrow({ where: { id: datasetId } });
+      }
+      return { ...dataset, frozenAt, contentHash };
+    }, { isolationLevel: 'Serializable' });
   }
 
   async createEvaluator(userId: string, dto: CreateEvaluatorDto) {
@@ -142,6 +185,7 @@ export class EvaluationService {
       throw new BadRequestException('Dataset 至少需要一个启用的 case 才能运行评测');
     }
     const evaluator = await this.requireEvaluator(workspace.id, dto.evaluatorId);
+    const repeatCount = dto.repeatCount ?? 1;
     const startedAt = new Date();
     const evaluation = await this.prisma.agentEvaluationRun.create({
       data: {
@@ -158,52 +202,72 @@ export class EvaluationService {
 
     try {
       const caseResults: Array<{ score: number; passed: boolean }> = [];
+      const allRuns: any[] = [];
       for (const datasetCase of dataset.cases) {
-        try {
-          const run = await this.runtime.runAgent(
-            userId,
-            agentId,
-            {
-              agentVersionId: version.id,
-              application: 'agent-lab-evaluation',
-              externalRunId: `evaluation:${evaluation.id}:${datasetCase.id}`,
-              input: datasetCase.input as Record<string, unknown>,
-            },
-            { allowDraftVersion: true },
-          );
-          const ruleResult = this.evaluateRule(evaluator, datasetCase, run);
-          await this.prisma.evaluationResult.create({
-            data: {
-              evaluationRunId: evaluation.id,
-              datasetCaseId: datasetCase.id,
-              runId: run.id,
-              status: 'COMPLETED',
-              score: ruleResult.score,
-              passed: ruleResult.passed,
-              metrics: ruleResult.metrics as any,
-              evidence: ruleResult.evidence as any,
-              outputSummary: this.summarizeOutput(run.output),
-              failureCategory: ruleResult.failureCategory,
-              failureMessage: ruleResult.failureMessage,
-            },
-          });
-          caseResults.push(ruleResult);
-        } catch (error: any) {
-          const message = error?.message || '运行或规则评测失败';
-          await this.prisma.evaluationResult.create({
-            data: {
-              evaluationRunId: evaluation.id,
-              datasetCaseId: datasetCase.id,
-              runId: error?.agentLabRunId,
-              status: 'FAILED',
-              passed: false,
-              failureCategory: 'RUN_FAILED',
-              failureMessage: message,
-              evidence: { error: message, runId: error?.agentLabRunId ?? null },
-            },
-          });
-          caseResults.push({ score: 0, passed: false });
+        const samples: Array<{ rule: RuleEvaluation; run?: any; error?: string }> = [];
+        for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+          try {
+            const run = await this.runtime.runAgent(
+              userId,
+              agentId,
+              {
+                agentVersionId: version.id,
+                application: 'agent-lab-evaluation',
+                externalRunId: `evaluation:${evaluation.id}:${datasetCase.id}:${repeatIndex + 1}`,
+                input: datasetCase.input as Record<string, unknown>,
+              },
+              { allowDraftVersion: true },
+            );
+            allRuns.push(run);
+            samples.push({ rule: this.evaluateRule(evaluator, datasetCase, run), run });
+          } catch (error: any) {
+            const message = error?.message || '运行或规则评测失败';
+            samples.push({
+              rule: {
+                score: 0,
+                passed: false,
+                metrics: {},
+                evidence: { error: message, runId: error?.agentLabRunId ?? null },
+                failureCategory: 'RUN_FAILED',
+                failureMessage: message,
+              },
+              error: message,
+              run: error?.agentLabRunId ? { id: error.agentLabRunId } : undefined,
+            });
+          }
         }
+        const score = samples.reduce((sum, item) => sum + item.rule.score, 0) / samples.length;
+        const passed = samples.every((item) => item.rule.passed);
+        const failed = samples.find((item) => !item.rule.passed);
+        const runIds = samples.map((item) => item.run?.id).filter(Boolean);
+        const latencies = samples
+          .map((item) => item.run?.latencyMs)
+          .filter((value): value is number => typeof value === 'number');
+        await this.prisma.evaluationResult.create({
+          data: {
+            evaluationRunId: evaluation.id,
+            datasetCaseId: datasetCase.id,
+            runId: runIds[0],
+            status: samples.some((item) => item.error) ? 'FAILED' : 'COMPLETED',
+            score,
+            passed,
+            metrics: {
+              repeatCount,
+              latency: latencies.length === samples.length
+                ? { p95Ms: this.percentile(latencies, 0.95) }
+                : { status: 'unavailable' },
+              samples: samples.map((item) => item.rule.metrics),
+            } as any,
+            evidence: {
+              runIds,
+              samples: samples.map((item) => item.rule.evidence),
+            } as any,
+            outputSummary: this.summarizeOutput(samples.map((item) => item.run?.output ?? null)),
+            failureCategory: failed?.rule.failureCategory,
+            failureMessage: failed?.rule.failureMessage,
+          },
+        });
+        caseResults.push({ score, passed });
       }
 
       const passedCases = caseResults.filter((item) => item.passed).length;
@@ -219,11 +283,16 @@ export class EvaluationService {
           completedAt,
           metrics: {
             evaluatorType: evaluator.type,
+            datasetContentHash: dataset.contentHash ?? null,
+            datasetFrozenAt: dataset.frozenAt ?? null,
+            repeatCount,
+            totalSamples: dataset.cases.length * repeatCount,
             totalCases: caseResults.length,
             passedCases,
             failedCases: caseResults.length - passedCases,
             averageScore: score,
-            latencyMs: completedAt.getTime() - startedAt.getTime(),
+            wallClockLatencyMs: completedAt.getTime() - startedAt.getTime(),
+            ...this.aggregateRunEvidence(allRuns),
           },
         },
       });
@@ -432,6 +501,45 @@ export class EvaluationService {
     return typeof value === 'number' && Number.isFinite(value) && value >= 0
       ? value
       : fallback;
+  }
+
+  private aggregateRunEvidence(runs: any[]) {
+    const latencies = runs.map((run) => run.latencyMs)
+      .filter((value): value is number => typeof value === 'number');
+    const totalTokens = runs.map((run) => this.toRecord(run.tokenUsage).totalTokens);
+    const costs = runs.map((run) => run.estimatedCost);
+    return {
+      latency: runs.length > 0 && latencies.length === runs.length
+        ? {
+            sampleCount: latencies.length,
+            p50Ms: this.percentile(latencies, 0.5),
+            p95Ms: this.percentile(latencies, 0.95),
+            maxMs: Math.max(...latencies),
+          }
+        : { status: 'unavailable', sampleCount: latencies.length },
+      tokenUsage: runs.length > 0 && totalTokens.length === runs.length
+        && totalTokens.every((value) => typeof value === 'number')
+        ? { status: 'available', totalTokens: (totalTokens as number[]).reduce((sum, value) => sum + value, 0) }
+        : { status: 'unavailable' },
+      estimatedCost: runs.length > 0 && costs.length === runs.length
+        && costs.every((value) => typeof value === 'number')
+        ? { status: 'available', totalCny: Number((costs as number[]).reduce((sum, value) => sum + value, 0).toFixed(6)) }
+        : { status: 'unavailable' },
+    };
+  }
+
+  private percentile(values: number[], percentile: number) {
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.max(0, Math.ceil(sorted.length * percentile) - 1)];
+  }
+
+  private stableStringify(value: unknown): string {
+    if (Array.isArray(value)) return `[${value.map((item) => this.stableStringify(item)).join(',')}]`;
+    if (value && typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value) ?? 'null';
   }
 
   private summarizeOutput(value: unknown): string {

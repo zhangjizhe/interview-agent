@@ -2,6 +2,9 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsInt,
+  Max,
+  Min,
   Matches,
   MaxLength,
   IsIn,
@@ -203,6 +206,12 @@ export class RunEvaluationDto {
   @IsString()
   @MaxLength(100)
   agentVersionId?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  repeatCount?: number;
 }
 
 export class SpawnSubRunDto {

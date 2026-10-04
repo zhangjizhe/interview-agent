@@ -101,6 +101,14 @@ describe('Release gate inference', () => {
       passedCases: 2,
       failedCases: 0,
       completedAt: new Date(),
+      datasetFrozenAt: new Date(),
+      datasetContentHash: 'sha256:dataset',
+      metrics: {
+        repeatCount: 3,
+        latency: { p95Ms: 1000 },
+        tokenUsage: { status: 'available', totalTokens: 300 },
+        estimatedCost: { status: 'available', totalCny: 0.01 },
+      },
     });
     expect(decision.outcome.allowed).toBe(true);
     expect(decision.matchedRules).toContain('RG-005:release-approved');
@@ -131,6 +139,14 @@ describe('Release gate inference', () => {
       passedCases: 2,
       failedCases: 0,
       completedAt: new Date(),
+      datasetFrozenAt: new Date(),
+      datasetContentHash: 'sha256:dataset',
+      metrics: {
+        repeatCount: 3,
+        latency: { p95Ms: 1000 },
+        tokenUsage: { status: 'available', totalTokens: 300 },
+        estimatedCost: { status: 'available', totalCny: 0.01 },
+      },
     };
     const baseline = { ...candidate, id: 'evaluation-baseline', score: 96 };
 
@@ -138,5 +154,48 @@ describe('Release gate inference', () => {
 
     expect(decision.outcome.allowed).toBe(false);
     expect(decision.matchedRules).toContain('RG-007:no-score-regression');
+  });
+
+  it('denies publication when the dataset is mutable or repeated evidence is insufficient', () => {
+    const evaluation = {
+      id: 'evaluation-1', status: 'COMPLETED', score: 100, totalCases: 1,
+      passedCases: 1, failedCases: 0, completedAt: new Date(),
+      datasetFrozenAt: null, datasetContentHash: null,
+      metrics: { repeatCount: 1 },
+    };
+
+    const decision = inferReleaseGate(evaluation);
+
+    expect(decision.outcome.allowed).toBe(false);
+    expect(decision.matchedRules).toContain('RG-008:frozen-dataset-required');
+  });
+
+  it('denies publication when latency, tokens, or estimated cost regress beyond 20 percent', () => {
+    const metrics = {
+      repeatCount: 3,
+      latency: { p95Ms: 1300 },
+      tokenUsage: { status: 'available', totalTokens: 390 },
+      estimatedCost: { status: 'available', totalCny: 0.013 },
+    };
+    const candidate = {
+      id: 'evaluation-candidate', status: 'COMPLETED', score: 100, totalCases: 1,
+      passedCases: 1, failedCases: 0, completedAt: new Date(),
+      datasetFrozenAt: new Date(), datasetContentHash: 'sha256:dataset', metrics,
+    };
+    const baseline = {
+      ...candidate,
+      id: 'evaluation-baseline',
+      metrics: {
+        repeatCount: 3,
+        latency: { p95Ms: 1000 },
+        tokenUsage: { status: 'available', totalTokens: 300 },
+        estimatedCost: { status: 'available', totalCny: 0.01 },
+      },
+    };
+
+    const decision = inferReleaseGate(candidate, { required: true, baseline });
+
+    expect(decision.outcome.allowed).toBe(false);
+    expect(decision.matchedRules).toContain('RG-011:latency-regression');
   });
 });

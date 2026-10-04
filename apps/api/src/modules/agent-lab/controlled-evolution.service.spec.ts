@@ -134,6 +134,8 @@ describe('ControlledEvolutionService', () => {
     prisma.agentEvaluationRun.findFirst
       .mockResolvedValueOnce({
         id: 'candidate-eval',
+        status: 'COMPLETED',
+        completedAt: new Date(),
         agentVersionId: 'version-2',
         datasetId: 'dataset-1',
         evaluatorId: 'evaluator-1',
@@ -141,10 +143,18 @@ describe('ControlledEvolutionService', () => {
         totalCases: 10,
         passedCases: 10,
         failedCases: 0,
-        metrics: { latencyMs: 1200 },
+        dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
+        metrics: {
+          repeatCount: 3,
+          latency: { p95Ms: 1200 },
+          tokenUsage: { status: 'available', totalTokens: 300 },
+          estimatedCost: { status: 'available', totalCny: 0.01 },
+        },
       })
       .mockResolvedValueOnce({
         id: 'baseline-eval',
+        status: 'COMPLETED',
+        completedAt: new Date(),
         agentVersionId: currentVersion.id,
         datasetId: 'dataset-1',
         evaluatorId: 'evaluator-1',
@@ -152,7 +162,13 @@ describe('ControlledEvolutionService', () => {
         totalCases: 10,
         passedCases: 10,
         failedCases: 0,
-        metrics: { latencyMs: 1100 },
+        dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
+        metrics: {
+          repeatCount: 3,
+          latency: { p95Ms: 1100 },
+          tokenUsage: { status: 'available', totalTokens: 300 },
+          estimatedCost: { status: 'available', totalCny: 0.01 },
+        },
       });
 
     const service = new ControlledEvolutionService(prisma);

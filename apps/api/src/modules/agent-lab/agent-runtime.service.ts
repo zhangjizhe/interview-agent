@@ -115,6 +115,8 @@ export class AgentRuntimeService {
           status: 'COMPLETED',
           output: output as any,
           latencyMs,
+          tokenUsage: graphResult.tokenUsage as any,
+          estimatedCost: graphResult.estimatedCostCny,
           completedAt,
         },
       });
@@ -125,10 +127,11 @@ export class AgentRuntimeService {
         output,
         payload: { status: 'COMPLETED', output },
         latencyMs,
+        tokenUsage: graphResult.tokenUsage,
+        estimatedCost: graphResult.estimatedCostCny,
         metadata: {
           adapter: runtimeConfig.adapter,
-          tokenUsage: 'unavailable',
-          estimatedCost: 'unavailable',
+          pricing: graphResult.pricing,
         },
       });
       return completed;
@@ -380,6 +383,8 @@ export class AgentRuntimeService {
       output?: unknown;
       metadata?: unknown;
       latencyMs?: number;
+      tokenUsage?: unknown;
+      estimatedCost?: number;
       error?: string;
     },
   ) {
@@ -393,6 +398,8 @@ export class AgentRuntimeService {
         output: event.output,
         metadata: event.metadata,
         latencyMs: event.latencyMs,
+        tokenUsage: event.tokenUsage,
+        estimatedCost: event.estimatedCost,
         error: event.error,
       });
     } catch (error: any) {

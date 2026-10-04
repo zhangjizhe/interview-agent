@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-04 · 发布证据门（最新）
+
+Agent Lab 已增加 Dataset 冻结与内容指纹、1–5 次有界重复评测、真实 Gateway Token 汇总和配置单价成本估算；`release-gate/v2` 要求至少 3 次同指纹基线/候选证据，并限制 P95 延迟、Token 与估算成本回归不超过 20%。加性迁移已在本机应用并核验 trigger；API 70 suites / 515 tests、Cache 22、Web 83、lint/typecheck/build 通过。新 API 构建产物已在 3002 启动，管理员浏览器写入验收因自动审批禁止持久化测试 ADMIN 而未执行。详见 `docs/ACCEPTANCE-REPORT-2026-10-04-EVIDENCE-GATE.md`。
+
 ## 2026-10-02 · 受控自进化首版（最新）
 
 Lab 已交付失败评测生成草稿候选、草稿隔离评测、同 Dataset/Evaluator 非回归比较、90/100 发布门和 ADMIN 人工发布；Interview 从下一回合读取当前已发布策略。真实浏览器验证了 100 分基线、0 分失败探针、`1.0.1` 草稿及 `REJECT`/禁止发布路径。API 510、Cache 22、Web 83，lint/typecheck/build 通过。没有 schema/依赖变化；尚不声明真实质量提升，Token/成本/稳定延迟门仍待完善。报告见 `docs/ACCEPTANCE-REPORT-2026-10-02-CONTROLLED-EVOLUTION.md`。

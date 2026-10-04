@@ -37,6 +37,11 @@ export class EvaluationController {
     return this.evaluations.addDatasetCase(req.user.userId, datasetId, dto);
   }
 
+  @Post('datasets/:datasetId/freeze')
+  freezeDataset(@Req() req: any, @Param('datasetId') datasetId: string) {
+    return this.evaluations.freezeDataset(req.user.userId, datasetId);
+  }
+
   @Post('evaluators')
   createEvaluator(@Req() req: any, @Body() dto: CreateEvaluatorDto) {
     return this.evaluations.createEvaluator(req.user.userId, dto);

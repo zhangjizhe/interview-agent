@@ -4,9 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { inferReleaseGate } from '../inference/release-gate-inference';
 import { GenerateImprovementCandidateDto } from './dto/controlled-evolution.dto';
 
-const MIN_RELEASE_SCORE = 90;
 const POLICY_HEADING = '【Agent Lab 受控改进策略】';
 
 const STRATEGIES: Record<string, string> = {
@@ -126,6 +126,7 @@ export class ControlledEvolutionService {
         agentVersionId: candidateVersionId,
         status: 'COMPLETED',
       },
+      include: { dataset: { select: { frozenAt: true, contentHash: true } } },
       orderBy: { completedAt: 'desc' },
     });
     if (!candidate) throw new ConflictException('候选版本尚未完成评测');
@@ -139,6 +140,7 @@ export class ControlledEvolutionService {
         evaluatorId: candidate.evaluatorId,
         status: 'COMPLETED',
       },
+      include: { dataset: { select: { frozenAt: true, contentHash: true } } },
       orderBy: { completedAt: 'desc' },
     });
     if (!baseline) {
@@ -147,12 +149,19 @@ export class ControlledEvolutionService {
 
     const candidateScore = candidate.score ?? 0;
     const baselineScore = baseline.score ?? 0;
-    const allCandidateCasesPassed = candidate.totalCases > 0
-      && candidate.failedCases === 0
-      && candidate.passedCases === candidate.totalCases;
-    const releaseRecommended = allCandidateCasesPassed
-      && candidateScore >= MIN_RELEASE_SCORE
-      && candidateScore >= baselineScore;
+    const releaseGate = inferReleaseGate({
+      ...candidate,
+      datasetFrozenAt: candidate.dataset.frozenAt,
+      datasetContentHash: candidate.dataset.contentHash,
+    }, {
+      required: true,
+      baseline: {
+        ...baseline,
+        datasetFrozenAt: baseline.dataset.frozenAt,
+        datasetContentHash: baseline.dataset.contentHash,
+      },
+    });
+    const releaseRecommended = releaseGate.outcome.allowed;
 
     return {
       comparable: true,
@@ -162,11 +171,8 @@ export class ControlledEvolutionService {
       candidate: this.evaluationSummary(candidate),
       scoreDelta: candidateScore - baselineScore,
       releaseRecommendation: releaseRecommended ? 'APPROVE' : 'REJECT',
-      reasons: [
-        ...(allCandidateCasesPassed ? [] : ['候选版本存在未通过用例']),
-        ...(candidateScore >= MIN_RELEASE_SCORE ? [] : [`候选分数低于 ${MIN_RELEASE_SCORE}`]),
-        ...(candidateScore >= baselineScore ? [] : ['候选分数低于当前版本基线']),
-      ],
+      reasons: releaseRecommended ? [] : [releaseGate.outcome.reason],
+      releaseGate,
     };
   }
 

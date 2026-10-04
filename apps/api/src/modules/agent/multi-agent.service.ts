@@ -18,7 +18,11 @@ import {
   INTERVIEW_GRAPH_RECURSION_LIMIT,
   type InterviewAgentStateType,
 } from '../../agents/multi-agent/graph';
-import { LlmGatewayChatModel, threadIdStorage } from '../../agents/multi-agent/llm-gateway-chat-model';
+import {
+  LlmGatewayChatModel,
+  LlmUsageAccumulator,
+  threadIdStorage,
+} from '../../agents/multi-agent/llm-gateway-chat-model';
 import { dedupFinalResponse } from '../../agents/multi-agent/dedup';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
@@ -193,9 +197,20 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
 
     // 用 AsyncLocalStorage 包装，让 _generate 拿到真实 threadId
     // （LangChain v1.x _generate 拿到的 options.configurable 已被剥离）
-    const result = await threadIdStorage.run({ threadId }, async () =>
+    const usage: LlmUsageAccumulator = {
+      promptTokens: 0,
+      completionTokens: 0,
+      calls: 0,
+      models: new Set<string>(),
+    };
+    const result = await threadIdStorage.run({ threadId, usage }, async () =>
       this.graph!.invoke(input as any, config),
     );
+
+    const inputPriceCnyPer1k = this.priceFromEnv('LLM_INPUT_PRICE_CNY_PER_1K', 'QWEN_INPUT_PRICE', 0.004);
+    const outputPriceCnyPer1k = this.priceFromEnv('LLM_OUTPUT_PRICE_CNY_PER_1K', 'QWEN_OUTPUT_PRICE', 0.012);
+    const estimatedCostCny = (usage.promptTokens / 1000) * inputPriceCnyPer1k
+      + (usage.completionTokens / 1000) * outputPriceCnyPer1k;
 
     return {
       response: (result as any).final_response || '',
@@ -204,7 +219,25 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
       pastSteps: (result as any).past_steps,
       steps: ((result as any).past_steps || []).length,
       threadId,
+      tokenUsage: {
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.promptTokens + usage.completionTokens,
+        calls: usage.calls,
+        models: [...usage.models].sort(),
+      },
+      estimatedCostCny: Number(estimatedCostCny.toFixed(6)),
+      pricing: {
+        source: 'configured-conservative-estimate',
+        inputPriceCnyPer1k,
+        outputPriceCnyPer1k,
+      },
     };
+  }
+
+  private priceFromEnv(primary: string, legacy: string, fallback: number) {
+    const parsed = Number(process.env[primary] ?? process.env[legacy] ?? fallback);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
   }
 
   async *stream(
