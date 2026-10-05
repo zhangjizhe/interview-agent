@@ -182,6 +182,7 @@ export class LlmGatewayService {
           usage: { promptTokens: 0, completionTokens: 0 },
           finishReason: 'stop',
           model: `semantic_cache:${sem.cacheId}`,
+          provider: 'semantic_cache',
         };
       }
     }

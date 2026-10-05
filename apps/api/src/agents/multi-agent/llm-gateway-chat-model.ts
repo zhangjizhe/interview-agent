@@ -56,6 +56,12 @@ export interface LlmUsageAccumulator {
   completionTokens: number;
   calls: number;
   models: Set<string>;
+  samples: Array<{
+    provider: string;
+    model: string;
+    promptTokens: number;
+    completionTokens: number;
+  }>;
 }
 
 interface ThreadContext {
@@ -123,7 +129,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
       },
       this.provider,
     );
-    this.recordUsage(response.usage, response.model);
+    this.recordUsage(response.usage, response.provider, response.model);
 
     const aiMessage = new AIMessage(response.content);
     return {
@@ -200,7 +206,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
       }
       // 用量统计：最后一个 chunk 透传给 LangChain 用于 llmOutput.tokenUsage
       if (chunk.usage) {
-        this.recordUsage(chunk.usage);
+        this.recordUsage(chunk.usage, chunk.provider || this.provider, chunk.model || this.provider);
         yield new ChatGenerationChunk({
           message: new AIMessageChunk({ content: '' }),
           text: '',
@@ -215,6 +221,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
 
   private recordUsage(
     usage?: { promptTokens: number; completionTokens: number },
+    provider?: string,
     model?: string,
   ) {
     const accumulator = threadIdStorage.getStore()?.usage;
@@ -223,6 +230,12 @@ export class LlmGatewayChatModel extends BaseChatModel {
     accumulator.completionTokens += usage.completionTokens;
     accumulator.calls += 1;
     if (model) accumulator.models.add(model);
+    accumulator.samples.push({
+      provider: provider || 'unknown',
+      model: model || 'unknown',
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+    });
   }
 
   /**

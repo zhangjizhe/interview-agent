@@ -4,16 +4,16 @@
 
 ## 任务 ID
 
-LAB-EVIDENCE-GATE-3
+LAB-PRICING-EVIDENCE-4
 
 ## 目标与范围
 
-在已部署的本地管理员工作流中复验 Dataset 冻结和重复评测，并关闭“未冻结 Dataset 仍可生成 3–5 次发布证据”的产品缺口。API 对发布证据强制要求冻结时间和内容指纹；Agent Lab 在冻结前禁用基线与候选重复评测。保留单次探索性评测能力，不改变发布算法、数据库或自动发布边界。
+建立集中、版本化的 Provider/Model 费率目录，让真实 Token 用量按可追溯费率生成成本证据；未知模型或无效费率必须显式返回不可用，禁止静默套用通用默认价格。统一 Agent Runtime 与会话成本跟踪的定价入口，不改变 Provider 路由、数据库或计费扣款行为。
 
 ## 状态
 
-已完成代码、测试、构建和部分真实管理员验收。Dataset 冻结、指纹、冻结后 UI 写保护及三次基线评测已通过；候选真实评测点击因浏览器自动审批服务容量不足未执行，不作为通过项。
+已完成。Agent Runtime 与 Session Cost 已按实际 Provider/Model 使用同一版本化费率目录；未知费率会将成本证据标记为不可用。本机迁移、容器启动、Provider 健康检查及完整工程门禁均通过，尚无真实 Provider 账单样本可供财务对账。
 
 ## 验收
 
-API 回归覆盖未冻结 Dataset 的三次发布证据拒绝；Agent Lab build、全仓 lint/typecheck/build、API Jest 与缓存测试通过。最终需检查 diff，仅提交本任务文件，推送至 `origin/agent-lab` 并确认远端 SHA。
+单元测试覆盖精确 Provider/Model、输入阶梯、缓存输入、环境覆盖、未知模型、无效配置和账单容差判断；API 71 suites / 523 tests（另 2 suites / 14 tests skipped）、Cache 22、lint、typecheck、build 通过。加性迁移已在本机 PostgreSQL 应用，API 与 Agent Lab 健康运行；提交后推送并核验 `origin/agent-lab`。

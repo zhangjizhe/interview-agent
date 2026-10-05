@@ -179,7 +179,7 @@ export const configuration = (): AppConfig => {
   deepseek: {
     apiKey: process.env.DEEPSEEK_API_KEY || '',
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1',
-    model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
   },
   bocha: {
     apiKey: process.env.BOCHA_API_KEY || '',

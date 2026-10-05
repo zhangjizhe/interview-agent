@@ -17,7 +17,7 @@ export class DeepseekProvider extends BaseLLMProvider {
 
   constructor(private config: ConfigService, @Optional() metrics?: MetricsService) {
     super();
-    this.defaultModel = this.config.get<string>('deepseek.model') || 'deepseek-chat';
+    this.defaultModel = this.config.get<string>('deepseek.model') || 'deepseek-flash';
     this.client = new OpenAI({
       fetch: metrics?.modelFetch('deepseek') as any,
       apiKey: this.config.get<string>('deepseek.apiKey'),
@@ -55,6 +55,7 @@ export class DeepseekProvider extends BaseLLMProvider {
         },
         finishReason: choice.finish_reason || 'stop',
         model: response.model,
+        provider: this.name,
       };
     } catch (err) {
       this.logger.error({ event: 'provider_chat_failed', provider: this.name, status: err?.status });
@@ -85,6 +86,8 @@ export class DeepseekProvider extends BaseLLMProvider {
         }
         if (chunk.usage) {
           yield {
+            provider: this.name,
+            model: chunk.model || this.defaultModel,
             usage: {
               promptTokens: chunk.usage.prompt_tokens,
               completionTokens: chunk.usage.completion_tokens,

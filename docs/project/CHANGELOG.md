@@ -1,5 +1,12 @@
 # 上下文变更日志
 
+## 2026-10-05 · 版本化模型费率证据
+
+- 新增集中、可覆盖且启动时严格校验的 Provider/Model 费率目录与账单样本容差对账。
+- Gateway 响应透传实际 Provider/Model；Multi-Agent 与 Session Cost 按逐调用 usage 使用同一目录。
+- Session Cost 新增成本可用状态与目录版本；未知模型成本对外为不可用。
+- DeepSeek 默认模型更新为 `deepseek-flash`；增加加性 Prisma 迁移和发布门成本合同。
+
 ## 2026-10-05 · 发布证据真实验收加固
 
 - API 拒绝在没有冻结时间或内容指纹的 Dataset 上运行 3–5 次发布证据评测；单次探索性评测保持可用。

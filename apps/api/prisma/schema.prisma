@@ -918,6 +918,8 @@ model SessionCost {
   outputCostPer1k  Float @default(0) // 输出 token 单价
   cacheDiscount    Float @default(0.4) // 缓存折扣（Qwen 0.4，DeepSeek 0.1）
   estimatedCostCny Float @default(0) // 估算总成本（元）
+  costStatus            String @default("unavailable")
+  pricingCatalogVersion String?
 
   // === 时间 ===
   startedAt DateTime  @default(now())

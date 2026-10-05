@@ -1,5 +1,11 @@
 # 任务交接
 
+## 2026-10-05 · LAB-PRICING-EVIDENCE-4
+
+已建立 `2026-10-05.1` 版本化费率目录，Multi-Agent 与 Session Cost 按实际 Qwen/DeepSeek 模型计算成本；未知有计费 Token 的模型会令证据不可用。迁移 `20261005000000_versioned_llm_pricing` 已在本机应用，API:3001 与 Lab:5175 健康，Qwen/DeepSeek health check 正常。API 71 suites / 523 tests、Cache 22、lint/typecheck/build 通过。账单对账函数已测试，但无真实账单样本，不得写成财务对账通过。下一独立任务可补 Provider 账单抽样，或推进业务 Dataset 分层统计与显著性门禁。
+
+原有 UI/题库/Web/截图与旧交接编辑继续保留未提交；提交时只纳入本轮明确差异。
+
 ## 2026-10-05 · LAB-EVIDENCE-GATE-3
 
 已用既有管理员会话真实冻结 `Interview 失败探针 1.0.0`，生成指纹 `sha256:3e44457bff06fe37703f6ad349010bda00ad37247e8568cd4561fdd95a701607`，并完成冻结后的三次基线评测。发现冻结前可启动重复评测后，已在 API 和 Agent Lab 双层限制：3–5 次发布证据必须来自带指纹的冻结 Dataset。API Jest 516、Cache 22、lint/typecheck/build 通过。候选真实评测因浏览器自动审批服务容量不足未执行；不要将其记为通过或绕过审批。下一独立任务建议实现版本化 Provider/Model 费率表与账单抽样对账。

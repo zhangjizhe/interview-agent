@@ -1,5 +1,9 @@
 # 架构地图
 
+## 2026-10-05 · 版本化费率证据链
+
+Gateway 同步/流式响应透传实际 Provider 与 Model，`LlmGatewayChatModel` 聚合逐调用 usage；`LlmPricingCatalogService` 按版本化 Provider/Model 费率、输入阶梯和缓存输入计算证据。Multi-Agent 评测与 Session Cost 共用该入口；Session Cost 持久化 `costStatus` 和 `pricingCatalogVersion`，任一未知有计费 Token 的调用使整批成本不可用。
+
 ## 2026-10-04 · 发布证据链补充
 
 `EvaluationDataset` 可显式冻结并保存内容指纹；Serializable 事务与 PostgreSQL trigger 共同保证冻结后 Case 不变。`LlmGatewayChatModel` 在 Multi-Agent 的 AsyncLocalStorage 上聚合真实 usage，`Run` 保存 Token 与配置单价成本估算。`AgentEvaluationRun.metrics` 聚合重复样本的 P50/P95/最大延迟、Token 和成本；`release-gate/v2` 只接受至少 3 次、同指纹、同重复次数且资源回归不超过 20% 的基线/候选证据。

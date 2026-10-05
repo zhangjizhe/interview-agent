@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-05 · 版本化模型费率证据（最新）
+
+Agent Runtime 与 Session Cost 已统一使用 `2026-10-05.1` 费率目录，按实际 Provider/Model、输入阶梯与缓存输入生成可追溯 CNY 估算；未知费率显式不可用。加性迁移已应用本机，API/Agent Lab 健康，Qwen/DeepSeek 启动健康检查通过；API 71 suites / 523 tests、Cache 22、lint/typecheck/build 通过。当前没有真实账单样本，只声明工程估算与确定性对账能力。详见 `docs/ACCEPTANCE-REPORT-2026-10-05-PRICING-EVIDENCE.md`。
+
 ## 2026-10-05 · 发布证据真实验收加固（最新）
 
 本地最新 API/Agent Lab 镜像已成功重建并健康运行。既有管理员会话真实验证了 Dataset 冻结、SHA-256 指纹、冻结后新增 Case/重复冻结禁用和冻结数据集三次基线评测。验收发现并修复冻结前仍可启动重复发布证据评测的问题：API 对 3–5 次评测强制要求 `frozenAt` 与 `contentHash`，Lab 同步禁用按钮并解释原因。API Jest 516、Cache 22、lint/typecheck/build 通过；候选真实评测因浏览器自动审批服务容量不足未执行，不声明候选效果或发布可用。详见 `docs/ACCEPTANCE-REPORT-2026-10-05-EVIDENCE-GATE-FOLLOWUP.md`。

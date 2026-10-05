@@ -10,6 +10,7 @@ import { SessionCostController } from './cost/session-cost.controller';
 import { UsageService } from './usage/usage.service';
 import { UsageController } from './usage/usage.controller';
 import { QdrantModule } from '../../infra/qdrant/qdrant.module';
+import { LlmPricingCatalogService } from './cost/llm-pricing-catalog.service';
 
 /** LLM provider health check bootstrap */
 @Injectable()
@@ -30,6 +31,7 @@ class LlmHealthBootstrap implements OnApplicationBootstrap {
     PromptCacheInterceptor,
     SemanticCacheService,
     SessionCostTracker,
+    LlmPricingCatalogService,
     UsageService,
     QuotaService,
     LlmHealthBootstrap,
@@ -42,6 +44,7 @@ class LlmHealthBootstrap implements OnApplicationBootstrap {
     PromptCacheInterceptor,
     SemanticCacheService,
     SessionCostTracker,
+    LlmPricingCatalogService,
     UsageService,
     QuotaService,
   ],

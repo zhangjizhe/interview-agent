@@ -144,8 +144,9 @@ services:
       QWEN_API_KEY: ${QWEN_API_KEY:-}
       QWEN_MODEL: ${QWEN_MODEL:-qwen-plus}
       DEEPSEEK_BASE_URL: https://api.deepseek.com/v1
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      LLM_PRICING_CATALOG_JSON: ${LLM_PRICING_CATALOG_JSON:-}
       MEM0_API_KEY: ${MEM0_API_KEY:-}
       MEM0_HOST: ${MEM0_HOST:-}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (deploy.sh 自动生成 dev 占位)}
