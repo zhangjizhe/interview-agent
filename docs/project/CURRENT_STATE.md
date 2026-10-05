@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-05 · 发布证据真实验收加固（最新）
+
+本地最新 API/Agent Lab 镜像已成功重建并健康运行。既有管理员会话真实验证了 Dataset 冻结、SHA-256 指纹、冻结后新增 Case/重复冻结禁用和冻结数据集三次基线评测。验收发现并修复冻结前仍可启动重复发布证据评测的问题：API 对 3–5 次评测强制要求 `frozenAt` 与 `contentHash`，Lab 同步禁用按钮并解释原因。API Jest 516、Cache 22、lint/typecheck/build 通过；候选真实评测因浏览器自动审批服务容量不足未执行，不声明候选效果或发布可用。详见 `docs/ACCEPTANCE-REPORT-2026-10-05-EVIDENCE-GATE-FOLLOWUP.md`。
+
 ## 2026-10-04 · 发布证据门（最新）
 
 Agent Lab 已增加 Dataset 冻结与内容指纹、1–5 次有界重复评测、真实 Gateway Token 汇总和配置单价成本估算；`release-gate/v2` 要求至少 3 次同指纹基线/候选证据，并限制 P95 延迟、Token 与估算成本回归不超过 20%。加性迁移已在本机应用并核验 trigger；API 70 suites / 515 tests、Cache 22、Web 83、lint/typecheck/build 通过。新 API 构建产物已在 3002 启动，管理员浏览器写入验收因自动审批禁止持久化测试 ADMIN 而未执行。详见 `docs/ACCEPTANCE-REPORT-2026-10-04-EVIDENCE-GATE.md`。

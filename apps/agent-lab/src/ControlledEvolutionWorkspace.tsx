@@ -95,6 +95,7 @@ export function ControlledEvolutionWorkspace() {
   );
   const draftVersions = (versions.data || []).filter((item) => item.status === 'DRAFT');
   const selectedDataset = datasets.data?.find((item) => item.id === datasetId);
+  const releaseEvidenceReady = Boolean(selectedDataset?.frozenAt && selectedDataset?.contentHash);
 
   useEffect(() => {
     if (!sourceEvaluationId && failedEvaluations[0]) setSourceEvaluationId(failedEvaluations[0].id);
@@ -263,11 +264,13 @@ export function ControlledEvolutionWorkspace() {
     </div>
 
     <div className="lab-actions">
-      <button onClick={() => selectedAgent?.currentVersion && runEvaluation.mutate(selectedAgent.currentVersion.id)} disabled={busy || !selectedAgent?.currentVersion || !datasetId || !evaluatorId}>评测当前基线</button>
-      <button onClick={() => runEvaluation.mutate(candidateVersionId)} disabled={busy || !candidateVersionId || !datasetId || !evaluatorId}>评测候选</button>
+      <button onClick={() => selectedAgent?.currentVersion && runEvaluation.mutate(selectedAgent.currentVersion.id)} disabled={busy || !selectedAgent?.currentVersion || !datasetId || !evaluatorId || !releaseEvidenceReady}>评测当前基线</button>
+      <button onClick={() => runEvaluation.mutate(candidateVersionId)} disabled={busy || !candidateVersionId || !datasetId || !evaluatorId || !releaseEvidenceReady}>评测候选</button>
       <button onClick={() => compare.mutate()} disabled={busy || !candidateVersionId}>同集对比</button>
       <button onClick={() => publish.mutate()} disabled={busy || comparison?.releaseRecommendation !== 'APPROVE'}>管理员发布</button>
     </div>
+
+    {selectedDataset && !releaseEvidenceReady && <p className="lab-feedback">请先冻结当前 Dataset；3–5 次重复评测只接受带内容指纹的不可变数据集。</p>}
 
     {comparison && <article className="lab-row">
       <div><p className={`decision-${comparison.releaseRecommendation.toLowerCase()}`}>{comparison.releaseRecommendation}</p><h2>同集评测结果</h2><p>Dataset {comparison.datasetId} · Evaluator {comparison.evaluatorId}</p></div>

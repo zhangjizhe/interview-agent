@@ -184,8 +184,11 @@ export class EvaluationService {
     if (dataset.cases.length === 0) {
       throw new BadRequestException('Dataset 至少需要一个启用的 case 才能运行评测');
     }
-    const evaluator = await this.requireEvaluator(workspace.id, dto.evaluatorId);
     const repeatCount = dto.repeatCount ?? 1;
+    if (repeatCount >= 3 && (!dataset.frozenAt || !dataset.contentHash)) {
+      throw new BadRequestException('3–5 次发布证据评测要求先冻结 Dataset 并生成内容指纹');
+    }
+    const evaluator = await this.requireEvaluator(workspace.id, dto.evaluatorId);
     const startedAt = new Date();
     const evaluation = await this.prisma.agentEvaluationRun.create({
       data: {

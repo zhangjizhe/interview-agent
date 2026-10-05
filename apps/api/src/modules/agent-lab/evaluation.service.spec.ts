@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 jest.mock('../../infra/prisma/prisma.service', () => ({
   PrismaService: class PrismaService {},
@@ -169,6 +169,12 @@ describe('EvaluationService', () => {
       { id: 'evaluator-1', type: 'KEYWORD', config: { minScore: 100 } },
       [{ id: 'case-1', input: { message: '开始' }, expectedOutput: { keywords: ['通过'] } }],
     );
+    prisma.evaluationDataset.findFirst.mockResolvedValue({
+      id: 'dataset-1',
+      frozenAt: new Date('2026-10-05T00:00:00.000Z'),
+      contentHash: `sha256:${'a'.repeat(64)}`,
+      cases: [{ id: 'case-1', input: { message: '开始' }, expectedOutput: { keywords: ['通过'] } }],
+    });
     const runtime = {
       runAgent: jest.fn()
         .mockResolvedValueOnce({ id: 'run-1', latencyMs: 100, tokenUsage: { totalTokens: 10 }, estimatedCost: 0.01, output: { response: '通过' } })
@@ -199,6 +205,24 @@ describe('EvaluationService', () => {
         }),
       }),
     }));
+  });
+
+  it('拒绝在未冻结 Dataset 上生成三次以上的发布证据', async () => {
+    const prisma: any = createPrismaMock();
+    prepareEvaluation(
+      prisma,
+      { id: 'evaluator-1', type: 'KEYWORD', config: { minScore: 100 } },
+      [{ id: 'case-1', input: { message: '开始' }, expectedOutput: { keywords: ['通过'] } }],
+    );
+    const runtime = { runAgent: jest.fn() };
+    const service = new EvaluationService(prisma, runtime as any);
+
+    await expect(service.runEvaluation('user-a', 'agent-1', {
+      datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount: 3,
+    })).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(runtime.runAgent).not.toHaveBeenCalled();
+    expect(prisma.agentEvaluationRun.create).not.toHaveBeenCalled();
   });
 
   it('保存 JSON_SCHEMA 规则失败的断言证据', async () => {
