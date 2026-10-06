@@ -59,6 +59,9 @@ export function ControlledEvolutionWorkspace() {
   const [caseKey, setCaseKey] = useState('job-relevance');
   const [caseMessage, setCaseMessage] = useState('请提出一道与当前岗位直接相关的面试题。');
   const [caseKeywords, setCaseKeywords] = useState('问题');
+  const [caseJobFamily, setCaseJobFamily] = useState('ai-agent-engineer');
+  const [caseSkill, setCaseSkill] = useState('agent-evaluation');
+  const [caseDifficulty, setCaseDifficulty] = useState('intermediate');
   const [repeatCount, setRepeatCount] = useState(3);
 
   const agents = useQuery<Agent[]>({
@@ -95,7 +98,11 @@ export function ControlledEvolutionWorkspace() {
   );
   const draftVersions = (versions.data || []).filter((item) => item.status === 'DRAFT');
   const selectedDataset = datasets.data?.find((item) => item.id === datasetId);
-  const releaseEvidenceReady = Boolean(selectedDataset?.frozenAt && selectedDataset?.contentHash);
+  const releaseEvidenceReady = Boolean(
+    selectedDataset?.frozenAt
+    && selectedDataset?.contentHash
+    && selectedDataset?._count?.cases >= 10,
+  );
 
   useEffect(() => {
     if (!sourceEvaluationId && failedEvaluations[0]) setSourceEvaluationId(failedEvaluations[0].id);
@@ -158,9 +165,19 @@ export function ControlledEvolutionWorkspace() {
         expectedOutput: {
           keywords: caseKeywords.split(',').map((item) => item.trim()).filter(Boolean),
         },
+        metadata: {
+          segments: {
+            jobFamily: caseJobFamily,
+            skill: caseSkill,
+            difficulty: caseDifficulty,
+          },
+        },
       }),
     }),
-    onSuccess: () => setFeedback('评测 Case 已加入 Dataset。'),
+    onSuccess: async () => {
+      setFeedback('评测 Case 已加入 Dataset。');
+      await queryClient.invalidateQueries({ queryKey: ['registry-datasets'] });
+    },
     onError: (error: Error) => setFeedback(error.message),
   });
   const freezeDataset = useMutation({
@@ -223,7 +240,7 @@ export function ControlledEvolutionWorkspace() {
     </div>
 
     <section className="lab-thresholds">
-      <span>数据集冻结</span><span>3–5 次重复评测</span><span>资源回归 ≤20%</span><span>人工发布</span>
+      <span>数据集冻结</span><span>业务切片覆盖</span><span>成对 95% 非劣效</span><span>资源回归 ≤20%</span><span>人工发布</span>
     </section>
 
     <details className="evolution-assets">
@@ -243,9 +260,12 @@ export function ControlledEvolutionWorkspace() {
         <label>Case key<input value={caseKey} onChange={(event) => setCaseKey(event.target.value)} /></label>
         <label>输入消息<input value={caseMessage} onChange={(event) => setCaseMessage(event.target.value)} /></label>
         <label>必含关键词（逗号分隔）<input value={caseKeywords} onChange={(event) => setCaseKeywords(event.target.value)} /></label>
+        <label>岗位族标签<input value={caseJobFamily} onChange={(event) => setCaseJobFamily(event.target.value)} placeholder="ai-agent-engineer" /></label>
+        <label>技能标签<input value={caseSkill} onChange={(event) => setCaseSkill(event.target.value)} placeholder="agent-evaluation" /></label>
+        <label>难度标签<input value={caseDifficulty} onChange={(event) => setCaseDifficulty(event.target.value)} placeholder="intermediate" /></label>
       </div>
       <div className="lab-actions">
-        <button onClick={() => addCase.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt || !caseKey || !caseMessage || !caseKeywords}>添加 Case 到当前 Dataset</button>
+        <button onClick={() => addCase.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt || !caseKey || !caseMessage || !caseKeywords || !caseJobFamily || !caseSkill || !caseDifficulty}>添加 Case 到当前 Dataset</button>
         <button onClick={() => freezeDataset.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt}>冻结当前 Dataset</button>
       </div>
     </details>
@@ -270,11 +290,11 @@ export function ControlledEvolutionWorkspace() {
       <button onClick={() => publish.mutate()} disabled={busy || comparison?.releaseRecommendation !== 'APPROVE'}>管理员发布</button>
     </div>
 
-    {selectedDataset && !releaseEvidenceReady && <p className="lab-feedback">请先冻结当前 Dataset；3–5 次重复评测只接受带内容指纹的不可变数据集。</p>}
+    {selectedDataset && !releaseEvidenceReady && <p className="lab-feedback">请先冻结当前 Dataset；3–5 次发布评测要求至少 10 个带岗位族、技能和难度标签的 Case，且每个切片至少 2 个 Case。</p>}
 
     {comparison && <article className="lab-row">
       <div><p className={`decision-${comparison.releaseRecommendation.toLowerCase()}`}>{comparison.releaseRecommendation}</p><h2>同集评测结果</h2><p>Dataset {comparison.datasetId} · Evaluator {comparison.evaluatorId}</p></div>
-      <div className="lab-row-metrics"><span>基线 {comparison.baseline.score}</span><span>候选 {comparison.candidate.score}</span><span>变化 {comparison.scoreDelta >= 0 ? '+' : ''}{comparison.scoreDelta}</span><span>发布证据 {comparison.releaseGate.ruleSetVersion}</span></div>
+      <div className="lab-row-metrics"><span>基线 {comparison.baseline.score}</span><span>候选 {comparison.candidate.score}</span><span>变化 {comparison.scoreDelta >= 0 ? '+' : ''}{comparison.scoreDelta}</span><span>发布证据 {comparison.releaseGate.ruleSetVersion}</span>{comparison.releaseGate.evidence?.statisticalComparison && <span>95% 下界 {comparison.releaseGate.evidence.statisticalComparison.lowerConfidenceBoundPoints ?? '不可用'} · 配对 {comparison.releaseGate.evidence.statisticalComparison.pairedCaseCount}</span>}</div>
     </article>}
     {feedback && <p className="lab-feedback">{feedback}</p>}
   </section>;

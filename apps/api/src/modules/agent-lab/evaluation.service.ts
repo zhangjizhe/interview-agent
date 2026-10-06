@@ -13,6 +13,7 @@ import {
   CreateEvaluatorDto,
   RunEvaluationDto,
 } from './dto/agent.dto';
+import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-statistics';
 
 type RuleEvaluation = {
   score: number;
@@ -188,6 +189,17 @@ export class EvaluationService {
     if (repeatCount >= 3 && (!dataset.frozenAt || !dataset.contentHash)) {
       throw new BadRequestException('3–5 次发布证据评测要求先冻结 Dataset 并生成内容指纹');
     }
+    if (repeatCount >= 3) {
+      const coverage = buildStratifiedEvaluationEvidence(dataset.cases.map((item: any) => ({
+        caseKey: item.key,
+        score: 0,
+        passed: true,
+        metadata: item.metadata,
+      })));
+      if (coverage.status === 'unavailable') {
+        throw new BadRequestException(`发布 Dataset 分层证据不足：${coverage.reasons.join('；')}`);
+      }
+    }
     const evaluator = await this.requireEvaluator(workspace.id, dto.evaluatorId);
     const startedAt = new Date();
     const evaluation = await this.prisma.agentEvaluationRun.create({
@@ -204,7 +216,13 @@ export class EvaluationService {
     });
 
     try {
-      const caseResults: Array<{ score: number; passed: boolean }> = [];
+      const caseResults: Array<{
+        caseKey: string;
+        score: number;
+        passed: boolean;
+        passRate: number;
+        metadata: unknown;
+      }> = [];
       const allRuns: any[] = [];
       for (const datasetCase of dataset.cases) {
         const samples: Array<{ rule: RuleEvaluation; run?: any; error?: string }> = [];
@@ -270,7 +288,13 @@ export class EvaluationService {
             failureMessage: failed?.rule.failureMessage,
           },
         });
-        caseResults.push({ score, passed });
+        caseResults.push({
+          caseKey: datasetCase.key,
+          score,
+          passed,
+          passRate: samples.filter((item) => item.rule.passed).length / samples.length,
+          metadata: datasetCase.metadata,
+        });
       }
 
       const passedCases = caseResults.filter((item) => item.passed).length;
@@ -295,6 +319,7 @@ export class EvaluationService {
             failedCases: caseResults.length - passedCases,
             averageScore: score,
             wallClockLatencyMs: completedAt.getTime() - startedAt.getTime(),
+            stratification: buildStratifiedEvaluationEvidence(caseResults),
             ...this.aggregateRunEvidence(allRuns),
           },
         },

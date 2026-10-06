@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-07 · 业务分层与统计发布门（最新）
+
+`release-gate/v3` 要求冻结发布 Dataset 至少 10 个启用 Case，并具备岗位族、技能和难度切片；候选与同指纹基线按 Case key 成对比较，95% 区间下界不得低于 -2 分，任一切片平均回归不得超过 5 分。API 72 suites / 532 tests、Cache 22、lint/typecheck/build、Docker readiness 和 Lab 浏览器门禁展示通过；未运行批量真实 Provider 评测，不声明 Agent 质量提升。详见 `docs/ACCEPTANCE-REPORT-2026-10-07-STRATIFIED-SIGNIFICANCE.md`。
+
 ## 2026-10-05 · 版本化模型费率证据（最新）
 
 Agent Runtime 与 Session Cost 已统一使用 `2026-10-05.1` 费率目录，按实际 Provider/Model、输入阶梯与缓存输入生成可追溯 CNY 估算；未知费率显式不可用。加性迁移已应用本机，API/Agent Lab 健康，Qwen/DeepSeek 启动健康检查通过；API 71 suites / 523 tests、Cache 22、lint/typecheck/build 通过。当前没有真实账单样本，只声明工程估算与确定性对账能力。详见 `docs/ACCEPTANCE-REPORT-2026-10-05-PRICING-EVIDENCE.md`。

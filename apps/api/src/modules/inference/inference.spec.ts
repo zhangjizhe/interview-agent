@@ -1,6 +1,27 @@
 import { categoryForPosition } from './interview-ontology';
 import { inferInterviewRouting } from './interview-routing-inference';
 import { inferReleaseGate } from './release-gate-inference';
+import { buildStratifiedEvaluationEvidence } from './evaluation-statistics';
+
+function releaseMetrics(overrides: Record<string, unknown> = {}, scores = Array(10).fill(95)) {
+  return {
+    repeatCount: 3,
+    latency: { p95Ms: 1000 },
+    tokenUsage: { status: 'available', totalTokens: 300 },
+    estimatedCost: { status: 'available', totalCny: 0.01 },
+    stratification: buildStratifiedEvaluationEvidence(scores.map((score, index) => ({
+      caseKey: `case-${index + 1}`,
+      score,
+      passed: score >= 90,
+      metadata: { segments: {
+        jobFamily: 'ai-agent-engineer',
+        skill: index < 5 ? 'rag' : 'agent-evaluation',
+        difficulty: index % 2 === 0 ? 'foundation' : 'advanced',
+      } },
+    }))),
+    ...overrides,
+  };
+}
 
 describe('Interview inference', () => {
   it('routes AI Agent roles to the agent ontology instead of algorithms', () => {
@@ -97,18 +118,13 @@ describe('Release gate inference', () => {
       id: 'evaluation-1',
       status: 'COMPLETED',
       score: 95,
-      totalCases: 2,
-      passedCases: 2,
+      totalCases: 10,
+      passedCases: 10,
       failedCases: 0,
       completedAt: new Date(),
       datasetFrozenAt: new Date(),
       datasetContentHash: 'sha256:dataset',
-      metrics: {
-        repeatCount: 3,
-        latency: { p95Ms: 1000 },
-        tokenUsage: { status: 'available', totalTokens: 300 },
-        estimatedCost: { status: 'available', totalCny: 0.01 },
-      },
+      metrics: releaseMetrics(),
     });
     expect(decision.outcome.allowed).toBe(true);
     expect(decision.matchedRules).toContain('RG-005:release-approved');
@@ -119,8 +135,8 @@ describe('Release gate inference', () => {
       id: 'evaluation-low-score',
       status: 'COMPLETED',
       score: 89,
-      totalCases: 2,
-      passedCases: 2,
+      totalCases: 10,
+      passedCases: 10,
       failedCases: 0,
       completedAt: new Date(),
     });
@@ -135,18 +151,13 @@ describe('Release gate inference', () => {
       id: 'evaluation-candidate',
       status: 'COMPLETED',
       score: 94,
-      totalCases: 2,
-      passedCases: 2,
+      totalCases: 10,
+      passedCases: 10,
       failedCases: 0,
       completedAt: new Date(),
       datasetFrozenAt: new Date(),
       datasetContentHash: 'sha256:dataset',
-      metrics: {
-        repeatCount: 3,
-        latency: { p95Ms: 1000 },
-        tokenUsage: { status: 'available', totalTokens: 300 },
-        estimatedCost: { status: 'available', totalCny: 0.01 },
-      },
+      metrics: releaseMetrics(),
     };
     const baseline = { ...candidate, id: 'evaluation-baseline', score: 96 };
 
@@ -171,31 +182,70 @@ describe('Release gate inference', () => {
   });
 
   it('denies publication when latency, tokens, or estimated cost regress beyond 20 percent', () => {
-    const metrics = {
-      repeatCount: 3,
+    const metrics = releaseMetrics({
       latency: { p95Ms: 1300 },
       tokenUsage: { status: 'available', totalTokens: 390 },
       estimatedCost: { status: 'available', totalCny: 0.013 },
-    };
+    });
     const candidate = {
-      id: 'evaluation-candidate', status: 'COMPLETED', score: 100, totalCases: 1,
-      passedCases: 1, failedCases: 0, completedAt: new Date(),
+      id: 'evaluation-candidate', status: 'COMPLETED', score: 100, totalCases: 10,
+      passedCases: 10, failedCases: 0, completedAt: new Date(),
       datasetFrozenAt: new Date(), datasetContentHash: 'sha256:dataset', metrics,
     };
     const baseline = {
       ...candidate,
       id: 'evaluation-baseline',
-      metrics: {
-        repeatCount: 3,
-        latency: { p95Ms: 1000 },
-        tokenUsage: { status: 'available', totalTokens: 300 },
-        estimatedCost: { status: 'available', totalCny: 0.01 },
-      },
+      metrics: releaseMetrics(),
     };
 
     const decision = inferReleaseGate(candidate, { required: true, baseline });
 
     expect(decision.outcome.allowed).toBe(false);
     expect(decision.matchedRules).toContain('RG-011:latency-regression');
+  });
+
+  it('allows a paired candidate only when the 95 percent interval is non-inferior', () => {
+    const baseline = {
+      id: 'evaluation-baseline', status: 'COMPLETED', score: 95, totalCases: 10,
+      passedCases: 10, failedCases: 0, completedAt: new Date(),
+      datasetFrozenAt: new Date(), datasetContentHash: 'sha256:dataset',
+      metrics: releaseMetrics({}, Array(10).fill(95)),
+    };
+    const candidate = {
+      ...baseline,
+      id: 'evaluation-candidate',
+      score: 96,
+      metrics: releaseMetrics({}, Array(10).fill(96)),
+    };
+
+    const decision = inferReleaseGate(candidate, { required: true, baseline });
+
+    expect(decision.outcome.allowed).toBe(true);
+    expect(decision.ruleSetVersion).toBe('release-gate/v3');
+    expect(decision.evidence.statisticalComparison).toMatchObject({
+      status: 'available', pairedCaseCount: 10, nonInferior: true,
+    });
+  });
+
+  it('denies a noisy candidate whose paired interval crosses the non-inferiority margin', () => {
+    const baseline = {
+      id: 'evaluation-baseline', status: 'COMPLETED', score: 95, totalCases: 10,
+      passedCases: 10, failedCases: 0, completedAt: new Date(),
+      datasetFrozenAt: new Date(), datasetContentHash: 'sha256:dataset',
+      metrics: releaseMetrics({}, Array(10).fill(95)),
+    };
+    const candidate = {
+      ...baseline,
+      id: 'evaluation-candidate',
+      metrics: releaseMetrics({}, [90, 100, 90, 100, 90, 100, 90, 100, 90, 100]),
+    };
+
+    const decision = inferReleaseGate(candidate, { required: true, baseline });
+
+    expect(decision.outcome.allowed).toBe(false);
+    expect(decision.matchedRules).toContain('RG-020:paired-non-inferiority-required');
+    expect(decision.evidence.statisticalComparison).toMatchObject({
+      status: 'available', nonInferior: false,
+    });
   });
 });

@@ -1,5 +1,9 @@
 # 任务列表
 
+## 2026-10-07 · 业务分层与统计发布门（最新）
+
+LAB-STRATIFIED-SIGNIFICANCE-5 已完成：发布 Dataset 分层合同、脱敏 Case/切片聚合、成对 95% 非劣效区间和切片回归门已进入 `release-gate/v3`；API/Lab、容器和浏览器门禁验收通过。待办：建设至少 10 Case 的真实脱敏业务 Dataset 并执行受控基线/候选评测；真实账单抽样仍待 Provider 账单样本。TASK-029 与原 Phase 4 继续暂缓。
+
 ## 2026-10-05 · 版本化模型费率证据（最新）
 
 LAB-PRICING-EVIDENCE-4 已完成：实际 Provider/Model 用量统一进入版本化费率目录，Session Cost 持久化可用状态和目录版本，未知费率禁止伪装成零成本；本机迁移、容器与完整工程门禁通过。待办：取得 Provider 账单样本后执行真实容差对账；业务 Dataset 分层统计与显著性判断作为下一独立任务。TASK-029 与原 Phase 4 继续暂缓。

@@ -1,5 +1,9 @@
 # 架构地图
 
+## 2026-10-07 · 分层统计发布证据链
+
+Evaluation Case 的 `metadata.segments` 提供受限岗位族、技能和难度标签；发布评测预检覆盖后，在 Run metrics 中保存脱敏 Case 分数/通过率和切片摘要。`release-gate/v3` 对同 Dataset 指纹的候选/基线按 Case key 配对，计算 95% 非劣效区间并检查切片回归；Decision Ledger 自动保存规则、阈值和统计证据。没有新增数据库表或候选人数据流。
+
 ## 2026-10-05 · 版本化费率证据链
 
 Gateway 同步/流式响应透传实际 Provider 与 Model，`LlmGatewayChatModel` 聚合逐调用 usage；`LlmPricingCatalogService` 按版本化 Provider/Model 费率、输入阶梯和缓存输入计算证据。Multi-Agent 评测与 Session Cost 共用该入口；Session Cost 持久化 `costStatus` 和 `pricingCatalogVersion`，任一未知有计费 Token 的调用使整批成本不可用。

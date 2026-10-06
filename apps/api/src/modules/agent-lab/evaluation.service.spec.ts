@@ -164,22 +164,43 @@ describe('EvaluationService', () => {
 
   it('按 repeatCount 重复运行并聚合 P95、Token 与成本证据', async () => {
     const prisma: any = createPrismaMock();
+    const cases = Array.from({ length: 10 }, (_, index) => ({
+      id: `case-${index + 1}`,
+      key: `case-${index + 1}`,
+      input: { message: '开始' },
+      expectedOutput: { keywords: ['通过'] },
+      metadata: {
+        segments: {
+          jobFamily: 'ai-agent-engineer',
+          skill: index < 5 ? 'rag' : 'agent-evaluation',
+          difficulty: index % 2 === 0 ? 'foundation' : 'advanced',
+        },
+      },
+    }));
     prepareEvaluation(
       prisma,
       { id: 'evaluator-1', type: 'KEYWORD', config: { minScore: 100 } },
-      [{ id: 'case-1', input: { message: '开始' }, expectedOutput: { keywords: ['通过'] } }],
+      cases,
     );
     prisma.evaluationDataset.findFirst.mockResolvedValue({
       id: 'dataset-1',
       frozenAt: new Date('2026-10-05T00:00:00.000Z'),
       contentHash: `sha256:${'a'.repeat(64)}`,
-      cases: [{ id: 'case-1', input: { message: '开始' }, expectedOutput: { keywords: ['通过'] } }],
+      cases,
     });
+    let callIndex = 0;
     const runtime = {
-      runAgent: jest.fn()
-        .mockResolvedValueOnce({ id: 'run-1', latencyMs: 100, tokenUsage: { totalTokens: 10 }, estimatedCost: 0.01, output: { response: '通过' } })
-        .mockResolvedValueOnce({ id: 'run-2', latencyMs: 200, tokenUsage: { totalTokens: 20 }, estimatedCost: 0.02, output: { response: '通过' } })
-        .mockResolvedValueOnce({ id: 'run-3', latencyMs: 300, tokenUsage: { totalTokens: 30 }, estimatedCost: 0.03, output: { response: '通过' } }),
+      runAgent: jest.fn().mockImplementation(async () => {
+        callIndex += 1;
+        const sample = ((callIndex - 1) % 3) + 1;
+        return {
+          id: `run-${callIndex}`,
+          latencyMs: sample * 100,
+          tokenUsage: { totalTokens: sample * 10 },
+          estimatedCost: sample * 0.01,
+          output: { response: '通过' },
+        };
+      }),
     };
     const service = new EvaluationService(prisma, runtime as any);
 
@@ -187,7 +208,7 @@ describe('EvaluationService', () => {
       datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount: 3,
     });
 
-    expect(runtime.runAgent).toHaveBeenCalledTimes(3);
+    expect(runtime.runAgent).toHaveBeenCalledTimes(30);
     expect(prisma.evaluationResult.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         passed: true,
@@ -200,11 +221,44 @@ describe('EvaluationService', () => {
         metrics: expect.objectContaining({
           repeatCount: 3,
           latency: expect.objectContaining({ p95Ms: 300 }),
-          tokenUsage: expect.objectContaining({ status: 'available', totalTokens: 60 }),
-          estimatedCost: expect.objectContaining({ status: 'available', totalCny: 0.06 }),
+          tokenUsage: expect.objectContaining({ status: 'available', totalTokens: 600 }),
+          estimatedCost: expect.objectContaining({ status: 'available', totalCny: 0.6 }),
+          stratification: expect.objectContaining({
+            status: 'available',
+            caseCount: 10,
+            requiredDimensions: ['jobFamily', 'skill', 'difficulty'],
+          }),
         }),
       }),
     }));
+  });
+
+  it('在调用 Provider 前拒绝缺少业务切片标签的发布评测', async () => {
+    const prisma: any = createPrismaMock();
+    const cases = Array.from({ length: 10 }, (_, index) => ({
+      id: `case-${index + 1}`,
+      key: `case-${index + 1}`,
+      input: { message: '开始' },
+      expectedOutput: { keywords: ['通过'] },
+      metadata: null,
+    }));
+    prepareEvaluation(
+      prisma,
+      { id: 'evaluator-1', type: 'KEYWORD', config: { minScore: 100 } },
+      cases,
+    );
+    prisma.evaluationDataset.findFirst.mockResolvedValue({
+      id: 'dataset-1', frozenAt: new Date(), contentHash: 'sha256:dataset', cases,
+    });
+    const runtime = { runAgent: jest.fn() };
+    const service = new EvaluationService(prisma, runtime as any);
+
+    await expect(service.runEvaluation('user-a', 'agent-1', {
+      datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount: 3,
+    })).rejects.toThrow('发布 Dataset 分层证据不足');
+
+    expect(runtime.runAgent).not.toHaveBeenCalled();
+    expect(prisma.agentEvaluationRun.create).not.toHaveBeenCalled();
   });
 
   it('拒绝在未冻结 Dataset 上生成三次以上的发布证据', async () => {

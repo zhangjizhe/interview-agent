@@ -1,5 +1,25 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { AgentRegistryService } from './agent-registry.service';
+import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-statistics';
+
+function releaseMetrics(score = 100) {
+  return {
+    repeatCount: 3,
+    latency: { p95Ms: 100 },
+    tokenUsage: { status: 'available', totalTokens: 30 },
+    estimatedCost: { status: 'available', totalCny: 0.01 },
+    stratification: buildStratifiedEvaluationEvidence(Array.from({ length: 10 }, (_, index) => ({
+      caseKey: `case-${index + 1}`,
+      score,
+      passed: score >= 90,
+      metadata: { segments: {
+        jobFamily: 'ai-agent-engineer',
+        skill: index < 5 ? 'rag' : 'agent-evaluation',
+        difficulty: index % 2 === 0 ? 'foundation' : 'advanced',
+      } },
+    }))),
+  };
+}
 
 function createDecisionLedgerMock() {
   return {
@@ -83,12 +103,12 @@ describe('AgentRegistryService', () => {
       id: 'evaluation-1',
       status: 'COMPLETED',
       score: 100,
-      totalCases: 2,
-      passedCases: 2,
+      totalCases: 10,
+      passedCases: 10,
       failedCases: 0,
       completedAt: new Date(),
       dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
-      metrics: { repeatCount: 3, latency: { p95Ms: 100 }, tokenUsage: { status: 'available', totalTokens: 30 }, estimatedCost: { status: 'available', totalCny: 0.01 } },
+      metrics: releaseMetrics(),
     });
     prisma.agentVersion.update.mockResolvedValue({
       id: 'version-2',
@@ -157,12 +177,12 @@ describe('AgentRegistryService', () => {
       id: 'evaluation-1',
       status: 'COMPLETED',
       score: 100,
-      totalCases: 1,
-      passedCases: 1,
+      totalCases: 10,
+      passedCases: 10,
       failedCases: 0,
       completedAt: new Date(),
       dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
-      metrics: { repeatCount: 3, latency: { p95Ms: 100 }, tokenUsage: { status: 'available', totalTokens: 30 }, estimatedCost: { status: 'available', totalCny: 0.01 } },
+      metrics: releaseMetrics(),
     });
     const ledger = createDecisionLedgerMock();
     ledger.record.mockRejectedValue(new Error('ledger unavailable'));
@@ -189,25 +209,25 @@ describe('AgentRegistryService', () => {
         id: 'evaluation-candidate',
         status: 'COMPLETED',
         score: 94,
-        totalCases: 2,
-        passedCases: 2,
+        totalCases: 10,
+        passedCases: 10,
         failedCases: 0,
         completedAt: new Date(),
         datasetId: 'dataset-1',
         evaluatorId: 'evaluator-1',
         dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
-        metrics: { repeatCount: 3, latency: { p95Ms: 100 }, tokenUsage: { status: 'available', totalTokens: 30 }, estimatedCost: { status: 'available', totalCny: 0.01 } },
+        metrics: releaseMetrics(94),
       })
       .mockResolvedValueOnce({
         id: 'evaluation-baseline',
         status: 'COMPLETED',
         score: 96,
-        totalCases: 2,
-        passedCases: 2,
+        totalCases: 10,
+        passedCases: 10,
         failedCases: 0,
         completedAt: new Date(),
         dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
-        metrics: { repeatCount: 3, latency: { p95Ms: 100 }, tokenUsage: { status: 'available', totalTokens: 30 }, estimatedCost: { status: 'available', totalCny: 0.01 } },
+        metrics: releaseMetrics(96),
       });
     const service = new AgentRegistryService(prisma, createDecisionLedgerMock() as any);
 

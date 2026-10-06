@@ -1,5 +1,11 @@
 # 任务交接
 
+## 2026-10-07 · LAB-STRATIFIED-SIGNIFICANCE-5
+
+已完成 `release-gate/v3`：3–5 次发布评测要求冻结 Dataset 至少 10 Case，Case metadata 包含 `jobFamily`、`skill`、`difficulty`；以 Case 为单位与同指纹基线配对，95% 区间下界不低于 -2 分，切片平均回归不超过 5 分。现有单 Case 失败探针在 UI/API 均被阻断，不应绕过。API 72 suites / 532 tests、Cache 22、lint/typecheck/build、Docker readiness 和浏览器展示通过；未运行批量真实评测。下一任务应先策划并人工审查真实脱敏业务 Dataset，再执行有界基线/候选评测。
+
+原有 UI/题库/Web/截图与旧交接编辑继续保留未提交；提交时只纳入本轮明确差异。
+
 ## 2026-10-05 · LAB-PRICING-EVIDENCE-4
 
 已建立 `2026-10-05.1` 版本化费率目录，Multi-Agent 与 Session Cost 按实际 Qwen/DeepSeek 模型计算成本；未知有计费 Token 的模型会令证据不可用。迁移 `20261005000000_versioned_llm_pricing` 已在本机应用，API:3001 与 Lab:5175 健康，Qwen/DeepSeek health check 正常。API 71 suites / 523 tests、Cache 22、lint/typecheck/build 通过。账单对账函数已测试，但无真实账单样本，不得写成财务对账通过。下一独立任务可补 Provider 账单抽样，或推进业务 Dataset 分层统计与显著性门禁。

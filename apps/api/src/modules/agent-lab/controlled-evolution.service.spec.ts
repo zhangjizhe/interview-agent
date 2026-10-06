@@ -5,6 +5,26 @@ jest.mock('../../infra/prisma/prisma.service', () => ({
 }));
 
 import { ControlledEvolutionService } from './controlled-evolution.service';
+import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-statistics';
+
+function releaseMetrics(score: number, p95Ms: number) {
+  return {
+    repeatCount: 3,
+    latency: { p95Ms },
+    tokenUsage: { status: 'available', totalTokens: 300 },
+    estimatedCost: { status: 'available', totalCny: 0.01 },
+    stratification: buildStratifiedEvaluationEvidence(Array.from({ length: 10 }, (_, index) => ({
+      caseKey: `case-${index + 1}`,
+      score,
+      passed: score >= 90,
+      metadata: { segments: {
+        jobFamily: 'ai-agent-engineer',
+        skill: index < 5 ? 'rag' : 'agent-evaluation',
+        difficulty: index % 2 === 0 ? 'foundation' : 'advanced',
+      } },
+    }))),
+  };
+}
 
 function createPrismaMock() {
   return {
@@ -144,12 +164,7 @@ describe('ControlledEvolutionService', () => {
         passedCases: 10,
         failedCases: 0,
         dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
-        metrics: {
-          repeatCount: 3,
-          latency: { p95Ms: 1200 },
-          tokenUsage: { status: 'available', totalTokens: 300 },
-          estimatedCost: { status: 'available', totalCny: 0.01 },
-        },
+        metrics: releaseMetrics(96, 1200),
       })
       .mockResolvedValueOnce({
         id: 'baseline-eval',
@@ -163,12 +178,7 @@ describe('ControlledEvolutionService', () => {
         passedCases: 10,
         failedCases: 0,
         dataset: { frozenAt: new Date(), contentHash: 'sha256:dataset' },
-        metrics: {
-          repeatCount: 3,
-          latency: { p95Ms: 1100 },
-          tokenUsage: { status: 'available', totalTokens: 300 },
-          estimatedCost: { status: 'available', totalCny: 0.01 },
-        },
+        metrics: releaseMetrics(91, 1100),
       });
 
     const service = new ControlledEvolutionService(prisma);

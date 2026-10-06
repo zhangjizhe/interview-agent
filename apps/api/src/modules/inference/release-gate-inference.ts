@@ -1,6 +1,12 @@
 import { InferenceDecision } from './inference.types';
+import {
+  compareStratifiedEvidence,
+  MAX_STRATUM_REGRESSION_POINTS,
+  MIN_RELEASE_CASES,
+  NON_INFERIORITY_MARGIN_POINTS,
+} from './evaluation-statistics';
 
-export const RELEASE_GATE_RULESET_VERSION = 'release-gate/v2';
+export const RELEASE_GATE_RULESET_VERSION = 'release-gate/v3';
 export const MIN_RELEASE_SCORE = 90;
 export const MIN_RELEASE_REPEATS = 3;
 export const MAX_RESOURCE_REGRESSION_RATIO = 1.2;
@@ -77,6 +83,13 @@ export function inferReleaseGate(
     matchedRules.push('RG-010:resource-evidence-required');
     return denied('发布评测缺少完整的延迟、Token 或成本证据。', matchedRules, { evaluation });
   }
+  if (!stratificationAvailable(evaluation.metrics, evaluation.totalCases)) {
+    matchedRules.push('RG-017:stratified-evidence-required');
+    return denied('发布评测缺少可用的岗位族、技能和难度分层证据。', matchedRules, {
+      evaluation,
+      minimumPairedCases: MIN_RELEASE_CASES,
+    });
+  }
 
   if (comparison.required && !comparison.baseline) {
     matchedRules.push('RG-006:comparable-baseline-required');
@@ -128,6 +141,33 @@ export function inferReleaseGate(
         baselineEvaluation: comparison.baseline,
       });
     }
+    if (!stratificationAvailable(comparison.baseline.metrics, comparison.baseline.totalCases)) {
+      matchedRules.push('RG-018:baseline-stratified-evidence-required');
+      return denied('当前版本基线缺少等价的业务分层证据。', matchedRules, {
+        evaluation,
+        baselineEvaluation: comparison.baseline,
+      });
+    }
+    const statisticalComparison = compareStratifiedEvidence(
+      evaluation.metrics,
+      comparison.baseline.metrics,
+    );
+    if (statisticalComparison.status === 'unavailable') {
+      matchedRules.push('RG-019:paired-statistical-evidence-required');
+      return denied(statisticalComparison.reasons[0] || '候选与基线缺少可配对的统计证据。', matchedRules, {
+        evaluation,
+        baselineEvaluation: comparison.baseline,
+        statisticalComparison,
+      });
+    }
+    if (!statisticalComparison.nonInferior) {
+      matchedRules.push('RG-020:paired-non-inferiority-required');
+      return denied(statisticalComparison.reasons.join('；') || '候选版本未通过成对非劣效检验。', matchedRules, {
+        evaluation,
+        baselineEvaluation: comparison.baseline,
+        statisticalComparison,
+      });
+    }
     const regressions = [
       ['RG-011:latency-regression', evidence.p95Ms, baselineEvidence.p95Ms, 'P95 延迟'],
       ['RG-014:token-regression', evidence.totalTokens, baselineEvidence.totalTokens, 'Token'],
@@ -156,6 +196,12 @@ export function inferReleaseGate(
       minimumScore: MIN_RELEASE_SCORE,
       minimumRepeats: MIN_RELEASE_REPEATS,
       maximumResourceRegressionRatio: MAX_RESOURCE_REGRESSION_RATIO,
+      minimumPairedCases: MIN_RELEASE_CASES,
+      nonInferiorityMarginPoints: NON_INFERIORITY_MARGIN_POINTS,
+      maximumStratumRegressionPoints: MAX_STRATUM_REGRESSION_POINTS,
+      statisticalComparison: comparison.baseline
+        ? compareStratifiedEvidence(evaluation.metrics, comparison.baseline.metrics)
+        : null,
     },
   };
 }
@@ -191,6 +237,16 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 function numberValue(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : -1;
+}
+
+function stratificationAvailable(metrics: unknown, totalCases: number) {
+  const stratification = toRecord(toRecord(metrics).stratification);
+  const caseCount = numberValue(stratification.caseCount);
+  return stratification.status === 'available'
+    && Array.isArray(stratification.cases)
+    && stratification.cases.length === caseCount
+    && caseCount === totalCases
+    && caseCount >= MIN_RELEASE_CASES;
 }
 
 function denied(

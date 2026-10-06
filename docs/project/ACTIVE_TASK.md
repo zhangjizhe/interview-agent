@@ -1,19 +1,19 @@
 # 当前任务
 
-最后更新：2026-10-05
+最后更新：2026-10-07
 
 ## 任务 ID
 
-LAB-PRICING-EVIDENCE-4
+LAB-STRATIFIED-SIGNIFICANCE-5
 
 ## 目标与范围
 
-建立集中、版本化的 Provider/Model 费率目录，让真实 Token 用量按可追溯费率生成成本证据；未知模型或无效费率必须显式返回不可用，禁止静默套用通用默认价格。统一 Agent Runtime 与会话成本跟踪的定价入口，不改变 Provider 路由、数据库或计费扣款行为。
+为 Agent Lab 发布证据增加业务 Dataset 分层统计和成对非劣效区间。发布评测 Case 使用受限的岗位族、技能和难度标签；评测只保存脱敏的 Case key、分数、通过率与切片摘要。候选与同指纹基线按 Case 成对比较，样本量、切片覆盖或统计证据不足时拒绝发布。复用现有 JSON metadata/metrics，不新增数据库表，不改变自动发布边界。
 
 ## 状态
 
-已完成。Agent Runtime 与 Session Cost 已按实际 Provider/Model 使用同一版本化费率目录；未知费率会将成本证据标记为不可用。本机迁移、容器启动、Provider 健康检查及完整工程门禁均通过，尚无真实 Provider 账单样本可供财务对账。
+已完成。发布 Dataset 在付费调用前执行分层覆盖检查，评测持久化脱敏切片摘要，`release-gate/v3` 强制成对 95% 非劣效区间和切片回归门。正式 API/Lab 容器健康运行；现有单 Case 冻结数据集按预期被阻断，未执行批量真实 Provider 评测。
 
 ## 验收
 
-单元测试覆盖精确 Provider/Model、输入阶梯、缓存输入、环境覆盖、未知模型、无效配置和账单容差判断；API 71 suites / 523 tests（另 2 suites / 14 tests skipped）、Cache 22、lint、typecheck、build 通过。加性迁移已在本机 PostgreSQL 应用，API 与 Agent Lab 健康运行；提交后推送并核验 `origin/agent-lab`。
+确定性测试覆盖标签缺失、样本量不足、Case 配对不完整、切片回归、区间非劣效通过/失败，以及既有质量/资源门。API 72 suites / 532 tests（另 2 suites / 14 tests skipped）、Cache 22、lint/typecheck/build 通过；Docker migration/API/Lab 与浏览器门禁展示通过。提交后推送并核验 `origin/agent-lab`。
