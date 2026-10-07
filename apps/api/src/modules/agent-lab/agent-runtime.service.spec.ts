@@ -60,7 +60,7 @@ describe('AgentRuntimeService', () => {
     jest.clearAllMocks();
   });
 
-  it('执行已发布版本，并写入开始与完成 Trace', async () => {
+  it('执行已发布版本，透传评测缓存策略并写入开始与完成 Trace', async () => {
     const prisma: any = createPrismaMock();
     prisma.agent.findFirst.mockResolvedValue({
       id: 'agent-1',
@@ -92,7 +92,7 @@ describe('AgentRuntimeService', () => {
 
     const result = await service.runAgent('user-a', 'agent-1', {
       input: { message: '请开始面试' },
-    });
+    }, { bypassSemanticCache: true });
 
     expect(result).toMatchObject({ id: 'run-1', status: 'COMPLETED' });
     expect(multiAgent.run).toHaveBeenCalledWith(
@@ -100,6 +100,7 @@ describe('AgentRuntimeService', () => {
       'run-1',
       [],
       '已批准策略',
+      { bypassSemanticCache: true },
     );
     expect(trace.append).toHaveBeenCalledTimes(2);
     expect(prisma.run.update).toHaveBeenCalledWith(
@@ -213,6 +214,7 @@ describe('AgentRuntimeService', () => {
       'run-draft',
       [],
       '候选策略',
+      { bypassSemanticCache: false },
     );
   });
 

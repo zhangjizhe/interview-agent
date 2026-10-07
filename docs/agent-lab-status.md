@@ -18,7 +18,7 @@
 
 评测 API 位于 `/api/agent-lab`：创建 Dataset 与 Case、创建 Evaluator 后，可调用 `POST /agents/:agentId/evaluations` 同步执行已发布版本；`GET /agents/:agentId/evaluations` 查看汇总，`GET /evaluations/:evaluationId` 查看逐用例结果。输入用例必须满足目标 Agent 的输入契约，首个 Interview 适配器要求 `input.message` 非空。
 
-当前阶段不会替换既有 Interview 接口和 LangGraph 面试流程。Run 已记录状态、输入、输出、耗时和错误；Token 与成本仍依赖现有 Interview 会话统计，独立 Run 会明确标记该指标暂不可用。评测不以不稳定的 LLM Judge 作为基础契约，尚未导入现有 Golden Dataset JSON。部署前必须运行 `pnpm db:deploy`。
+当前阶段不会替换既有 Interview 接口和 LangGraph 面试流程。Run 已记录状态、输入、输出、耗时和错误；独立 Run 现由模型网关 usage 汇总 Token 与版本化费率估算成本；缺少 usage/费率时明确标记不可用，不能视为零费用。评测不以不稳定的 LLM Judge 作为基础契约，尚未导入现有 Golden Dataset JSON。部署前必须运行 `pnpm db:deploy`。
 
 数据库迁移由独立 migration job 在 API 启动前执行；API entrypoint 只启动服务。当前活动迁移以 production baseline 为基础，远端分叉迁移已归档，新增 `20260928000000_agent_lab_branch_integration` 已于 2026-09-30 在备份/恢复验证后应用到本机数据库，生产部署仍需单独验收。已有远端数据库必须先审计迁移历史，不能直接套用本地主基线。
 
@@ -43,4 +43,8 @@ AgentLab 新增独立 `ToolRunner` 契约，供后续 MCP、插件和工作区 p
 
 失败分析 → 改进候选 → 同数据集对比 → 人工批准 → Interview 使用已批准版本的最小闭环已实现。失败分类只映射到服务端固定改进策略并生成 `DRAFT` AgentVersion；草稿只在 Lab 评测内部显式放行。发布门使用 0–100 分制，要求候选全部 Case 通过、至少 90 分，并具有当前版本在同一 Dataset/Evaluator 的无回归基线。只有 ADMIN 显式发布才更新当前版本，Interview 从下一回合读取该 `PUBLISHED` 策略。
 
-该能力不包含 LLM 自动改写、自动发布或效果声明。真实验收已证明失败候选返回 `REJECT` 且不能发布；独立 Run 的 Token/费用与稳定延迟对比仍待补齐。详见 `docs/ACCEPTANCE-REPORT-2026-10-02-CONTROLLED-EVOLUTION.md`。
+该能力不包含 LLM 自动改写、自动发布或效果声明。真实验收已证明失败候选返回 `REJECT` 且不能发布；独立 Run 的 Token/费用已接入；完整可信版本对比尚未完成。详见 `docs/ACCEPTANCE-REPORT-2026-10-02-CONTROLLED-EVOLUTION.md`。
+
+## 2026-10-08 真实评测核验边界
+
+Lab 版本评测强制隔离语义答案缓存，v4 发布门拒绝缺少隔离证据的旧结果。固定 12 Case 已批准；真实隔离基线因月度额度失败（13/36 成功样本），候选未重跑或发布。工程门禁通过不等于业务质量验收通过，当前完整可信对比仍待额度及中断费用核验后重跑。详见 `docs/ACCEPTANCE-REPORT-2026-10-07-CURATED-REAL-EVALUATION.md`。

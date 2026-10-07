@@ -1,5 +1,9 @@
 # 任务交接
 
+## 2026-10-08 · LAB-CURATED-BENCHMARK-6 核验收尾
+
+已部署 Lab 内部 bypassSemanticCache 与 v4 发布门；API 545、Cache 22、Web 83、lint/typecheck/build 通过。固定 Dataset 已批准；首轮 36+36 缓存污染结果不采信。隔离基线 cmuyad4g9000xf0ua2vpw0u97 因月度额度 FAILED，13/36 成功样本、费用小计 0.069285 CNY；中断 Run cmuyale7n00bef0ua31b41x32 费用未知。候选未重跑、未发布，最终真实比较 REJECT/RG-021。不得重复提交、改写历史或自动放宽额度；先核对运营额度和中断费用，再确认新预算。报告已记录边界，普通 Interview 缓存隔离另列任务。原有编辑（含旧报告粘贴文本）保留。
+
 ## 2026-10-07 · LAB-CURATED-BENCHMARK-6 异常成本保护
 
 本轮只修复发布评测的失败成本边界：运行异常和无效成本均停止后续 Provider 调用，FAILED metrics 记录 `costEvidenceStatus=unavailable`、`interruptedRunId` 和已核验费用小计。API 542 tests（14 skipped）、定向 18 tests、lint/typecheck/build 通过，API 镜像已重建启动且 readiness 正常。冻结 12 Case 仍 PENDING，运行总数 5，未执行批量 Provider 评测。等待用户明确批准固定数据集后继续，当前版本与草稿保持不变。原有未提交编辑继续保留。

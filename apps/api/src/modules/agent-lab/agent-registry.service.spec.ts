@@ -5,6 +5,7 @@ import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-stati
 function releaseMetrics(score = 100) {
   return {
     repeatCount: 3,
+    cachePolicy: 'semantic-cache-bypass/v1',
     latency: { p95Ms: 100 },
     tokenUsage: { status: 'available', totalTokens: 30 },
     estimatedCost: { status: 'available', totalCny: 0.01 },

@@ -26,7 +26,7 @@ export class AgentRuntimeService {
     userId: string,
     agentId: string,
     dto: RunAgentDto,
-    options: { allowDraftVersion?: boolean } = {},
+    options: { allowDraftVersion?: boolean; bypassSemanticCache?: boolean } = {},
   ) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const agent = await this.prisma.agent.findFirst({
@@ -97,6 +97,7 @@ export class AgentRuntimeService {
         dto.externalRunId || run.id,
         [],
         version.systemPrompt,
+        { bypassSemanticCache: options.bypassSemanticCache === true },
       );
       const completedAt = new Date();
       const latencyMs = completedAt.getTime() - startedAt.getTime();

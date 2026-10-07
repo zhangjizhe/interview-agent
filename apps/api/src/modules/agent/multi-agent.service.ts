@@ -188,6 +188,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     threadId: string,
     history: BaseMessageLike[] = [],
     interviewContext = '',
+    options: { bypassSemanticCache?: boolean } = {},
   ) {
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
@@ -206,7 +207,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
       models: new Set<string>(),
       samples: [],
     };
-    const result = await threadIdStorage.run({ threadId, usage }, async () =>
+    const result = await threadIdStorage.run({ threadId, usage, bypassSemanticCache: options.bypassSemanticCache }, async () =>
       this.graph!.invoke(input as any, config),
     );
 

@@ -126,7 +126,7 @@ describe('EvaluationService', () => {
         agentVersionId: 'version-1',
         application: 'agent-lab-evaluation',
       }),
-      { allowDraftVersion: true },
+      { allowDraftVersion: true, bypassSemanticCache: true },
     );
     expect(prisma.evaluationResult.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -309,6 +309,7 @@ describe('EvaluationService', () => {
       data: expect.objectContaining({
         metrics: expect.objectContaining({
           repeatCount: 3,
+          cachePolicy: 'semantic-cache-bypass/v1',
           latency: expect.objectContaining({ p95Ms: 300 }),
           tokenUsage: expect.objectContaining({ status: 'available', totalTokens: 600 }),
           estimatedCost: expect.objectContaining({ status: 'available', totalCny: 0.6 }),
@@ -626,7 +627,7 @@ describe('EvaluationService', () => {
       'user-a',
       'agent-1',
       expect.objectContaining({ agentVersionId: 'version-draft' }),
-      { allowDraftVersion: true },
+      { allowDraftVersion: true, bypassSemanticCache: true },
     );
   });
 

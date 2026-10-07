@@ -634,3 +634,11 @@ await fs.writeFile(`docs/reflect-${formatDate(new Date())}.md`, report);
 - 保留 Nest Logger 接口，改用 JSON sink 并接管主进程 console；敏感结构字段和已知字符串凭据脱敏。自由文本日志的语义隐私仍需调用方保证。
 - 部署实测发现两个非单元路径问题：局部 JWT Guard 的 AuthSessionService 未导出；migration 使用了与新 API 不一致的旧镜像。修复模块导出，API/migration 共享镜像，并要求 readiness 校验全部打包迁移。补 Nest 模块装配及旧迁移拒绝回归。
 - 取舍：进程内指标重启归零，由 Prometheus 保留时序；此阶段没有分布式日志存储或总费用账单。安装时 prom-client 元数据提示后继包 @prometheus-io/client，暂按用户明确清单保持当前依赖，后续迁移需独立兼容验收。
+
+## 16. 版本评测必须隔离答案缓存
+
+- 日期：2026-10-07。真实评测发现基线部分样本和候选全部样本命中答案语义缓存；现有缓存仅按用户消息复用，忽略版本策略，满分与零成本不足以支撑候选效果结论。
+- 决策：复用 EvaluationService → AgentRuntime → MultiAgent → Gateway adapter；服务端内部选项与 AsyncLocalStorage 在每个 Lab 评测上下文中禁止答案缓存读写，不增加客户端开关或全局可变状态。普通 Interview 路径保持现有配置，产品缓存的上下文指纹治理另行处理。
+- 发布门升级为 v4，要求两版都有 `semantic-cache-bypass/v1` 证据。历史运行不删除或改写，但不能进入新发布门；任何重跑仍受数据批准、样本上限、额度和成本阈值约束。
+- 替代方案：清空共享缓存会影响其他请求且无法保护后续重复运行；只按版本分桶仍会令三次重复样本复用第一次答案，均不适合作为本次策略评测。
+- 成本：真实 Provider 调用和延迟会高于答案缓存命中；Provider Prompt 输入缓存仍可使用，因为它保留本次答案生成及真实 usage。该合同不等于关闭 Provider 所有缓存，也不意味着已通过财务对账。

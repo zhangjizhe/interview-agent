@@ -1,5 +1,9 @@
 # 架构地图
 
+## 2026-10-08 · 评测缓存边界
+
+EvaluationService 的服务端内部选项经 AgentRuntime、MultiAgent 与 ALS 到 LlmGatewayChatModel，只在该评测调用上下文中绕过答案语义缓存读写。Evaluation metrics 保存 cachePolicy，v4 发布门要求基线/候选均具备该证据；普通 Interview 缓存配置未在本轮改变。无新增表或路由，详见 ADR 16。
+
 ## 2026-10-07 · 发布 Dataset 人工治理与成本停止
 
 版本化内置清单经 ADMIN 幂等导入为冻结 Dataset；内容指纹绑定 Case 内容，独立 metadata 记录管理员审查，不允许自动代理代替人类批准。重复发布评测预检批准状态、10–50 Case 分层合同和显式 CNY 阈值；每个完成样本累加版本化估算成本，费率不可用或达到阈值时将评测置为失败并停止后续调用。复用现有 JSON 字段，无数据库迁移。

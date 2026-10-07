@@ -397,7 +397,7 @@ export class EvaluationService {
                 externalRunId: `evaluation:${evaluation.id}:${datasetCase.id}:${repeatIndex + 1}`,
                 input: datasetCase.input as Record<string, unknown>,
               },
-              { allowDraftVersion: true },
+              { allowDraftVersion: true, bypassSemanticCache: true },
             );
             allRuns.push(run);
             completedSamples += 1;
@@ -493,6 +493,7 @@ export class EvaluationService {
           completedAt,
           metrics: {
             evaluatorType: evaluator.type,
+            cachePolicy: 'semantic-cache-bypass/v1',
             datasetContentHash: dataset.contentHash ?? null,
             datasetFrozenAt: dataset.frozenAt ?? null,
             repeatCount,

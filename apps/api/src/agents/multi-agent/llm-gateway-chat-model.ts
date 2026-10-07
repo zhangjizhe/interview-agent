@@ -68,6 +68,8 @@ interface ThreadContext {
   threadId?: string;
   userId?: string;
   usage?: LlmUsageAccumulator;
+  /** 离线版本评测必须读取本次模型结果，不能复用其他策略的答案。 */
+  bypassSemanticCache?: boolean;
 }
 export const threadIdStorage = new AsyncLocalStorage<ThreadContext>();
 
@@ -125,7 +127,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
         interviewId: resolvedInterviewId,
         userId: resolvedUserId,
         // 关键：传 semanticCacheType 让 llmGateway 内部处理 cache 查 + 计数 + 回写
-        semanticCacheType: this.cacheType as any,
+        semanticCacheType: threadIdStorage.getStore()?.bypassSemanticCache ? undefined : this.cacheType as any,
       },
       this.provider,
     );
@@ -171,7 +173,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
         userId: resolvedUserId,
         // R-P1-6 修复：传 semanticCacheType 让 llmGateway 内部处理 cache 查 + 计数 + 回写。
         // 原 L148 漏传，导致流式调用绕开语义缓存（_generate 已传），缓存命中率偏低。
-        semanticCacheType: this.cacheType as any,
+        semanticCacheType: threadIdStorage.getStore()?.bypassSemanticCache ? undefined : this.cacheType as any,
       },
       this.provider,
     )) {

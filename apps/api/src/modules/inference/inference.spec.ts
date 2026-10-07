@@ -6,6 +6,7 @@ import { buildStratifiedEvaluationEvidence } from './evaluation-statistics';
 function releaseMetrics(overrides: Record<string, unknown> = {}, scores = Array(10).fill(95)) {
   return {
     repeatCount: 3,
+    cachePolicy: 'semantic-cache-bypass/v1',
     latency: { p95Ms: 1000 },
     tokenUsage: { status: 'available', totalTokens: 300 },
     estimatedCost: { status: 'available', totalCny: 0.01 },
@@ -221,10 +222,25 @@ describe('Release gate inference', () => {
     const decision = inferReleaseGate(candidate, { required: true, baseline });
 
     expect(decision.outcome.allowed).toBe(true);
-    expect(decision.ruleSetVersion).toBe('release-gate/v3');
+    expect(decision.ruleSetVersion).toBe('release-gate/v4');
     expect(decision.evidence.statisticalComparison).toMatchObject({
       status: 'available', pairedCaseCount: 10, nonInferior: true,
     });
+  });
+
+  it.each(['candidate', 'baseline'])('拒绝 %s 缺少答案缓存隔离证据的历史满分评测', (side) => {
+    const evaluation = {
+      id: 'evaluation-1', status: 'COMPLETED', score: 100, totalCases: 10,
+      passedCases: 10, failedCases: 0, completedAt: new Date(),
+      datasetFrozenAt: new Date(), datasetContentHash: 'sha256:dataset',
+      metrics: releaseMetrics({ cachePolicy: 'semantic-cache-bypass/v1' }),
+    };
+    const legacy = { ...evaluation, metrics: releaseMetrics({ cachePolicy: undefined }) };
+    const decision = inferReleaseGate(side === 'candidate' ? legacy : evaluation, {
+      required: true, baseline: side === 'baseline' ? legacy : evaluation,
+    });
+    expect(decision.outcome.allowed).toBe(false);
+    expect(decision.matchedRules).toContain('RG-021:answer-cache-isolation-required');
   });
 
   it('denies a noisy candidate whose paired interval crosses the non-inferiority margin', () => {

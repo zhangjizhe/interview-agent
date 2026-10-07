@@ -6,7 +6,7 @@ import {
   NON_INFERIORITY_MARGIN_POINTS,
 } from './evaluation-statistics';
 
-export const RELEASE_GATE_RULESET_VERSION = 'release-gate/v3';
+export const RELEASE_GATE_RULESET_VERSION = 'release-gate/v4';
 export const MIN_RELEASE_SCORE = 90;
 export const MIN_RELEASE_REPEATS = 3;
 export const MAX_RESOURCE_REGRESSION_RATIO = 1.2;
@@ -141,6 +141,12 @@ export function inferReleaseGate(
         baselineEvaluation: comparison.baseline,
       });
     }
+    if (!answerCacheIsolated(evaluation.metrics) || !answerCacheIsolated(comparison.baseline.metrics)) {
+      matchedRules.push('RG-021:answer-cache-isolation-required');
+      return denied('候选与基线必须具有绕过答案语义缓存的评测证据。', matchedRules, {
+        evaluation, baselineEvaluation: comparison.baseline,
+      });
+    }
     if (!stratificationAvailable(comparison.baseline.metrics, comparison.baseline.totalCases)) {
       matchedRules.push('RG-018:baseline-stratified-evidence-required');
       return denied('当前版本基线缺少等价的业务分层证据。', matchedRules, {
@@ -185,6 +191,11 @@ export function inferReleaseGate(
     }
   }
 
+  if (!answerCacheIsolated(evaluation.metrics)) {
+    matchedRules.push('RG-021:answer-cache-isolation-required');
+    return denied('发布评测必须具有绕过答案语义缓存的证据。', matchedRules, { evaluation });
+  }
+
   matchedRules.push('RG-005:release-approved');
   return {
     outcome: { allowed: true, reason: '评测完成且全部用例通过，允许发布。' },
@@ -204,6 +215,10 @@ export function inferReleaseGate(
         : null,
     },
   };
+}
+
+function answerCacheIsolated(metrics: unknown) {
+  return toRecord(metrics).cachePolicy === 'semantic-cache-bypass/v1';
 }
 
 function resourceEvidence(metrics: unknown) {

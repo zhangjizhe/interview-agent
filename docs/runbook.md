@@ -693,3 +693,7 @@ Nest Logger 与运行中的 console 调用统一输出单行 JSON；包含级别
 ### Agent Lab 发布评测预算
 
 部署环境通过 `AGENT_LAB_MAX_EVALUATION_COST_CNY` 设置单次重复发布评测的服务端成本停止阈值，默认 5 CNY。管理员发起评测时还必须提交不高于该值的 `maxEstimatedCostCny`。阈值按每个已完成样本的版本化估算费率累计；费率不可用或达到阈值时停止后续 Provider 调用并将评测标记为失败。阈值不是预付硬上限，最后一个在途样本可能产生少量超额，运行证据会保存实际值。
+
+### Agent Lab 评测缓存隔离
+
+Lab 所有版本评测由服务端内部选项强制绕过答案语义缓存，不清空共享缓存，不修改 Interview 正常运行的缓存开关。同步与流式模型调用通过本次 AsyncLocalStorage 上下文传递策略，避免并发请求互相影响。`release-gate/v4` 要求候选和基线都具有 `cachePolicy: semantic-cache-bypass/v1`；旧评测保留历史，但必须重跑才能用于发布。Provider Prompt 输入缓存保留，其真实费用仍由 usage/费率目录计算。

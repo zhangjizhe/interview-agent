@@ -84,3 +84,12 @@
 - Evaluation/Benchmark：本阶段为故障注入与工程验收，不声称模型质量提升；没有执行真实候选人模型面试或质量 Benchmark，启动沿用已有有界 Provider 健康探测。Lab 用例使用合成录制数据。
 - 风险：本机运行的前端包含用户原有未提交 UI 修改，它们未混入本阶段提交；公开生产发布、真实模型面试端到端、分布式指标/日志与完整自进化闭环尚未完成。prom-client 提示后继包，按原计划保持当前版本，未来单独迁移。自由文本日志仍需语义隐私审查。
 - Phase 3 已完成本地交付门禁；提交推送至 origin/agent-lab 后暂停，不自动执行 Phase 4。
+
+## 2026-10-08 · LAB-CURATED-BENCHMARK-6 评测缓存隔离
+
+- 实测发现：首轮固定回归集两版术语均满分，但候选全部复用语义答案缓存，比较证据不可信；旧运行保留审计，原 APPROVE 不采信。
+- 修复：复用 ALS，在 Lab 评测内部强制绕过答案缓存；同步、流式、并发普通请求边界覆盖测试。v4 发布门要求两版缓存隔离证据，真实 comparison 返回 REJECT/RG-021。
+- 验证：先失败再修复；API 545、Cache 22、Web 83、lint/typecheck/build 通过（4 条既有 lint warnings；14 条专用数据库测试默认跳过）。Docker API/migration 构建部署和 readiness 通过。
+- Evaluation：用户确认 12 Case、36 样本/版、5 CNY/版后批准 Dataset；隔离重跑阈值 4.99 CNY。基线完成 13 样本后月度额度拒绝，FAILED；已核验费用小计 0.069285 CNY，中断费用未知，候选未启动。失败保护停止后续调用，未重复提交。
+- 影响：无新依赖、Schema、migration 或路由；内部运行选项和评测 metrics 增量。Provider Prompt 缓存保留，普通 Interview 答案缓存未调整。
+- 未完成：完整可信质量/延迟/费用对比、候选发布及正式商用业务验收。先核对运营额度和中断费用，普通 Interview 缓存上下文指纹作为独立发布前任务。详见本轮交付报告。

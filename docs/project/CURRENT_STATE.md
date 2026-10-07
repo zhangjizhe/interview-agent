@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-08 · 真实评测缓存隔离与失败核验
+
+评测答案缓存隔离与 v4 发布门已完成工程验收：API 545、Cache 22、Web 83、lint/typecheck/build 通过，本机 API healthy。首轮缓存污染结果不采信；隔离基线在 13/36 成功样本后触发月度额度而 FAILED，已核验费用小计 0.069285 CNY，中断成本未知；候选未重跑、未发布。最终 comparison 为 v4 REJECT/RG-021，正式业务验收未通过。报告见 docs/ACCEPTANCE-REPORT-2026-10-07-CURATED-REAL-EVALUATION.md。
+
 ## 2026-10-07 · 发布评测失败成本保护
 
 发布评测（3–5 次）在样本异常或负数/非有限成本时立即停止后续调用，保存费用证据不可用状态与中断 Run ID；已核验费用小计不冒充完整账单。API 73 suites / 542 tests、定向 18 tests、lint/typecheck/build 通过，API 镜像已更新，本机 readiness 正常。内置 12 Case Dataset 仍为 PENDING，评测运行总数为 5；真实评测尚待人类批准。详见 `docs/ACCEPTANCE-REPORT-2026-10-07-EVALUATION-FAILURE-COST.md`。
