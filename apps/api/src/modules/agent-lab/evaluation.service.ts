@@ -355,6 +355,8 @@ export class EvaluationService {
       : null;
     let spentCostCny = 0;
     let completedSamples = 0;
+    let interruptedRunId: string | null = null;
+    let costEvidenceUnavailable = false;
     const evaluation = await this.prisma.agentEvaluationRun.create({
       data: {
         workspaceId: workspace.id,
@@ -400,7 +402,10 @@ export class EvaluationService {
             allRuns.push(run);
             completedSamples += 1;
             if (effectiveBudgetCny !== null) {
-              if (typeof run.estimatedCost !== 'number' || !Number.isFinite(run.estimatedCost)) {
+              if (typeof run.estimatedCost !== 'number'
+                || !Number.isFinite(run.estimatedCost) || run.estimatedCost < 0) {
+                interruptedRunId = run.id ?? null;
+                costEvidenceUnavailable = true;
                 throw new ReleaseEvaluationBudgetError('评测费率证据不可用，已停止后续 Provider 调用');
               }
               spentCostCny += run.estimatedCost;
@@ -413,6 +418,13 @@ export class EvaluationService {
             samples.push({ rule: this.evaluateRule(evaluator, datasetCase, run), run });
           } catch (error: any) {
             if (error instanceof ReleaseEvaluationBudgetError) throw error;
+            if (effectiveBudgetCny !== null) {
+              interruptedRunId = error?.agentLabRunId ?? null;
+              costEvidenceUnavailable = true;
+              // A failed runtime can already have incurred Provider charges.
+              // Without complete usage evidence, continuing cannot enforce the budget.
+              throw new ReleaseEvaluationBudgetError('发布评测样本失败，费用无法完整核验，已停止后续 Provider 调用');
+            }
             const message = error?.message || '运行或规则评测失败';
             samples.push({
               rule: {
@@ -518,6 +530,10 @@ export class EvaluationService {
                   limitCny: effectiveBudgetCny,
                   spentCny: Number(spentCostCny.toFixed(6)),
                   completedSamples,
+                  ...(costEvidenceUnavailable ? {
+                    costEvidenceStatus: 'unavailable',
+                    interruptedRunId,
+                  } : {}),
                 },
               },
           completedAt: new Date(),

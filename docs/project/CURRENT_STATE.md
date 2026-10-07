@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-07 · 发布评测失败成本保护
+
+发布评测（3–5 次）在样本异常或负数/非有限成本时立即停止后续调用，保存费用证据不可用状态与中断 Run ID；已核验费用小计不冒充完整账单。API 73 suites / 542 tests、定向 18 tests、lint/typecheck/build 通过，API 镜像已更新，本机 readiness 正常。内置 12 Case Dataset 仍为 PENDING，评测运行总数为 5；真实评测尚待人类批准。详见 `docs/ACCEPTANCE-REPORT-2026-10-07-EVALUATION-FAILURE-COST.md`。
+
 ## 2026-10-07 · 业务回归集治理（等待人工审查）
 
 内置 `interview-release-v1@1.0.0` 已在 Agent Lab 幂等导入并冻结为 12 个无候选人数据的合成业务场景，指纹 `sha256:2b7afcec3f242506a3f12915630121fe5795903f18382ef842cae31be6bfc39a`。发布评测现在要求管理员批准、最多 50 Case、显式 CNY 停止阈值和可用费率证据。API 73 suites / 538 tests、Cache 22、lint/typecheck/build、Docker 与浏览器待审查视图通过；Dataset 仍为 `PENDING`，没有新增 Provider 调用或质量结论。

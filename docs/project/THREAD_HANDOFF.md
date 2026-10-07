@@ -1,5 +1,9 @@
 # 任务交接
 
+## 2026-10-07 · LAB-CURATED-BENCHMARK-6 异常成本保护
+
+本轮只修复发布评测的失败成本边界：运行异常和无效成本均停止后续 Provider 调用，FAILED metrics 记录 `costEvidenceStatus=unavailable`、`interruptedRunId` 和已核验费用小计。API 542 tests（14 skipped）、定向 18 tests、lint/typecheck/build 通过，API 镜像已重建启动且 readiness 正常。冻结 12 Case 仍 PENDING，运行总数 5，未执行批量 Provider 评测。等待用户明确批准固定数据集后继续，当前版本与草稿保持不变。原有未提交编辑继续保留。
+
 ## 2026-10-07 · LAB-CURATED-BENCHMARK-6（等待管理员审查）
 
 已部署 `interview-release-v1@1.0.0`：12 个合成业务 Case、RAG/Evaluation/System Design 与三档难度均衡分层，不含候选人数据。管理员 `admin-acceptance` 已用于正常 RBAC 登录和幂等导入，未执行批准；Lab 当前展开 12 Case 审查视图。评测要求 `maxEstimatedCostCny`，服务端默认最多 5 CNY/版本，并在未知费率或达到阈值时停止后续调用。API 538 tests、Cache 22、lint/typecheck/build、Docker readiness 通过；评测总数仍为 5，未新增 Provider 调用。人类批准后再运行当前 1.0.0 与草稿 1.0.1 各 36 个样本，随后执行 v3 对比，禁止自动发布。

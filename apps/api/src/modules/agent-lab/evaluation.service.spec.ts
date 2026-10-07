@@ -426,6 +426,53 @@ describe('EvaluationService', () => {
     }));
   });
 
+  it.each(['runtime-failure', 'unknown-cost', 'negative-cost', 'nonfinite-cost'])(
+    '发布样本出现 %s 后立即停止，保留已核验费用及中断标识', async (failure) => {
+      const prisma: any = createPrismaMock();
+      const cases = Array.from({ length: 10 }, (_, index) => ({
+        id: `case-${index + 1}`, key: `case-${index + 1}`,
+        input: { message: '开始' }, expectedOutput: { keywords: ['通过'] },
+        metadata: releaseMetadata(index),
+      }));
+      prepareEvaluation(prisma, { id: 'evaluator-1', type: 'KEYWORD', config: {} }, cases);
+      prisma.evaluationDataset.findFirst.mockResolvedValue({
+        id: 'dataset-1', frozenAt: new Date(), contentHash: 'sha256:dataset',
+        metadata: { review: { status: 'APPROVED' } }, cases,
+      });
+      const runtime = { runAgent: jest.fn().mockResolvedValueOnce({
+        id: 'run-1', estimatedCost: 0.2, output: { response: '通过' },
+      }) };
+      if (failure === 'runtime-failure') {
+        const error = Object.assign(new Error('Provider failed after partial usage'), { agentLabRunId: 'run-2' });
+        runtime.runAgent.mockRejectedValueOnce(error);
+      } else {
+        runtime.runAgent.mockResolvedValueOnce({
+          id: 'run-2', output: { response: '通过' },
+          estimatedCost: failure === 'unknown-cost' ? null : failure === 'negative-cost' ? -1 : Infinity,
+        });
+      }
+      const service = new EvaluationService(prisma, runtime as any);
+
+      await expect(service.runEvaluation('user-a', 'agent-1', {
+        datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount: 3,
+        maxEstimatedCostCny: 1,
+      })).rejects.toThrow('已停止后续 Provider 调用');
+
+      expect(runtime.runAgent).toHaveBeenCalledTimes(2);
+      expect(prisma.agentEvaluationRun.update).toHaveBeenLastCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'FAILED',
+          metrics: { budget: expect.objectContaining({
+            status: 'stopped', limitCny: 1, spentCny: 0.2,
+            completedSamples: failure === 'runtime-failure' ? 1 : 2,
+            costEvidenceStatus: 'unavailable', interruptedRunId: 'run-2',
+          }) },
+        }),
+      }));
+      expect(prisma.evaluationResult.create).not.toHaveBeenCalled();
+    },
+  );
+
   it('拒绝在未冻结 Dataset 上生成三次以上的发布证据', async () => {
     const prisma: any = createPrismaMock();
     prepareEvaluation(

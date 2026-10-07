@@ -12,8 +12,8 @@ LAB-CURATED-BENCHMARK-6
 
 ## 状态
 
-等待管理员人工审查。代码、测试、容器和浏览器导入已完成；`interview-release-v1@1.0.0` 已冻结为 12 Case，状态为 `PENDING`，未启动真实 Provider 评测。已有单 Case 失败探针、当前 1.0.0 与草稿 1.0.1 均保持不变。
+等待管理员人工审查。已进一步修复发布样本异常后继续调用的成本缺口，保存费用不可用与中断运行标识；代码、测试、容器和浏览器导入已完成；`interview-release-v1@1.0.0` 已冻结为 12 Case，状态为 `PENDING`，未启动真实 Provider 评测。已有单 Case 失败探针、当前 1.0.0 与草稿 1.0.1 均保持不变。
 
 ## 验收
 
-已通过：固定清单与幂等导入、人工批准门、50 Case 上限、成本/费率熔断、API 73 suites / 538 tests（另 2 suites / 14 tests skipped）、Cache 22、lint/typecheck/build、Docker readiness 和浏览器待审查视图。待管理员批准后运行每版本 36 个样本的真实评测；候选只有通过 `release-gate/v3` 且经管理员发布后才可生效。
+已通过：固定清单与幂等导入、人工批准门、50 Case 上限、成本/费率熔断、API 73 suites / 542 tests（另 2 suites / 14 tests skipped）、Cache 22、lint/typecheck/build、Docker readiness 和浏览器待审查视图。待管理员批准后运行每版本 36 个样本的真实评测；候选只有通过 `release-gate/v3` 且经管理员发布后才可生效。
