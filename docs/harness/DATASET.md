@@ -28,5 +28,11 @@
 - `metadata.segments` 必须包含受限小写标识：`jobFamily`、`skill`、`difficulty`。
 - 岗位族至少 1 个不同值，技能和难度各至少 2 个不同值；每个实际切片至少 2 个 Case。
 - 标签与 Case 内容共同进入 Dataset 内容指纹，冻结后不得修改。
+- 单次发布评测最多 50 个启用 Case，避免错误导入导致无界 Provider 调用。
+- 3–5 次发布评测前必须由管理员逐条核对输入、期望、切片、来源和个人数据声明，并保存独立审查记录；审查记录不改变冻结内容指纹。
 
 发布评测只持久化 Case key、平均分、重复通过率和切片聚合，不把输入、输出或候选人内容复制到分层证据。
+
+## 内置发布回归集
+
+`interview-release-v1@1.0.0` 包含 12 个合成产品场景，均来自项目定义，不含候选人或生产会话数据。它按 RAG、Agent Evaluation、System Design 各 4 Case，按 foundation、intermediate、advanced 各 4 Case 分层。管理员可幂等导入，但导入后状态为 `PENDING`；只有逐条审查并显式批准后才能进入重复发布评测。

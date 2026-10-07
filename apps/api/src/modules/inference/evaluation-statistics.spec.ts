@@ -48,6 +48,16 @@ describe('Evaluation statistics', () => {
     ]));
   });
 
+  it('rejects an oversized release dataset before any paid evaluation', () => {
+    const evidence = buildStratifiedEvaluationEvidence(inputs(Array(51).fill(95)));
+
+    expect(evidence).toMatchObject({
+      status: 'unavailable',
+      caseCount: 51,
+      reasons: expect.arrayContaining([expect.stringContaining('最多允许 50 个')]),
+    });
+  });
+
   it('accepts a paired candidate whose 95% interval stays within the non-inferiority margin', () => {
     const baseline = buildStratifiedEvaluationEvidence(inputs(Array(10).fill(95)));
     const candidate = buildStratifiedEvaluationEvidence(inputs(Array(10).fill(96)));

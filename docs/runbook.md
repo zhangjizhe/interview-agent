@@ -689,3 +689,7 @@ Redis 不可用时受保护请求返回 503；严禁通过清空 Redis 恢复访
 Nest Logger 与运行中的 console 调用统一输出单行 JSON；包含级别、上下文、脱敏消息，结构化敏感字段被隐藏。已有自由文本日志仍须遵守不记录候选人原文的规则，正则脱敏不能代替隐私审查。指标为进程累计值，重启归零；Prometheus 保留 7 天，Grafana 使用 provisioned dashboard。多副本部署需为每个实例配置 scrape target。
 
 本地浏览器验收复用 `pnpm --filter @interview-agent/web e2e:auth:real` 与 `pnpm --filter @interview-agent/agent-lab e2e`；可设置 `CHROME_PATH` 使用已有 Chrome。这些用例使用合成账号/录制数据，不代表真实模型质量 Benchmark。
+
+### Agent Lab 发布评测预算
+
+部署环境通过 `AGENT_LAB_MAX_EVALUATION_COST_CNY` 设置单次重复发布评测的服务端成本停止阈值，默认 5 CNY。管理员发起评测时还必须提交不高于该值的 `maxEstimatedCostCny`。阈值按每个已完成样本的版本化估算费率累计；费率不可用或达到阈值时停止后续 Provider 调用并将评测标记为失败。阈值不是预付硬上限，最后一个在途样本可能产生少量超额，运行证据会保存实际值。

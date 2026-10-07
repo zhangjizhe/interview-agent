@@ -23,6 +23,11 @@ export class EvaluationController {
     return this.evaluations.listDatasets(req.user.userId);
   }
 
+  @Post('datasets/bootstrap/interview-release-v1')
+  bootstrapCuratedReleaseDataset(@Req() req: any) {
+    return this.evaluations.bootstrapCuratedReleaseDataset(req.user.userId);
+  }
+
   @Get('datasets/:datasetId')
   getDataset(@Req() req: any, @Param('datasetId') datasetId: string) {
     return this.evaluations.getDataset(req.user.userId, datasetId);
@@ -40,6 +45,11 @@ export class EvaluationController {
   @Post('datasets/:datasetId/freeze')
   freezeDataset(@Req() req: any, @Param('datasetId') datasetId: string) {
     return this.evaluations.freezeDataset(req.user.userId, datasetId);
+  }
+
+  @Post('datasets/:datasetId/review')
+  approveDatasetReview(@Req() req: any, @Param('datasetId') datasetId: string) {
+    return this.evaluations.approveDatasetReview(req.user.userId, datasetId);
   }
 
   @Post('evaluators')

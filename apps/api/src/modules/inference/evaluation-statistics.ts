@@ -1,5 +1,6 @@
 export const RELEASE_SEGMENT_DIMENSIONS = ['jobFamily', 'skill', 'difficulty'] as const;
 export const MIN_RELEASE_CASES = 10;
+export const MAX_RELEASE_CASES = 50;
 export const MIN_CASES_PER_STRATUM = 2;
 export const MIN_DISTINCT_SEGMENTS: Record<ReleaseSegmentDimension, number> = {
   jobFamily: 1,
@@ -70,6 +71,9 @@ export function buildStratifiedEvaluationEvidence(
   const reasons: string[] = [];
   if (inputs.length < MIN_RELEASE_CASES) {
     reasons.push(`发布证据至少需要 ${MIN_RELEASE_CASES} 个启用 Case`);
+  }
+  if (inputs.length > MAX_RELEASE_CASES) {
+    reasons.push(`单次发布证据最多允许 ${MAX_RELEASE_CASES} 个启用 Case`);
   }
 
   const seenKeys = new Set<string>();

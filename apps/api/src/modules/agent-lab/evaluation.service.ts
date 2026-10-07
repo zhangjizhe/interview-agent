@@ -14,6 +14,14 @@ import {
   RunEvaluationDto,
 } from './dto/agent.dto';
 import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-statistics';
+import {
+  CURATED_INTERVIEW_RELEASE_DATASET,
+  CURATED_INTERVIEW_RELEASE_EVALUATOR,
+} from './curated-release-dataset';
+
+const DEFAULT_RELEASE_EVALUATION_BUDGET_CNY = 5;
+
+class ReleaseEvaluationBudgetError extends Error {}
 
 type RuleEvaluation = {
   score: number;
@@ -58,6 +66,136 @@ export class EvaluationService {
       where: { workspaceId: workspace.id },
       include: { _count: { select: { cases: true, evaluationRuns: true } } },
       orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  async bootstrapCuratedReleaseDataset(userId: string) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    const manifest = CURATED_INTERVIEW_RELEASE_DATASET;
+    const coverage = buildStratifiedEvaluationEvidence(manifest.cases.map((item) => ({
+      caseKey: item.key,
+      score: 0,
+      passed: true,
+      metadata: item.metadata,
+    })));
+    if (coverage.status === 'unavailable') {
+      throw new ConflictException(`内置发布 Dataset 清单无效：${coverage.reasons.join('；')}`);
+    }
+    const canonicalCases = [...manifest.cases]
+      .sort((left, right) => left.key.localeCompare(right.key))
+      .map((item) => ({
+        key: item.key,
+        input: item.input,
+        expectedOutput: item.expectedOutput,
+        metadata: item.metadata,
+        enabled: item.enabled,
+      }));
+    const contentHash = this.datasetContentHash(manifest.version, canonicalCases);
+
+    return this.prisma.$transaction(async (tx) => {
+      let dataset = await tx.evaluationDataset.findFirst({
+        where: { workspaceId: workspace.id, key: manifest.key },
+        include: { cases: { orderBy: { key: 'asc' } } },
+      });
+      if (dataset) {
+        if (dataset.version !== manifest.version || dataset.contentHash !== contentHash || !dataset.frozenAt) {
+          throw new ConflictException('同名内置 Dataset 与当前清单不一致；请保留旧版本并使用新的 Dataset key');
+        }
+      } else {
+        dataset = await tx.evaluationDataset.create({
+          data: {
+            workspaceId: workspace.id,
+            key: manifest.key,
+            name: manifest.name,
+            description: manifest.description,
+            version: manifest.version,
+            metadata: manifest.metadata as any,
+            cases: {
+              create: canonicalCases.map((item) => ({
+                key: item.key,
+                input: item.input as any,
+                expectedOutput: item.expectedOutput as any,
+                metadata: item.metadata as any,
+                enabled: item.enabled,
+              })),
+            },
+          },
+          include: { cases: { orderBy: { key: 'asc' } } },
+        });
+        dataset = await tx.evaluationDataset.update({
+          where: { id: dataset.id },
+          data: { frozenAt: new Date(), contentHash },
+          include: { cases: { orderBy: { key: 'asc' } } },
+        });
+      }
+
+      let evaluator = await tx.evaluator.findFirst({
+        where: { workspaceId: workspace.id, key: CURATED_INTERVIEW_RELEASE_EVALUATOR.key },
+      });
+      if (!evaluator) {
+        evaluator = await tx.evaluator.create({
+          data: {
+            workspaceId: workspace.id,
+            ...CURATED_INTERVIEW_RELEASE_EVALUATOR,
+          },
+        });
+      } else if (evaluator.type !== CURATED_INTERVIEW_RELEASE_EVALUATOR.type
+        || this.stableStringify(evaluator.config) !== this.stableStringify(CURATED_INTERVIEW_RELEASE_EVALUATOR.config)) {
+        throw new ConflictException('同名内置 Evaluator 与当前合同不一致');
+      }
+
+      return {
+        dataset,
+        evaluator,
+        coverage,
+        reviewRequired: this.datasetReviewStatus(dataset) !== 'APPROVED',
+        releaseRunPlan: {
+          cases: canonicalCases.length,
+          minimumRepeats: 3,
+          samplesPerVersion: canonicalCases.length * 3,
+          comparisonSamples: canonicalCases.length * 3 * 2,
+          serverBudgetCeilingCny: this.releaseBudgetCeilingCny(),
+        },
+      };
+    }, { isolationLevel: 'Serializable' });
+  }
+
+  async approveDatasetReview(userId: string, datasetId: string) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    const dataset = await this.requireDataset(workspace.id, datasetId, {
+      cases: { where: { enabled: true }, orderBy: { key: 'asc' } },
+    });
+    if (!dataset.frozenAt || !dataset.contentHash) {
+      throw new ConflictException('只有已冻结并生成内容指纹的 Dataset 可以批准');
+    }
+    if (this.datasetReviewStatus(dataset) === 'APPROVED') return dataset;
+    const coverage = buildStratifiedEvaluationEvidence(dataset.cases.map((item: any) => ({
+      caseKey: item.key,
+      score: 0,
+      passed: true,
+      metadata: item.metadata,
+    })));
+    if (coverage.status === 'unavailable') {
+      throw new BadRequestException(`Dataset 不满足发布合同：${coverage.reasons.join('；')}`);
+    }
+    const governanceReasons = this.datasetGovernanceReasons(dataset.cases);
+    if (governanceReasons.length > 0) {
+      throw new BadRequestException(`Dataset 治理证据不足：${governanceReasons.join('；')}`);
+    }
+    const metadata = this.toRecord(dataset.metadata);
+    return this.prisma.evaluationDataset.update({
+      where: { id: dataset.id },
+      data: {
+        metadata: {
+          ...metadata,
+          review: {
+            status: 'APPROVED',
+            reviewedByUserId: userId,
+            reviewedAt: new Date().toISOString(),
+          },
+        } as any,
+      },
+      include: { cases: { orderBy: { key: 'asc' } } },
     });
   }
 
@@ -199,9 +337,24 @@ export class EvaluationService {
       if (coverage.status === 'unavailable') {
         throw new BadRequestException(`发布 Dataset 分层证据不足：${coverage.reasons.join('；')}`);
       }
+      const governanceReasons = this.datasetGovernanceReasons(dataset.cases);
+      if (governanceReasons.length > 0) {
+        throw new BadRequestException(`发布 Dataset 治理证据不足：${governanceReasons.join('；')}`);
+      }
+      if (this.datasetReviewStatus(dataset) !== 'APPROVED') {
+        throw new BadRequestException('3–5 次发布证据评测要求管理员先审查并批准 Dataset');
+      }
+      if (typeof dto.maxEstimatedCostCny !== 'number') {
+        throw new BadRequestException('3–5 次发布证据评测必须提供 maxEstimatedCostCny 成本停止阈值');
+      }
     }
     const evaluator = await this.requireEvaluator(workspace.id, dto.evaluatorId);
     const startedAt = new Date();
+    const effectiveBudgetCny = repeatCount >= 3
+      ? Math.min(dto.maxEstimatedCostCny!, this.releaseBudgetCeilingCny())
+      : null;
+    let spentCostCny = 0;
+    let completedSamples = 0;
     const evaluation = await this.prisma.agentEvaluationRun.create({
       data: {
         workspaceId: workspace.id,
@@ -227,6 +380,11 @@ export class EvaluationService {
       for (const datasetCase of dataset.cases) {
         const samples: Array<{ rule: RuleEvaluation; run?: any; error?: string }> = [];
         for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+          if (effectiveBudgetCny !== null && spentCostCny >= effectiveBudgetCny) {
+            throw new ReleaseEvaluationBudgetError(
+              `评测成本已达到停止阈值 ¥${effectiveBudgetCny.toFixed(2)}，已停止后续 Provider 调用`,
+            );
+          }
           try {
             const run = await this.runtime.runAgent(
               userId,
@@ -240,8 +398,21 @@ export class EvaluationService {
               { allowDraftVersion: true },
             );
             allRuns.push(run);
+            completedSamples += 1;
+            if (effectiveBudgetCny !== null) {
+              if (typeof run.estimatedCost !== 'number' || !Number.isFinite(run.estimatedCost)) {
+                throw new ReleaseEvaluationBudgetError('评测费率证据不可用，已停止后续 Provider 调用');
+              }
+              spentCostCny += run.estimatedCost;
+              if (spentCostCny > effectiveBudgetCny) {
+                throw new ReleaseEvaluationBudgetError(
+                  `评测成本超过停止阈值 ¥${effectiveBudgetCny.toFixed(2)}，已停止后续 Provider 调用`,
+                );
+              }
+            }
             samples.push({ rule: this.evaluateRule(evaluator, datasetCase, run), run });
           } catch (error: any) {
+            if (error instanceof ReleaseEvaluationBudgetError) throw error;
             const message = error?.message || '运行或规则评测失败';
             samples.push({
               rule: {
@@ -319,6 +490,14 @@ export class EvaluationService {
             failedCases: caseResults.length - passedCases,
             averageScore: score,
             wallClockLatencyMs: completedAt.getTime() - startedAt.getTime(),
+            budget: effectiveBudgetCny === null
+              ? { status: 'not-required' }
+              : {
+                  status: 'within-limit',
+                  limitCny: effectiveBudgetCny,
+                  spentCny: Number(spentCostCny.toFixed(6)),
+                  completedSamples,
+                },
             stratification: buildStratifiedEvaluationEvidence(caseResults),
             ...this.aggregateRunEvidence(allRuns),
           },
@@ -331,6 +510,16 @@ export class EvaluationService {
         data: {
           status: 'FAILED',
           error: message,
+          metrics: effectiveBudgetCny === null
+            ? undefined
+            : {
+                budget: {
+                  status: error instanceof ReleaseEvaluationBudgetError ? 'stopped' : 'failed',
+                  limitCny: effectiveBudgetCny,
+                  spentCny: Number(spentCostCny.toFixed(6)),
+                  completedSamples,
+                },
+              },
           completedAt: new Date(),
         },
       });
@@ -568,6 +757,47 @@ export class EvaluationService {
       return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${this.stableStringify(record[key])}`).join(',')}}`;
     }
     return JSON.stringify(value) ?? 'null';
+  }
+
+  private datasetContentHash(version: string, cases: unknown[]) {
+    return `sha256:${createHash('sha256')
+      .update(this.stableStringify({ version, cases }))
+      .digest('hex')}`;
+  }
+
+  private datasetReviewStatus(dataset: any) {
+    return this.toRecord(this.toRecord(dataset?.metadata).review).status;
+  }
+
+  private datasetGovernanceReasons(cases: any[]) {
+    const reasons: string[] = [];
+    for (const item of cases) {
+      const provenance = this.toRecord(this.toRecord(item.metadata).provenance);
+      if (typeof provenance.sourceType !== 'string' || provenance.sourceType.length === 0) {
+        reasons.push(`Case ${item.key} 缺少 sourceType`);
+      }
+      if (typeof provenance.owner !== 'string' || provenance.owner.length === 0) {
+        reasons.push(`Case ${item.key} 缺少 owner`);
+      }
+      if (provenance.allowedUse !== 'agent-release-evaluation') {
+        reasons.push(`Case ${item.key} 未授权用于发布评测`);
+      }
+      if (provenance.containsPersonalData !== false) {
+        reasons.push(`Case ${item.key} 未明确证明不含个人数据`);
+      }
+      if (provenance.containsCandidateData === true
+        && (provenance.deidentified !== true || typeof provenance.consentBasis !== 'string')) {
+        reasons.push(`Case ${item.key} 的候选人数据缺少脱敏或同意依据`);
+      }
+    }
+    return [...new Set(reasons)];
+  }
+
+  private releaseBudgetCeilingCny() {
+    const configured = Number(process.env.AGENT_LAB_MAX_EVALUATION_COST_CNY);
+    return Number.isFinite(configured) && configured >= 0.01
+      ? configured
+      : DEFAULT_RELEASE_EVALUATION_BUDGET_CNY;
   }
 
   private summarizeOutput(value: unknown): string {

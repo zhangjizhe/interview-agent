@@ -9,6 +9,7 @@ jest.mock('./agent-runtime.service', () => ({
 }));
 
 import { EvaluationService } from './evaluation.service';
+import { CURATED_INTERVIEW_RELEASE_EVALUATOR } from './curated-release-dataset';
 
 function createPrismaMock() {
   const prisma: any = {
@@ -26,6 +27,7 @@ function createPrismaMock() {
       findMany: jest.fn(),
       findFirst: jest.fn(),
       findFirstOrThrow: jest.fn(),
+      update: jest.fn(),
       updateMany: jest.fn(),
     },
     evaluationCase: {
@@ -55,6 +57,23 @@ const publishedVersion = {
   version: '1.0.0',
   status: 'PUBLISHED',
 };
+
+function releaseMetadata(index: number) {
+  return {
+    segments: {
+      jobFamily: 'ai-agent-engineer',
+      skill: index < 5 ? 'rag' : 'agent-evaluation',
+      difficulty: index % 2 === 0 ? 'foundation' : 'advanced',
+    },
+    provenance: {
+      sourceType: 'synthetic-product-scenario',
+      owner: 'test-maintainer',
+      allowedUse: 'agent-release-evaluation',
+      containsCandidateData: false,
+      containsPersonalData: false,
+    },
+  };
+}
 
 function prepareEvaluation(prisma: any, evaluator: any, cases: any[]) {
   prisma.agent.findFirst.mockResolvedValue({
@@ -162,6 +181,80 @@ describe('EvaluationService', () => {
     expect(prisma.evaluationCase.create).not.toHaveBeenCalled();
   });
 
+  it('幂等导入内置发布 Dataset 与 Evaluator，并保持人工审查待办', async () => {
+    const prisma: any = createPrismaMock();
+    prisma.evaluationDataset.findFirst.mockResolvedValue(null);
+    prisma.evaluationDataset.create.mockResolvedValue({
+      id: 'dataset-curated', version: '1.0.0', metadata: { review: { status: 'PENDING' } },
+    });
+    prisma.evaluationDataset.update.mockImplementation(async ({ data }: any) => ({
+      id: 'dataset-curated',
+      key: 'interview-release-v1',
+      version: '1.0.0',
+      metadata: { review: { status: 'PENDING' } },
+      cases: [],
+      ...data,
+    }));
+    prisma.evaluator.findFirst.mockResolvedValue(null);
+    prisma.evaluator.create.mockResolvedValue({
+      id: 'evaluator-curated',
+      ...CURATED_INTERVIEW_RELEASE_EVALUATOR,
+    });
+    const service = new EvaluationService(prisma, { runAgent: jest.fn() } as any);
+
+    const first = await service.bootstrapCuratedReleaseDataset('user-a');
+    prisma.evaluationDataset.findFirst.mockResolvedValue(first.dataset);
+    prisma.evaluator.findFirst.mockResolvedValue(first.evaluator);
+    const second = await service.bootstrapCuratedReleaseDataset('user-a');
+
+    expect(first).toMatchObject({
+      reviewRequired: true,
+      releaseRunPlan: { cases: 12, samplesPerVersion: 36, comparisonSamples: 72 },
+    });
+    expect(second.dataset.id).toBe('dataset-curated');
+    expect(prisma.evaluationDataset.create).toHaveBeenCalledTimes(1);
+    expect(prisma.evaluator.create).toHaveBeenCalledTimes(1);
+    expect(prisma.evaluationDataset.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        key: 'interview-release-v1',
+        cases: { create: expect.arrayContaining([expect.objectContaining({ key: 'rag-retrieval-foundation' })]) },
+      }),
+    }));
+  });
+
+  it('只允许批准已冻结且满足分层合同的 Dataset，并记录管理员身份', async () => {
+    const prisma: any = createPrismaMock();
+    const cases = Array.from({ length: 10 }, (_, index) => ({
+      id: `case-${index + 1}`,
+      key: `case-${index + 1}`,
+      metadata: releaseMetadata(index),
+    }));
+    prisma.evaluationDataset.findFirst.mockResolvedValue({
+      id: 'dataset-1',
+      frozenAt: new Date(),
+      contentHash: 'sha256:dataset',
+      metadata: { review: { status: 'PENDING' } },
+      cases,
+    });
+    prisma.evaluationDataset.update.mockImplementation(async ({ data }: any) => data);
+    const service = new EvaluationService(prisma, { runAgent: jest.fn() } as any);
+
+    await service.approveDatasetReview('admin-user', 'dataset-1');
+
+    expect(prisma.evaluationDataset.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'dataset-1' },
+      data: {
+        metadata: expect.objectContaining({
+          review: expect.objectContaining({
+            status: 'APPROVED',
+            reviewedByUserId: 'admin-user',
+            reviewedAt: expect.any(String),
+          }),
+        }),
+      },
+    }));
+  });
+
   it('按 repeatCount 重复运行并聚合 P95、Token 与成本证据', async () => {
     const prisma: any = createPrismaMock();
     const cases = Array.from({ length: 10 }, (_, index) => ({
@@ -169,13 +262,7 @@ describe('EvaluationService', () => {
       key: `case-${index + 1}`,
       input: { message: '开始' },
       expectedOutput: { keywords: ['通过'] },
-      metadata: {
-        segments: {
-          jobFamily: 'ai-agent-engineer',
-          skill: index < 5 ? 'rag' : 'agent-evaluation',
-          difficulty: index % 2 === 0 ? 'foundation' : 'advanced',
-        },
-      },
+      metadata: releaseMetadata(index),
     }));
     prepareEvaluation(
       prisma,
@@ -186,6 +273,7 @@ describe('EvaluationService', () => {
       id: 'dataset-1',
       frozenAt: new Date('2026-10-05T00:00:00.000Z'),
       contentHash: `sha256:${'a'.repeat(64)}`,
+      metadata: { review: { status: 'APPROVED' } },
       cases,
     });
     let callIndex = 0;
@@ -206,6 +294,7 @@ describe('EvaluationService', () => {
 
     await service.runEvaluation('user-a', 'agent-1', {
       datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount: 3,
+      maxEstimatedCostCny: 2,
     });
 
     expect(runtime.runAgent).toHaveBeenCalledTimes(30);
@@ -223,6 +312,9 @@ describe('EvaluationService', () => {
           latency: expect.objectContaining({ p95Ms: 300 }),
           tokenUsage: expect.objectContaining({ status: 'available', totalTokens: 600 }),
           estimatedCost: expect.objectContaining({ status: 'available', totalCny: 0.6 }),
+          budget: expect.objectContaining({
+            status: 'within-limit', limitCny: 2, spentCny: 0.6, completedSamples: 30,
+          }),
           stratification: expect.objectContaining({
             status: 'available',
             caseCount: 10,
@@ -259,6 +351,79 @@ describe('EvaluationService', () => {
 
     expect(runtime.runAgent).not.toHaveBeenCalled();
     expect(prisma.agentEvaluationRun.create).not.toHaveBeenCalled();
+  });
+
+  it('在调用 Provider 前拒绝未批准或未声明成本阈值的发布评测', async () => {
+    const prisma: any = createPrismaMock();
+    const cases = Array.from({ length: 10 }, (_, index) => ({
+      id: `case-${index + 1}`,
+      key: `case-${index + 1}`,
+      input: { message: '开始' },
+      expectedOutput: { keywords: ['通过'] },
+      metadata: releaseMetadata(index),
+    }));
+    prepareEvaluation(prisma, { id: 'evaluator-1', type: 'KEYWORD', config: {} }, cases);
+    prisma.evaluationDataset.findFirst.mockResolvedValue({
+      id: 'dataset-1', frozenAt: new Date(), contentHash: 'sha256:dataset',
+      metadata: { review: { status: 'PENDING' } }, cases,
+    });
+    const runtime = { runAgent: jest.fn() };
+    const service = new EvaluationService(prisma, runtime as any);
+
+    await expect(service.runEvaluation('user-a', 'agent-1', {
+      datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount: 3,
+      maxEstimatedCostCny: 2,
+    })).rejects.toThrow('管理员先审查并批准');
+
+    prisma.evaluationDataset.findFirst.mockResolvedValue({
+      id: 'dataset-1', frozenAt: new Date(), contentHash: 'sha256:dataset',
+      metadata: { review: { status: 'APPROVED' } }, cases,
+    });
+    await expect(service.runEvaluation('user-a', 'agent-1', {
+      datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount: 3,
+    })).rejects.toThrow('maxEstimatedCostCny');
+    expect(runtime.runAgent).not.toHaveBeenCalled();
+    expect(prisma.agentEvaluationRun.create).not.toHaveBeenCalled();
+  });
+
+  it('达到成本停止阈值后不再调用 Provider，并保存失败预算证据', async () => {
+    const prisma: any = createPrismaMock();
+    const cases = Array.from({ length: 10 }, (_, index) => ({
+      id: `case-${index + 1}`,
+      key: `case-${index + 1}`,
+      input: { message: '开始' },
+      expectedOutput: { keywords: ['通过'] },
+      metadata: releaseMetadata(index),
+    }));
+    prepareEvaluation(prisma, { id: 'evaluator-1', type: 'KEYWORD', config: {} }, cases);
+    prisma.evaluationDataset.findFirst.mockResolvedValue({
+      id: 'dataset-1', frozenAt: new Date(), contentHash: 'sha256:dataset',
+      metadata: { review: { status: 'APPROVED' } }, cases,
+    });
+    const runtime = {
+      runAgent: jest.fn().mockResolvedValue({
+        id: 'run-1', estimatedCost: 0.6, tokenUsage: { totalTokens: 10 },
+        latencyMs: 10, output: { response: '通过' },
+      }),
+    };
+    const service = new EvaluationService(prisma, runtime as any);
+
+    await expect(service.runEvaluation('user-a', 'agent-1', {
+      datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount: 3,
+      maxEstimatedCostCny: 1,
+    })).rejects.toThrow('超过停止阈值');
+
+    expect(runtime.runAgent).toHaveBeenCalledTimes(2);
+    expect(prisma.agentEvaluationRun.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        status: 'FAILED',
+        metrics: {
+          budget: expect.objectContaining({
+            status: 'stopped', limitCny: 1, spentCny: 1.2, completedSamples: 2,
+          }),
+        },
+      }),
+    }));
   });
 
   it('拒绝在未冻结 Dataset 上生成三次以上的发布证据', async () => {

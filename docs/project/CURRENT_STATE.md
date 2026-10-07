@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-07 · 业务回归集治理（等待人工审查）
+
+内置 `interview-release-v1@1.0.0` 已在 Agent Lab 幂等导入并冻结为 12 个无候选人数据的合成业务场景，指纹 `sha256:2b7afcec3f242506a3f12915630121fe5795903f18382ef842cae31be6bfc39a`。发布评测现在要求管理员批准、最多 50 Case、显式 CNY 停止阈值和可用费率证据。API 73 suites / 538 tests、Cache 22、lint/typecheck/build、Docker 与浏览器待审查视图通过；Dataset 仍为 `PENDING`，没有新增 Provider 调用或质量结论。
+
 ## 2026-10-07 · 业务分层与统计发布门（最新）
 
 `release-gate/v3` 要求冻结发布 Dataset 至少 10 个启用 Case，并具备岗位族、技能和难度切片；候选与同指纹基线按 Case key 成对比较，95% 区间下界不得低于 -2 分，任一切片平均回归不得超过 5 分。API 72 suites / 532 tests、Cache 22、lint/typecheck/build、Docker readiness 和 Lab 浏览器门禁展示通过；未运行批量真实 Provider 评测，不声明 Agent 质量提升。详见 `docs/ACCEPTANCE-REPORT-2026-10-07-STRATIFIED-SIGNIFICANCE.md`。

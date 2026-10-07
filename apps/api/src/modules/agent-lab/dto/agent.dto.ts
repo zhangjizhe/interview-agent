@@ -8,6 +8,7 @@ import {
   Matches,
   MaxLength,
   IsIn,
+  IsNumber,
 } from 'class-validator';
 
 const AGENT_KEY_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
@@ -212,6 +213,12 @@ export class RunEvaluationDto {
   @Min(1)
   @Max(5)
   repeatCount?: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(100)
+  maxEstimatedCostCny?: number;
 }
 
 export class SpawnSubRunDto {

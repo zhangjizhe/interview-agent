@@ -63,6 +63,7 @@ export function ControlledEvolutionWorkspace() {
   const [caseSkill, setCaseSkill] = useState('agent-evaluation');
   const [caseDifficulty, setCaseDifficulty] = useState('intermediate');
   const [repeatCount, setRepeatCount] = useState(3);
+  const [maxEstimatedCostCny, setMaxEstimatedCostCny] = useState(5);
 
   const agents = useQuery<Agent[]>({
     queryKey: ['registry-agents'],
@@ -86,6 +87,11 @@ export function ControlledEvolutionWorkspace() {
     queryKey: ['registry-datasets'],
     queryFn: () => api('/agent-lab/datasets'),
   });
+  const datasetDetails = useQuery<any>({
+    queryKey: ['registry-dataset', datasetId],
+    queryFn: () => api(`/agent-lab/datasets/${datasetId}`),
+    enabled: Boolean(datasetId),
+  });
   const evaluators = useQuery<any[]>({
     queryKey: ['registry-evaluators'],
     queryFn: () => api('/agent-lab/evaluators'),
@@ -101,7 +107,8 @@ export function ControlledEvolutionWorkspace() {
   const releaseEvidenceReady = Boolean(
     selectedDataset?.frozenAt
     && selectedDataset?.contentHash
-    && selectedDataset?._count?.cases >= 10,
+    && selectedDataset?._count?.cases >= 10
+    && selectedDataset?.metadata?.review?.status === 'APPROVED'
   );
 
   useEffect(() => {
@@ -136,6 +143,20 @@ export function ControlledEvolutionWorkspace() {
       setDatasetId(result.id);
       setFeedback('Dataset 已创建，请添加至少一个评测 Case。');
       await queryClient.invalidateQueries({ queryKey: ['registry-datasets'] });
+    },
+    onError: (error: Error) => setFeedback(error.message),
+  });
+  const bootstrapReleaseDataset = useMutation({
+    mutationFn: () => api('/agent-lab/datasets/bootstrap/interview-release-v1', { method: 'POST' }),
+    onSuccess: async (result) => {
+      setDatasetId(result.dataset.id);
+      setEvaluatorId(result.evaluator.id);
+      setFeedback(`内置发布集已就绪：${result.releaseRunPlan.cases} Cases；请逐条审查后批准。`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['registry-datasets'] }),
+        queryClient.invalidateQueries({ queryKey: ['registry-evaluators'] }),
+        queryClient.invalidateQueries({ queryKey: ['registry-dataset', result.dataset.id] }),
+      ]);
     },
     onError: (error: Error) => setFeedback(error.message),
   });
@@ -188,6 +209,17 @@ export function ControlledEvolutionWorkspace() {
     },
     onError: (error: Error) => setFeedback(error.message),
   });
+  const approveDataset = useMutation({
+    mutationFn: () => api(`/agent-lab/datasets/${datasetId}/review`, { method: 'POST' }),
+    onSuccess: async () => {
+      setFeedback('Dataset 审查已由当前管理员批准，可执行有界发布评测。');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['registry-datasets'] }),
+        queryClient.invalidateQueries({ queryKey: ['registry-dataset', datasetId] }),
+      ]);
+    },
+    onError: (error: Error) => setFeedback(error.message),
+  });
   const generate = useMutation({
     mutationFn: () => api(`/agent-lab/agents/${agentId}/evolution/candidates`, {
       method: 'POST',
@@ -204,7 +236,13 @@ export function ControlledEvolutionWorkspace() {
   const runEvaluation = useMutation({
     mutationFn: (versionId: string) => api(`/agent-lab/agents/${agentId}/evaluations`, {
       method: 'POST',
-      body: JSON.stringify({ agentVersionId: versionId, datasetId, evaluatorId, repeatCount }),
+      body: JSON.stringify({
+        agentVersionId: versionId,
+        datasetId,
+        evaluatorId,
+        repeatCount,
+        maxEstimatedCostCny,
+      }),
     }),
     onSuccess: async (result) => {
       setFeedback(`评测完成：${result.score?.toFixed?.(1) ?? result.score ?? 0} 分。`);
@@ -231,7 +269,7 @@ export function ControlledEvolutionWorkspace() {
     onError: (error: Error) => setFeedback(error.message),
   });
 
-  const busy = bootstrap.isPending || createDataset.isPending || createEvaluator.isPending || addCase.isPending || freezeDataset.isPending || generate.isPending || runEvaluation.isPending || compare.isPending || publish.isPending;
+  const busy = bootstrap.isPending || bootstrapReleaseDataset.isPending || createDataset.isPending || createEvaluator.isPending || addCase.isPending || freezeDataset.isPending || approveDataset.isPending || generate.isPending || runEvaluation.isPending || compare.isPending || publish.isPending;
 
   return <section className="lab-panel">
     <div className="lab-section-head">
@@ -246,6 +284,9 @@ export function ControlledEvolutionWorkspace() {
     <details className="evolution-assets">
       <summary>配置评测资产</summary>
       <p>创建 Dataset、关键词 Evaluator 和 Case。这里仅写入测试资产，不调用模型。</p>
+      <div className="lab-actions">
+        <button onClick={() => bootstrapReleaseDataset.mutate()} disabled={busy}>导入内置发布回归集 v1</button>
+      </div>
       <div className="lab-form-grid">
         <label>Dataset key<input value={datasetKey} onChange={(event) => setDatasetKey(event.target.value)} /></label>
         <label>Dataset 名称<input value={datasetName} onChange={(event) => setDatasetName(event.target.value)} /></label>
@@ -268,6 +309,20 @@ export function ControlledEvolutionWorkspace() {
         <button onClick={() => addCase.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt || !caseKey || !caseMessage || !caseKeywords || !caseJobFamily || !caseSkill || !caseDifficulty}>添加 Case 到当前 Dataset</button>
         <button onClick={() => freezeDataset.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt}>冻结当前 Dataset</button>
       </div>
+      {datasetDetails.data && <details className="evolution-assets">
+        <summary>审查当前 Dataset · {datasetDetails.data.cases?.length || 0} Cases · {datasetDetails.data.metadata?.review?.status || 'PENDING'}</summary>
+        <p>批准表示当前管理员已核对输入、期望关键词、业务切片、来源与无个人数据声明。批准记录不修改冻结内容指纹。</p>
+        {datasetDetails.data.cases?.map((item: any) => <article className="lab-row" key={item.id}>
+          <div><h3>{item.key}</h3><p>{item.input?.message}</p></div>
+          <div className="lab-row-metrics">
+            <span>关键词 {(item.expectedOutput?.keywords || []).join('、')}</span>
+            <span>{item.metadata?.segments?.skill}</span>
+            <span>{item.metadata?.segments?.difficulty}</span>
+            <span>{item.metadata?.provenance?.containsPersonalData ? '含个人数据' : '无个人数据'}</span>
+          </div>
+        </article>)}
+        <button onClick={() => approveDataset.mutate()} disabled={busy || !datasetId || !selectedDataset?.frozenAt || selectedDataset?.metadata?.review?.status === 'APPROVED'}>管理员批准当前 Dataset</button>
+      </details>}
     </details>
 
     <div className="lab-form-grid">
@@ -281,7 +336,10 @@ export function ControlledEvolutionWorkspace() {
       <label>Dataset<select value={datasetId} onChange={(event) => setDatasetId(event.target.value)}><option value="">选择 Dataset</option>{datasets.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.version} · {item.frozenAt ? '已冻结' : '可编辑'}</option>)}</select></label>
       <label>Evaluator<select value={evaluatorId} onChange={(event) => setEvaluatorId(event.target.value)}><option value="">选择 Evaluator</option>{evaluators.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.type}</option>)}</select></label>
       <label>重复次数<select value={repeatCount} onChange={(event) => setRepeatCount(Number(event.target.value))}><option value={3}>3 次</option><option value={4}>4 次</option><option value={5}>5 次</option></select></label>
+      <label>成本停止阈值（CNY）<input type="number" min="0.01" max="100" step="0.01" value={maxEstimatedCostCny} onChange={(event) => setMaxEstimatedCostCny(Number(event.target.value))} /></label>
     </div>
+
+    {selectedDataset && <p>计划调用：{selectedDataset._count?.cases || 0} Cases × {repeatCount} 次 = {(selectedDataset._count?.cases || 0) * repeatCount} 个样本/版本；单版本达到 ¥{maxEstimatedCostCny.toFixed(2)} 时停止后续调用。</p>}
 
     <div className="lab-actions">
       <button onClick={() => selectedAgent?.currentVersion && runEvaluation.mutate(selectedAgent.currentVersion.id)} disabled={busy || !selectedAgent?.currentVersion || !datasetId || !evaluatorId || !releaseEvidenceReady}>评测当前基线</button>
@@ -290,7 +348,7 @@ export function ControlledEvolutionWorkspace() {
       <button onClick={() => publish.mutate()} disabled={busy || comparison?.releaseRecommendation !== 'APPROVE'}>管理员发布</button>
     </div>
 
-    {selectedDataset && !releaseEvidenceReady && <p className="lab-feedback">请先冻结当前 Dataset；3–5 次发布评测要求至少 10 个带岗位族、技能和难度标签的 Case，且每个切片至少 2 个 Case。</p>}
+    {selectedDataset && !releaseEvidenceReady && <p className="lab-feedback">发布评测要求 Dataset 已冻结、至少 10 个带完整业务切片的 Case，并由管理员逐条审查批准。</p>}
 
     {comparison && <article className="lab-row">
       <div><p className={`decision-${comparison.releaseRecommendation.toLowerCase()}`}>{comparison.releaseRecommendation}</p><h2>同集评测结果</h2><p>Dataset {comparison.datasetId} · Evaluator {comparison.evaluatorId}</p></div>

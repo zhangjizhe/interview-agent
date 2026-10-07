@@ -1,5 +1,11 @@
 # 任务交接
 
+## 2026-10-07 · LAB-CURATED-BENCHMARK-6（等待管理员审查）
+
+已部署 `interview-release-v1@1.0.0`：12 个合成业务 Case、RAG/Evaluation/System Design 与三档难度均衡分层，不含候选人数据。管理员 `admin-acceptance` 已用于正常 RBAC 登录和幂等导入，未执行批准；Lab 当前展开 12 Case 审查视图。评测要求 `maxEstimatedCostCny`，服务端默认最多 5 CNY/版本，并在未知费率或达到阈值时停止后续调用。API 538 tests、Cache 22、lint/typecheck/build、Docker readiness 通过；评测总数仍为 5，未新增 Provider 调用。人类批准后再运行当前 1.0.0 与草稿 1.0.1 各 36 个样本，随后执行 v3 对比，禁止自动发布。
+
+原有 UI/题库/Web/截图与旧交接编辑继续保留未提交；提交时只纳入本轮明确差异。
+
 ## 2026-10-07 · LAB-STRATIFIED-SIGNIFICANCE-5
 
 已完成 `release-gate/v3`：3–5 次发布评测要求冻结 Dataset 至少 10 Case，Case metadata 包含 `jobFamily`、`skill`、`difficulty`；以 Case 为单位与同指纹基线配对，95% 区间下界不低于 -2 分，切片平均回归不超过 5 分。现有单 Case 失败探针在 UI/API 均被阻断，不应绕过。API 72 suites / 532 tests、Cache 22、lint/typecheck/build、Docker readiness 和浏览器展示通过；未运行批量真实评测。下一任务应先策划并人工审查真实脱敏业务 Dataset，再执行有界基线/候选评测。
