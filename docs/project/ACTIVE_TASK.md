@@ -4,20 +4,16 @@
 
 ## 任务 ID
 
-LAB-CURATED-BENCHMARK-6
+DELIVERY-UI-REFRESH-1
 
 ## 目标与范围
 
-建立首个版本化、脱敏、可人工审查的 Interview Agent 业务场景 Dataset，并提供幂等管理员导入入口。发布评测增加 Dataset 样本上限、显式成本预算和未知费率熔断；随后在固定 Dataset/Evaluator 上执行有界真实基线与候选评测，保存质量、延迟、Token、成本和分层统计证据。不自动发布候选，不使用候选人数据。
+用户要求继续交付完整项目并更换设计风格。本阶段复用 React 界面与现有领域合同，将 Interview 和 Agent Lab 统一为浅色专业工作台；改造登录、导航、画布、表单与状态样式，验证桌面和移动布局。完整项目的剩余交付门禁见 `docs/product/COMPLETE_DELIVERY_PLAN.md`。
 
 ## 状态
 
-缓存隔离修复及 v4 发布门工程验证完成。Dataset 已获用户确认并批准；首轮缓存污染结果不采信。隔离后基线完成 13/36 样本、4 个完整 Case 后触发月度额度，终态 FAILED；已核验费用小计 0.069285 CNY，中断费用证据不可用。候选未重跑、未发布，正式评测受运营额度与完整费用核验阻塞。
+本阶段界面改造与本机验收完成，提交推送后等待用户继续下一阶段。先前 LAB-CURATED-BENCHMARK-6 正式真实对比因月度额度失败，保留为受阻待办；不放宽额度、不重置账本、不自动发布候选。
 
 ## 验收
 
-API 73 suites / 545 tests（另 2 suites / 14 tests skipped）、Cache 22、Web 83、lint/typecheck/build、Docker readiness 通过。最终真实 comparison API 为 v4 REJECT/RG-021，不能声明业务质量、非回归或可商用验收通过。详见 `docs/ACCEPTANCE-REPORT-2026-10-07-CURATED-REAL-EVALUATION.md`。
-
-## 后续
-
-先由管理员核对组织本月模型尝试额度及中断费用，再确认新的有界重跑预算；禁止重置账本、绕过额度或重复提交失败任务。普通 Interview 缓存上下文/策略/模型指纹列为独立发布前任务。
+Web 83 tests、全工作区 lint/typecheck/build、最终两端 Docker build 通过；30/30 桌面/手机布局检查、登录及真实 v4 REJECT/发布禁用核验通过。纯 UI 改动不声明 Agent 质量改善，无新 Schema/API/依赖或付费模型调用。

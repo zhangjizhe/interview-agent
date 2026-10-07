@@ -1,5 +1,9 @@
 # 架构地图
 
+## 2026-10-08 · 双端视觉层
+
+Interview 使用现有 Tailwind 主题、index.css 与 AppShell；Agent Lab 在既有样式之后导入 visual-theme.css，复用现有组件及请求合同。两端不增加 UI 框架、运行依赖、API、数据库表或模型调用。
+
 ## 2026-10-08 · 评测缓存边界
 
 EvaluationService 的服务端内部选项经 AgentRuntime、MultiAgent 与 ALS 到 LlmGatewayChatModel，只在该评测调用上下文中绕过答案语义缓存读写。Evaluation metrics 保存 cachePolicy，v4 发布门要求基线/候选均具备该证据；普通 Interview 缓存配置未在本轮改变。无新增表或路由，详见 ADR 16。

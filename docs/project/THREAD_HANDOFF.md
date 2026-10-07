@@ -1,5 +1,9 @@
 # 任务交接
 
+## 2026-10-08 · DELIVERY-UI-REFRESH-1 交接
+
+用户要求完整项目与新设计风格。本阶段采用浅色专业工作台，两端样式、Interview 登录/导航、Lab 手机溢出及退出入口已验证；Web 83、lint/typecheck/build、最终 Docker 和 30/30 布局检查通过，真实 v4 REJECT/发布禁用仍成立。下一阶段按照 COMPLETE_DELIVERY_PLAN 完成普通 Interview 缓存隔离；受额度阻塞的真实对比另核验预算，不能自动发布。保留原有题库/认证/UI/旧报告编辑，后续独立整合；本机镜像含这些既有编辑，不能当成干净生产发布。
+
 ## 2026-10-08 · LAB-CURATED-BENCHMARK-6 核验收尾
 
 已部署 Lab 内部 bypassSemanticCache 与 v4 发布门；API 545、Cache 22、Web 83、lint/typecheck/build 通过。固定 Dataset 已批准；首轮 36+36 缓存污染结果不采信。隔离基线 cmuyad4g9000xf0ua2vpw0u97 因月度额度 FAILED，13/36 成功样本、费用小计 0.069285 CNY；中断 Run cmuyale7n00bef0ua31b41x32 费用未知。候选未重跑、未发布，最终真实比较 REJECT/RG-021。不得重复提交、改写历史或自动放宽额度；先核对运营额度和中断费用，再确认新预算。报告已记录边界，普通 Interview 缓存隔离另列任务。原有编辑（含旧报告粘贴文本）保留。

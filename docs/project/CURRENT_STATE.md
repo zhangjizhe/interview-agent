@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-08 · 双端浅色工作台验收
+
+Interview 与 Lab 已更换为暖灰/白色/靛蓝设计；候选人登录与工作台导航、Lab 表单/状态/手机退出改造完成。修复手机导航及控制中心网格溢出；Web 83 tests、lint/typecheck/build、两端 Docker build 和 30/30 布局检查通过。完整项目仍有普通 Interview 缓存隔离、可信评测及生产验收待办；没有新增付费调用或发布候选。
+
 ## 2026-10-08 · 真实评测缓存隔离与失败核验
 
 评测答案缓存隔离与 v4 发布门已完成工程验收：API 545、Cache 22、Web 83、lint/typecheck/build 通过，本机 API healthy。首轮缓存污染结果不采信；隔离基线在 13/36 成功样本后触发月度额度而 FAILED，已核验费用小计 0.069285 CNY，中断成本未知；候选未重跑、未发布。最终 comparison 为 v4 REJECT/RG-021，正式业务验收未通过。报告见 docs/ACCEPTANCE-REPORT-2026-10-07-CURATED-REAL-EVALUATION.md。

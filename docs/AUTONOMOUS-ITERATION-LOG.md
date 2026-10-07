@@ -93,3 +93,11 @@
 - Evaluation：用户确认 12 Case、36 样本/版、5 CNY/版后批准 Dataset；隔离重跑阈值 4.99 CNY。基线完成 13 样本后月度额度拒绝，FAILED；已核验费用小计 0.069285 CNY，中断费用未知，候选未启动。失败保护停止后续调用，未重复提交。
 - 影响：无新依赖、Schema、migration 或路由；内部运行选项和评测 metrics 增量。Provider Prompt 缓存保留，普通 Interview 答案缓存未调整。
 - 未完成：完整可信质量/延迟/费用对比、候选发布及正式商用业务验收。先核对运营额度和中断费用，普通 Interview 缓存上下文指纹作为独立发布前任务。详见本轮交付报告。
+
+## 2026-10-08 · DELIVERY-UI-REFRESH-1 双端新设计
+
+- 用户要求完整项目交付与新设计。本阶段复用现有 React/Tailwind/Lucide，统一暖灰/白色/靛蓝专业工作台，改造 Interview 登录和导航、Lab 表单与状态。
+- 真实浏览器发现并修复两处手机 Grid 最小宽度溢出；补 Lab 手机退出入口、输入字号和 Interview 底栏安全区。录制报告决定与真实版本发布门标签分离。
+- 验证：Web 83 tests、全工作区 lint/typecheck/build、最终两端 Docker build 通过；30/30 桌面/手机布局检查通过，v4 REJECT/发布禁用成立。排除原有未提交编辑的暂存源码另行通过 Web 83 tests 与两端 build。
+- 无新依赖、Schema、API 或付费模型调用，不声明 Agent 质量改善。原有编辑保留；本机镜像含这些编辑，干净版本部署仍需单独核验。
+- 完整交付顺序保存至 COMPLETE_DELIVERY_PLAN；本阶段完成后等待用户继续普通 Interview 缓存隔离。真实评测额度与未知中断成本阻碍保留，候选未发布。

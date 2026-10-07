@@ -19,6 +19,7 @@ import { useState } from 'react';
 import './styles.css';
 import './lab.css';
 import { ControlledEvolutionWorkspace } from './ControlledEvolutionWorkspace';
+import './visual-theme.css';
 
 type View = 'overview' | 'runtime' | 'mcp' | 'trace' | 'evaluation' | 'evolution' | 'experiments' | 'release' | 'audit' | 'operations';
 type Server = {
@@ -346,19 +347,19 @@ function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: numbe
   return <div className="agent-page-grid">
     <section className="agent-hero">
       <p className="agent-eyebrow">SYSTEM STATUS</p>
-      <h2>受控运行，而不是不可见自动化。</h2>
+      <h2>Agent 的运行与评测工作台</h2>
       <p>数据源：Golden Dataset {lab.dataset.version}，已校验 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。控制面只显示脱敏摘要、指标和发布证据。</p>
       <div className="agent-hero-actions"><button onClick={onRuntime}><Workflow size={16}/>查看编排</button><button className="quiet" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button></div>
     </section>
     <section className="agent-metric-grid">
       <article><span>MCP 服务</span><strong>{data.runningCount} / {data.count}</strong><small>当前可用</small></article>
       <article><span>运行编排</span><strong>受控</strong><small>阶段可见，内部推理不可见</small></article>
-      <article><span>最新发布记录</span><strong>{lab.summary.latestDecision || '无记录'}</strong><small>{latestDecision ? `${new Date(latestDecision.createdAt).toLocaleString()} · 仅记录人工决定，不触发部署` : '尚无人工发布决定'}</small></article>
+      <article><span>录制报告发布记录</span><strong>{lab.summary.latestDecision || '无记录'}</strong><small>{latestDecision ? `${new Date(latestDecision.createdAt).toLocaleString()} · 仅记录人工决定，不触发部署` : '尚无人工发布决定'}</small></article>
     </section>
     <section className="lab-summary-grid">
       <article><span>数据集</span><strong>{lab.dataset.validationStatus}</strong><small>{lab.dataset.version} · {lab.runs[0] ? new Date(lab.runs[0].startedAt).toLocaleString() : '当前控制面读取'}</small></article>
       <article><span>失败运行</span><strong>{lab.summary.failedRunCount}</strong><small>最近 20 条运行</small></article>
-      <article><span>发布门</span><strong>{Math.round(lab.thresholds.qualityScore * 100)}%</strong><small>质量最低阈值</small></article>
+      <article><span>录制报告质量门</span><strong>{Math.round(lab.thresholds.qualityScore * 100)}%</strong><small>版本自进化使用独立发布证据门</small></article>
     </section>
     <RuntimeCanvas compact />
   </div>;

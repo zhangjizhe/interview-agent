@@ -93,10 +93,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (session) return <>{children}</>;
 
   return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-sm bg-white border border-slate-200 rounded-lg shadow-sm p-6 space-y-4">
+    <main className="studio-auth">
+      <section className="studio-auth-story" aria-label="面试训练介绍">
+        <div className="studio-auth-brand"><span className="brand-mark" aria-hidden="true">面</span>小面训练</div>
+        <h2>准备得更清楚，<br />面试得更从容。</h2>
+        <p>从目标岗位出发，把每一次模拟面试，变成有证据、有方向的成长。</p>
+        <div className="studio-auth-steps"><div><span>01</span>明确你的目标岗位</div><div><span>02</span>进行有针对性的模拟面试</div><div><span>03</span>依据评价证据，继续练习</div></div>
+      </section>
+      <div className="studio-auth-form">
+      <form onSubmit={submit} className="space-y-5">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">小面</h1>
+          <p className="mb-3 text-xs font-semibold tracking-wider text-blue-700">INTERVIEW STUDIO</p>
+          <h1 className="font-semibold text-slate-900">{registering ? '创建你的训练空间' : '欢迎回来'}</h1>
           <p className="mt-1 text-sm text-slate-500">{registering ? '创建账号以保护你的面试与简历数据' : '登录以继续你的面试记录'}</p>
         </div>
         <label className="block text-sm text-slate-700">
@@ -115,6 +123,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           {registering ? '已有账号，去登录' : '没有账号，创建账号'}
         </button>
       </form>
+      </div>
     </main>
   );
 }
