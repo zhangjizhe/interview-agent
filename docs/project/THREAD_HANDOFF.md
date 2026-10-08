@@ -2,6 +2,10 @@
 
 更新：2026-10-08 · DELIVERY-CLOSEOUT-1
 
+## 全产品重新验收（2026-10-08）
+
+PRODUCT-REACCEPTANCE-1 为当前唯一活动主题。用户要求测试确认后再交付；产品整体 NOT_ACCEPTED。Phase 0 建立34功能合同、673源码模板项（144交互/529展示，全部未验收），要求API/持久化与浏览器独立二次确认，条件/动态/响应式需逐项展开。发现旧产品规格和全流程脚本过时、CI没有浏览器验收门。计划 `docs/acceptance/PRODUCT_REACCEPTANCE_PLAN.md`。按AGENTS分阶段等待继续；真实模型测试须核对额度/未知账单并确定新预算，当前无新推理或产品通过声明。
+
 ## 新组织管理员控制面修复（2026-10-08）
 
 LAB-FIRST-ADMIN-1：LabDataset 全局版本唯一与组织隔离冲突，dashboard 404 被误导为重新登录。改为组织/版本复合唯一和按组织 upsert，新增重试连接。真实 PG 19/19、Lab 服务 15/15、认证 10/10、相关 lint/type/build 和实际镜像 36/36 通过；隔离恢复演练通过。备份后部署新迁移 18/18，本机 Lab readiness 200，用户浏览器实际显示控制中心及 VALID 数据集。旧测试固定管理员、mock 初始化和未访问 dashboard 导致漏测，见 `docs/ACCEPTANCE-REPORT-2026-10-08-LAB-FIRST-ADMIN.md`。没有改权限/组织归属或调用模型；本次不是所有业务功能的完整验收。

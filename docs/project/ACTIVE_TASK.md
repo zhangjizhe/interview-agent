@@ -1,15 +1,13 @@
 # 当前任务
 
-更新：2026-10-08 · LAB-FIRST-ADMIN-1
+更新：2026-10-08 · PRODUCT-REACCEPTANCE-1
 
-## 目标
+## 用户要求与交付门
 
-修复新组织管理员登录后 dashboard 404 和错误页面引导重复登录；核对并补足验收缺口。保留组织隔离，不迁移用户组织、不扩大权限、不调用模型。
+用户要求全部功能重新严谨测试，先明确产品规划，每个交互和展示二次确认，测试确认后才交付。执行API/持久化与浏览器独立双证据门；不以旧测试数量、readiness或mock结果声明全链路通过。
 
-## 实现与当前验证
+## 当前阶段
 
-LabDataset 从全局 version 唯一改为 organizationId/version 复合唯一，服务按当前组织 upsert；迁移保留所有行与 ID。错误页新增重试连接。真实 PostgreSQL 新库/存量升级与跨组织并发首次 dashboard、隔离/同组织重复验证 19/19；Lab 服务 15/15、认证 transport 10/10、相关 lint/API typecheck/Lab build 通过。实际镜像隔离 HTTP 36/36 与恢复演练通过；备份后部署迁移 18/18，本机用户浏览器已显示控制中心与 VALID 数据集。详细报告见 `docs/ACCEPTANCE-REPORT-2026-10-08-LAB-FIRST-ADMIN.md`。
+Phase 0 验收清单完成，产品整体 NOT_ACCEPTED。计划见 `docs/acceptance/PRODUCT_REACCEPTANCE_PLAN.md`；源码清单 `UI_INVENTORY.json` 有673模板项（144交互/529展示），全部未验收，运行时仍需条件/动态/响应式展开。34个功能级合同含完整训练、管理员控制面、数据展示、故障恢复与费用边界。已确认产品规格陈旧、CI无浏览器门和旧全流程脚本合同过期。
 
-## 测试缺口
-
-服务测试 mock ensureGoldenDataset；固定管理员浏览器脚本未覆盖另一个组织的新管理员。旧 HTTP smoke 只验证 Lab agents，未访问 dashboard。本次加入普通用户被拒、合成授权/重新登录/全部初始接口/撤权拒绝回归。所有合成权限操作仅在无外网的专用 fixture 数据库执行。
+按 AGENTS.md 每Phase完成后等待用户继续；下阶段为校准规格、独立合成环境非付费真实API与浏览器逐项测试及修复。真实AI阶段先核对额度/账单并明确新有界预算，不能绕过已记录的费用门。当前不新增业务代码、权限或模型请求，不声称完成产品验收。
