@@ -16,9 +16,9 @@ qdrant_image='qdrant/qdrant@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f
 cleanup() {
   local status=$?
   if [[ "$status" -ne 0 ]]; then
-    docker logs "$fixture_milvus" >&2 2>/dev/null || true
-    docker logs "$fixture_etcd" >&2 2>/dev/null || true
-    docker logs "$fixture_qdrant" >&2 2>/dev/null || true
+    docker logs --tail 120 "$fixture_milvus" >&2 2>/dev/null || true
+    docker logs --tail 120 "$fixture_etcd" >&2 2>/dev/null || true
+    docker logs --tail 120 "$fixture_qdrant" >&2 2>/dev/null || true
   fi
   docker rm -fv "$fixture_api" "$fixture_pg" "$fixture_redis" "$fixture_milvus" "$fixture_etcd" "$fixture_qdrant" >/dev/null 2>&1 || true
   docker network rm "$fixture_network" >/dev/null 2>&1 || true
@@ -120,5 +120,18 @@ for attempt in {1..90}; do
 done
 test "$fixture_vector_ready" = true
 docker start "$fixture_api" >/dev/null
-docker exec "$fixture_api" node /tmp/verify-vector-recovery.cjs restored
+vector_restore_ready=false
+for attempt in {1..6}; do
+  if docker exec "$fixture_api" node /tmp/verify-vector-recovery.cjs restored > "$fixture_backup/vector-restore.log" 2>&1; then
+    cat "$fixture_backup/vector-restore.log"
+    vector_restore_ready=true
+    break
+  fi
+  if [[ "$attempt" -eq 6 ]]; then
+    cat "$fixture_backup/vector-restore.log" >&2
+  else
+    sleep 5
+  fi
+done
+test "$vector_restore_ready" = true
 echo 'PASS isolated recovery drill; synthetic data only, no production RPO/RTO claim'

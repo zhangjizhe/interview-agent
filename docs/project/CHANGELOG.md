@@ -6,7 +6,7 @@
 
 ## DELIVERY-CLOSEOUT-1（进行中）
 
-- 最终验证收尾：PostgreSQL 专用回归 18 项；API Jest 663、Cache 22、Web/Lab 99；严格 lint/type/build 通过。隔离 API HTTP smoke 28/28，真实 Milvus 写入与准确主键补偿、Redis 故障探针、PostgreSQL 数据转储相等、Milvus+etcd 和 Qdrant 恢复后实际读回通过。CI PostgreSQL socket 探活竞态改为 TCP readiness。
+- 最终验证收尾：PostgreSQL 专用回归 18 项；API Jest 663、Cache 22、Web/Lab 99；严格 lint/type/build 通过。隔离 API HTTP smoke 28/28，真实 Milvus 写入与准确主键补偿、Redis 故障探针、PostgreSQL 数据转储相等、Milvus+etcd 和 Qdrant 恢复后实际读回通过。CI PostgreSQL socket 探活竞态改为 TCP readiness；Milvus 的 healthz 早于内部 QueryNode 可读，恢复流程以有界实际查询确认就绪。
 
 - Docker Compose 将宿主端口限制到 loopback，Redis 开启 AOF 与 `noeviction`；运行手册归档 Python 替代实现旧记录，并更新恢复演练边界。唯一官方 audit high 仍为 braces 无上游修复 advisory；工程合并不等于商业生产发布。
 
