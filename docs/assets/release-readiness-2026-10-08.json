@@ -1,0 +1,117 @@
+{
+  "verified_at_utc": "2026-10-08T08:10:25.501620+00:00",
+  "scope": "local engineering acceptance; not production or real model quality",
+  "checks": {
+    "api": {
+      "passed": 626,
+      "dedicated_db_skipped": 17
+    },
+    "postgresql": {
+      "passed": 17,
+      "fresh_install": true,
+      "legacy_upgrade": true
+    },
+    "cache_unit": 22,
+    "web_lab_component": 95,
+    "real_api_browser": 24,
+    "report_fixture_browser": 8,
+    "lab_recorded_fixture": "passed",
+    "strict_lint_warnings": 0,
+    "typecheck": "passed",
+    "product_build": "passed",
+    "golden_dataset_format_cases": 30,
+    "docker_applications": [
+      "api",
+      "web",
+      "agent-lab"
+    ],
+    "database_restore_schema_and_row_counts": "matched",
+    "built_api_smoke": {
+      "passed": 12,
+      "isolated_infrastructure": [
+        "PostgreSQL",
+        "Redis",
+        "Milvus"
+      ],
+      "external_network": "blocked",
+      "model_work": false
+    },
+    "lab_responsive": {
+      "desktop_width": 1440,
+      "mobile_width": 390,
+      "horizontal_overflow": false,
+      "publish_enabled": false
+    }
+  },
+  "production_dependency_audit": {
+    "registry": "https://registry.npmjs.org",
+    "counts": {
+      "info": 0,
+      "low": 0,
+      "moderate": 6,
+      "high": 1,
+      "critical": 0
+    },
+    "remaining": [
+      {
+        "package": "file-type",
+        "severity": "moderate",
+        "advisory": "GHSA-5v7r-6r5c-r473",
+        "patched_versions": ">=21.3.1"
+      },
+      {
+        "package": "file-type",
+        "severity": "moderate",
+        "advisory": "GHSA-j47w-4g3g-c36v",
+        "patched_versions": ">=21.3.2"
+      },
+      {
+        "package": "@nestjs/core",
+        "severity": "moderate",
+        "advisory": "GHSA-36xv-jgw5-4q75",
+        "patched_versions": ">=11.1.18"
+      },
+      {
+        "package": "uuid",
+        "severity": "moderate",
+        "advisory": "GHSA-w5hq-g745-h8pq",
+        "patched_versions": ">=11.1.1"
+      },
+      {
+        "package": "react-router",
+        "severity": "moderate",
+        "advisory": "GHSA-wrjc-x8rr-h8h6",
+        "patched_versions": ">=7.18.0"
+      },
+      {
+        "package": "react-router",
+        "severity": "moderate",
+        "advisory": "GHSA-337j-9hxr-rhxg",
+        "patched_versions": ">=7.18.0"
+      },
+      {
+        "package": "braces",
+        "severity": "high",
+        "advisory": "GHSA-vfj7-8cjw-p6xm",
+        "patched_versions": "<0.0.0"
+      }
+    ]
+  },
+  "file_sha256": {
+    "pnpm-lock.yaml": "5da271a52cdffd4ddaac9e2b58931c95c3b72d00f7bc3b288ee5736b38eeddc5",
+    "patches/braces@3.0.3.patch": "69dd7aaf771908ae290c98621c7e61311a8b240d7b50bef8f144fceafb209e57"
+  },
+  "business_evaluation": {
+    "status": "FAILED",
+    "successful_samples": 13,
+    "planned_samples": 36,
+    "verified_subtotal_cny": 0.069285,
+    "interrupted_call_cost": "unknown",
+    "candidate": "1.0.1 DRAFT",
+    "current": "1.0.0",
+    "gate": "release-gate/v4",
+    "recommendation": "REJECT",
+    "new_paid_business_benchmark": false
+  },
+  "merge_main": "held for security review and remaining dependency migration; no approved exception"
+}

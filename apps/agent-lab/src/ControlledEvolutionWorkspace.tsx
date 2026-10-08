@@ -353,7 +353,7 @@ export function ControlledEvolutionWorkspace() {
 
     {comparison && <article className="lab-row">
       <div><p className={`decision-${comparison.releaseRecommendation.toLowerCase()}`}>{comparison.releaseRecommendation}</p><h2>同集评测结果</h2><p>Dataset {comparison.datasetId} · Evaluator {comparison.evaluatorId}</p></div>
-      <div>{comparison.reasons?.map((reason: string) => <p className="evolution-rejection" key={reason}>{reason}</p>)}</div>
+      <div>{comparison.reasons?.map((reason: string) => <p className="evolution-rejection" key={reason}>{reason}</p>)}<p>以下是原始术语分数；发布门拒绝时不能作为有效发布依据，也不代表完整面试质量。</p></div>
       <div className="lab-row-metrics"><span>基线 {comparison.baseline.score}</span><span>候选 {comparison.candidate.score}</span><span>变化 {comparison.scoreDelta >= 0 ? '+' : ''}{comparison.scoreDelta}</span><span>发布证据 {comparison.releaseGate.ruleSetVersion}</span>{comparison.releaseGate.evidence?.statisticalComparison && <span>95% 下界 {comparison.releaseGate.evidence.statisticalComparison.lowerConfidenceBoundPoints ?? '不可用'} · 配对 {comparison.releaseGate.evidence.statisticalComparison.pairedCaseCount}</span>}</div>
     </article>}
     <section className="evolution-jobs" aria-label="评测任务与证据">

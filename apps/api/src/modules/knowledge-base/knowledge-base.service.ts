@@ -246,7 +246,6 @@ export class KnowledgeBaseService implements OnModuleInit {
     try {
       const client = this.qdrant.getClient();
       let offset: string | number | undefined;
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const res: any = await client.scroll(this.collection, {
           limit: 100,

@@ -1,0 +1,28 @@
+diff --git a/lib/parse.js b/lib/parse.js
+index 3a6988e629f52aee6609dc5ec290a5e9ff47cecb..6666fea1456216dfb7febf5acac976256eaabeaf 100644
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -144,6 +144,11 @@ const parse = (input, options = {}) => {
+ 
+     if (value === CHAR_LEFT_PARENTHESES) {
+       block = push({ type: 'paren', nodes: [] });
++      // Local mitigation for GHSA-vfj7-8cjw-p6xm: bound AST depth before
++      // recursive compile/expand/stringify walkers can exhaust the stack.
++      if (stack.length >= 33) {
++        throw new SyntaxError('Brace pattern exceeds maximum nesting depth (32)');
++      }
+       stack.push(block);
+       push({ type: 'text', value });
+       continue;
+@@ -210,6 +215,11 @@ const parse = (input, options = {}) => {
+       };
+ 
+       block = push(brace);
++      // Local mitigation for GHSA-vfj7-8cjw-p6xm: bound AST depth before
++      // recursive compile/expand/stringify walkers can exhaust the stack.
++      if (stack.length >= 33) {
++        throw new SyntaxError('Brace pattern exceeds maximum nesting depth (32)');
++      }
+       stack.push(block);
+       push({ type: 'open', value });
+       continue;

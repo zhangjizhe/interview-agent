@@ -10,18 +10,19 @@ WORKDIR /app
 RUN apk add --no-cache openssl python3 make g++ curl
 
 # pnpm
-RUN npm install -g pnpm@9
+RUN npm install -g pnpm@9.0.0
 ENV npm_config_registry=https://registry.npmjs.org
 
 # 拷贝 monorepo 配置
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
+COPY patches ./patches
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
 
 # 装依赖。BuildKit cache 让镜像仓库短暂失败后的重试复用已下载包。
 RUN --mount=type=cache,id=interview-agent-pnpm-api,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store && \
-    pnpm install --frozen-lockfile=false
+    pnpm install --frozen-lockfile
 
 # Prisma Client 必须在 Nest 编译前根据当前 schema 生成。
 # 否则新增模型或枚举不会出现在 TypeScript 类型中。
@@ -55,11 +56,11 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 
 # 运行时只需要：openssl（Prisma runtime）+ curl（docker healthcheck）
-# 不装 python3/make/g++，镜像小 600MB+，build 快 10x
+# 编译工具仅保留在 builder 阶段。
 RUN apk add --no-cache openssl curl
 
-# pnpm（容器内手动装包用）
-RUN npm install -g pnpm@9
+# pnpm 用于迁移命令；发布依赖由锁文件构建，禁止运行时改装。
+RUN npm install -g pnpm@9.0.0
 
 # 从 builder 拷贝已 build 的产物
 COPY --from=builder /app/apps/api/dist /app/apps/api/dist
@@ -74,6 +75,7 @@ COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/packages /app/packages
 COPY --from=builder /app/pnpm-workspace.yaml /app/
 COPY --from=builder /app/package.json /app/
+COPY --from=builder /app/patches /app/patches
 COPY --from=builder /app/.npmrc /app/
 COPY --from=builder /usr/local/bin/docker-entrypoint.sh /usr/local/bin/
 COPY --from=builder /usr/local/bin/migration-entrypoint.sh /usr/local/bin/

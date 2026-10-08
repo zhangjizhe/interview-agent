@@ -662,3 +662,11 @@ await fs.writeFile(`docs/reflect-${formatDate(new Date())}.md`, report);
 - 后台恢复认证用户和组织范围，执行前及每个样本边界重查数据库 ADMIN。资产变更在模型调用前拒绝；仍经现有额度、缓存隔离和预算检查。没有模型调用绕过入口，不保存额外候选人正文。
 - UI 轮询真实进度，网络重试保留原键；未知总数不推算百分比，未知成绩/费用不显示为零。比较限定 Dataset/Evaluator，条件变化清除旧比较。
 - 取舍：增加数据库轮询与进度写入；不是高吞吐队列，没有取消接口、跨进程暂停或崩溃精确结算。预算仍是软停止阈值，最多超出一个在途样本。规模扩大再评估专用队列；离线 fixture 不证明真实质量或账单一致。
+
+## 19. 冻结兼容依赖与可追溯本地安全补丁
+
+- 日期：2026-10-08。生产依赖审计发现 critical/high 项，原 CI 还存在失败 lint 被吞掉和 npm/pnpm 合同不一致。
+- 决策：三端统一 pnpm 9.0.0、官方 registry 与 frozen-lockfile；兼容升级 Multer、MCP SDK 等依赖，CI 严格执行 lint/type/test、真实 Redis、专用 PostgreSQL 升级及三端 Docker 构建。不将离线 fixture、历史 Benchmark 或本地构建当作当前商业效果/远端成功。
+- braces 3.0.3 无上游修复，使用 pnpm patch 在字符串解析前限制嵌套深度 32，并沿实际 DeepAgents 依赖链验证深层模式拒绝与正常模式兼容。补丁进入锁文件与所有 Docker 构建；不修改审计版本或隐藏 high。不保证恶意手工 AST 路径，主版本升级须重新审查。
+- 取舍：超深模式被拒绝；需承担补丁维护。NestJS / Router 等剩余项跨主版本，列为独立迁移，不在兼容修复中推倒现有架构。审计仍为 0 critical / 1 high / 6 moderate；没有已批准的风险豁免或零漏洞结论。
+- 无新增 schema、公开 API 或模型调用路径；上传依赖变化用真实 multipart HTTP 回归。main 合并与生产安全验收分开记录，剩余风险不能被 CI 工程绿灯替代。

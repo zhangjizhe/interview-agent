@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outputDir = join(__dirname, 'screenshots', 'acceptance-2026-08-15');
+const outputDir = join(__dirname, 'screenshots', `acceptance-${new Date().toISOString().slice(0, 10)}`);
 const webUrl = process.env.WEB_URL || 'http://localhost:5173';
 const chromePath = process.env.CHROME_PATH;
 const password = 'acceptance-password-123';

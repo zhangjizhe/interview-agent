@@ -51,7 +51,6 @@ export type GoldenDataset = z.infer<typeof GoldenDatasetSchema>;
  * 失败时抛 ZodError,显示具体哪条 case / 哪个字段错
  */
 export function loadGoldenDataset(path: string): GoldenDataset {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const raw = require('fs').readFileSync(path, 'utf-8');
   const data = JSON.parse(raw);
   return GoldenDatasetSchema.parse(data);

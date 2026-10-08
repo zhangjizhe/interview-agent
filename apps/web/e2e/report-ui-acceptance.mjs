@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const outputDir = join(__dirname, 'screenshots', 'ui-2026-09-02');
+const outputDir = join(__dirname, 'screenshots', `ui-${new Date().toISOString().slice(0, 10)}`);
 const webUrl = process.env.WEB_URL || 'http://localhost:5173';
 const chromePath = process.env.CHROME_PATH;
 

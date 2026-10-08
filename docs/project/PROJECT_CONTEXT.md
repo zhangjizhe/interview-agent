@@ -1,6 +1,6 @@
 # 项目上下文
 
-最后更新：2026-08-13
+最后更新：2026-10-08
 
 ## 产品
 
@@ -28,7 +28,7 @@ Interview Agent 是开源 AI 面试训练平台，正从 Agent Engineering 实�
 - Agent：LangGraph Multi-Agent Runtime；DeepAgents 和 Direct LLM 为受控降级。
 - 数据：PostgreSQL、Redis、Milvus、Qdrant。
 - AI：统一 LLM Gateway，Qwen 主用，DeepSeek 备用。
-- 运维：Langfuse、Token/Cost Tracking、Docker、Jest、Vitest、Playwright、E2E。
+- 运维：Prometheus/Grafana、Langfuse、Token/Cost Tracking、Docker、Jest、Vitest、Playwright、E2E。
 
 `apps/py-api` 是实验性实现，不能作为默认产品路径的改动依据。
 
@@ -44,11 +44,11 @@ Interview Agent 是开源 AI 面试训练平台，正从 Agent Engineering 实�
 
 ## 当前阶段
 
-仓库已具备认证后的技术面试 MVP：简历导入、流式面试、报告生成、题库/知识管理、Multi-Agent 编排、检索和验收证据。完整的技能档案、训练计划、额度/计费和商业 SaaS 闭环尚未实现。
+仓库已具备认证后的技术面试 MVP、目标岗位版本、正式技能证据聚合、训练推荐/复测关联、原子额度与受控 Agent 评测任务。完整训练提升、真实模型版本对比、账单对账和商业生产验收尚未完成。当前工程结果与边界见 CURRENT_STATE，不以过期阶段结论替代代码事实。
 
 ## 非目标
 
 - 没有文档化、测试保护的迁移理由时替换 React、NestJS、LangGraph、Prisma 或现有数据存储。
 - 将实验性 Python API 提升为主运行时。
-- 在前置依赖完成前交付 Billing、Payment、多租户或小程序。
+- 在前置验收完成前声明 Billing / Payment 或商业 SaaS 全链路可用；既有组织隔离与额度不等同商业账单闭环。
 - 从零散聊天体验推断模型、检索或评价质量。

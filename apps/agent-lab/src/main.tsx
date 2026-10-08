@@ -382,7 +382,7 @@ function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: numbe
     <section className="agent-hero">
       <p className="agent-eyebrow">SYSTEM STATUS</p>
       <h2>Agent 的运行与评测工作台</h2>
-      <p>数据源：Golden Dataset {lab.dataset.version}，已校验 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。控制面只显示脱敏摘要、指标和发布证据。</p>
+      <p>合成基准：Golden Dataset {lab.dataset.version}，格式校验覆盖 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。录制指标用于回放与工程验证；当前业务版本的质量结论见受控自进化证据。</p>
       <div className="agent-hero-actions"><button onClick={onRuntime}><Workflow size={16}/>查看编排</button><button className="quiet" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button></div>
     </section>
     <section className="agent-metric-grid">

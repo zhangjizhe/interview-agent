@@ -16,7 +16,7 @@
 - 提供版本化 `EvaluationDataset`、`EvaluationCase`、`Evaluator`、`AgentEvaluationRun` 和 `EvaluationResult`。评测结果关联实际 Agent Run，按 AgentVersion 与 Dataset 版本可回溯。
 - 首版评测器为确定性规则：`KEYWORD` 检查输出关键词、`JSON_SCHEMA` 检查输出字段、`LATENCY` 检查运行耗时。每条结果保存分数、阈值、断言明细、输出摘要和失败原因。
 
-评测 API 位于 `/api/agent-lab`：创建 Dataset 与 Case、创建 Evaluator 后，可调用 `POST /agents/:agentId/evaluations` 同步执行已发布版本；`GET /agents/:agentId/evaluations` 查看汇总，`GET /evaluations/:evaluationId` 查看逐用例结果。输入用例必须满足目标 Agent 的输入契约，首个 Interview 适配器要求 `input.message` 非空。
+评测 API 位于 `/api/agent-lab`：创建 Dataset 与 Case、创建 Evaluator 后，调用 `POST /agents/:agentId/evaluations`，携带 16–100 字符的 `requestKey`，返回 202 持久化任务回执；同键同内容复用，不同内容 409。`GET /agents/:agentId/evaluations` 查看汇总，`GET /evaluations/:evaluationId` 查询进度和逐用例结果。输入用例必须满足目标 Agent 的输入契约，首个 Interview 适配器要求 `input.message` 非空。任务由 PostgreSQL 原子领取、心跳保护，过期失败且不自动付费重放；不是通用远程队列。
 
 当前阶段不会替换既有 Interview 接口和 LangGraph 面试流程。Run 已记录状态、输入、输出、耗时和错误；独立 Run 现由模型网关 usage 汇总 Token 与版本化费率估算成本；缺少 usage/费率时明确标记不可用，不能视为零费用。评测不以不稳定的 LLM Judge 作为基础契约，尚未导入现有 Golden Dataset JSON。部署前必须运行 `pnpm db:deploy`。
 
@@ -41,7 +41,7 @@ AgentLab 新增独立 `ToolRunner` 契约，供后续 MCP、插件和工作区 p
 
 ## 2026-10-02 受控自进化首版
 
-失败分析 → 改进候选 → 同数据集对比 → 人工批准 → Interview 使用已批准版本的最小闭环已实现。失败分类只映射到服务端固定改进策略并生成 `DRAFT` AgentVersion；草稿只在 Lab 评测内部显式放行。发布门使用 0–100 分制，要求候选全部 Case 通过、至少 90 分，并具有当前版本在同一 Dataset/Evaluator 的无回归基线。只有 ADMIN 显式发布才更新当前版本，Interview 从下一回合读取该 `PUBLISHED` 策略。
+失败分析 → 改进候选 → 同数据集对比 → 人工批准 → Interview 使用已批准版本的工程闭环已实现。失败分类只映射到服务端固定改进策略并生成 `DRAFT` AgentVersion；草稿只在 Lab 评测内部显式放行。v4 发布门要求冻结且经审查的同指纹 Dataset/Evaluator、3–5 次重复的缓存隔离证据、完整样本、质量及切片/统计非劣效、Token/延迟/费用资源边界；缺失证据即拒绝。只有 ADMIN 显式发布才更新当前版本，Interview 从下一回合读取该 `PUBLISHED` 策略。关键词评估仅表示术语遵循，完整真实业务对比尚未通过。
 
 该能力不包含 LLM 自动改写、自动发布或效果声明。真实验收已证明失败候选返回 `REJECT` 且不能发布；独立 Run 的 Token/费用已接入；完整可信版本对比尚未完成。详见 `docs/ACCEPTANCE-REPORT-2026-10-02-CONTROLLED-EVOLUTION.md`。
 
