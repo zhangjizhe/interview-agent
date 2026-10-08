@@ -1,8 +1,10 @@
 # 任务交接
 
-更新：2026-10-08 · RELEASE-READINESS-2
+更新：2026-10-08 · DELIVERY-CLOSEOUT-1
 
 ## 当前结论
+
+本轮已完成安全迁移与 braces AST 防护本地验收，见 ADR 20。API 631 / Cache 22 / 双端 95、lint/type/build 通过；官方审计仍显示唯一无上游修复的 braces high，CI 固定补丁 SHA 并运行回归，不隐藏 advisory。用户要求继续全部工程主题后合并；最新远端/镜像/导航收尾尚未完成。额度只读核验为 100/100，已询问正规新增额度及 ¥10 上限，不重置账本。生产环境目标也待补充。
 
 247521d 已提交推送，远端确认一致；[Draft PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 已关联本任务。源码验收与远端 CI 是独立证据；当前检查见 PR / Actions，后续安全迁移后必须复验最新提交。默认 Jest 仍排除 5 份旧 spec，已补真实测试口径，不称历史零跳过。
 

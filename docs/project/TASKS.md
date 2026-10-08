@@ -4,8 +4,8 @@
 
 | 优先级 | 任务 | 状态与验收条件 |
 | --- | --- | --- |
-| 当前 | RELEASE-READINESS-2 | 本地优化与整体验证完成；提交推送、远端 CI 与 main 合并结论收尾。真实质量与商用发布不记完成 |
-| P0 | DEPENDENCY-SECURITY-1 | braces 本地补丁独立复核；NestJS / file-type / Router / uuid 安全迁移，实际上传/SSE/导航/SDK 回归，重新审计。未批准风险豁免 |
+| 当前 | DELIVERY-CLOSEOUT-1 | 用户要求连续完成已知缺口后合并；按主题验证推送，最终核验最新 CI。真实质量与生产结果据实记录 |
+| P0 | DEPENDENCY-SECURITY-1 | 主版本安全迁移及 braces 完整输入补丁本地验收通过；API 631 / Cache 22 / 双端 95，audit moderate 0、上游 high 1 由可追溯补丁修复；最终镜像及浏览器复验待收尾，无第三方审计或零漏洞声明 |
 | P0 | LAB-CURATED-BENCHMARK-6 | 额度失败与中断费用阻塞。核对额度/费用和新有界预算后才能续跑；同集真实隔离评测与人工审查后决定候选发布 |
 | P0 | PRODUCTION-ACCEPTANCE-1 | TLS、凭据/端口/网络隔离、备份与向量恢复、容量、监控和故障演练；工程 CI 不替代生产验收 |
 | P1 | TRAINING-LOOP-1 | 训练 → 再面试 → 可比正式技能证据；实际 API/浏览器与真实样本核验。现有 fixture 与入口不是提升证明 |

@@ -3,7 +3,7 @@ name: Product verification
 'on':
   push:
     branches: [main, agent-lab]
-    paths: ['apps/api/**', 'apps/web/**', 'apps/agent-lab/**', 'packages/**', 'scripts/db/**', 'scripts/ci/**', 'docker-compose.yml', 'deploy.sh', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'eslint.config.mjs', '.github/workflows/ci-api.yml']
+    paths: ['apps/api/**', 'apps/web/**', 'apps/agent-lab/**', 'packages/**', 'patches/**', 'scripts/db/**', 'scripts/ci/**', 'docker-compose.yml', 'deploy.sh', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'eslint.config.mjs', '.github/workflows/ci-api.yml']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -39,6 +39,8 @@ jobs:
         run: pnpm install --frozen-lockfile --registry=https://registry.npmjs.org
       - name: Generate Prisma client
         run: pnpm db:generate
+      - name: Production audit and reviewed patch integrity
+        run: node scripts/ci/security-audit.mjs
       - name: Lint (fail closed)
         run: pnpm lint --max-warnings 0
       - name: Typecheck all product applications

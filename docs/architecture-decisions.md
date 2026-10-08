@@ -670,3 +670,10 @@ await fs.writeFile(`docs/reflect-${formatDate(new Date())}.md`, report);
 - braces 3.0.3 无上游修复，使用 pnpm patch 在字符串解析前限制嵌套深度 32，并沿实际 DeepAgents 依赖链验证深层模式拒绝与正常模式兼容。补丁进入锁文件与所有 Docker 构建；不修改审计版本或隐藏 high。不保证恶意手工 AST 路径，主版本升级须重新审查。
 - 取舍：超深模式被拒绝；需承担补丁维护。NestJS / Router 等剩余项跨主版本，列为独立迁移，不在兼容修复中推倒现有架构。审计仍为 0 critical / 1 high / 6 moderate；没有已批准的风险豁免或零漏洞结论。
 - 无新增 schema、公开 API 或模型调用路径；上传依赖变化用真实 multipart HTTP 回归。main 合并与生产安全验收分开记录，剩余风险不能被 CI 工程绿灯替代。
+
+## 20. 安全主版本迁移与完整 AST 防护
+
+- 日期：2026-10-08。用户要求完成剩余优化后合并；沿用模块化单体，将 NestJS 固定为 11.2.7 / Config 4.0.4、Router 7.18.4，mem0ai 的 uuid 定向覆写为支持 CommonJS 的 11.1.1。保持 Node 20 与 React 18，不扩大到 NestJS 12 或 Router 8。迁移依据为 [NestJS 11 发布说明](https://github.com/nestjs/nest/releases/tag/v11.0.0)和 [Router 7 发布说明](https://github.com/remix-run/react-router/releases/tag/react-router@7.0.0)。
+- 原 braces 补丁只保护字符串。新增回归先在旧补丁复现失败，再以迭代 AST 验证保护公开和 lib 编译、展开、字符串化入口：深度 33（根为 0、32 层块及叶节点）、20,000 节点、祖先循环拒绝；展开过程的 parent 链另设有界检查，允许正常解析器反向引用及非循环共享节点。字符串解析的 32 层上限保持不变。
+- 官方生产审计降为 0 critical / 1 high / 0 moderate / 0 low。唯一 high 是 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)，仍无上游发布修复；审计如实保留。此为指定漏洞的本地代码修复，不能宣称上游零漏洞或独立第三方审计。补丁 SHA-256 固定于 CI；新 advisory、补丁变动或防护回归失败均阻止交付。
+- 无数据库迁移、API 签名或业务模型策略变化。上传、SSE 注入、SDK 模式及双端导航实际验收；主版本变化需全量类型、测试、构建及冻结镜像 CI 通过后合并。维护成本为本地补丁与框架兼容复验。

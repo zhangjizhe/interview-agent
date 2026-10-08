@@ -4,6 +4,12 @@
 
 ## RELEASE-READINESS-2
 
+## DELIVERY-CLOSEOUT-1（进行中）
+
+- 安全主题：NestJS 11 / Config 4、Router 7、定向 uuid 11；braces 补齐 AST/循环/宽度及 parent 防护。红绿复现、真实 multipart/SSE、全量 API 631 / Cache 22 / 双端 95、lint/type/build 通过；上游审计仍有一个由本地补丁修复的 high，新增 CI 完整性与新 advisory 拒绝门。
+
+## 既有交付记录
+
 - 247521d 已推送并建立 Draft PR #4；补充真实测试排除口径和干净源码核验入口，main 安全剩余项不被工程绿灯替代。
 
 - 8067764：评测任务加性迁移、幂等 202 API、资产冻结指纹、原子领取、租约与真实进度；同集比较和未知费用/失败展示。

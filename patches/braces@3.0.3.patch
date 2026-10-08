@@ -1,3 +1,49 @@
+diff --git a/lib/compile.js b/lib/compile.js
+index dce69beb90ece5c3b0ca234a949418f9f34eedbc..e9e836f22cca434abb318816afdd72563df75c46 100644
+--- a/lib/compile.js
++++ b/lib/compile.js
+@@ -4,6 +4,7 @@ const fill = require('fill-range');
+ const utils = require('./utils');
+ 
+ const compile = (ast, options = {}) => {
++  require('./validate-ast')(ast);
+   const walk = (node, parent = {}) => {
+     const invalidBlock = utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+diff --git a/lib/expand.js b/lib/expand.js
+index 35b2c41d6afdb8f0197959e26079f266e48370d3..538dfd6e723c5e75a3e8f5e687ded48c7e4509c9 100644
+--- a/lib/expand.js
++++ b/lib/expand.js
+@@ -31,6 +31,7 @@ const append = (queue = '', stash = '', enclose = false) => {
+ };
+ 
+ const expand = (ast, options = {}) => {
++  require('./validate-ast')(ast);
+   const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;
+ 
+   const walk = (node, parent = {}) => {
+@@ -38,8 +39,10 @@ const expand = (ast, options = {}) => {
+ 
+     let p = parent;
+     let q = parent.queue;
++    let parentDepth = 0;
+ 
+     while (p.type !== 'brace' && p.type !== 'root' && p.parent) {
++      if (++parentDepth > 33) throw new SyntaxError('Invalid or cyclic brace AST parent chain');
+       p = p.parent;
+       q = p.queue;
+     }
+@@ -74,8 +77,10 @@ const expand = (ast, options = {}) => {
+     const enclose = utils.encloseBrace(node);
+     let queue = node.queue;
+     let block = node;
++    let blockDepth = 0;
+ 
+     while (block.type !== 'brace' && block.type !== 'root' && block.parent) {
++      if (++blockDepth > 33) throw new SyntaxError('Invalid or cyclic brace AST parent chain');
+       block = block.parent;
+       queue = block.queue;
+     }
 diff --git a/lib/parse.js b/lib/parse.js
 index 3a6988e629f52aee6609dc5ec290a5e9ff47cecb..6666fea1456216dfb7febf5acac976256eaabeaf 100644
 --- a/lib/parse.js
@@ -26,3 +72,54 @@ index 3a6988e629f52aee6609dc5ec290a5e9ff47cecb..6666fea1456216dfb7febf5acac97625
        stack.push(block);
        push({ type: 'open', value });
        continue;
+diff --git a/lib/stringify.js b/lib/stringify.js
+index 8bcf872c31894f81a8c64d9202fd607e4fd7ea2b..cc2f8be8d892a06fb48e6ddcbb0e7472553fa1a9 100644
+--- a/lib/stringify.js
++++ b/lib/stringify.js
+@@ -3,6 +3,7 @@
+ const utils = require('./utils');
+ 
+ module.exports = (ast, options = {}) => {
++  require('./validate-ast')(ast);
+   const stringify = (node, parent = {}) => {
+     const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+@@ -29,4 +30,3 @@ module.exports = (ast, options = {}) => {
+ 
+   return stringify(ast);
+ };
+-
+diff --git a/lib/validate-ast.js b/lib/validate-ast.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..29f961239ee22258291f7059cc56e351f9ddedf2
+--- /dev/null
++++ b/lib/validate-ast.js
+@@ -0,0 +1,28 @@
++'use strict';
++
++// GHSA-vfj7-8cjw-p6xm: AST callers bypass parse(), so validate iteratively
++// before any recursive walker. Parent backlinks in parsed ASTs are intentional.
++module.exports = ast => {
++  const active = new WeakSet();
++  const stack = [{ node: ast, depth: 0, exit: false }];
++  let visited = 0;
++  while (stack.length) {
++    const { node, depth, exit } = stack.pop();
++    if (!node || typeof node !== 'object') throw new SyntaxError('Invalid brace AST');
++    if (exit) { active.delete(node); continue; }
++    if (active.has(node)) throw new SyntaxError('Cyclic brace AST');
++    // A leaf under 32 nested blocks is at depth 33 (root at zero).
++    if (depth > 33) throw new SyntaxError('Brace pattern exceeds maximum nesting depth (32)');
++    if (++visited > 20000) throw new SyntaxError('Brace AST exceeds maximum node count (20000)');
++    active.add(node);
++    stack.push({ node, depth, exit: true });
++    if (node.nodes) {
++      if (!Array.isArray(node.nodes)) throw new SyntaxError('Invalid brace AST nodes');
++      // Bound work before copying a hostile, extremely wide nodes array.
++      if (node.nodes.length > 20000) throw new SyntaxError('Brace AST exceeds maximum node count (20000)');
++      for (let i = node.nodes.length - 1; i >= 0; i--) {
++        stack.push({ node: node.nodes[i], depth: depth + 1, exit: false });
++      }
++    }
++  }
++};
