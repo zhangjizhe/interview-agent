@@ -12,7 +12,7 @@
 | P1 | AUTH-LOGOUT-1 | 两端服务端吊销、失败重试与新登录竞态已完成；后端 Lua 原子吊销 access/refresh，13 项认证和双端 99 项测试通过。最终镜像增加跨设备令牌复用 HTTP 验收 |
 | P1 | QUESTION-INPUT-1 | DTO 字节/嵌套/查询限额、批量 ≤20/embedding 并发 ≤2、零隐式重试，新增 6 项与既有 6 项通过；单次插入与有界 flush，失败按准确主键补偿，无法确认时 503 且禁止假成功。数量/Token 上限不冒充精确人民币预算，最终 Milvus 实测待收尾 |
 | P1 | EVALUATION-CONTROL-1 | 工程完成：排队/样本边界取消、并发及组织分页轮转验证；相关 40 项、PostgreSQL 18 项通过。不承诺终止在途调用/退费/账单级结算或高吞吐，全局规模化另立后续任务 |
-| P2 | CACHE-LIFECYCLE-1 | 旧 Qdrant 答案保留/清理策略、旧 benchmark 合同适配、模型别名更新治理与真实费用/延迟对比 |
+| P2 | CACHE-LIFECYCLE-1 | 工程完成：Redis v2 benchmark 50 检查、零模型/embedding 调用；operator revision 隔离模型别名更新，旧集合仅预览/快照/准确 ID 计划删除并有真实 HTTP 回归。缓存相关 74 项、维护工具 1 项通过；真实费用和生产命中率未验证 |
 | P2 | HISTORICAL-TEST-DEBT-1 | 已恢复 5 份旧 spec，移除全部历史路径排除；按当前合同 21 项通过。上下文缓存改为完整内容/role/tier SHA-256 并刷新 LRU；全量 Jest 88 suites / 661 项通过，另 18 项专用 PG 运行 |
 
 已完成工程主题：双端视觉更新、完整请求答案缓存、Lab 缓存隔离/v4 门、评测任务、认证/题库整合、兼容依赖与 CI。完成工程主题不代表对应 AI 业务效果、生产验收或全部路线图完成。

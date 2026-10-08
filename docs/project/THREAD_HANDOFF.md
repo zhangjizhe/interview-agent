@@ -6,11 +6,11 @@
 
 本轮已完成安全迁移与 braces AST 防护本地验收，见 ADR 20。API 631 / Cache 22 / 双端 95、lint/type/build 通过；官方审计仍显示唯一无上游修复的 braces high，CI 固定补丁 SHA 并运行回归，不隐藏 advisory。用户要求继续全部工程主题后合并；最新远端/镜像/导航收尾尚未完成。额度只读核验为 100/100，已询问正规新增额度及 ¥10 上限，不重置账本。生产环境目标也待补充。
 
-247521d 已提交推送，远端确认一致；[Draft PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 已关联本任务。源码验收与远端 CI 是独立证据；当前检查见 PR / Actions，后续安全迁移后必须复验最新提交。默认 Jest 仍排除 5 份旧 spec，已补真实测试口径，不称历史零跳过。
+截至 24c98a9，安全、退出、题库输入、取消、历史测试与训练闭环已按主题提交推送。[PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 已关联；最终合并读取最新提交的实际 CI。默认 Jest 已移除全部历史路径排除，18 项专用 PostgreSQL 单独执行。
 
 本轮优化与本地全量验证通过，详见[交付报告](../DELIVERY-REPORT-2026-10-08.md)。8067764 为评测任务，d17afec 为认证与题库整合；安全/CI/文档提交随后收尾。全部后续修改在 agent-lab，并按主题验收、提交、推送后核对远端。
 
-main 暂不合并：生产审计仍有 1 high / 6 moderate，braces 本地补丁未获独立风险复核，剩余升级跨主版本。远端 CI 必须读取实际结果，不能用本地通过替代。完成这两项再恢复合并审核；代码合并与 Agent 发布是不同动作。
+本轮官方 audit 为 0 critical / 1 high / 0 moderate；唯一 braces advisory 无上游修复，固定 SHA 补丁及真实 SDK 回归已完成。无独立审计声明。继续最新镜像/恢复/CI 收尾，再执行用户授权的 main 合并；真实质量、账单与生产验收保留未完成边界。
 
 ## 禁止遗忘的边界
 
@@ -33,4 +33,4 @@ main 暂不合并：生产审计仍有 1 high / 6 moderate，braces 本地补丁
 
 ## 推荐下一主题
 
-[DEPENDENCY-SECURITY-1](TASKS.md)：安全主版本迁移与补丁复核。一次只处理该主题；不自动启动付费评测、发布候选或扩大生产部署范围。
+完成真实 Milvus 写入确认、隔离数据恢复与最新 CI。缓存治理工程已完成（相关 74 项、维护工具 1 项、Redis 合成合同 50 检查），详见 CACHE-LIFECYCLE.md；尚无真实费用收益。Docker 服务中途停止已尝试恢复，恢复前不将新镜像检查记为通过。

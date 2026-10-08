@@ -355,7 +355,8 @@ export class LlmGatewayService {
     try {
       const limits = await this.quota.getAnswerCacheLimits();
       const fingerprint = answerCacheFingerprint(params,
-        { organizationId: scope.organizationId, userId: scope.userId }, provider, limits, mode);
+        { organizationId: scope.organizationId, userId: scope.userId },
+        { name: provider.name, defaultModel: provider.defaultModel, revision: process.env.ANSWER_CACHE_REVISION || 'initial-v2' }, limits, mode);
       if (fingerprint) return { fingerprint, maxTokens: Math.min(params.maxTokens ?? limits.maxOutputTokens, limits.maxOutputTokens) };
     } catch {
       this.logger.debug({ event: 'answer_cache_policy_unavailable' });

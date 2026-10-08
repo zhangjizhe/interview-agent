@@ -24,7 +24,7 @@ function canonical(value: unknown): string {
 export function answerCacheFingerprint(
   params: ChatParams & { interviewId?: string; userId?: string; semanticCacheType?: string },
   identity: { organizationId: string; userId?: string },
-  provider: { name: string; defaultModel: string },
+  provider: { name: string; defaultModel: string; revision?: string },
   limits: AnswerCacheLimits,
   mode: 'chat' | 'stream',
 ): string | undefined {
@@ -45,7 +45,7 @@ export function answerCacheFingerprint(
     request.maxTokens = Math.min(params.maxTokens ?? limits.maxOutputTokens, limits.maxOutputTokens);
     const context = canonical({
       contract: 'answer-cache/v2', identity, interviewId: interviewId ?? 'unknown',
-      provider: { name: provider.name, model: provider.defaultModel }, limits, mode, request,
+      provider: { name: provider.name, model: provider.defaultModel, revision: provider.revision ?? 'initial-v2' }, limits, mode, request,
     });
     return createHash('sha256').update(context).digest('hex');
   } catch {

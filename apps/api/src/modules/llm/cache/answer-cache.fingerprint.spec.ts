@@ -11,6 +11,10 @@ describe('answer request fingerprint', () => {
     expect(fingerprint({ ...params, maxTokens: 200 })).toBe(fingerprint({ ...params, maxTokens: 100 }));
     expect(fingerprint()).not.toBe(fingerprint(params, limits, 'stream'));
   });
+  it('invalidates an operator revision even when the provider model alias is unchanged', () => {
+    expect(answerCacheFingerprint(params, identity, { ...provider, revision: 'alias-revision-1' }, limits, 'chat'))
+      .not.toBe(answerCacheFingerprint(params, identity, { ...provider, revision: 'alias-revision-2' }, limits, 'chat'));
+  });
   it.each([NaN, Infinity, -1, 0, 1.5])('bypasses invalid output limit %s', maxTokens => {
     expect(fingerprint({ ...params, maxTokens })).toBeUndefined();
   });
