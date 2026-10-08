@@ -52,4 +52,5 @@ if [[ "$fixture_ready" != true ]]; then
   docker logs "$fixture_api" >&2
   exit 1
 fi
+docker cp scripts/ci/verify-training-loop.cjs "$fixture_api:/tmp/verify-training-loop.cjs"
 docker exec -i "$fixture_api" node --input-type=module < scripts/ci/verify-built-api.mjs

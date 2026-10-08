@@ -14,6 +14,8 @@ main 暂不合并：生产审计仍有 1 high / 6 moderate，braces 本地补丁
 
 ## 禁止遗忘的边界
 
+- TRAINING-LOOP-1 工程镜像 26/26 通过（含真实 API 与 PostgreSQL 的训练记录/正式聚合），修复正式证据遗漏 skillId 与并发重复完成。数据和分数均为隔离合成 fixture，不是付费评测或候选人成效；默认构建 HTTP CI 每次复验。
+
 - 已移除全部五个历史 Jest 路径排除，重写 21 项真实合同测试，API 全量 661 项通过。SSE 是实际 HTTP / 离线 Agent；Golden 是离线 scorer 合同，不能称付费 Benchmark。专用 PG 18 项单独通过。
 
 - EVALUATION-CONTROL-1：相关 40 项 / PostgreSQL 18 项通过；加性取消迁移须由独立 migration 部署。取消停止后续样本，保留在途租约和实际费用；新键才可明确重跑，不能把合作取消等同零费用或账单结算。

@@ -6,6 +6,8 @@
 
 ## DELIVERY-CLOSEOUT-1（进行中）
 
+- 训练主题：正式证据保存题目 skillId，训练完成 CAS 幂等、复测单次关联；相关 29 项通过，隔离镜像 HTTP/PG 26/26（含训练链路）通过，不声明真实能力提升。
+
 - 恢复全部 5 份旧设计测试、移除排除规则；完整内容/role/tier 压缩缓存指纹及 LRU 命中刷新。全量 Jest 661 项、严格 lint/type/API build 通过；真实 SSE HTTP 与离线 Golden 分别记录。
 
 - 评测控制：加性 CANCELLED / cancelRequestedAt、ADMIN 工作区取消、样本边界停止及实际费用保留；并发/幂等/分页回归，相关 40 项 / PostgreSQL 18 项、lint/type/build 通过。

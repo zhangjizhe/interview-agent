@@ -122,6 +122,7 @@ export class EvaluationService {
             interviewId: run.interviewId,
             questionId: answer.questionId,
             answerId: answer.id,
+            skillId: answer.question.skillId ?? null,
             answerExcerpt: answer.content.slice(0, 1200),
             expectedEvidence: answer.question.expectedEvidence ?? undefined,
             observedEvidence: legacy?.feedback

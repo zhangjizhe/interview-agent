@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 
 // Isolated synthetic fixtures. Never call model, embedding or evaluation execution.
 const base = process.env.API_BASE_URL || 'http://127.0.0.1:3001/api';
@@ -44,4 +45,6 @@ check('server logout acknowledged', (await request('/auth/logout', { method: 'PO
 check('logged out access token rejected', (await request('/auth/profile', { token: sibling.data.accessToken })).status === 401);
 check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: sibling.data.refreshToken } })).status === 401);
 check('other device remains authenticated', (await request('/auth/profile', { token: owner })).status === 200);
+const require = createRequire(`${process.cwd()}/package.json`);
+await require('/tmp/verify-training-loop.cjs')({ request, owner, targetJobId: created.data.id, check });
 console.log(`Built API smoke: ${passed}/${passed} passed (synthetic, no model work).`);

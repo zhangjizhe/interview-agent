@@ -5,8 +5,8 @@ describe('TrainingService', () => {
   const prisma = {
     targetJob: { findFirst: jest.fn() },
     assessmentEvidence: { findMany: jest.fn() },
-    trainingRecommendation: { upsert: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
-    trainingAttempt: { create: jest.fn(), update: jest.fn() },
+    trainingRecommendation: { upsert: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    trainingAttempt: { create: jest.fn(), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }), findFirst: jest.fn() },
     candidateSkillState: { update: jest.fn() },
     $transaction: jest.fn(),
   };
@@ -90,8 +90,8 @@ describe('TrainingService', () => {
 
     await service.attachRetest('user-a', 'recommendation-a', 'interview-retest', 'job-a', 'skill-rag');
 
-    expect(prisma.trainingAttempt.update).toHaveBeenCalledWith({
-      where: { id: 'attempt-a' },
+    expect(prisma.trainingAttempt.updateMany).toHaveBeenCalledWith({
+      where: { id: 'attempt-a', userId: 'user-a', retestInterviewId: null },
       data: { retestInterviewId: 'interview-retest' },
     });
     expect(prisma.candidateSkillState.update).not.toHaveBeenCalled();

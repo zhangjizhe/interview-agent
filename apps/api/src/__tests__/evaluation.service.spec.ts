@@ -151,7 +151,7 @@ describe('EvaluationService', () => {
       interviewId: 'interview-1',
       questionId: 'question-1',
       content: '我会解释检索、重排和引用。',
-      question: { expectedEvidence: ['检索', '重排', '引用'] },
+      question: { skillId: 'skill-rag', expectedEvidence: ['检索', '重排', '引用'] },
       answerHistories: [{
         score: 0.8,
         completeness: 0.8,
@@ -181,5 +181,6 @@ describe('EvaluationService', () => {
       interview: { userId: 'user-a', targetJobId: 'job-a' },
     });
     expect(tx.report.upsert).toHaveBeenCalled();
+    expect(tx.assessmentEvidence.upsert).toHaveBeenCalledWith(expect.objectContaining({ create: expect.objectContaining({ skillId: 'skill-rag', questionId: 'question-1', answerId: 'answer-1' }) }));
   });
 });

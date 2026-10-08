@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 
 const TRAINING_POLICY_VERSION = 'evidence-gap-v1';
@@ -92,12 +92,10 @@ export class TrainingService {
       return recommendation.attempts[0] || null;
     }
     return this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.trainingRecommendation.updateMany({ where: { id: recommendationId, userId, status: 'READY' }, data: { status: 'COMPLETED' } });
+      if (claimed.count !== 1) return tx.trainingAttempt.findFirst({ where: { recommendationId, userId }, orderBy: { completedAt: 'desc' } });
       const attempt = await tx.trainingAttempt.create({
         data: { recommendationId, userId },
-      });
-      await tx.trainingRecommendation.update({
-        where: { id: recommendationId },
-        data: { status: 'COMPLETED' },
       });
       return attempt;
     });
@@ -121,14 +119,17 @@ export class TrainingService {
     const attempt = recommendation.attempts[0];
     if (!attempt) throw new BadRequestException('Training completion is required before retest');
     return this.prisma.$transaction(async (tx) => {
-      await tx.trainingAttempt.update({
-        where: { id: attempt.id },
-        data: { retestInterviewId: interviewId },
-      });
-      return tx.trainingRecommendation.update({
-        where: { id: recommendationId },
+      const claim = await tx.trainingRecommendation.updateMany({
+        where: { id: recommendationId, userId, status: 'COMPLETED', targetJob: { isActive: true, profileVersion: recommendation.targetJobProfileVersion } },
         data: { status: 'RETEST_STARTED' },
       });
+      if (claim.count !== 1) throw new ConflictException('Training retest already started or target job changed');
+      const attached = await tx.trainingAttempt.updateMany({
+        where: { id: attempt.id, userId, retestInterviewId: null },
+        data: { retestInterviewId: interviewId },
+      });
+      if (attached.count !== 1) throw new ConflictException('Training attempt already attached');
+      return tx.trainingRecommendation.findFirst({ where: { id: recommendationId, userId } });
     });
   }
 }
