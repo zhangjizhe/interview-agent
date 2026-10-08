@@ -6,6 +6,8 @@
 
 ## DELIVERY-CLOSEOUT-1（进行中）
 
+- 题库主题：运行时 DTO、嵌套/UTF-8/数量/查询约束；有界 embedding 并发与零隐式重试，准确主键补偿、有界 flush 与未知写入 503；相关 12 项、lint/type/build 通过。
+
 - 退出主题：双端服务端吊销、失败重试与新登录竞态保护，服务端 Lua 原子撤销；认证 13 项、双端 99 项、lint/type/build 通过，镜像 HTTP 验收已扩充。
 
 - 安全主题：NestJS 11 / Config 4、Router 7、定向 uuid 11；braces 补齐 AST/循环/宽度及 parent 防护。红绿复现、真实 multipart/SSE、全量 API 631 / Cache 22 / 双端 95、lint/type/build 通过；上游审计仍有一个由本地补丁修复的 high，新增 CI 完整性与新 advisory 拒绝门。

@@ -38,6 +38,8 @@ check('foreign target job access denied', [403, 404].includes(foreignRead.status
 check('USER question governance denied', (await request('/interview/question-bank/list', { token: owner })).status === 403);
 check('ADMIN Lab registry access', (await request('/agent-lab/agents', { token: admin })).status === 200);
 check('evaluation request contract rejected before model work', (await request('/agent-lab/agents/fixture/evaluations', { method: 'POST', token: admin, body: {} })).status === 400);
+check('invalid question batch rejected before embedding', (await request('/interview/question-bank/batch', { method: 'POST', token: admin, body: { questions: [{}] } })).status === 400);
+check('unbounded question query rejected before vector work', (await request('/interview/question-bank/list?limit=100000', { token: admin })).status === 400);
 check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: sibling.data.accessToken })).status === 200);
 check('logged out access token rejected', (await request('/auth/profile', { token: sibling.data.accessToken })).status === 401);
 check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: sibling.data.refreshToken } })).status === 401);

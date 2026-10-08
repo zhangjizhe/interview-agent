@@ -20,16 +20,7 @@ import { ResumeParserService } from '../services/resume-parser.service';
 import { fetchSafeExternalText } from './external-url.util';
 import { Roles } from '../../auth/roles.decorator';
 import { requireOwnedInterview } from '../../../common/ownership.util';
-
-interface QuestionDto {
-  questionId?: string;
-  position: string;
-  level?: string;
-  category?: string;
-  question: string;
-  answer: string;
-  tags?: string[];
-}
+import { GenerateDynamicQuestionsDto, GenerateQuestionsDto, QuestionBatchDto, QuestionDto, QuestionImportDto, QuestionSearchDto, QuestionUrlDto } from '../dto/question-bank.dto';
 
 /**
  * 面试题知识库 CRUD + 动态生成
@@ -66,7 +57,7 @@ export class QuestionBankController {
 
   @Post('question-bank/batch')
   @Roles('ADMIN')
-  async addQuestions(@Body() dto: { questions: QuestionDto[] }) {
+  async addQuestions(@Body() dto: QuestionBatchDto) {
     const result = await this.questionBank.addQuestions(
       (dto.questions || []).map((q) => ({
         questionId: q.questionId || `q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -84,18 +75,15 @@ export class QuestionBankController {
   @Get('question-bank/search')
   @Roles('ADMIN')
   async searchQuestionBank(
-    @Query('q') query: string,
-    @Query('position') position?: string,
-    @Query('level') level?: string,
-    @Query('category') category?: string,
-    @Query('limit') limit?: string,
+    @Query() dto: QuestionSearchDto,
   ) {
+    const { q: query, position, level, category, limit = 5 } = dto;
     if (!query) return { query: '', results: [], count: 0 };
     const results = await this.questionBank.search(query, {
       position,
       level,
       category,
-      limit: limit ? parseInt(limit, 10) : 5,
+      limit,
     });
     return { query, position, level, category, results, count: results.length };
   }
@@ -103,12 +91,12 @@ export class QuestionBankController {
   @Get('question-bank/list')
   @Roles('ADMIN')
   async listQuestionBank(
-    @Query('position') position?: string,
-    @Query('limit') limit?: string,
+    @Query() dto: QuestionSearchDto,
   ) {
+    const { position, limit = 20 } = dto;
     const results = await this.questionBank.list(
       position,
-      limit ? parseInt(limit, 10) : 20,
+      limit,
     );
     return { position, results, count: results.length };
   }
@@ -130,10 +118,9 @@ export class QuestionBankController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   async importQuestionBankFile(
     @UploadedFile() file: any,
-    @Body('position') position: string,
-    @Body('level') level?: string,
-    @Body('category') category?: string,
+    @Body() dto: QuestionImportDto,
   ) {
+    const { position, level, category } = dto;
     if (!file) throw new BadRequestException('No file uploaded');
     if (!position) throw new BadRequestException('position is required');
     const text = await this.resumeParser.parse(file); // 复用简历解析器
@@ -153,7 +140,7 @@ export class QuestionBankController {
   @Post('question-bank/import-url')
   @Roles('ADMIN')
   async importQuestionBankUrl(
-    @Body() dto: { url: string; position: string; level?: string; category?: string },
+    @Body() dto: QuestionUrlDto,
   ) {
     if (!dto.url) throw new BadRequestException('url is required');
     if (!dto.position) throw new BadRequestException('position is required');
@@ -199,7 +186,7 @@ export class QuestionBankController {
    */
   @Post('generate-questions')
   async generateInterviewQuestions(
-    @Body() dto: { text: string; position?: string; count?: number },
+    @Body() dto: GenerateQuestionsDto,
   ) {
     if (!dto.text || dto.text.trim().length < 20) {
       throw new BadRequestException('简历内容过短');
@@ -250,7 +237,7 @@ export class QuestionBankController {
   @Post(':interviewId/generate-dynamic-questions')
   async generateDynamicQuestions(
     @Param('interviewId') interviewId: string,
-    @Body() dto: { resumeText: string; count?: number },
+    @Body() dto: GenerateDynamicQuestionsDto,
     @Req() req: any,
   ) {
     const interview = await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
