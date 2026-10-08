@@ -30,6 +30,7 @@ import {
   MetricType,
   IndexType,
   FunctionType,
+  ConsistencyLevelEnum,
 } from '@zilliz/milvus2-sdk-node';
 import { escapeMilvusString } from './escape-milvus.util';
 
@@ -269,14 +270,22 @@ export class QuestionBankService {
   }
 
   private async flushConfirmed() {
-    const result = await this.client.flush({ collection_names: [this.COLLECTION], timeout: 1000 });
+    const deadline = Date.now() + 30000;
+    let result: any;
+    // Only flush is retried: Milvus can rate-limit it to one operation / 10s.
+    // Never repeat insert or paid embeddings after an ambiguous outcome.
+    while (Date.now() < deadline) {
+      result = await this.client.flush({ collection_names: [this.COLLECTION], timeout: 5000 });
+      if (String(result?.status?.error_code) !== 'RateLimit') { this.assertWrite(result); break; }
+      await new Promise(done => setTimeout(done, Math.min(10000, Math.max(0, deadline - Date.now()))));
+    }
     this.assertWrite(result);
     const segmentIDs = Object.values(result.coll_segIDs || {}).flatMap((value: any) => value.data || []);
-    for (let attempt = 0; attempt < 15; attempt++) {
-      const state = await this.client.getFlushState({ segmentIDs, timeout: 1000 });
+    while (Date.now() < deadline) {
+      const state = await this.client.getFlushState({ segmentIDs, timeout: 2000 });
       this.assertWrite(state);
       if (state.flushed) return;
-      await new Promise(done => setTimeout(done, 100));
+      await new Promise(done => setTimeout(done, 250));
     }
     throw new Error('QUESTION_FLUSH_TIMEOUT');
   }
@@ -466,6 +475,7 @@ export class QuestionBankService {
       const filter = position ? `position == "${escapeMilvusString(position)}"` : undefined;
       const result = await this.client.query({
         collection_name: this.COLLECTION,
+        consistency_level: ConsistencyLevelEnum.Strong,
         filter,
         output_fields: ['questionId', 'position', 'level', 'category', 'question', 'answer', 'tags', 'createdAt'],
         limit,

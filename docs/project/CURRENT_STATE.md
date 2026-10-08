@@ -6,7 +6,7 @@
 
 默认 React + NestJS + Prisma + LangGraph 模块化单体；Interview 5173、Lab 5175、API 3001 已在本机 Docker 运行。两端统一暖灰/白/靛蓝风格。评测持久化任务、幂等与失败费用、认证竞态与题库治理已完成工程优化；独立 migration 在 API 就绪前执行。
 
-本轮 API 626、Cache 22、Web/Lab 95、专用 PostgreSQL 17、真实浏览器 24、合成报告浏览器 8 与 Lab 流程通过；lint 0 warning、typecheck/build、三端 Docker 和隔离备份恢复通过。工程结果不代表覆盖率、生产发布或模型质量。
+本轮 API Jest 663、Cache 22、Web/Lab 99、专用 PostgreSQL 18、真实浏览器 24、合成报告浏览器 8 与 Lab 流程通过；lint 0 warning、typecheck/build 通过。隔离 API smoke 28/28，覆盖真实 Milvus 写入和按主键补偿；Redis 故障探针、PostgreSQL 转储相等、Milvus+etcd 与 Qdrant 恢复读回通过。工程结果不代表覆盖率、生产发布或模型质量。
 
 ## 真实证据
 
@@ -26,13 +26,13 @@
 
 ## 本轮安全收尾
 
-NestJS 11.2.7 / Config 4.0.4、Router 7.18.4 和 mem0ai 定向 uuid 11.1.1 已完成本地兼容验证。braces 补齐 AST 深度、循环、大小及 parent 链防护，旧补丁红测、新补丁绿测；实际 multipart/SSE 回归 14 项通过。API 631、Cache 22、双端 95、严格 lint/type/build 通过。官方审计 0 critical / 1 high / 0 moderate；唯一 high 无上游修复，CI 保留原始提示并核对补丁与回归。无零漏洞或第三方审计声明。后续退出、题库等主题与最终镜像/浏览器/远端验收进行中。
+NestJS 11.2.7 / Config 4.0.4、Router 7.18.4 和 mem0ai 定向 uuid 11.1.1 已完成兼容验证。braces 补齐 AST 深度、循环、大小及 parent 链防护，旧补丁红测、新补丁绿测；实际 multipart/SSE 回归 14 项通过。最新本机 API Jest 663、Cache 22、双端 99、专用 PostgreSQL 18、严格 lint/type/build 通过。隔离 API smoke 28/28，Milvus+etcd 与 Qdrant 数据备份恢复后实际读取通过。官方审计 0 critical / 1 high / 0 moderate；唯一 high 无上游修复，CI 保留原始提示并核对补丁与回归。无零漏洞或第三方审计声明。
 
 ## 合并与安全
 
 所有开发保留在 agent-lab。用户已要求完成后合并 main；待剩余工程主题和最新 CI 核验后合并。源码合并不能替代真实质量、账单或生产部署验收。
 
-工程候选已提交推送 247521d，远端确认一致；[Draft PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 为 main 提供可审查结果，实际远端检查以 PR / Actions 为准。安全专项完成后必须重新核验合并条件，不自动合并或批准风险豁免。
+此前工程候选已提交推送 247521d；后续安全、训练、题库和评测控制主题也已推送到 `origin/agent-lab`。[PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 目标是合并到 `main`。最近一次远端 CI (f1c0cba) 仅 PostgreSQL job 探活竞态失败，已修正为 TCP readiness 并在本地 18 项回归通过；当前最终收尾提交仍须等待最新 PR Actions 全绿后合并。安全 high 风险按报告披露，不伪称审计通过或生产发布。
 
 ## 入口
 

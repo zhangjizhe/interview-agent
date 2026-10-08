@@ -1,8 +1,8 @@
 # 交付核验报告
 
-**Interview Agent / Agent Lab · 2026-10-08 · RELEASE-READINESS-2**
+**Interview Agent / Agent Lab · 2026-10-08 · DELIVERY-CLOSEOUT-1**
 
-本版完成评测任务可靠性、认证与题库治理、依赖兼容升级、可信 CI 和文档整理，并通过本地全量工程、数据库与浏览器验收。代码仍在 `agent-lab`；main 合并须核对远端检查与安全剩余项。本报告不把本地部署称为生产发布，不把合成或录制指标称为真实模型效果。
+本版完成评测任务可靠性、认证与题库治理、依赖兼容升级、可信 CI 和文档整理，并通过本地全量工程、数据库、真实 Milvus/Qdrant 隔离恢复和浏览器验收。代码位于 `agent-lab`，通过 PR #4 合入 `main` 前仍需最新远端 CI 全绿。本报告不把本地部署称为生产发布，不把合成或录制指标称为真实模型效果。
 
 ## 交付内容
 
@@ -12,9 +12,9 @@
 | 评测证据 | 同 Dataset / Evaluator 对比、选择变化清除旧结论、失败与未知成本展示 | 历史缓存污染结果不能通过 v4 发布门；关键词分数不等于综合质量 |
 | 认证 | 两端统一当前 401 恢复，迟到旧请求不删除新会话，Lab 清除旧查询缓存 | 不改变后端 JWT / RBAC / 租户归属授权边界 |
 | 题库治理 | ADMIN 列表与检索、真实删除结果、搜索竞态处理、来源缺失与错误态 | 删除失败返回明确错误；未新增模型题库写入验收 |
-| 依赖 | 固定 pnpm、冻结锁文件、官方 registry、兼容安全升级与 braces 补丁 | 不升级 NestJS / Router 主版本；剩余风险单列 |
+| 依赖 | 固定 pnpm、冻结锁文件、官方 registry、NestJS 11 / Router 7 / Multer 2 / uuid 兼容升级与 braces 补丁 | 唯一剩余官方 high 为无上游修复的 braces advisory；补丁缓解不等于上游修复或独立审计 |
 | 交付呈现 | 暖灰/白/靛蓝界面，标注合成与录制来源，README 与当前上下文精简 | 不填充虚构用户、增长、质量或费用指标；历史上下文保留归档 |
-| CI | 严格 lint、真实 Redis、PostgreSQL 新库/升级、测试和三端镜像 | 移除失败后继续的 lint 行为；Actions 实际结果需单独核对。未添加“审计零漏洞”声明 |
+| CI | 严格 lint、真实 Redis、PostgreSQL 新库/升级、测试和三端镜像；API 真实 Milvus 写入、Qdrant/Milvus 恢复读回 | 移除失败后继续的 lint 行为；最新 Actions 仍须核对。未添加“审计零漏洞”声明 |
 
 专题证据：[评测任务](ACCEPTANCE-REPORT-2026-10-08-EVALUATION-JOBS.md)、[认证与题库](ACCEPTANCE-REPORT-2026-10-08-AUTH-GOVERNANCE.md)、[缓存](ACCEPTANCE-REPORT-2026-10-08-ANSWER-CACHE.md)。设计复用既有 React / NestJS / Prisma / LangGraph；没有引入新队列、数据库或付费供应商。
 
@@ -26,23 +26,23 @@
 
 | 检查 | 结果 | 口径 |
 | --- | --- | --- |
-| API Jest | 82 suites / 626 tests 通过 | 另有 3 suites / 17 tests 由专用数据库步骤执行 |
-| PostgreSQL 专用回归 | 3 suites / 17 tests 通过 | 新库、保留旧业务记录的升级、租户、原子额度与任务竞争 |
+| API Jest | 87 suites / 663 tests 通过 | 4 suites / 20 tests 明确 skip；另有 3 suites / 18 tests 由专用数据库步骤执行 |
+| PostgreSQL 专用回归 | 3 suites / 18 tests 通过 | 新库、保留旧业务记录的升级、租户、原子额度与任务竞争 |
 | 缓存单元 | 22 通过 | 确定性 fixture |
-| Web / Lab 组件 | 18 files / 95 tests 通过 | 包括会话竞态、题库与评测状态 |
+| Web / Lab 组件 | 18 files / 99 tests 通过 | 包括会话竞态、题库与评测状态 |
 | 严格 lint | 0 error / 0 warning | 不以跳过或吞掉退出码替代成功 |
 | 类型 / 三端生产构建 | 通过 | Prisma Client 生成后校验 |
 | 三端 Docker | 构建通过、本地运行正常 | API 与 migration 共用镜像；锁文件与本地补丁进入镜像 |
-| 实际 API 镜像 smoke | 12/12 通过 | 独立 PG/Redis/Milvus、internal Docker 网络；健康、JWT、ADMIN、岗位持久化/归属及评测 DTO 拒绝；无模型执行 |
+| 实际 API 镜像 smoke | 28/28 通过 | 独立 PG/Redis/Milvus、internal Docker 网络；含会话撤销、训练并发幂等、真实 Milvus 写入及准确主键补偿；无模型执行 |
 | 真实 API 浏览器 | 24/24 通过 | 合成账号，登录、岗位 CRUD/版本、资源隔离、过期会话、ADMIN 与 390px 布局 |
 | Lab 浏览器 | 通过 | ADMIN / USER 门禁、题库入口、MCP 与录制 fixture 导入/实验/决定记录 |
 | 报告浏览器 | 8/8 通过 | 桌面/手机合成报告、证据回放与训练入口；API 响应为 fixture |
 | Golden Dataset | 30 Cases 格式通过 | 合成基准，不证明真实业务质量 |
 | braces 安全回归 | 6/6 通过，已计入 API | 实际 DeepAgents → micromatch / fast-glob 链；深层字符串拒绝与正常模式兼容 |
 | multipart HTTP 回归 | 3/3 通过，已计入 API | 实际 NestJS + 新 Multer；合法上传、超限 413、畸形 400；不调用模型 |
-| 数据库恢复 | 通过 | 停止 API 后备份，在隔离库恢复；schema 与全部 public 表行数一致 |
+| 数据库与向量恢复 | 通过 | PostgreSQL 逻辑转储恢复后 schema/数据/序列规范化转储一致；停止写入后配对复制 Milvus+etcd 与 Qdrant，重建后通过 API 读回合成记录和向量载荷 |
 
-数据库恢复时归一化 schema SHA-256 为 `e9d8186e8e01067133939d55443900d90c67f5d672f9ed17ce1ad6b46b8d6ff4`。备份保存在被 Git 忽略的 `.local-backups/release-20261008/`，目录/文件权限为 700/600，不提交原始业务数据；恢复实例验收后清理。该测试不证明异地灾备、生产 RTO/RPO 或向量库恢复。
+恢复演练只使用临时隔离容器和合成数据，脚本在退出时清理副本；没有读取或提交生产用户数据。该演练验证 PostgreSQL、Milvus+etcd 与 Qdrant 的本地恢复路径，不证明异地灾备、生产 RTO/RPO 或容量目标。
 
 可复跑命令见 README。浏览器脚本输出按实际执行日期分目录；运行截图和原始日志默认不提交。只将脱敏聚合结果记录为交付证据。
 
@@ -67,25 +67,21 @@
 | 审计 | critical | high | moderate | low |
 | --- | ---: | ---: | ---: | ---: |
 | 升级前 | 1 | 26 | 44 | 5 |
-| 升级后 | 0 | 1 | 6 | 0 |
+| 升级后 | 0 | 1 | 0 | 0 |
 
-Multer、MCP SDK、proxy-addr、axios、grpc、protobufjs、hono 等采用兼容修复版本，并冻结解析结果。braces 没有上游已修复版本，保留 3.0.3 并通过 pnpm patch 限制字符串解析嵌套深度 32；官方版本审计仍报告 high，不能当作上游修复或审计通过。[braces 公告](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
+Multer、MCP SDK、proxy-addr、axios、grpc、protobufjs、hono 等采用兼容修复版本，并冻结解析结果。NestJS、React Router、uuid 已完成兼容迁移。braces 没有上游已修复版本，保留 3.0.3 并通过 pnpm patch 限制字符串解析嵌套深度 32；官方版本审计仍报告 high，不能当作上游修复或审计通过。[braces 公告](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
 
-补丁位于 `patches/braces@3.0.3.patch`，锁文件 hash 为 `rrshtuefukmbyzek7tkmdjtkja`。已核验 parse / compile / expand / stringify 的字符串路径以及 fast-glob 正常模式；该补丁不对调用方手工构造的任意 AST 提供通用保护，超深合法模式也会被拒绝。依赖升级必须重新审核补丁与回归，不能静默移除。
+补丁位于 `patches/braces@3.0.3.patch`，锁文件 patch hash 为 `xnz46gr5zjrzqvkrjzopcyhulq`。已核验 parse / compile / expand / stringify、手工构造 AST 的循环/宽度/节点数与 parent 链，以及 fast-glob 正常模式；最大嵌套深度 32，超深模式会被拒绝。依赖升级必须重新审核补丁与回归，不能静默移除。
 
 | 剩余依赖 | 公告 | 后续处理 |
 | --- | --- | --- |
-| braces 3.0.3 | GHSA-vfj7-8cjw-p6xm，high | 独立复核本地补丁与真实可达输入；跟踪上游，当前不记录安全豁免已批准 |
-| file-type 20.4.1 | GHSA-5v7r-6r5c-r473、GHSA-j47w-4g3g-c36v，moderate | 21.3.2+ 涉及主版本/模块兼容，专项迁移并复验文件输入 |
-| NestJS core 10.4.22 | GHSA-36xv-jgw5-4q75，moderate | 11.1.18+ 主版本迁移；本项目使用手动 SSE，未发现框架 @Sse 路由，但不能据此声明零风险 |
-| uuid 9.0.1（mem0 链） | GHSA-w5hq-g745-h8pq，moderate | 11.1.1+ 兼容验证，核验 SDK 输入与 ID 生成 |
-| react-router 6.30.6 | GHSA-wrjc-x8rr-h8h6、GHSA-337j-9hxr-rhxg，moderate | 7.18.0+ 专项迁移；现有导航使用固定前缀与业务 ID，不据此消除审计项 |
+| braces 3.0.3 | GHSA-vfj7-8cjw-p6xm，high | 本地补丁与 SDK 可达路径有回归，持续跟踪上游；官方 audit 仍报告 high |
 
-尚有 high 及跨主版本迁移项，因此不能宣称已达到零高危商业发布基线。CI 的工程绿灯不能替代风险复核；main 是否合并及远端结果记录在[当前状态](project/CURRENT_STATE.md)。
+仍有一个 high，因此不能宣称达到零高危商业发布基线。CI 的工程绿灯不能替代风险复核；main 合并状态和远端检查记录在[当前状态](project/CURRENT_STATE.md)。
 
 ## 未完成与建议
 
-1. 优先单独完成安全剩余项兼容迁移与复核，再执行生产发布核验。
+1. 跟踪 braces 上游修复；出现修复版本后移除本地补丁并重新执行安全回归。
 2. 核验额度和未知费用后，经新的有界预算执行真实同集对比；人工审查通过后才能发布候选。
 3. 生产环境完成 TLS、凭据/网络隔离、向量库与异地备份、容量与故障演练。
 4. 完成训练 → 再面试 → 可比证据的闭环验收；当前页面与 fixture 不证明训练提升。

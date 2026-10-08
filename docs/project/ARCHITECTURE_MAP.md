@@ -15,8 +15,8 @@
 | 检索 | modules/knowledge-base、modules/memory | Milvus 混合检索、Qdrant；旧答案相似缓存不再读取 |
 | 数据 | apps/api/prisma | PostgreSQL，租户/额度/冻结证据约束与加性任务迁移 |
 | 观测 | infra/observability | Prometheus/Grafana；进程指标重启归零，完整账单另核验 |
-| 交付 | docker-compose.yml、三端 Dockerfile | migration 独立先行、pnpm 9 冻结依赖与 patches、API readiness |
-| CI | .github/workflows/ci-api.yml | 严格 lint/type/test、Redis、专用 PG 升级与三端镜像；不吞掉失败 |
+| 交付 | docker-compose.yml、三端 Dockerfile | migration 独立先行、pnpm 9 冻结依赖与 patches、API readiness；本机映射仅绑定 loopback，Redis AOF 与 noeviction |
+| CI | .github/workflows/ci-api.yml | 严格 lint/type/test、Redis、专用 PG 升级与三端镜像；API smoke 写入 Milvus，并对 PostgreSQL/Milvus+etcd/Qdrant 做隔离恢复；不吞掉失败 |
 
 答案缓存只复用完整主模型文本；指纹含租户/用户/面试、系统/历史/模型/有效参数/套餐，Redis TTL 一小时。工具、截断、fallback 与旧缓存不复用；Lab 评测始终 bypass。
 

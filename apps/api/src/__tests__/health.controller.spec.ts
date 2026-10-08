@@ -33,4 +33,20 @@ describe('HealthController readiness', () => {
     await expect(new HealthController(prisma as any, redis as any).readiness()).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
+  it('bounds a hung dependency and keeps liveness independent without leaking its error', async () => {
+    jest.useFakeTimers();
+    try {
+      const prisma = { $queryRaw: jest.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce([{ applied: REQUIRED_MIGRATIONS.length }]) };
+      const controller = new HealthController(prisma as any, { getClient: () => ({ ping: () => new Promise(() => {}) }) } as any);
+      const outcome = controller.readiness().catch(error => error);
+      await jest.advanceTimersByTimeAsync(3000);
+      const error = await outcome;
+      expect(error.getStatus()).toBe(503);
+      expect(error.getResponse()).toMatchObject({ checks: { postgres: 'ok', redis: 'fail', migration: 'ok' } });
+      expect(JSON.stringify(error.getResponse())).not.toContain('DEPENDENCY_PROBE_TIMEOUT');
+      expect(controller.liveness()).toMatchObject({ status: 'ok' });
+      expect(jest.getTimerCount()).toBe(0);
+    } finally { jest.useRealTimers(); }
+  });
+
 });

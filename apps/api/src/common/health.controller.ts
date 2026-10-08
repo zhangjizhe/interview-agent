@@ -19,6 +19,14 @@ export const REQUIRED_MIGRATIONS = readdirSync(migrationsDirectory).filter(name 
 @Controller('health')
 @Public()
 export class HealthController {
+  private async withinDeadline<T>(operation: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
+    try {
+      return await Promise.race([operation, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('DEPENDENCY_PROBE_TIMEOUT')), 3000);
+      })]);
+    } finally { clearTimeout(timer!); }
+  }
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
@@ -36,7 +44,7 @@ export class HealthController {
 
     // Postgres
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      await this.withinDeadline(this.prisma.$queryRaw`SELECT 1`);
       checks.postgres = 'ok';
     } catch (e: any) {
       checks.postgres = 'fail';
@@ -45,7 +53,7 @@ export class HealthController {
 
     // Redis
     try {
-      await this.redis.getClient().ping();
+      await this.withinDeadline(this.redis.getClient().ping());
       checks.redis = 'ok';
     } catch (e: any) {
       checks.redis = 'fail';
@@ -53,13 +61,13 @@ export class HealthController {
     }
 
     try {
-      const baseline = await this.prisma.$queryRaw<Array<{ applied: number }>>`
+      const baseline = await this.withinDeadline(this.prisma.$queryRaw<Array<{ applied: number }>>`
         SELECT COUNT(DISTINCT "migration_name")::int AS "applied"
         FROM "_prisma_migrations"
         WHERE "migration_name" IN (${Prisma.join(REQUIRED_MIGRATIONS)})
           AND "finished_at" IS NOT NULL
           AND "rolled_back_at" IS NULL
-      `;
+      `);
       if (REQUIRED_MIGRATIONS.length > 0 && baseline[0]?.applied === REQUIRED_MIGRATIONS.length) {
         checks.migration = 'ok';
       } else {

@@ -1,4 +1,4 @@
-jest.mock('@zilliz/milvus2-sdk-node', () => ({ MilvusClient: jest.fn(() => ({})) }));
+jest.mock('@zilliz/milvus2-sdk-node', () => ({ MilvusClient: jest.fn(() => ({})), ConsistencyLevelEnum: { Strong: 'Strong' } }));
 jest.mock('../modules/llm/llm.gateway.service', () => ({ LlmGatewayService: class {} }));
 jest.mock('openai', () => ({ __esModule: true, default: jest.fn(() => ({})) }));
 import { ValidationPipe } from '@nestjs/common';
@@ -57,5 +57,31 @@ describe('question input and bounded writes', () => {
     client.insert.mockResolvedValue({ status: { error_code: 'UnexpectedError' } });
     await expect(scope(() => service.addQuestions([item]))).rejects.toThrow('QUESTION_WRITE_UNCONFIRMED');
     expect(client.delete).not.toHaveBeenCalled();
+  });
+  it('waits for asynchronous flush and retries rate-limited flush without repeating embeddings or insertion', async () => {
+    jest.useFakeTimers();
+    try {
+      client.flush.mockResolvedValueOnce({ status: { error_code: 'RateLimit', code: 8 } });
+      client.getFlushState.mockResolvedValueOnce({ ...ok, flushed: false });
+      const promise = scope(() => service.addQuestions([item]));
+      await jest.advanceTimersByTimeAsync(10500);
+      await expect(promise).resolves.toEqual({ count: 1 });
+      expect(client.flush).toHaveBeenCalledTimes(2);
+      expect(client.getFlushState).toHaveBeenCalledTimes(2);
+      expect(client.insert).toHaveBeenCalledTimes(1);
+      expect(service.embedText).toHaveBeenCalledTimes(1);
+    } finally { jest.useRealTimers(); }
+  });
+  it('bounds flush confirmation and reports unknown compensation without repeating a paid call', async () => {
+    jest.useFakeTimers();
+    try {
+      client.getFlushState.mockResolvedValue({ ...ok, flushed: false });
+      const outcome = scope(() => service.addQuestions([item])).catch((error: Error) => error);
+      await jest.advanceTimersByTimeAsync(60500);
+      expect((await outcome).message).toContain('QUESTION_WRITE_UNCONFIRMED');
+      expect(client.insert).toHaveBeenCalledTimes(1);
+      expect(service.embedText).toHaveBeenCalledTimes(1);
+      expect(client.delete).toHaveBeenCalledTimes(1);
+    } finally { jest.useRealTimers(); }
   });
 });

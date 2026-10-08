@@ -1,18 +1,19 @@
 {
-  "verified_at_utc": "2026-10-08T08:10:25.501620+00:00",
+  "verified_at_utc": "2026-10-08T10:14:11+00:00",
   "scope": "local engineering acceptance; not production or real model quality",
   "checks": {
     "api": {
-      "passed": 626,
-      "dedicated_db_skipped": 17
+      "passed": 663,
+      "skipped": 20,
+      "dedicated_db_passed": 18
     },
     "postgresql": {
-      "passed": 17,
+      "passed": 18,
       "fresh_install": true,
       "legacy_upgrade": true
     },
     "cache_unit": 22,
-    "web_lab_component": 95,
+    "web_lab_component": 99,
     "real_api_browser": 24,
     "report_fixture_browser": 8,
     "lab_recorded_fixture": "passed",
@@ -27,11 +28,13 @@
     ],
     "database_restore_schema_and_row_counts": "matched",
     "built_api_smoke": {
-      "passed": 12,
+      "passed": 28,
       "isolated_infrastructure": [
         "PostgreSQL",
         "Redis",
-        "Milvus"
+        "Milvus",
+        "etcd",
+        "Qdrant"
       ],
       "external_network": "blocked",
       "model_work": false
@@ -41,6 +44,13 @@
       "mobile_width": 390,
       "horizontal_overflow": false,
       "publish_enabled": false
+    },
+    "redis_fault_probe": "readiness 503 / liveness 200; 25 concurrent ready probes recovered",
+    "database_and_vector_recovery": {
+      "postgresql_schema_data_sequences": "normalized dump equality",
+      "milvus_etcd": "restored; actual question record read back",
+      "qdrant": "restored; actual vector and payload read back",
+      "data": "synthetic fixtures only"
     }
   },
   "production_dependency_audit": {
@@ -48,58 +58,23 @@
     "counts": {
       "info": 0,
       "low": 0,
-      "moderate": 6,
+      "moderate": 0,
       "high": 1,
       "critical": 0
     },
     "remaining": [
-      {
-        "package": "file-type",
-        "severity": "moderate",
-        "advisory": "GHSA-5v7r-6r5c-r473",
-        "patched_versions": ">=21.3.1"
-      },
-      {
-        "package": "file-type",
-        "severity": "moderate",
-        "advisory": "GHSA-j47w-4g3g-c36v",
-        "patched_versions": ">=21.3.2"
-      },
-      {
-        "package": "@nestjs/core",
-        "severity": "moderate",
-        "advisory": "GHSA-36xv-jgw5-4q75",
-        "patched_versions": ">=11.1.18"
-      },
-      {
-        "package": "uuid",
-        "severity": "moderate",
-        "advisory": "GHSA-w5hq-g745-h8pq",
-        "patched_versions": ">=11.1.1"
-      },
-      {
-        "package": "react-router",
-        "severity": "moderate",
-        "advisory": "GHSA-wrjc-x8rr-h8h6",
-        "patched_versions": ">=7.18.0"
-      },
-      {
-        "package": "react-router",
-        "severity": "moderate",
-        "advisory": "GHSA-337j-9hxr-rhxg",
-        "patched_versions": ">=7.18.0"
-      },
       {
         "package": "braces",
         "severity": "high",
         "advisory": "GHSA-vfj7-8cjw-p6xm",
         "patched_versions": "<0.0.0"
       }
-    ]
+    ],
+    "source": "last successful GitHub Actions audit for f1c0cba; final head pending; local registry DNS unavailable during this verification"
   },
   "file_sha256": {
-    "pnpm-lock.yaml": "5da271a52cdffd4ddaac9e2b58931c95c3b72d00f7bc3b288ee5736b38eeddc5",
-    "patches/braces@3.0.3.patch": "69dd7aaf771908ae290c98621c7e61311a8b240d7b50bef8f144fceafb209e57"
+    "pnpm-lock.yaml": "9ca5c5facd0a765dded2ead6e219d149b0ff3597e67f235e9fcf8c075341c111",
+    "patches/braces@3.0.3.patch": "5119117206a8fea09e28f76c0c31763c259ec2e88e4a66ce1cf9d31306fd6eda"
   },
   "business_evaluation": {
     "status": "FAILED",
@@ -113,5 +88,5 @@
     "recommendation": "REJECT",
     "new_paid_business_benchmark": false
   },
-  "merge_main": "held for security review and remaining dependency migration; no approved exception"
+  "merge_main": "user authorized merge; pending latest PR Actions checks"
 }
