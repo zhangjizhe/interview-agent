@@ -12,7 +12,7 @@ RELEASE-READINESS-2
 
 ## 状态
 
-分析后实施。复用 AgentEvaluationRun 与既有 EvaluationService，增加加性队列字段/唯一索引、原子领取和心跳；崩溃任务 FAILED，不自动付费重放。POST 返回 202，GET 展示真实进度；UI 轮询并清除失效比较。架构/数据库/API/安全/成本与验证影响将记入 ADR 和报告。后续修改保持 agent-lab，main 只合并已核验提交。
+评测子阶段已提交推送 8067764，认证/题库整合已通过全量 API 617、Web 95 与 lint/typecheck/build，准备提交。随后修正可信 CI/文档，执行干净源码 Docker、备份恢复与浏览器整体复验，再判断 main。后续修改保持 agent-lab，main 只合并已核验提交；真实模型质量与生产验收不能由工程结果替代。
 
 ## 验收
 

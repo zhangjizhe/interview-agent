@@ -52,6 +52,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    const handleExpired = () => {
+      setError('登录已过期，请重新登录。');
+      setSession(null);
+    };
+    window.addEventListener('ia:session-expired', handleExpired);
+    return () => window.removeEventListener('ia:session-expired', handleExpired);
+  }, []);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');

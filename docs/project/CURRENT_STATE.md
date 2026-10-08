@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-08 · 认证与题库整合
+
+认证/题库原有编辑已独立核验整合：ADMIN 列表/搜索、双端当前会话 401 恢复、迟到旧请求不删除新会话，题库搜索与增删状态一致。API 617、Web 95、lint/typecheck/build 通过；Docker/浏览器整体验证与 main 仍待后续。
+
 ## 2026-10-08 · 评测任务可靠性
 
 评测新增 PostgreSQL 持久化任务、202/requestKey 幂等、原子领取与心跳；过期 FAILED，不自动付费重放。UI 展示真实进度和成本，清除过期比较。PostgreSQL 17、Redis 2、API 614、Cache 22、Web 86 与 lint/typecheck/build 通过。整体认证/题库整合、CI、干净部署及 main 合并仍进行中。

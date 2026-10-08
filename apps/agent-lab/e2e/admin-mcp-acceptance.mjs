@@ -60,6 +60,9 @@ try {
   if (!receipts.control.id || !receipts.treatment.id) throw new Error('recorded report receipts missing');
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: '控制中心' }).waitFor({ state: 'visible' });
+  await page.getByRole('button', { name: '题库治理' }).click();
+  await page.getByRole('heading', { name: '题库治理', level: 1 }).waitFor({ state: 'visible' });
+  if (await page.getByRole('button', { name: '新增题目' }).count() !== 1) throw new Error('Question bank control view missing');
   await page.getByRole('button', { name: '评测' }).click();
   const controlVersion = `v-c-${receipts.stamp}`;
   const treatmentVersion = `v-d-${receipts.stamp}`;
@@ -117,7 +120,7 @@ try {
   await userPage.getByLabel('用户名').fill(ordinaryUserId);
   await userPage.getByLabel('密码').fill(password);
   await userPage.getByRole('button', { name: '创建并验证权限' }).click();
-  await userPage.getByText('当前账号不在 Agent Lab 管理员允许名单中').waitFor({ state: 'visible' });
+  await userPage.getByText('账号已创建，但 Agent Lab 仅允许管理员进入。请联系部署管理员授权后再登录。').waitFor({ state: 'visible' });
   const userControlPlaneStatus = await userPage.evaluate(async ({ ordinaryUserId, password }) => {
     const login = await fetch('/api/auth/login', {
       method: 'POST',

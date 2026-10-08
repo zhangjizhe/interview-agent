@@ -44,8 +44,15 @@ export function installAuthenticatedFetch(): void {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (!isApiRequest || !token) return nativeFetch(input, init);
 
-    const headers = new Headers(init?.headers);
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init?.headers).forEach((value, key) => headers.set(key, value));
     headers.set('Authorization', `Bearer ${token}`);
-    return nativeFetch(input, { ...init, headers });
+    const response = await nativeFetch(input, { ...init, headers });
+    // A response from the previous session must not erase a newly signed-in one.
+    if (response.status === 401 && localStorage.getItem(ACCESS_TOKEN_KEY) === token) {
+      clearSession();
+      window.dispatchEvent(new Event('ia:session-expired'));
+    }
+    return response;
   };
 }

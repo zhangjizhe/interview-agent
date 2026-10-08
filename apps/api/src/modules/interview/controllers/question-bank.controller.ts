@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Req,
+  ServiceUnavailableException,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -81,6 +82,7 @@ export class QuestionBankController {
   }
 
   @Get('question-bank/search')
+  @Roles('ADMIN')
   async searchQuestionBank(
     @Query('q') query: string,
     @Query('position') position?: string,
@@ -99,6 +101,7 @@ export class QuestionBankController {
   }
 
   @Get('question-bank/list')
+  @Roles('ADMIN')
   async listQuestionBank(
     @Query('position') position?: string,
     @Query('limit') limit?: string,
@@ -113,7 +116,9 @@ export class QuestionBankController {
   @Delete('question-bank/:questionId')
   @Roles('ADMIN')
   async deleteQuestionBank(@Param('questionId') questionId: string) {
-    return this.questionBank.deleteQuestion(questionId);
+    const result = await this.questionBank.deleteQuestion(questionId);
+    if (!result.deleted) throw new ServiceUnavailableException('题目删除未确认，请稍后刷新核验');
+    return result;
   }
 
   /**

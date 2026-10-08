@@ -112,6 +112,10 @@ try {
   const editButton = userPage.getByRole('button', { name: '编辑B3 Browser Acceptance Engineer' });
   check('target job edit control is available', await editButton.count() === 1);
   await editButton.click();
+  await userPage.waitForFunction(() => {
+    const label = Array.from(document.querySelectorAll('label')).find((item) => item.textContent?.includes('职级'));
+    return label?.querySelector('input')?.value === 'P5';
+  });
   await userPage.getByLabel('职级').fill('P6');
   await userPage.getByRole('button', { name: '保存岗位' }).click();
   await userPage.getByRole('status').getByText('岗位已更新').waitFor({ state: 'visible' });
@@ -177,6 +181,18 @@ try {
     await userPage.getByRole('heading', { name: '还没有可开始的训练' }).count() === 1,
   );
   await userPage.screenshot({ path: join(outputDir, '10-training-empty-state.png'), fullPage: true });
+
+  const expiredContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  const expiredPage = await expiredContext.newPage();
+  await expiredPage.addInitScript(() => {
+    localStorage.setItem('ia_access_token', 'expired-token');
+    localStorage.setItem('ia_userId', 'expired-user');
+    localStorage.setItem('ia_user_role', 'USER');
+  });
+  await expiredPage.goto(`${webUrl}/settings`, { waitUntil: 'networkidle' });
+  await expiredPage.getByRole('button', { name: '登录' }).waitFor({ state: 'visible' });
+  check('expired JWT returns candidate to the login gate', await expiredPage.getByText('登录已过期，请重新登录。').count() === 1);
+  await expiredContext.close();
 
   const foreignUserId = `browser-foreign-${suffix}`;
   const foreignRegister = await requestJson('/auth/register', {

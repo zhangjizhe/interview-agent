@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
+  BookOpen,
   Bot,
   FlaskConical,
   FileUp,
@@ -8,6 +9,7 @@ import {
   GitBranch,
   LogOut,
   RefreshCw,
+  Search,
   ScrollText,
   ShieldAlert,
   SlidersHorizontal,
@@ -15,13 +17,15 @@ import {
   Workflow,
 } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { api, role, token } from './api';
+import { QuestionBankWorkspace, type QuestionBankItem } from './QuestionBankWorkspace';
 import './styles.css';
 import './lab.css';
 import { ControlledEvolutionWorkspace } from './ControlledEvolutionWorkspace';
 import './visual-theme.css';
 
-type View = 'overview' | 'runtime' | 'mcp' | 'trace' | 'evaluation' | 'evolution' | 'experiments' | 'release' | 'audit' | 'operations';
+type View = 'overview' | 'runtime' | 'mcp' | 'question-bank' | 'trace' | 'evaluation' | 'evolution' | 'experiments' | 'release' | 'audit' | 'operations';
 type Server = {
   name: string;
   displayName?: string;
@@ -96,10 +100,12 @@ type LabOperationLogResponse = {
   }>;
 };
 
+
 const CONTROL_NAV: Array<{ id: View; label: string; icon: typeof Gauge; enabled: boolean }> = [
   { id: 'overview', label: '控制中心', icon: Gauge, enabled: true },
   { id: 'runtime', label: '运行编排', icon: Workflow, enabled: true },
   { id: 'mcp', label: 'MCP 与工具', icon: SlidersHorizontal, enabled: true },
+  { id: 'question-bank', label: '题库治理', icon: BookOpen, enabled: true },
   { id: 'trace', label: 'Trace', icon: GitBranch, enabled: true },
   { id: 'evaluation', label: '评测', icon: FlaskConical, enabled: true },
   { id: 'evolution', label: '自进化', icon: RefreshCw, enabled: true },
@@ -108,22 +114,6 @@ const CONTROL_NAV: Array<{ id: View; label: string; icon: typeof Gauge; enabled:
   { id: 'audit', label: '审计', icon: ScrollText, enabled: true },
   { id: 'operations', label: '操作日志', icon: ScrollText, enabled: true },
 ];
-
-const token = () => localStorage.getItem('ia_access_token');
-const role = () => localStorage.getItem('ia_user_role');
-
-async function api(path: string, init?: RequestInit) {
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    headers: {
-      ...init?.headers,
-      Authorization: `Bearer ${token()}`,
-    },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
-  return body;
-}
 
 function ControlCenter() {
   const queryClient = useQueryClient();
@@ -140,6 +130,16 @@ function ControlCenter() {
   const [operationOutcome, setOperationOutcome] = useState('');
   const [operationObjectType, setOperationObjectType] = useState('');
   const [operationPage, setOperationPage] = useState(1);
+  const [questionQuery, setQuestionQuery] = useState('');
+  const [questionPosition, setQuestionPosition] = useState('');
+  const [questionSearch, setQuestionSearch] = useState('');
+  const [questionMessage, setQuestionMessage] = useState('');
+  const questionSearchVersion = useRef(0);
+  const clearQuestionSearch = () => {
+    questionSearchVersion.current += 1;
+    setQuestionSearch('');
+    setQuestionMessage('');
+  };
   const servers = useQuery({
     queryKey: ['agent-lab-mcp'],
     queryFn: () => api('/admin/mcp-servers'),
@@ -177,6 +177,11 @@ function ControlCenter() {
       if (operationObjectType) params.set('objectType', operationObjectType);
       return api(`/agent-lab/operation-logs?${params.toString()}`);
     },
+    enabled: role() === 'ADMIN',
+  });
+  const questions = useQuery({
+    queryKey: ['agent-lab-question-bank', questionPosition],
+    queryFn: () => api(`/interview/question-bank/list?position=${encodeURIComponent(questionPosition)}&limit=50`),
     enabled: role() === 'ADMIN',
   });
 
@@ -249,13 +254,30 @@ function ControlCenter() {
   if (servers.isLoading || lab.isLoading || recordedImports.isLoading) return <main className="agent-loading">正在连接控制面...</main>;
   if (servers.isError || lab.isError || recordedImports.isError) {
     const error = (servers.error || lab.error || recordedImports.error) as Error;
-    return <main className="agent-gate"><ShieldAlert size={26}/><h1>无法读取控制面</h1><p>{error.message}</p></main>;
+    return <main className="agent-gate"><ShieldAlert size={26}/><h1>无法读取控制面</h1><p>{error.message}</p><button className="agent-command" onClick={() => {
+      localStorage.removeItem('ia_access_token'); localStorage.removeItem('ia_user_role'); localStorage.removeItem('ia_userId'); window.location.reload();
+    }}>重新登录控制台</button></main>;
   }
 
   const data = servers.data as { servers: Server[]; runningCount: number; count: number };
   const labData = lab.data as LabDashboard;
   const imports = (recordedImports.data as { imports: LabRecordedImport[] }).imports;
+  const questionItems = ((questions.data as { results?: QuestionBankItem[] })?.results || []);
   const currentMutationError = toggle.error || health.error || reload.error || executeImport.error || createExperiment.error || recordDecision.error;
+  const searchQuestions = async () => {
+    if (!questionQuery.trim()) return;
+    const version = ++questionSearchVersion.current;
+    setQuestionMessage('');
+    try {
+      const data = await api(`/interview/question-bank/search?q=${encodeURIComponent(questionQuery)}&position=${encodeURIComponent(questionPosition)}&limit=20`);
+      if (version !== questionSearchVersion.current) return;
+      setQuestionSearch(JSON.stringify(data.results || []));
+    } catch (error) {
+      if (version !== questionSearchVersion.current) return;
+      setQuestionSearch('');
+      setQuestionMessage(error instanceof Error ? error.message : '搜索失败');
+    }
+  };
   return (
     <div className="agent-shell">
       <aside className="agent-sidebar">
@@ -303,6 +325,18 @@ function ControlCenter() {
         {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} />}
         {view === 'runtime' && <RuntimeCanvas />}
         {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} />}
+        {view === 'question-bank' && <QuestionBankWorkspace
+          questions={questionItems}
+          query={questionQuery}
+          position={questionPosition}
+          searchResults={questionSearch ? JSON.parse(questionSearch) as QuestionBankItem[] : null}
+          message={questionMessage || (questions.isError ? '题库暂不可用，请重试；未将读取失败显示为空数据。' : '')}
+          loading={questions.isLoading}
+          onQuery={(value) => { clearQuestionSearch(); setQuestionQuery(value); }}
+          onPosition={(value) => { clearQuestionSearch(); setQuestionPosition(value); }}
+          onSearch={searchQuestions}
+          onClearSearch={clearQuestionSearch}
+        />}
         {view === 'trace' && <TraceWorkspace runs={labData.runs} />}
         {view === 'evaluation' && <EvaluationWorkspace data={labData} imports={imports} executeImport={executeImport} />}
         {view === 'evolution' && <ControlledEvolutionWorkspace />}
@@ -339,7 +373,7 @@ function ControlCenter() {
 }
 
 function titleFor(view: View) {
-  return { overview: '控制中心', runtime: '架构视图', mcp: 'MCP 与工具治理', trace: 'Trace 运行记录', evaluation: '评测证据', evolution: '受控自进化', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
+  return { overview: '控制中心', runtime: '架构视图', mcp: 'MCP 与工具治理', 'question-bank': '题库治理', trace: 'Trace 运行记录', evaluation: '评测证据', evolution: '受控自进化', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
 }
 
 function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void }) {
@@ -562,10 +596,10 @@ function McpWorkspace({ data, health, toggle }: {
   </section>;
 }
 
-function AdminAccess() {
+function AdminAccess({ expired = false }: { expired?: boolean }) {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(expired ? '登录已过期，请重新登录。' : '');
   const [pending, setPending] = useState(false);
   const [registering, setRegistering] = useState(false);
   const submit = async (event: React.FormEvent) => {
@@ -580,12 +614,14 @@ function AdminAccess() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || '认证失败');
-      if (data.role !== 'ADMIN') throw new Error('当前账号不在 Agent Lab 管理员允许名单中');
       if (registering) {
         setRegistering(false);
-        setError('管理员账号已创建，请使用相同凭据登录。');
+        setError(data.role === 'ADMIN'
+          ? '管理员账号已创建，请使用相同凭据登录。'
+          : '账号已创建，但 Agent Lab 仅允许管理员进入。请联系部署管理员授权后再登录。');
         return;
       }
+      if (data.role !== 'ADMIN') throw new Error('账号登录成功，但当前账号尚未获得 Agent Lab 管理员权限。');
       localStorage.setItem('ia_access_token', data.accessToken);
       localStorage.setItem('ia_user_role', data.role);
       localStorage.setItem('ia_userId', data.userId);
@@ -599,4 +635,16 @@ function AdminAccess() {
   return <main className="agent-access"><section><div className="agent-access-mark"><Bot size={22}/></div><p className="agent-eyebrow">AGENT LAB / CONTROL PLANE</p><h1>{registering ? '创建管理员账号' : '进入控制台'}</h1><p>管理员账号由部署允许名单授予。控制面会话独立于候选人产品。</p><form onSubmit={submit}><label>用户名<input value={userId} onChange={(event) => setUserId(event.target.value)} required /></label><label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} required /></label>{error && <p className="agent-error">{error}</p>}<button disabled={pending}>{pending ? '处理中' : registering ? '创建并验证权限' : '登录控制台'}</button><button type="button" className="text-command" onClick={() => { setRegistering((value) => !value); setError(''); }}>{registering ? '已有账号，返回登录' : '创建管理员账号'}</button></form></section><aside><p>CONTROLLED OPERATIONS</p><strong>运行、MCP、评测与发布。</strong><span>未配置的控制面能力不会显示虚构运行数据。</span></aside></main>;
 }
 
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient()}><ControlCenter/></QueryClientProvider>);
+function LabSessionGate() {
+  const queryClient = useQueryClient();
+  const [active, setActive] = useState(Boolean(token()) && role() === 'ADMIN');
+  const [expired, setExpired] = useState(false);
+  useEffect(() => {
+    const onExpired = () => { queryClient.clear(); setExpired(true); setActive(false); };
+    window.addEventListener('ia:session-expired', onExpired);
+    return () => window.removeEventListener('ia:session-expired', onExpired);
+  }, [queryClient]);
+  return active ? <ControlCenter /> : <AdminAccess expired={expired} />;
+}
+
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient()}><LabSessionGate/></QueryClientProvider>);

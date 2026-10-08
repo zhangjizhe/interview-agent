@@ -1,5 +1,9 @@
 # 架构地图
 
+## 2026-10-08 · 认证与题库整合
+
+Lab main 与 ControlledEvolutionWorkspace 共用 api.ts；LabSessionGate 在失效时清理查询缓存并卸载工作区。QuestionBankWorkspace 独立组件，仍接入既有 Milvus 服务与组织边界。
+
 ## 2026-10-08 · 评测任务可靠性
 
 EvaluationController → EvaluationJobsService → PostgreSQL AgentEvaluationRun → EvaluationService → AgentRuntime。组织轮转、原子领取、租约保护，ADMIN 重查、资产固定；恢复只 FAILED。GET 保留历史；POST 202/requestKey，详见 ADR 18。

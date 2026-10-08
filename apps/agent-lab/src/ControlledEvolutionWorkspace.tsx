@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './controlled-evolution.css';
+import { api } from './api';
 
 type AgentVersion = {
   id: string;
@@ -35,22 +36,6 @@ type Evaluation = {
   metrics?: { repeatCount?: number; totalSamples?: number; cachePolicy?: string;
     budget?: { completedSamples?: number; spentCny?: number; costEvidenceStatus?: string } };
 };
-
-const token = () => localStorage.getItem('ia_access_token');
-
-async function api(path: string, init?: RequestInit) {
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-      Authorization: `Bearer ${token() || ''}`,
-    },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
-  return body;
-}
 
 export function ControlledEvolutionWorkspace() {
   const queryClient = useQueryClient();

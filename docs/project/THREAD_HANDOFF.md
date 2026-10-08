@@ -1,5 +1,9 @@
 # 任务交接
 
+## 2026-10-08 · 认证与题库整合
+
+认证/题库工程整合已通过 API 617、Web 95 与 lint/typecheck/build，详见 AUTH-GOVERNANCE 报告。接着可信 CI/文档和干净部署；旧报告/截图保留，不冒充真实模型质量。
+
 ## 2026-10-08 · 评测任务可靠性
 
 RELEASE-READINESS-2 进行中。评测子阶段完成，报告见 ACCEPTANCE-REPORT-2026-10-08-EVALUATION-JOBS.md；接着认证/题库、CI/文档、干净部署与 main。无新增付费业务评测；不重置额度、自动发布或改写旧失败。旧未提交报告/截图保留。
