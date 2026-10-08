@@ -2,6 +2,10 @@
 
 更新：2026-10-08 · DELIVERY-CLOSEOUT-1
 
+## Lab 登录代理修复（2026-10-08）
+
+LAB-AUTH-PROXY-1：Lab nginx 缓存 API 容器旧地址，登录/注册请求 502。复用 Interview 的动态 Docker DNS 配置并重建部署 Lab。镜像 tsc/Vite build、严格 lint、nginx -t 通过；实际 Lab readiness 200、空凭据登录返回 API 结构化 400。用户实际账号登录待刷新重试确认；未读取密码、修改账号/权限/数据库或发起模型调用。
+
 ## 当前结论
 
 `PROVIDER-HEALTH-PROBE-METERING-1` 已完成：移除 `LlmHealthBootstrap` 和绕过 Gateway 的 `healthCheckProviders()`；业务模型调用继续由 quota reservation 保护。网关回归 16/16，API lint/typecheck/build、Docker build 通过。当前容器健康，API readiness 与 Interview/Lab HTTP 200；启动日志无 Provider probe。部署了既有加性 `20261008010000_evaluation_cancellation` migration，17/17 成功。未新增模型推理、费用或质量评测。报告：`docs/ACCEPTANCE-REPORT-2026-10-08-PROVIDER-HEALTH-METERING.md`。

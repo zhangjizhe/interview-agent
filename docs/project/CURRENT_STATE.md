@@ -2,6 +2,10 @@
 
 更新：2026-10-08 · PROVIDER-HEALTH-PROBE-METERING-1
 
+## Lab 登录代理修复（2026-10-08）
+
+LAB-AUTH-PROXY-1：Lab nginx 缓存 API 容器旧地址，登录/注册请求 502。复用 Interview 的动态 Docker DNS 配置并重建部署 Lab。镜像 tsc/Vite build、严格 lint、nginx -t 通过；实际 Lab readiness 200、空凭据登录返回 API 结构化 400。用户实际账号登录待刷新重试确认；未读取密码、修改账号/权限/数据库或发起模型调用。
+
 ## Provider 启动计量边界（2026-10-08）
 
 移除 API 启动时直接调用 Qwen/DeepSeek `chat()` 的健康探针，避免绕过统一 Gateway、额度与 Usage Ledger 的隐式模型请求。基础 `/api/health/ready` 仍验证 PostgreSQL、Redis 与 migration；业务 Provider 请求仍由 Gateway 先做额度预留。回归 16/16，API lint/typecheck/build 与 Docker 镜像构建通过；修复镜像启动无 Provider 探针，API readiness、Interview、Lab 均 HTTP 200。为本机 readiness 部署了现有加性 migration `20261008010000_evaluation_cancellation`，17/17 migrations 已应用。未做新的模型推理、真实质量评估或账单对账，详见 [修复报告](../ACCEPTANCE-REPORT-2026-10-08-PROVIDER-HEALTH-METERING.md)。
