@@ -789,6 +789,14 @@ model AgentEvaluationRun {
   error          String?          @db.Text
   startedAt      DateTime?
   completedAt    DateTime?
+  requestKey     String?
+  requestHash    String?
+  requestParams  Json?
+  requestedByUserId String?
+  leaseOwner     String?
+  heartbeatAt    DateTime?
+  completedSamples Int @default(0)
+  completedCases Int @default(0)
   createdAt      DateTime         @default(now())
 
   workspace Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -801,6 +809,8 @@ model AgentEvaluationRun {
   @@index([workspaceId, createdAt])
   @@index([agentId, createdAt])
   @@index([agentVersionId, createdAt])
+  @@unique([organizationId, workspaceId, requestKey])
+  @@index([organizationId, status, createdAt])
   @@map("agent_evaluation_runs")
 }
 

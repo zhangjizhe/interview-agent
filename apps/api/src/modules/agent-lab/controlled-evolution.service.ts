@@ -107,7 +107,7 @@ export class ControlledEvolutionService {
     };
   }
 
-  async compareCandidate(userId: string, agentId: string, candidateVersionId: string) {
+  async compareCandidate(userId: string, agentId: string, candidateVersionId: string, scope: { datasetId?: string; evaluatorId?: string } = {}) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const agent = await this.prisma.agent.findFirst({
       where: { id: agentId, workspaceId: workspace.id },
@@ -125,6 +125,8 @@ export class ControlledEvolutionService {
         agentId,
         agentVersionId: candidateVersionId,
         status: 'COMPLETED',
+        ...(scope.datasetId ? { datasetId: scope.datasetId } : {}),
+        ...(scope.evaluatorId ? { evaluatorId: scope.evaluatorId } : {}),
       },
       include: { dataset: { select: { frozenAt: true, contentHash: true } } },
       orderBy: { completedAt: 'desc' },

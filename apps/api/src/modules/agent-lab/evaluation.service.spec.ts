@@ -419,6 +419,8 @@ describe('EvaluationService', () => {
       data: expect.objectContaining({
         status: 'FAILED',
         metrics: {
+          repeatCount: 3,
+          totalSamples: 30,
           budget: expect.objectContaining({
             status: 'stopped', limitCny: 1, spentCny: 1.2, completedSamples: 2,
           }),
@@ -463,7 +465,7 @@ describe('EvaluationService', () => {
       expect(prisma.agentEvaluationRun.update).toHaveBeenLastCalledWith(expect.objectContaining({
         data: expect.objectContaining({
           status: 'FAILED',
-          metrics: { budget: expect.objectContaining({
+          metrics: { repeatCount: 3, totalSamples: 30, budget: expect.objectContaining({
             status: 'stopped', limitCny: 1, spentCny: 0.2,
             completedSamples: failure === 'runtime-failure' ? 1 : 2,
             costEvidenceStatus: 'unavailable', interruptedRunId: 'run-2',

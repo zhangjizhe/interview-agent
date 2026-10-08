@@ -221,6 +221,13 @@ export class RunEvaluationDto {
   maxEstimatedCostCny?: number;
 }
 
+export class StartEvaluationJobDto extends RunEvaluationDto {
+  @IsString()
+  @MaxLength(100)
+  @Matches(/^[a-zA-Z0-9_-]{16,100}$/)
+  requestKey!: string;
+}
+
 export class SpawnSubRunDto {
   @IsObject()
   input!: Record<string, unknown>;

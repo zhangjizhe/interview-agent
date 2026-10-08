@@ -4,16 +4,16 @@
 
 ## 任务 ID
 
-INTERVIEW-CACHE-CONTEXT-1
+RELEASE-READINESS-2
 
 ## 目标与范围
 
-用户批准开始优化。本阶段只修复普通 Interview 答案缓存的上下文隔离：完整消息、实际主路由模型、生成参数、组织/用户/面试与套餐限制纳入 SHA-256 指纹；只复用完整文本答案，工具请求、截断和 fallback 不写答案缓存。复用现有 Gateway、Redis、白名单与成本记录，隔离旧缓存，不清空共享数据。
+用户要求继续完成优化、整体验证、条件允许时合并 main，并提升文档与数据的真实感和专业呈现。按主题提交：先持久化评测任务与幂等/进度/失败边界，随后核验并整合既有认证/题库修改，再更新真实交付证据与主分支合并结论。当前子阶段为评测任务；不改 Agent 策略、不伪造业务数据、不重跑受额度阻塞的付费评测。
 
 ## 状态
 
-工程优化、合成验收与本机部署已完成，报告见 docs/ACCEPTANCE-REPORT-2026-10-08-ANSWER-CACHE.md；提交推送核验后等待用户继续。无新增数据库表、公开 API、UI 或依赖。Lab 评测继续绕过答案缓存；付费产品 canary 与可信真实评测仍受月度额度和未知中断成本阻塞，不改变额度或发布候选。
+分析后实施。复用 AgentEvaluationRun 与既有 EvaluationService，增加加性队列字段/唯一索引、原子领取和心跳；崩溃任务 FAILED，不自动付费重放。POST 返回 202，GET 展示真实进度；UI 轮询并清除失效比较。架构/数据库/API/安全/成本与验证影响将记入 ADR 和报告。后续修改保持 agent-lab，main 只合并已核验提交。
 
 ## 验收
 
-最终 API Jest 77 suites / 600 tests 通过（14 dedicated DB skipped）；Cache 22、Web 83、lint/typecheck/build 通过。真实 Redis 验证命中、上下文/模型/套餐/身份隔离、12 用户并发、TTL 与流式零 usage；Provider 为离线合成 fixture。正式质量 Benchmark 不在本轮执行，交付报告记录边界。
+计划：任务幂等、重复并发、租户/管理员权限、原子领取、真实进度、崩溃不重放、成本失效停止、UI 比较失效和错误态；隔离 PostgreSQL 迁移/集成、全量测试、lint/typecheck/build、干净源码 Docker 与浏览器。真实模型质量、完整账单及生产部署仍单独标注边界；历史基准不作为当前效果。

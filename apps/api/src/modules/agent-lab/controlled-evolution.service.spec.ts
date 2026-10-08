@@ -184,7 +184,7 @@ describe('ControlledEvolutionService', () => {
 
     const service = new ControlledEvolutionService(prisma);
     await expect(
-      service.compareCandidate('user-a', 'agent-1', 'version-2'),
+      service.compareCandidate('user-a', 'agent-1', 'version-2', { datasetId: 'dataset-1', evaluatorId: 'evaluator-1' }),
     ).resolves.toMatchObject({
       comparable: true,
       scoreDelta: 5,
@@ -192,5 +192,6 @@ describe('ControlledEvolutionService', () => {
       candidate: { evaluationId: 'candidate-eval', score: 96 },
       baseline: { evaluationId: 'baseline-eval', score: 91 },
     });
+    expect(prisma.agentEvaluationRun.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: expect.objectContaining({ datasetId: 'dataset-1', evaluatorId: 'evaluator-1', agentVersionId: 'version-2' }) }));
   });
 });

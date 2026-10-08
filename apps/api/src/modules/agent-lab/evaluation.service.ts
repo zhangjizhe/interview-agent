@@ -23,6 +23,14 @@ const DEFAULT_RELEASE_EVALUATION_BUDGET_CNY = 5;
 
 class ReleaseEvaluationBudgetError extends Error {}
 
+export interface EvaluationJobExecution {
+  id: string;
+  startedAt: Date;
+  assetHash: string;
+  progress: (progress: { completedSamples: number; completedCases: number; spentCny: number; limitCny: number | null; costEvidenceStatus: string }) => Promise<void>;
+  finish: (data: Record<string, any>) => Promise<any>;
+}
+
 type RuleEvaluation = {
   score: number;
   passed: boolean;
@@ -302,7 +310,7 @@ export class EvaluationService {
     });
   }
 
-  async runEvaluation(userId: string, agentId: string, dto: RunEvaluationDto) {
+  async prepareEvaluation(userId: string, agentId: string, dto: RunEvaluationDto) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const agent = await this.prisma.agent.findFirst({
       where: { id: agentId, workspaceId: workspace.id },
@@ -349,15 +357,30 @@ export class EvaluationService {
       }
     }
     const evaluator = await this.requireEvaluator(workspace.id, dto.evaluatorId);
-    const startedAt = new Date();
     const effectiveBudgetCny = repeatCount >= 3
       ? Math.min(dto.maxEstimatedCostCny!, this.releaseBudgetCeilingCny())
       : null;
+    const assetHash = this.datasetContentHash(dataset.version, {
+      cases: dataset.cases, evaluator: { type: evaluator.type, config: evaluator.config },
+      version: { systemPrompt: version.systemPrompt, modelConfig: version.modelConfig,
+        runtimeConfig: version.runtimeConfig, toolBindings: version.toolBindings,
+        knowledgeBindings: version.knowledgeBindings, memoryBindings: version.memoryBindings,
+        inputSchema: version.inputSchema, outputSchema: version.outputSchema },
+    });
+    return { workspace, agent, version, dataset, evaluator, repeatCount, effectiveBudgetCny, assetHash };
+  }
+
+  async runEvaluation(userId: string, agentId: string, dto: RunEvaluationDto, job?: EvaluationJobExecution) {
+    const prepared = await this.prepareEvaluation(userId, agentId, dto);
+    if (job && job.assetHash !== prepared.assetHash) throw new ConflictException('评测资产已变化，请明确创建新任务');
+    const { workspace, agent, version, dataset, evaluator, repeatCount, effectiveBudgetCny } = prepared;
+    const startedAt = job?.startedAt ?? new Date();
     let spentCostCny = 0;
     let completedSamples = 0;
+    let completedCases = 0;
     let interruptedRunId: string | null = null;
     let costEvidenceUnavailable = false;
-    const evaluation = await this.prisma.agentEvaluationRun.create({
+    const evaluation = job ? { id: job.id } : await this.prisma.agentEvaluationRun.create({
       data: {
         workspaceId: workspace.id,
         agentId: agent.id,
@@ -369,6 +392,13 @@ export class EvaluationService {
         startedAt,
       },
     });
+
+    const progress = () => job?.progress({ completedSamples, completedCases,
+      spentCny: Number(spentCostCny.toFixed(6)), limitCny: effectiveBudgetCny,
+      costEvidenceStatus: costEvidenceUnavailable ? 'unavailable' : 'available' });
+    const finish = (data: Record<string, any>) => job
+      ? job.finish({ ...data, completedSamples, completedCases })
+      : this.prisma.agentEvaluationRun.update({ where: { id: evaluation.id }, data });
 
     try {
       const caseResults: Array<{
@@ -382,6 +412,7 @@ export class EvaluationService {
       for (const datasetCase of dataset.cases) {
         const samples: Array<{ rule: RuleEvaluation; run?: any; error?: string }> = [];
         for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+          await progress();
           if (effectiveBudgetCny !== null && spentCostCny >= effectiveBudgetCny) {
             throw new ReleaseEvaluationBudgetError(
               `评测成本已达到停止阈值 ¥${effectiveBudgetCny.toFixed(2)}，已停止后续 Provider 调用`,
@@ -401,14 +432,15 @@ export class EvaluationService {
             );
             allRuns.push(run);
             completedSamples += 1;
+            const validCost = typeof run.estimatedCost === 'number' && Number.isFinite(run.estimatedCost) && run.estimatedCost >= 0;
+            if (validCost) spentCostCny += run.estimatedCost;
+            else costEvidenceUnavailable = true;
             if (effectiveBudgetCny !== null) {
-              if (typeof run.estimatedCost !== 'number'
-                || !Number.isFinite(run.estimatedCost) || run.estimatedCost < 0) {
+              if (!validCost) {
                 interruptedRunId = run.id ?? null;
                 costEvidenceUnavailable = true;
                 throw new ReleaseEvaluationBudgetError('评测费率证据不可用，已停止后续 Provider 调用');
               }
-              spentCostCny += run.estimatedCost;
               if (spentCostCny > effectiveBudgetCny) {
                 throw new ReleaseEvaluationBudgetError(
                   `评测成本超过停止阈值 ¥${effectiveBudgetCny.toFixed(2)}，已停止后续 Provider 调用`,
@@ -416,6 +448,7 @@ export class EvaluationService {
               }
             }
             samples.push({ rule: this.evaluateRule(evaluator, datasetCase, run), run });
+            await progress();
           } catch (error: any) {
             if (error instanceof ReleaseEvaluationBudgetError) throw error;
             if (effectiveBudgetCny !== null) {
@@ -426,6 +459,7 @@ export class EvaluationService {
               throw new ReleaseEvaluationBudgetError('发布评测样本失败，费用无法完整核验，已停止后续 Provider 调用');
             }
             const message = error?.message || '运行或规则评测失败';
+            costEvidenceUnavailable = true;
             samples.push({
               rule: {
                 score: 0,
@@ -471,6 +505,8 @@ export class EvaluationService {
             failureMessage: failed?.rule.failureMessage,
           },
         });
+        completedCases += 1;
+        await progress();
         caseResults.push({
           caseKey: datasetCase.key,
           score,
@@ -483,9 +519,7 @@ export class EvaluationService {
       const passedCases = caseResults.filter((item) => item.passed).length;
       const score = caseResults.reduce((sum, item) => sum + item.score, 0) / caseResults.length;
       const completedAt = new Date();
-      return this.prisma.agentEvaluationRun.update({
-        where: { id: evaluation.id },
-        data: {
+      return finish({
           status: 'COMPLETED',
           score,
           passedCases,
@@ -504,7 +538,7 @@ export class EvaluationService {
             averageScore: score,
             wallClockLatencyMs: completedAt.getTime() - startedAt.getTime(),
             budget: effectiveBudgetCny === null
-              ? { status: 'not-required' }
+              ? { status: 'not-required', spentCny: Number(spentCostCny.toFixed(6)), costEvidenceStatus: costEvidenceUnavailable ? 'unavailable' : 'available' }
               : {
                   status: 'within-limit',
                   limitCny: effectiveBudgetCny,
@@ -513,32 +547,29 @@ export class EvaluationService {
                 },
             stratification: buildStratifiedEvaluationEvidence(caseResults),
             ...this.aggregateRunEvidence(allRuns),
+            ...(costEvidenceUnavailable ? { estimatedCost: { status: 'unavailable' } } : {}),
           },
-        },
       });
     } catch (error: any) {
       const message = error?.message || '评测执行失败';
-      await this.prisma.agentEvaluationRun.update({
-        where: { id: evaluation.id },
-        data: {
+      await finish({
           status: 'FAILED',
           error: message,
-          metrics: effectiveBudgetCny === null
-            ? undefined
-            : {
+          metrics: {
+                repeatCount,
+                totalSamples: dataset.cases.length * repeatCount,
                 budget: {
                   status: error instanceof ReleaseEvaluationBudgetError ? 'stopped' : 'failed',
                   limitCny: effectiveBudgetCny,
                   spentCny: Number(spentCostCny.toFixed(6)),
                   completedSamples,
-                  ...(costEvidenceUnavailable ? {
+                  ...(costEvidenceUnavailable || effectiveBudgetCny === null ? {
                     costEvidenceStatus: 'unavailable',
                     interruptedRunId,
                   } : {}),
                 },
               },
           completedAt: new Date(),
-        },
       });
       throw error;
     }
@@ -776,7 +807,7 @@ export class EvaluationService {
     return JSON.stringify(value) ?? 'null';
   }
 
-  private datasetContentHash(version: string, cases: unknown[]) {
+  private datasetContentHash(version: string, cases: unknown) {
     return `sha256:${createHash('sha256')
       .update(this.stableStringify({ version, cases }))
       .digest('hex')}`;

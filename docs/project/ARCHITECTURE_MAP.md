@@ -1,5 +1,9 @@
 # 架构地图
 
+## 2026-10-08 · 评测任务可靠性
+
+EvaluationController → EvaluationJobsService → PostgreSQL AgentEvaluationRun → EvaluationService → AgentRuntime。组织轮转、原子领取、租约保护，ADMIN 重查、资产固定；恢复只 FAILED。GET 保留历史；POST 202/requestKey，详见 ADR 18。
+
 ## 2026-10-08 · 产品答案缓存 v2
 
 普通 Gateway 在确定主路由后读取当前套餐限制，用完整请求、认证组织/用户/面试、模型与生成参数构造 SHA-256 指纹。兼容 SemanticCacheService 名称，内部改为 Redis 精确文本缓存（一小时 TTL）；不再写入或查询答案 Qdrant 集合。工具/截断/fallback 不缓存，miss 保留原子额度预留，Lab bypass 合同不变。无新增表/路由/依赖，详见 ADR 17。

@@ -23,10 +23,12 @@ done
 mkdir "$fixture_dir/migrations"
 cp apps/api/prisma/schema.prisma "$fixture_dir/schema.prisma"
 for migration in apps/api/prisma/migrations/*; do
-  case "$(basename "$migration")" in
-    20260929000000_organizations|20260929001000_organization_quotas) ;;
-    *) cp -R "$migration" "$fixture_dir/migrations/" ;;
-  esac
+  # Rehearse the actual pre-tenant upgrade. Later migrations may require
+  # organization columns, so excluding just two named migrations is unsafe.
+  migration_name="$(basename "$migration")"
+  if [[ "$migration_name" < "20260929000000_organizations" ]]; then
+    cp -R "$migration" "$fixture_dir/migrations/"
+  fi
 done
 DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/phase2_existing" pnpm --filter @interview-agent/api exec prisma migrate deploy --schema "$fixture_dir/schema.prisma"
 docker exec -i "$fixture_container" psql -U postgres -d phase2_existing -v ON_ERROR_STOP=1 <<'SQL'
@@ -36,4 +38,4 @@ SQL
 for database in phase2_empty phase2_existing; do
   DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/$database" pnpm --filter @interview-agent/api exec prisma migrate deploy
 done
-TENANT_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/phase2_existing" pnpm --filter @interview-agent/api test:jest --runInBand --testPathPatterns='tenant-database|quota-database'
+TENANT_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/phase2_existing" pnpm --filter @interview-agent/api test:jest --runInBand --testPathPatterns='tenant-database|quota-database|evaluation-jobs.database'

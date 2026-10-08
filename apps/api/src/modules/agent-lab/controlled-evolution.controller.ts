@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
 import { Roles } from '../auth/roles.decorator';
 import { ControlledEvolutionService } from './controlled-evolution.service';
-import { GenerateImprovementCandidateDto } from './dto/controlled-evolution.dto';
+import { ComparisonScopeDto, GenerateImprovementCandidateDto } from './dto/controlled-evolution.dto';
 
 @Controller('agent-lab/agents/:agentId/evolution')
 @Roles('ADMIN')
@@ -22,7 +22,8 @@ export class ControlledEvolutionController {
     @Req() req: any,
     @Param('agentId') agentId: string,
     @Param('candidateVersionId') candidateVersionId: string,
+    @Query() scope: ComparisonScopeDto,
   ) {
-    return this.evolution.compareCandidate(req.user.userId, agentId, candidateVersionId);
+    return this.evolution.compareCandidate(req.user.userId, agentId, candidateVersionId, scope);
   }
 }

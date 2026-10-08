@@ -1,5 +1,9 @@
 # 任务交接
 
+## 2026-10-08 · 评测任务可靠性
+
+RELEASE-READINESS-2 进行中。评测子阶段完成，报告见 ACCEPTANCE-REPORT-2026-10-08-EVALUATION-JOBS.md；接着认证/题库、CI/文档、干净部署与 main。无新增付费业务评测；不重置额度、自动发布或改写旧失败。旧未提交报告/截图保留。
+
 ## 2026-10-08 · INTERVIEW-CACHE-CONTEXT-1 交接
 
 用户批准优化，当前阶段只改产品答案缓存；完整请求 SHA-256、认证组织/用户/面试、主路由与套餐限制已进入 Redis v2，旧数据/工具/截断/fallback 不复用。API 600（14 dedicated DB skipped）、Cache 22、Web 83、lint/typecheck/build 和真实 Redis 合成并发/TTL/流式核验通过；不新增业务 Provider 样本，Lab 仍 bypass，无候选发布。真实 canary 和质量对比仍需先核对额度及未知中断费用并确认新预算。原有题库/认证/UI/报告/上下文编辑保留且不混入本次提交。下一阶段从 COMPLETE_DELIVERY_PLAN 与 TASKS 选一个主题，当前工程阶段收尾后等待用户继续。

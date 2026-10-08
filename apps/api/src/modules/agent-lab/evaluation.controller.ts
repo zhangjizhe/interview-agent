@@ -1,17 +1,18 @@
 import { Roles } from '../auth/roles.decorator';
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
 import { EvaluationService } from './evaluation.service';
+import { EvaluationJobsService } from './evaluation-jobs.service';
 import {
   CreateEvaluationDatasetCaseDto,
   CreateEvaluationDatasetDto,
   CreateEvaluatorDto,
-  RunEvaluationDto,
+  StartEvaluationJobDto,
 } from './dto/agent.dto';
 
 @Controller('agent-lab')
 @Roles('ADMIN')
 export class EvaluationController {
-  constructor(private readonly evaluations: EvaluationService) {}
+  constructor(private readonly evaluations: EvaluationService, private readonly jobs: EvaluationJobsService) {}
 
   @Post('datasets')
   createDataset(@Req() req: any, @Body() dto: CreateEvaluationDatasetDto) {
@@ -63,12 +64,13 @@ export class EvaluationController {
   }
 
   @Post('agents/:agentId/evaluations')
+  @HttpCode(202)
   runEvaluation(
     @Req() req: any,
     @Param('agentId') agentId: string,
-    @Body() dto: RunEvaluationDto,
+    @Body() dto: StartEvaluationJobDto,
   ) {
-    return this.evaluations.runEvaluation(req.user.userId, agentId, dto);
+    return this.jobs.enqueue(req.user.userId, agentId, dto);
   }
 
   @Get('agents/:agentId/evaluations')

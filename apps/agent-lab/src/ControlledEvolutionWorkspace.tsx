@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './controlled-evolution.css';
 
@@ -25,6 +25,15 @@ type Evaluation = {
   agentVersion: AgentVersion;
   dataset: { id: string; name: string; version: string };
   evaluator: { id: string; name: string; type: string };
+  requestKey?: string | null;
+  totalCases: number;
+  completedSamples: number;
+  completedCases: number;
+  createdAt: string;
+  completedAt?: string;
+  error?: string;
+  metrics?: { repeatCount?: number; totalSamples?: number; cachePolicy?: string;
+    budget?: { completedSamples?: number; spentCny?: number; costEvidenceStatus?: string } };
 };
 
 const token = () => localStorage.getItem('ia_access_token');
@@ -52,6 +61,7 @@ export function ControlledEvolutionWorkspace() {
   const [evaluatorId, setEvaluatorId] = useState('');
   const [comparison, setComparison] = useState<any>(null);
   const [feedback, setFeedback] = useState('');
+  const pendingRequest = useRef<{ signature: string; key: string }>();
   const [datasetKey, setDatasetKey] = useState('interview-regression');
   const [datasetName, setDatasetName] = useState('Interview 回归集');
   const [evaluatorKey, setEvaluatorKey] = useState('interview-keywords');
@@ -80,6 +90,7 @@ export function ControlledEvolutionWorkspace() {
   });
   const evaluations = useQuery<Evaluation[]>({
     queryKey: ['registry-evaluations', agentId],
+    refetchInterval: (query) => query.state.data?.some(item => item.status === 'PENDING' || item.status === 'RUNNING') ? 2000 : false,
     queryFn: () => api(`/agent-lab/agents/${agentId}/evaluations`),
     enabled: Boolean(agentId),
   });
@@ -234,30 +245,32 @@ export function ControlledEvolutionWorkspace() {
     onError: (error: Error) => setFeedback(error.message),
   });
   const runEvaluation = useMutation({
-    mutationFn: (versionId: string) => api(`/agent-lab/agents/${agentId}/evaluations`, {
-      method: 'POST',
-      body: JSON.stringify({
-        agentVersionId: versionId,
-        datasetId,
-        evaluatorId,
-        repeatCount,
-        maxEstimatedCostCny,
-      }),
-    }),
+    mutationFn: (versionId: string) => {
+      const payload = { agentVersionId: versionId, datasetId, evaluatorId, repeatCount, maxEstimatedCostCny };
+      const signature = JSON.stringify({ agentId, ...payload });
+      if (pendingRequest.current?.signature !== signature) pendingRequest.current = { signature, key: crypto.randomUUID() };
+      return api(`/agent-lab/agents/${agentId}/evaluations`, {
+        method: 'POST', body: JSON.stringify({ ...payload, requestKey: pendingRequest.current.key }),
+      });
+    },
+    onMutate: () => setComparison(null),
     onSuccess: async (result) => {
-      setFeedback(`评测完成：${result.score?.toFixed?.(1) ?? result.score ?? 0} 分。`);
-      setComparison(null);
+      pendingRequest.current = undefined;
+      setFeedback(`任务 ${result.id} 已${result.reused ? '复用' : '提交'}；状态 ${result.status}，可在任务列表查看真实进度。`);
       await refresh();
     },
-    onError: (error: Error) => setFeedback(error.message),
+    onError: async (error: Error) => { setFeedback(error.message); setComparison(null); await refresh(); },
   });
   const compare = useMutation({
-    mutationFn: () => api(`/agent-lab/agents/${agentId}/evolution/candidates/${candidateVersionId}/comparison`),
-    onSuccess: (result) => {
-      setComparison(result);
-      setFeedback(`对比完成：${result.releaseRecommendation}。`);
+    mutationFn: async () => {
+      const query = new URLSearchParams({ datasetId, evaluatorId });
+      const result = await api(`/agent-lab/agents/${agentId}/evolution/candidates/${candidateVersionId}/comparison?${query}`);
+      if (result.datasetId !== datasetId || result.evaluatorId !== evaluatorId) throw new Error('比较结果与当前资产不一致，请重新比较。');
+      return result;
     },
-    onError: (error: Error) => setFeedback(error.message),
+    onMutate: () => setComparison(null),
+    onSuccess: (result) => { setComparison(result); setFeedback(`对比完成：${result.releaseRecommendation}。`); },
+    onError: (error: Error) => { setFeedback(error.message); setComparison(null); },
   });
   const publish = useMutation({
     mutationFn: () => api(`/agent-lab/agents/${agentId}/versions/${candidateVersionId}/publish`, { method: 'POST' }),
@@ -269,7 +282,10 @@ export function ControlledEvolutionWorkspace() {
     onError: (error: Error) => setFeedback(error.message),
   });
 
-  const busy = bootstrap.isPending || bootstrapReleaseDataset.isPending || createDataset.isPending || createEvaluator.isPending || addCase.isPending || freezeDataset.isPending || approveDataset.isPending || generate.isPending || runEvaluation.isPending || compare.isPending || publish.isPending;
+  const activeEvaluation = evaluations.data?.some(item => item.status === 'PENDING' || item.status === 'RUNNING');
+  useEffect(() => { setComparison(null); }, [agentId, candidateVersionId, datasetId, evaluatorId, repeatCount, maxEstimatedCostCny, selectedAgent?.currentVersion?.id, activeEvaluation]);
+
+  const busy = Boolean(activeEvaluation) || bootstrap.isPending || bootstrapReleaseDataset.isPending || createDataset.isPending || createEvaluator.isPending || addCase.isPending || freezeDataset.isPending || approveDataset.isPending || generate.isPending || runEvaluation.isPending || compare.isPending || publish.isPending;
 
   return <section className="lab-panel">
     <div className="lab-section-head">
@@ -315,10 +331,10 @@ export function ControlledEvolutionWorkspace() {
         {datasetDetails.data.cases?.map((item: any) => <article className="lab-row" key={item.id}>
           <div><h3>{item.key}</h3><p>{item.input?.message}</p></div>
           <div className="lab-row-metrics">
-            <span>关键词 {(item.expectedOutput?.keywords || []).join('、')}</span>
+            <span>来源 {item.metadata?.provenance?.sourceType || '未声明'}</span><span>关键词 {(item.expectedOutput?.keywords || []).join('、')}</span>
             <span>{item.metadata?.segments?.skill}</span>
             <span>{item.metadata?.segments?.difficulty}</span>
-            <span>{item.metadata?.provenance?.containsPersonalData ? '含个人数据' : '无个人数据'}</span>
+            <span>{item.metadata?.provenance?.containsPersonalData === false ? '无个人数据（声明）' : item.metadata?.provenance?.containsPersonalData === true ? '含个人数据' : '隐私未声明'}</span>
           </div>
         </article>)}
         <button onClick={() => approveDataset.mutate()} disabled={busy || !datasetId || !selectedDataset?.frozenAt || selectedDataset?.metadata?.review?.status === 'APPROVED'}>管理员批准当前 Dataset</button>
@@ -326,25 +342,25 @@ export function ControlledEvolutionWorkspace() {
     </details>
 
     <div className="lab-form-grid">
-      <label>Agent<select value={agentId} onChange={(event) => { setAgentId(event.target.value); setCandidateVersionId(''); setSourceEvaluationId(''); setComparison(null); }}><option value="">选择 Agent</option>{agents.data?.map((agent) => <option key={agent.id} value={agent.id}>{agent.name} · {agent.currentVersion?.version || '无当前版本'}</option>)}</select></label>
+      <label>Agent<select value={agentId} disabled={busy} onChange={(event) => { setAgentId(event.target.value); setCandidateVersionId(''); setSourceEvaluationId(''); setComparison(null); }}><option value="">选择 Agent</option>{agents.data?.map((agent) => <option key={agent.id} value={agent.id}>{agent.name} · {agent.currentVersion?.version || '无当前版本'}</option>)}</select></label>
       <label>失败评测<select value={sourceEvaluationId} onChange={(event) => setSourceEvaluationId(event.target.value)}><option value="">选择失败评测</option>{failedEvaluations.map((item) => <option key={item.id} value={item.id}>{item.agentVersion.version} · {item.dataset.name} · 失败 {item.failedCases}</option>)}</select></label>
       <button onClick={() => generate.mutate()} disabled={busy || !agentId || !sourceEvaluationId}>生成草稿候选</button>
     </div>
 
     <div className="lab-form-grid">
-      <label>候选版本<select value={candidateVersionId} onChange={(event) => { setCandidateVersionId(event.target.value); setComparison(null); }}><option value="">选择草稿</option>{draftVersions.map((version) => <option key={version.id} value={version.id}>{version.version}</option>)}</select></label>
-      <label>Dataset<select value={datasetId} onChange={(event) => setDatasetId(event.target.value)}><option value="">选择 Dataset</option>{datasets.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.version} · {item.frozenAt ? '已冻结' : '可编辑'}</option>)}</select></label>
-      <label>Evaluator<select value={evaluatorId} onChange={(event) => setEvaluatorId(event.target.value)}><option value="">选择 Evaluator</option>{evaluators.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.type}</option>)}</select></label>
-      <label>重复次数<select value={repeatCount} onChange={(event) => setRepeatCount(Number(event.target.value))}><option value={3}>3 次</option><option value={4}>4 次</option><option value={5}>5 次</option></select></label>
-      <label>成本停止阈值（CNY）<input type="number" min="0.01" max="100" step="0.01" value={maxEstimatedCostCny} onChange={(event) => setMaxEstimatedCostCny(Number(event.target.value))} /></label>
+      <label>候选版本<select value={candidateVersionId} disabled={busy} onChange={(event) => { setCandidateVersionId(event.target.value); setComparison(null); }}><option value="">选择草稿</option>{draftVersions.map((version) => <option key={version.id} value={version.id}>{version.version}</option>)}</select></label>
+      <label>Dataset<select value={datasetId} disabled={busy} onChange={(event) => setDatasetId(event.target.value)}><option value="">选择 Dataset</option>{datasets.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.version} · {item.frozenAt ? '已冻结' : '可编辑'}</option>)}</select></label>
+      <label>Evaluator<select value={evaluatorId} disabled={busy} onChange={(event) => setEvaluatorId(event.target.value)}><option value="">选择 Evaluator</option>{evaluators.data?.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.type}</option>)}</select></label>
+      <label>重复次数<select value={repeatCount} disabled={busy} onChange={(event) => setRepeatCount(Number(event.target.value))}><option value={3}>3 次</option><option value={4}>4 次</option><option value={5}>5 次</option></select></label>
+      <label>成本停止阈值（CNY）<input type="number" min="0.01" max="100" step="0.01" value={maxEstimatedCostCny} disabled={busy} onChange={(event) => setMaxEstimatedCostCny(Number(event.target.value))} /></label>
     </div>
 
-    {selectedDataset && <p>计划调用：{selectedDataset._count?.cases || 0} Cases × {repeatCount} 次 = {(selectedDataset._count?.cases || 0) * repeatCount} 个样本/版本；单版本达到 ¥{maxEstimatedCostCny.toFixed(2)} 时停止后续调用。</p>}
+    {selectedDataset && <p>计划样本：{selectedDataset._count?.cases || 0} Cases × {repeatCount} 次 = {(selectedDataset._count?.cases || 0) * repeatCount} 个样本/版本；单版本达到 ¥{maxEstimatedCostCny.toFixed(2)} 时停止后续样本；在途样本可能超出阈值。</p>}
 
     <div className="lab-actions">
       <button onClick={() => selectedAgent?.currentVersion && runEvaluation.mutate(selectedAgent.currentVersion.id)} disabled={busy || !selectedAgent?.currentVersion || !datasetId || !evaluatorId || !releaseEvidenceReady}>评测当前基线</button>
       <button onClick={() => runEvaluation.mutate(candidateVersionId)} disabled={busy || !candidateVersionId || !datasetId || !evaluatorId || !releaseEvidenceReady}>评测候选</button>
-      <button onClick={() => compare.mutate()} disabled={busy || !candidateVersionId}>同集对比</button>
+      <button onClick={() => compare.mutate()} disabled={busy || !candidateVersionId || !datasetId || !evaluatorId}>同集对比</button>
       <button onClick={() => publish.mutate()} disabled={busy || comparison?.releaseRecommendation !== 'APPROVE'}>管理员发布</button>
     </div>
 
@@ -352,8 +368,29 @@ export function ControlledEvolutionWorkspace() {
 
     {comparison && <article className="lab-row">
       <div><p className={`decision-${comparison.releaseRecommendation.toLowerCase()}`}>{comparison.releaseRecommendation}</p><h2>同集评测结果</h2><p>Dataset {comparison.datasetId} · Evaluator {comparison.evaluatorId}</p></div>
+      <div>{comparison.reasons?.map((reason: string) => <p className="evolution-rejection" key={reason}>{reason}</p>)}</div>
       <div className="lab-row-metrics"><span>基线 {comparison.baseline.score}</span><span>候选 {comparison.candidate.score}</span><span>变化 {comparison.scoreDelta >= 0 ? '+' : ''}{comparison.scoreDelta}</span><span>发布证据 {comparison.releaseGate.ruleSetVersion}</span>{comparison.releaseGate.evidence?.statisticalComparison && <span>95% 下界 {comparison.releaseGate.evidence.statisticalComparison.lowerConfidenceBoundPoints ?? '不可用'} · 配对 {comparison.releaseGate.evidence.statisticalComparison.pairedCaseCount}</span>}</div>
     </article>}
+    <section className="evolution-jobs" aria-label="评测任务与证据">
+      <div><p className="agent-eyebrow">EVALUATION EVIDENCE</p><h3>评测任务与证据</h3><p>来自当前工作区的持久化运行；关键词分数仅表示术语遵循，不代表完整面试质量。</p></div>
+      {evaluations.isError && <p role="alert">评测记录暂不可用，请刷新；不会展示伪造进度。</p>}
+      {evaluations.data?.length === 0 && <p>尚无评测记录。提交有界任务后，进度与证据会在这里更新。</p>}
+      {evaluations.data?.slice(0, 6).map(item => {
+        const samples = item.requestKey ? item.completedSamples : item.metrics?.budget?.completedSamples ?? (item.status === 'COMPLETED' ? item.metrics?.totalSamples : null);
+        const total = item.metrics?.totalSamples ?? (item.metrics?.repeatCount ? item.totalCases * item.metrics.repeatCount : null);
+        const completed = samples ?? 0;
+        return <article key={item.id} className="evolution-job">
+          <div className="evolution-job-head"><strong>{item.agentVersion.version} · {item.dataset.name}</strong><span className={`evolution-status status-${item.status.toLowerCase()}`}>{item.status}</span></div>
+          <p>{item.id} · {item.evaluator.name}</p>
+          <div className="evolution-job-metrics"><span>样本 {samples ?? '未记录'}/{total ?? '总数未记录'}</span><span>得分 {item.score == null ? '—' : item.score.toFixed(1)}</span><span>费用小计 {typeof item.metrics?.budget?.spentCny === 'number' ? `¥${item.metrics.budget.spentCny.toFixed(6)}` : '未核验'}</span></div>
+          <progress aria-label="已完成样本" max={Math.max(total ?? completed, 1)} value={total == null || samples == null ? undefined : completed} />
+          {item.error && <p className="evolution-rejection">{item.error}</p>}
+          {item.metrics?.budget?.costEvidenceStatus === 'unavailable' && <p className="evolution-rejection">中断费用未知；以上仅为已核验样本小计。</p>}
+          {item.status === 'COMPLETED' && item.metrics?.cachePolicy !== 'semantic-cache-bypass/v1' && <p>旧运行缺少答案缓存隔离证据，不能作为发布质量依据。</p>}
+          <time dateTime={item.createdAt}>提交于 {new Date(item.createdAt).toLocaleString('zh-CN')}</time>
+        </article>;
+      })}
+    </section>
     {feedback && <p className="lab-feedback">{feedback}</p>}
   </section>;
 }

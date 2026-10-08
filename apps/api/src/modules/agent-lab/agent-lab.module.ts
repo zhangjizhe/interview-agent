@@ -9,6 +9,7 @@ import { AgentRuntimeController } from './agent-runtime.controller';
 import { AgentRuntimeService } from './agent-runtime.service';
 import { EvaluationController } from './evaluation.controller';
 import { EvaluationService } from './evaluation.service';
+import { EvaluationJobsService } from './evaluation-jobs.service';
 import { TraceEventService } from './trace-event.service';
 import { ToolApprovalService } from './tool-approval.service';
 import { ToolRunner } from './tool-runner.service';
@@ -31,6 +32,7 @@ import { ControlledEvolutionService } from './controlled-evolution.service';
     AgentRegistryService,
     AgentRuntimeService,
     EvaluationService,
+    EvaluationJobsService,
     TraceEventService,
     ToolApprovalService,
     ToolRunner,
