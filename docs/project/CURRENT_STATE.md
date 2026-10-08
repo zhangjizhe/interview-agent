@@ -1,6 +1,10 @@
 # 当前状态
 
-更新：2026-10-08 · DELIVERY-CLOSEOUT-1
+更新：2026-10-08 · REAL-PROVIDER-SMOKE-1
+
+## 真实 API 冒烟（2026-10-08）
+
+用户要求使用真实 API 验证。本机 PostgreSQL、Redis、Qdrant、Milvus/etcd 恢复后，API readiness、Interview 和 Lab 页面均返回 HTTP 200；API 启动探针对 Qwen 与 DeepSeek 发起真实 `ping` 聊天请求（`maxTokens=1`），日志均显示成功。探针直接调用 Provider 并绕过网关 Usage Ledger/成本追踪，实际 usage 与账单金额未知，不能视为零成本。该证据仅为连通性冒烟，不是业务质量 Benchmark 或发布验收。详见 [真实 Provider 冒烟报告](../ACCEPTANCE-REPORT-2026-10-08-REAL-PROVIDER-SMOKE.md)。固定评测续跑仍需核对额度和中断账单并明确新预算。
 
 ## 产品与工程
 

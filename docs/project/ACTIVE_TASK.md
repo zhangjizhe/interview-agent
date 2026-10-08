@@ -4,18 +4,20 @@
 
 ## 任务 ID
 
-DELIVERY-CLOSEOUT-1
+REAL-PROVIDER-SMOKE-1
 
 ## 目标与范围
 
-用户明确要求完成剩余事项后合并 main。依次按主题完成安全依赖迁移/补丁完整性、退出吊销与题库输入/成本合同、任务控制/旧测试债务、训练及恢复验收、真实评测额度/费用核验，再执行整体验证与 PR #4 合并。保持模块化单体与领域合同；不伪造数据、重置账本或自动发布候选。用户本轮要求连续完成，按主题验证提交推送，继续后续子阶段。
+用户要求用真实 API 验证。本次范围是恢复本地运行依赖，并验证 API readiness 及启动时真实 Provider 连通性；不启动付费业务评测，不修改账本，不使用候选人数据。
 
 ## 状态
 
-已完成：安全迁移、会话吊销、题库输入、评测取消、历史测试、训练闭环和缓存生命周期均按主题验证、提交并推送。真实 Milvus 写入、准确主键补偿、PostgreSQL 完整转储恢复、Milvus+etcd/Qdrant 隔离恢复及 API smoke 28/28 通过；本机全量工程检查和 Product verification #37 全绿。PR #4 于 2026-10-08 合入 main，merge commit `8b2e94c`；本地 `agent-lab` 已快进同步主线。真实模型质量、生产目标和账单未被此次工程合并代替；未重置账本或追加付费业务调用。
+已完成：本机 PostgreSQL、Redis、Qdrant、Milvus/etcd 已恢复；API readiness、Interview 与 Lab 返回 HTTP 200；真实 Qwen/DeepSeek 启动探针成功。启动探针绕过网关计量，实际 token/费用未知；没有运行产品业务推理或 Benchmark。结果详见 `docs/ACCEPTANCE-REPORT-2026-10-08-REAL-PROVIDER-SMOKE.md`。
+
+既有结论仍有效：PR #4 已合入 main，Agent 1.0.0 正式版；1.0.1 DRAFT、发布门 REJECT。固定真实评测此前失败，13/36 成功样本、已核验小计 ¥0.069285、中断调用费用未知。续跑前核对额度与账单并明确新的有界预算。新增后续任务 `PROVIDER-HEALTH-PROBE-METERING-1` 跟进启动探针绕过网关计量的问题。
 
 官方审计 0 critical / 1 high / 0 moderate；唯一 braces high 无上游修复，已用固定 SHA 补丁和实际 SDK 回归缓解。不是零漏洞或第三方审计。真实 Agent 1.0.0 保持发布；1.0.1 仍 DRAFT，发布门 REJECT。代码合并与候选发布分开验收。
 
 ## 验收
 
-按实际升级/修复运行安全复现与兼容回归、真实 HTTP/数据库/Redis、浏览器训练与恢复验收、lint/type/build、干净镜像与远端 CI；保留失败历史。main 合并需要最新检查通过与准确交付边界，Agent 版本仍独立受真实发布证据门与人工批准约束。
+本次验收：API readiness、Web 与 Lab HTTP 状态码为 200；脱敏启动日志的 Qwen、DeepSeek 探针均成功。无模型质量分数、usage 账本记录或供应商账单对账；实际费用未知。没有代码/API 合同变更、数据库 migration 或新增依赖。

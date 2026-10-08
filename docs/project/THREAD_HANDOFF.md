@@ -4,6 +4,8 @@
 
 ## 当前结论
 
+`REAL-PROVIDER-SMOKE-1` 已完成：恢复本机 Postgres/Redis/Qdrant/Milvus 后，API readiness、Web、Lab 返回 HTTP 200；API 启动探针真实调用 Qwen、DeepSeek 均成功。该探针直接调用 Provider，绕过 Gateway Usage Ledger，实际 token/费用未知，不是零成本或账单对账证据。详细结果见 `docs/ACCEPTANCE-REPORT-2026-10-08-REAL-PROVIDER-SMOKE.md`。后续真实推理/评测前先核对额度与中断账单并确认费用上限。`PROVIDER-HEALTH-PROBE-METERING-1` 记录探针计量缺口。
+
 DELIVERY-CLOSEOUT-1 已完成。PR #4 于 2026-10-08 合入 `main`，merge commit `8b2e94c5b8c831fc027024d43f03cff478e5b5a0`；Product verification #37 全绿，`agent-lab` 已快进同步 main。当前本机 API Jest 663 / Cache 22 / 双端 99 / 专用 PostgreSQL 18、lint/type/build 通过；隔离 API smoke 28/28，Milvus+etcd/Qdrant 恢复读回通过。唯一官方 high 是 braces advisory，补丁缓解不等于上游修复或第三方审计。真实 Benchmark、费用和生产环境验收仍未完成，不能将代码合并理解为候选发布。
 
 截至 f1c0cba，安全、退出、题库输入、取消、历史测试、训练与缓存生命周期已按主题提交推送。[PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 已关联；默认 Jest 已移除全部历史路径排除。当前收尾包含专用 PostgreSQL 18 项及 Milvus/etcd/Qdrant 隔离恢复。

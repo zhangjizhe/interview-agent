@@ -4,9 +4,11 @@
 
 | 优先级 | 任务 | 状态与验收条件 |
 | --- | --- | --- |
+| 完成 | REAL-PROVIDER-SMOKE-1 | 本机 API readiness 与 Interview/Lab 返回 200；真实 Qwen/DeepSeek 启动探针均成功。探针绕过网关计量，实际用量/费用未知；不代表业务质量验收，见真实 Provider 冒烟报告 |
 | 完成 | DELIVERY-CLOSEOUT-1 | PR #4 已于 2026-10-08 合入 main（8b2e94c）；Product verification #37 全绿；agent-lab 已同步主线。真实质量、费用和生产结果边界据实记录 |
 | P0 | DEPENDENCY-SECURITY-1 | NestJS/Router/uuid 主版本迁移及 braces 完整输入补丁本地验收通过；API 663 / Cache 22 / 双端 99，audit moderate 0、上游 high 1 有回归缓解；无第三方审计或零漏洞声明 |
 | P0 | LAB-CURATED-BENCHMARK-6 | 额度失败与中断费用阻塞。核对额度/费用和新有界预算后才能续跑；同集真实隔离评测与人工审查后决定候选发布 |
+| P0 | PROVIDER-HEALTH-PROBE-METERING-1 | API 启动探针直接调用 Provider.chat，绕过网关额度和 Usage Ledger；改为不产生计费推理的健康检查，或经受控网关与计量后再验收。需覆盖启动及计量回归 |
 | P0 | PRODUCTION-ACCEPTANCE-1 | TLS、凭据/端口/网络隔离、备份与向量恢复、容量、监控和故障演练；工程 CI 不替代生产验收 |
 | P1 | TRAINING-LOOP-1 | 工程闭环完成：正式证据保存 skillId、训练完成 CAS 幂等、复测单次关联；干净隔离 API 26/26 含真实训练 HTTP/PG 聚合通过。相同离线定义的合成证据验证链路，真实候选人提升/付费评测仍不记完成 |
 | P1 | AUTH-LOGOUT-1 | 两端服务端吊销、失败重试与新登录竞态已完成；后端 Lua 原子吊销 access/refresh，13 项认证和双端 99 项测试通过。最终镜像增加跨设备令牌复用 HTTP 验收 |
