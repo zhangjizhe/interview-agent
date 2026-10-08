@@ -6,6 +6,8 @@
 
 ## DELIVERY-CLOSEOUT-1（进行中）
 
+- 恢复全部 5 份旧设计测试、移除排除规则；完整内容/role/tier 压缩缓存指纹及 LRU 命中刷新。全量 Jest 661 项、严格 lint/type/API build 通过；真实 SSE HTTP 与离线 Golden 分别记录。
+
 - 评测控制：加性 CANCELLED / cancelRequestedAt、ADMIN 工作区取消、样本边界停止及实际费用保留；并发/幂等/分页回归，相关 40 项 / PostgreSQL 18 项、lint/type/build 通过。
 
 - 题库主题：运行时 DTO、嵌套/UTF-8/数量/查询约束；有界 embedding 并发与零隐式重试，准确主键补偿、有界 flush 与未知写入 503；相关 12 项、lint/type/build 通过。
