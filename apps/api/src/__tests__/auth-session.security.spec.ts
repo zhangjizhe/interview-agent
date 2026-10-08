@@ -9,6 +9,11 @@ class MemoryRedis {
   set = jest.fn(async (key: string, value: string, option?: string) => { if (option === 'NX' && this.values.has(key)) return null; this.values.set(key, value); return 'OK'; });
   incr = jest.fn(async (key: string) => { const n = Number(this.values.get(key) || 0) + 1; this.values.set(key, String(n)); return n; });
   eval = jest.fn(async (_script: string, count: number, ...args: string[]) => {
+    if (_script.startsWith('-- revoke-session')) {
+      this.values.set(args[0], '1');
+      if (args[4] === '1') this.values.set(args[1], '1');
+      return 1;
+    }
     if (count === 1) { const value = this.values.get(args[0]) ?? null; this.values.delete(args[0]); return value; }
     if (count === 2) { await this.incr(args[0]); this.values.delete(args[1]); return 1; }
     if ((this.values.get(args[0]) || '0') !== args[3] || this.values.has(args[1]) || this.values.has(args[2])) return 0;
@@ -48,11 +53,19 @@ describe('JWT 会话安全', () => {
     const pair = await service.issue(user, '0'); const decoded = payload(pair.accessToken);
     await service.logout(decoded, pair.accessToken);
     await expect(service.assertActive(decoded, pair.accessToken)).rejects.toMatchObject({ status: 401 });
-    expect(redis.set).toHaveBeenCalledWith(`auth:blacklist:${decoded.jti}`, '1', 'EX', expect.any(Number));
+    expect(redis.eval).toHaveBeenLastCalledWith(expect.stringContaining('-- revoke-session'), 2,
+      `auth:blacklist:${decoded.jti}`, `auth:session-revoked:${decoded.sid}`, expect.stringMatching(/^\d+$/), '604800', '1');
   });
   it('logout 同时使 refresh 失效', async () => {
     const pair = await service.issue(user, '0'); await service.logout(payload(pair.accessToken), pair.accessToken);
     await expect(service.consumeRefresh(pair.refreshToken)).rejects.toMatchObject({ status: 401 });
+  });
+  it('单会话退出不吊销其他设备，Redis 失败不伪装成功', async () => {
+    const a = await service.issue(user, '0'); const b = await service.issue(user, '0');
+    await service.logout(payload(a.accessToken), a.accessToken);
+    await expect(service.assertActive(payload(b.accessToken), b.accessToken)).resolves.toBeUndefined();
+    redis.eval.mockRejectedValueOnce(new Error('unavailable'));
+    await expect(service.logout(payload(b.accessToken), b.accessToken)).rejects.toMatchObject({ status: 503 });
   });
   it('吊销用户全部会话会拒绝所有设备', async () => {
     const a = await service.issue(user, '0'); const b = await service.issue(user, '0');

@@ -27,6 +27,8 @@ check('anonymous business access denied', (await request('/interview/list')).sta
 const owner = await login('fixture-ci-owner', 'USER');
 const foreign = await login('fixture-ci-foreign', 'USER');
 const admin = await login('fixture-ci-admin', 'ADMIN');
+const sibling = await request('/auth/login', { method: 'POST', body: { userId: 'fixture-ci-owner', password: 'isolated-fixture-password' } });
+check('parallel session login', sibling.status === 200);
 const created = await request('/interview/target-jobs', { method: 'POST', token: owner, body: { title: 'Synthetic CI Role', level: 'P5' } });
 check('owned target job creation', created.status === 201 && created.data.isActive === true && created.data.profileVersion === 1);
 const jobs = await request('/interview/target-jobs', { token: owner });
@@ -36,4 +38,8 @@ check('foreign target job access denied', [403, 404].includes(foreignRead.status
 check('USER question governance denied', (await request('/interview/question-bank/list', { token: owner })).status === 403);
 check('ADMIN Lab registry access', (await request('/agent-lab/agents', { token: admin })).status === 200);
 check('evaluation request contract rejected before model work', (await request('/agent-lab/agents/fixture/evaluations', { method: 'POST', token: admin, body: {} })).status === 400);
+check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: sibling.data.accessToken })).status === 200);
+check('logged out access token rejected', (await request('/auth/profile', { token: sibling.data.accessToken })).status === 401);
+check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: sibling.data.refreshToken } })).status === 401);
+check('other device remains authenticated', (await request('/auth/profile', { token: owner })).status === 200);
 console.log(`Built API smoke: ${passed}/${passed} passed (synthetic, no model work).`);

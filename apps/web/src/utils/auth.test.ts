@@ -1,12 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installAuthenticatedFetch, saveSession } from './auth';
-import { api as labApi } from '../../../agent-lab/src/api';
+import { installAuthenticatedFetch, logoutSession, saveSession } from './auth';
+import { api as labApi, logoutSession as labLogout } from '../../../agent-lab/src/api';
 
 describe('session expiry at the transport boundary', () => {
   let native: any;
   const session = (accessToken: string) => saveSession({ accessToken, userId: 'synthetic-user', email: 'fixture@example.invalid', role: 'ADMIN' });
   beforeEach(() => { localStorage.clear(); native = vi.fn(); vi.stubGlobal('fetch', native); });
   afterEach(() => { localStorage.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  it.each([logoutSession, labLogout])('revokes the active server session before clearing local credentials', async logout => {
+    session('fixture-old'); native.mockResolvedValue(new Response('{}'));
+    await expect(logout()).resolves.toBe(true);
+    expect(native.mock.calls[0][0]).toBe('/api/auth/logout');
+    expect(native.mock.calls[0][1].headers.Authorization).toBe('Bearer fixture-old');
+    expect(localStorage.getItem('ia_access_token')).toBeNull();
+  });
+  it.each([logoutSession, labLogout])('keeps failed logout retryable and protects a concurrent new login', async logout => {
+    session('fixture-old'); native.mockResolvedValueOnce(new Response('{}', { status: 503 }));
+    await expect(logout()).rejects.toThrow('退出未确认');
+    expect(localStorage.getItem('ia_access_token')).toBe('fixture-old');
+    let resolve!: (response: Response) => void;
+    native.mockReturnValueOnce(new Promise<Response>(done => { resolve = done; }));
+    const previous = logout(); session('fixture-new'); resolve(new Response('{}'));
+    await expect(previous).resolves.toBe(false);
+    expect(localStorage.getItem('ia_access_token')).toBe('fixture-new');
+  });
   it('clears the current failed session and emits expiry once', async () => {
     session('fixture-old'); native.mockResolvedValue(new Response('{}', { status: 401 }));
     const expired = vi.fn(); window.addEventListener('ia:session-expired', expired);

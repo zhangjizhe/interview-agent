@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
 import { useEffect, useRef, useState } from 'react';
-import { api, role, token } from './api';
+import { api, logoutSession, role, token } from './api';
 import { QuestionBankWorkspace, type QuestionBankItem } from './QuestionBankWorkspace';
 import './styles.css';
 import './lab.css';
@@ -300,11 +300,9 @@ function ControlCenter() {
         <button
           type="button"
           className="agent-signout"
-          onClick={() => {
-            localStorage.removeItem('ia_access_token');
-            localStorage.removeItem('ia_user_role');
-            localStorage.removeItem('ia_userId');
-            window.location.reload();
+          onClick={async () => {
+            try { if (await logoutSession()) window.location.reload(); }
+            catch (error) { setFeedback(error instanceof Error ? error.message : '退出未确认，请重试。'); }
           }}
         ><LogOut size={16}/>退出控制台</button>
       </aside>

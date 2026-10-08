@@ -72,8 +72,14 @@ export class AuthSessionService {
   async logout(payload: Record<string, any>, rawToken: string): Promise<void> {
     await this.available(async () => {
       const remaining = Math.max(1, Math.ceil(payload.exp - Date.now() / 1000));
-      await this.redis.getClient().set(`auth:blacklist:${payload.jti || this.hash(rawToken)}`, '1', 'EX', remaining);
-      if (payload.sid) await this.redis.getClient().set(this.revokedKey(payload.sid), '1', 'EX', Math.max(REFRESH_TTL, remaining));
+      const blacklist = `auth:blacklist:${payload.jti || this.hash(rawToken)}`;
+      // Access and refresh-family revocation must become visible atomically.
+      await this.redis.getClient().eval(`-- revoke-session
+        redis.call('SET', KEYS[1], '1', 'EX', ARGV[1])
+        if ARGV[3] == '1' then redis.call('SET', KEYS[2], '1', 'EX', ARGV[2]) end
+        return 1
+      `, 2, blacklist, payload.sid ? this.revokedKey(payload.sid) : blacklist,
+      String(remaining), String(Math.max(REFRESH_TTL, remaining)), payload.sid ? '1' : '0');
     });
   }
 

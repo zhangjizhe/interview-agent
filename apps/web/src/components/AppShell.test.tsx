@@ -4,7 +4,7 @@ import { vi } from 'vitest';
 import { AppShell } from './AppShell';
 
 vi.mock('../utils/auth', () => ({
-  clearSession: vi.fn(),
+  logoutSession: vi.fn(),
   getSession: () => ({ userId: 'candidate-a', role: 'USER' }),
 }));
 
