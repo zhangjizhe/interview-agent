@@ -2,6 +2,10 @@
 
 更新：2026-10-08 · DELIVERY-CLOSEOUT-1
 
+## 权限管理 SOP（2026-10-08）
+
+ADMIN-ACCESS-SOP-1：新增 `docs/ADMIN-ACCESS-SOP.md`，明确部署所有者控制、ADMIN 与私有名单区别、确认式单账号角色操作、旧会话吊销、验证与回滚。已核对现有鉴权代码及脚本语法；未新增权限变更或完整生产演练。当前缺少持久授权审计和管理员授权页面，作为后续主题保留。
+
 ## Lab 登录代理修复（2026-10-08）
 
 LAB-AUTH-PROXY-1：Lab nginx 缓存 API 容器旧地址，登录/注册请求 502。复用 Interview 的动态 Docker DNS 配置并重建部署 Lab。镜像 tsc/Vite build、严格 lint、nginx -t 通过；实际 Lab readiness 200、空凭据登录返回 API 结构化 400。用户实际账号登录待刷新重试确认；未读取密码、修改账号/权限/数据库或发起模型调用。

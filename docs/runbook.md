@@ -17,6 +17,10 @@ Interview 为 localhost:5173，Lab 为 localhost:5175；API 3001。服务端口�
 
 API 和独立 migration job 共享镜像。升级前冻结写入并备份；migration 成功且就绪检查通过后才恢复流量。禁止 `db push`、修改已应用迁移、重置账本或删卷恢复服务。取消功能包含加性 `20261008010000_evaluation_cancellation` 迁移；旧 API 回滚前须验证新数据合同兼容。
 
+## 管理员权限
+
+由部署所有者按 [管理员权限 SOP](ADMIN-ACCESS-SOP.md) 查询、授权、撤权与吊销旧会话。数据库角色和 ADMIN_USER_IDS 名单含义不同，不用名单删除替代撤权。
+
 ## 健康、故障与监控
 
 `GET /api/health` 只表示进程存活。`GET /api/health/ready` 检查 PostgreSQL、Redis 和镜像携带的全部迁移；每次依赖检查限时 3 秒，失败返回脱敏 503。它不证明模型、Milvus 或 Qdrant 可用，向量服务另查容器健康及业务合成读写。

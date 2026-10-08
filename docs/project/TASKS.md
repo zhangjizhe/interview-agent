@@ -4,6 +4,8 @@
 
 | 优先级 | 任务 | 状态与验收条件 |
 | --- | --- | --- |
+| 完成 | ADMIN-ACCESS-SOP-1 | 所有者授权/撤权/吊销与验证 SOP，代码核对和脚本语法检查通过；完整操作演练未执行 |
+| P2 | ADMIN-ACCESS-AUDIT-1 | 后续独立设计权限变更持久审计与受控管理入口；现阶段私有运维记录，不能声称已有审计能力 |
 | 完成 | LAB-AUTH-PROXY-1 | 修复 nginx 缓存 API 旧地址导致登录 502；动态 Docker DNS，build/lint/nginx 验证通过，Lab readiness 200、登录空请求结构化 400；用户账号重试待确认 |
 | 完成 | REAL-PROVIDER-SMOKE-1 | 本机 API readiness 与 Interview/Lab 返回 200；真实 Qwen/DeepSeek 启动探针均成功。探针绕过网关计量，实际用量/费用未知；不代表业务质量验收，见真实 Provider 冒烟报告 |
 | 完成 | DELIVERY-CLOSEOUT-1 | PR #4 已于 2026-10-08 合入 main（8b2e94c）；Product verification #37 全绿；agent-lab 已同步主线。真实质量、费用和生产结果边界据实记录 |
