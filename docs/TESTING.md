@@ -1,5 +1,17 @@
 # 测试基线与统计口径
 
+## 当前基线 · 2026-10-08
+
+Node.js 20、pnpm 9.0.0；源码与冻结依赖详见[交付报告](DELIVERY-REPORT-2026-10-08.md)。API 82 suites / 626 tests、Cache 22、Web/Lab 18 files / 95 tests 通过；3 suites / 17 数据库 tests 在默认步骤跳过，但由专用 PostgreSQL 新库/旧库升级步骤全部通过。严格 lint 0 warning、类型/三端构建、Docker、隔离实际镜像 smoke 12、真实 API 浏览器 24、合成报告浏览器 8 和 Lab 流程通过。未生成覆盖率，不声明覆盖率百分比。
+
+**仍有 5 份历史 spec 被 jest.config.js 显式排除**：memory.dual-write、interview.sse、dynamic-task-queue.followup、context-manager.watermark、golden-dataset.eval。本轮未恢复它们；现有模块/真实 HTTP 与浏览器检查不等于这些历史测试已执行。llm-gateway.fallback 已不在排除清单，不能继续沿用旧“6 份排除”的说法。
+
+复跑命令见 README；真实 Redis 必须显式测试 URL，数据库和镜像 smoke 使用独立合成环境。报告页面与 Lab 录制 fixture 不证明真实模型质量；真实发布对比仍 FAILED/REJECT。远端 CI 与 PR 检查单独记录，不以本地结果替代。
+
+## 历史快照 · 2026-09-28
+
+以下原始记录保留用于追溯，数量、排除项及“本轮未执行”均属于历史日期，不作为当前状态。
+
 本次核对：2026-09-28，基于本地 `agent-lab` 的 `c4868aa` 加本轮未提交改动，Node v24.11.1。以下只计算实际执行结果；不把测试文件数当用例数，不把用例数当覆盖率。
 
 | 验证 | 本次结果 | 范围 |

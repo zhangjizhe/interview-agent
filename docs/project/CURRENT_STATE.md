@@ -16,6 +16,8 @@
 
 所有开发保留在 agent-lab。兼容依赖升级后生产审计为 0 critical / 1 high / 6 moderate / 0 low；braces 由有测试的本地深度补丁缓解，未获上游修复，审计仍报告 high。没有批准风险豁免。main 暂不合并，先完成远端 CI 核对、安全专项迁移/复核；不得将工程测试通过记为商用交付成功。
 
+工程候选已提交推送 247521d，远端确认一致；[Draft PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 为 main 提供可审查结果，实际远端检查以 PR / Actions 为准。安全专项完成后必须重新核验合并条件，不自动合并或批准风险豁免。
+
 ## 入口
 
 - [本版交付报告](../DELIVERY-REPORT-2026-10-08.md)
