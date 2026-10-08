@@ -394,26 +394,4 @@ export class LlmGatewayService {
     await this.costTracker.endSession(interviewId);
   }
 
-  /**
-   * 启动时 health check：每个 provider 试一次，永久错立即 disable
-   * 非阻塞：失败也不影响模块启动
-   */
-  async healthCheckProviders(): Promise<void> {
-    for (const [name, provider] of this.providers) {
-      try {
-        await provider.chat({
-          messages: [{ role: 'user', content: 'ping' }],
-          maxTokens: 1,
-          temperature: 0,
-        });
-        this.logger.log(`[${name}] health check OK`);
-      } catch (err: any) {
-        if (this.isPermanentProviderError(err)) {
-          this.disableProvider(name, `health check failed: ${err?.message}`);
-        } else {
-          this.logger.warn(`[${name}] health check transient: ${err?.message}`);
-        }
-      }
-    }
-  }
 }

@@ -1,6 +1,10 @@
 # 当前状态
 
-更新：2026-10-08 · REAL-PROVIDER-SMOKE-1
+更新：2026-10-08 · PROVIDER-HEALTH-PROBE-METERING-1
+
+## Provider 启动计量边界（2026-10-08）
+
+移除 API 启动时直接调用 Qwen/DeepSeek `chat()` 的健康探针，避免绕过统一 Gateway、额度与 Usage Ledger 的隐式模型请求。基础 `/api/health/ready` 仍验证 PostgreSQL、Redis 与 migration；业务 Provider 请求仍由 Gateway 先做额度预留。回归 16/16，API lint/typecheck/build 与 Docker 镜像构建通过；修复镜像启动无 Provider 探针，API readiness、Interview、Lab 均 HTTP 200。为本机 readiness 部署了现有加性 migration `20261008010000_evaluation_cancellation`，17/17 migrations 已应用。未做新的模型推理、真实质量评估或账单对账，详见 [修复报告](../ACCEPTANCE-REPORT-2026-10-08-PROVIDER-HEALTH-METERING.md)。
 
 ## 真实 API 冒烟（2026-10-08）
 

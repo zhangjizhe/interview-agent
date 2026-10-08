@@ -4,7 +4,9 @@
 
 ## 当前结论
 
-`REAL-PROVIDER-SMOKE-1` 已完成：恢复本机 Postgres/Redis/Qdrant/Milvus 后，API readiness、Web、Lab 返回 HTTP 200；API 启动探针真实调用 Qwen、DeepSeek 均成功。该探针直接调用 Provider，绕过 Gateway Usage Ledger，实际 token/费用未知，不是零成本或账单对账证据。详细结果见 `docs/ACCEPTANCE-REPORT-2026-10-08-REAL-PROVIDER-SMOKE.md`。后续真实推理/评测前先核对额度与中断账单并确认费用上限。`PROVIDER-HEALTH-PROBE-METERING-1` 记录探针计量缺口。
+`PROVIDER-HEALTH-PROBE-METERING-1` 已完成：移除 `LlmHealthBootstrap` 和绕过 Gateway 的 `healthCheckProviders()`；业务模型调用继续由 quota reservation 保护。网关回归 16/16，API lint/typecheck/build、Docker build 通过。当前容器健康，API readiness 与 Interview/Lab HTTP 200；启动日志无 Provider probe。部署了既有加性 `20261008010000_evaluation_cancellation` migration，17/17 成功。未新增模型推理、费用或质量评测。报告：`docs/ACCEPTANCE-REPORT-2026-10-08-PROVIDER-HEALTH-METERING.md`。
+
+`REAL-PROVIDER-SMOKE-1` 已完成：恢复本机 Postgres/Redis/Qdrant/Milvus 后，API readiness、Web、Lab 返回 HTTP 200；API 启动探针曾真实调用 Qwen、DeepSeek。该历史探针直接调用 Provider，绕过 Gateway Usage Ledger，实际 token/费用未知，不是零成本或账单对账证据。该探针已由 `PROVIDER-HEALTH-PROBE-METERING-1` 移除。详细结果见 `docs/ACCEPTANCE-REPORT-2026-10-08-REAL-PROVIDER-SMOKE.md`。后续真实推理/评测前先核对额度与中断账单并确认费用上限。
 
 DELIVERY-CLOSEOUT-1 已完成。PR #4 于 2026-10-08 合入 `main`，merge commit `8b2e94c5b8c831fc027024d43f03cff478e5b5a0`；Product verification #37 全绿，`agent-lab` 已快进同步 main。当前本机 API Jest 663 / Cache 22 / 双端 99 / 专用 PostgreSQL 18、lint/type/build 通过；隔离 API smoke 28/28，Milvus+etcd/Qdrant 恢复读回通过。唯一官方 high 是 braces advisory，补丁缓解不等于上游修复或第三方审计。真实 Benchmark、费用和生产环境验收仍未完成，不能将代码合并理解为候选发布。
 
@@ -28,7 +30,7 @@ DELIVERY-CLOSEOUT-1 已完成。PR #4 于 2026-10-08 合入 `main`，merge commi
 
 - 正式 Agent 1.0.0，候选 1.0.1 DRAFT；v4 REJECT/RG-021。旧 36+36 缓存证据无效。
 - 隔离基线 FAILED，13/36 成功样本、小计 ¥0.069285，中断调用费用未知。先核验额度和费用，再确定新预算，不重置账本或盲目重跑。
-- 本轮无新付费业务 Benchmark；API 启动健康探测可能产生 Provider 调用。
+- Provider 启动聊天探针已移除；当前 API 启动不调用模型。此前真实冒烟触发探针的实际 usage/费用仍未知。
 - 录制 fixture 的 APPROVE 不发布 Agent。30 Case Golden Dataset 与 12 Case 发布集均为合成数据，不代表生产效果。
 - `.local-backups/release-20261008/` 为私有备份，Git 忽略，不提交。隔离恢复匹配 schema 和全表行数；不证明向量库/异地灾备。
 - 旧失败成本报告及历史截图的原有未提交编辑保留，不纳入本轮主题提交。六份旧上下文连同本地补充已[归档](archive/release-readiness-2026-10-08/THREAD_HANDOFF.md)，当前文件不再累积历史流水。
