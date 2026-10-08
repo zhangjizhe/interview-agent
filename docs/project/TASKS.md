@@ -4,6 +4,8 @@
 
 | 优先级 | 任务 | 状态与验收条件 |
 | --- | --- | --- |
+| 完成 | LAB-FIRST-ADMIN-1 | 修复跨组织 Golden Dataset 初始化 404；PG 19/19、服务 15/15、认证 10/10、实际镜像 36/36/恢复演练通过，迁移部署及用户浏览器控制中心确认 |
+| P2 | LAB-BROWSER-COVERAGE-1 | 在独立浏览器 CI 加入新组织注册/授权首次控制台和 API 重建 DNS 恢复；当前真实 PG/镜像 HTTP 已覆盖跨组织初始化 |
 | 完成 | ADMIN-ACCESS-SOP-1 | 所有者授权/撤权/吊销与验证 SOP，代码核对和脚本语法检查通过；完整操作演练未执行 |
 | P2 | ADMIN-ACCESS-AUDIT-1 | 后续独立设计权限变更持久审计与受控管理入口；现阶段私有运维记录，不能声称已有审计能力 |
 | 完成 | LAB-AUTH-PROXY-1 | 修复 nginx 缓存 API 旧地址导致登录 502；动态 Docker DNS，build/lint/nginx 验证通过，Lab readiness 200、登录空请求结构化 400；用户账号重试待确认 |

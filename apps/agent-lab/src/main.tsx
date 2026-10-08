@@ -256,7 +256,7 @@ function ControlCenter() {
     const error = (servers.error || lab.error || recordedImports.error) as Error;
     return <main className="agent-gate"><ShieldAlert size={26}/><h1>无法读取控制面</h1><p>{error.message}</p><button className="agent-command" onClick={() => {
       localStorage.removeItem('ia_access_token'); localStorage.removeItem('ia_user_role'); localStorage.removeItem('ia_userId'); window.location.reload();
-    }}>重新登录控制台</button></main>;
+    }}>重新登录控制台</button><button className="agent-command" onClick={() => { void servers.refetch(); void lab.refetch(); void recordedImports.refetch(); }}>重试连接</button></main>;
   }
 
   const data = servers.data as { servers: Server[]; runningCount: number; count: number };

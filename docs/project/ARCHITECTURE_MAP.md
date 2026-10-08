@@ -23,3 +23,5 @@
 发布 Dataset 冻结与审查后进行有界重复评测；同集统计/切片/资源/费率/缓存隔离证据齐备才可人工发布。录制 Harness 的人工决定与真实 Agent 发布分离。无 OS 沙箱、远程 worker 或自动付费重试；py-api 实验实现不作产品路径依据。
 
 安全迁移保持 Node 20/React 18，braces 补丁覆盖字符串与 AST；CI 保留上游 high 并验证固定补丁。ContextManager 缓存以完整内容/role/tier SHA-256 区分决策，容量 1000、命中刷新 LRU。全部旧 Jest 排除已解除；真实模型与生产验收另核验。
+
+Lab Golden Dataset 版本按 organizationId/version 唯一，可信租户上下文 upsert；不同组织有独立同版本记录，旧 ID/关系保留。首次新组织 dashboard 已纳入实际镜像 HTTP 与专用 PG 回归。

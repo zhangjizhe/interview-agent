@@ -5,6 +5,7 @@ import { join } from 'path';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { loadGoldenDataset } from '../../evals/golden-dataset.schema';
 import { ConfigService } from '@nestjs/config';
+import { requireTenant } from '../organizations/tenant-context';
 
 const RELEASE_THRESHOLDS = {
   qualityScore: 0.7,
@@ -651,7 +652,7 @@ export class AgentLabService {
     const sourceHash = createHash('sha256').update(source).digest('hex');
     const responseCount = parsed.cases.reduce((total, item) => total + item.responses.length, 0);
     return this.prisma.labDataset.upsert({
-      where: { version: parsed.version },
+      where: { organizationId_version: { organizationId: requireTenant().organizationId, version: parsed.version } },
       create: {
         version: parsed.version,
         name: 'Golden Dataset',

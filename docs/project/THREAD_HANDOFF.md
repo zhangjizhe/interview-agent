@@ -2,6 +2,10 @@
 
 更新：2026-10-08 · DELIVERY-CLOSEOUT-1
 
+## 新组织管理员控制面修复（2026-10-08）
+
+LAB-FIRST-ADMIN-1：LabDataset 全局版本唯一与组织隔离冲突，dashboard 404 被误导为重新登录。改为组织/版本复合唯一和按组织 upsert，新增重试连接。真实 PG 19/19、Lab 服务 15/15、认证 10/10、相关 lint/type/build 和实际镜像 36/36 通过；隔离恢复演练通过。备份后部署新迁移 18/18，本机 Lab readiness 200，用户浏览器实际显示控制中心及 VALID 数据集。旧测试固定管理员、mock 初始化和未访问 dashboard 导致漏测，见 `docs/ACCEPTANCE-REPORT-2026-10-08-LAB-FIRST-ADMIN.md`。没有改权限/组织归属或调用模型；本次不是所有业务功能的完整验收。
+
 ## 权限管理 SOP（2026-10-08）
 
 ADMIN-ACCESS-SOP-1：新增 `docs/ADMIN-ACCESS-SOP.md`，明确部署所有者控制、ADMIN 与私有名单区别、确认式单账号角色操作、旧会话吊销、验证与回滚。已核对现有鉴权代码及脚本语法；未新增权限变更或完整生产演练。当前缺少持久授权审计和管理员授权页面，作为后续主题保留。

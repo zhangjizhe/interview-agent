@@ -106,7 +106,7 @@ model LabDataset {
   @@index([organizationId])
   @@unique([id, organizationId])
   id             String          @id @default(cuid())
-  version        String          @unique
+  version        String
   name           String
   sourceHash     String
   caseCount      Int
@@ -117,6 +117,7 @@ model LabDataset {
   experiments    LabExperiment[]
   releaseDecisions LabReleaseDecision[]
 
+  @@unique([organizationId, version])
   @@index([validationStatus, createdAt])
   @@map("lab_datasets")
 }

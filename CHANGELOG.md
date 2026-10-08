@@ -21,6 +21,8 @@
 
 ### Fixed
 
+- Lab Golden Dataset 版本改为组织内唯一，修复新组织管理员首次登录后 dashboard 404；增加真实数据库及镜像 HTTP 回归、控制台重试连接。
+
 - Lab API 代理动态解析 Docker DNS，修复 API 容器重建后登录/注册返回 502。
 
 - 两端退出执行服务端会话吊销；修复训练证据遗漏 skillId、并发重复完成及复测关联。

@@ -38,6 +38,25 @@ const foreignRead = await request(`/interview/target-jobs/${created.data.id}/rea
 check('foreign target job access denied', [403, 404].includes(foreignRead.status));
 check('USER question governance denied', (await request('/interview/question-bank/list', { token: owner })).status === 403);
 check('ADMIN Lab registry access', (await request('/agent-lab/agents', { token: admin })).status === 200);
+check('first ADMIN dashboard initializes dataset', (await request('/agent-lab/dashboard', { token: admin })).status === 200);
+check('USER dashboard denied', (await request('/agent-lab/dashboard', { token: foreign })).status === 403);
+const fixtureRequire = createRequire(`${process.cwd()}/package.json`);
+const { PrismaClient } = fixtureRequire('@prisma/client');
+const fixturePrisma = new PrismaClient();
+try {
+  await fixturePrisma.user.update({ where: { id: 'fixture-ci-foreign' }, data: { role: 'ADMIN' } });
+  const promoted = await request('/auth/login', { method: 'POST', body: { userId: 'fixture-ci-foreign', password: 'isolated-fixture-password' } });
+  check('promoted USER re-login issues ADMIN session', promoted.status === 200 && promoted.data.role === 'ADMIN');
+  const dashboards = await Promise.all(Array.from({ length: 2 }, () => request('/agent-lab/dashboard', { token: promoted.data.accessToken })));
+  const original = await request('/agent-lab/dashboard', { token: admin });
+  check('second organization concurrent first dashboard succeeds', dashboards.every(r => r.status === 200));
+  check('dataset same version is isolated by organization', dashboards[0].data.dataset.version === original.data.dataset.version && dashboards[0].data.dataset.id !== original.data.dataset.id && dashboards[0].data.dataset.id === dashboards[1].data.dataset.id);
+  for (const path of ['/admin/mcp-servers', '/agent-lab/recorded-imports']) {
+    check(`promoted ADMIN initial control plane ${path}`, (await request(path, { token: promoted.data.accessToken })).status === 200);
+  }
+  await fixturePrisma.user.update({ where: { id: 'fixture-ci-foreign' }, data: { role: 'USER' } });
+  check('revoked ADMIN existing session denied', (await request('/agent-lab/dashboard', { token: promoted.data.accessToken })).status === 403);
+} finally { await fixturePrisma.$disconnect(); }
 check('evaluation request contract rejected before model work', (await request('/agent-lab/agents/fixture/evaluations', { method: 'POST', token: admin, body: {} })).status === 400);
 check('empty question batch rejected before embedding', (await request('/interview/question-bank/batch', { method: 'POST', token: admin, body: { questions: [] } })).status === 400);
 check('unbounded question query rejected before vector work', (await request('/interview/question-bank/list?limit=100000', { token: admin })).status === 400);
