@@ -1,5 +1,9 @@
 # 任务交接
 
+## 2026-10-08 · INTERVIEW-CACHE-CONTEXT-1 交接
+
+用户批准优化，当前阶段只改产品答案缓存；完整请求 SHA-256、认证组织/用户/面试、主路由与套餐限制已进入 Redis v2，旧数据/工具/截断/fallback 不复用。API 600（14 dedicated DB skipped）、Cache 22、Web 83、lint/typecheck/build 和真实 Redis 合成并发/TTL/流式核验通过；不新增业务 Provider 样本，Lab 仍 bypass，无候选发布。真实 canary 和质量对比仍需先核对额度及未知中断费用并确认新预算。原有题库/认证/UI/报告/上下文编辑保留且不混入本次提交。下一阶段从 COMPLETE_DELIVERY_PLAN 与 TASKS 选一个主题，当前工程阶段收尾后等待用户继续。
+
 ## 2026-10-08 · DELIVERY-UI-REFRESH-1 交接
 
 用户要求完整项目与新设计风格。本阶段采用浅色专业工作台，两端样式、Interview 登录/导航、Lab 手机溢出及退出入口已验证；Web 83、lint/typecheck/build、最终 Docker 和 30/30 布局检查通过，真实 v4 REJECT/发布禁用仍成立。下一阶段按照 COMPLETE_DELIVERY_PLAN 完成普通 Interview 缓存隔离；受额度阻塞的真实对比另核验预算，不能自动发布。保留原有题库/认证/UI/旧报告编辑，后续独立整合；本机镜像含这些既有编辑，不能当成干净生产发布。

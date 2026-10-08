@@ -9,6 +9,7 @@ import { LangfuseService } from '../../infra/langfuse/langfuse.service';
 import { ChatParams, ChatResponse, LLMProviderName, StreamChunk } from './providers/types';
 import { PromptCacheInterceptor } from './cache/prompt-cache.interceptor';
 import { SemanticCacheService, SemanticCacheType } from './cache/semantic-cache.service';
+import { answerCacheFingerprint } from './cache/answer-cache.fingerprint';
 import { SessionCostTracker } from './cost/session-cost.tracker';
 
 /**
@@ -22,7 +23,7 @@ import { SessionCostTracker } from './cost/session-cost.tracker';
  *
  * P0 新增：
  *  5. Prompt Cache（自动识别 3 段前缀，注入 prompt_cache_key）
- *  6. Semantic Cache（白名单场景：interview_question 命中直接返回）
+ *  6. Answer Cache（白名单文本场景：完整请求精确匹配，v2）
  *  7. 会话级成本埋点
  *
  * Bug 修复：Provider 永久错（401/403/404）检测
@@ -154,15 +155,11 @@ export class LlmGatewayService {
     const scope = requireTenant();
     const userId = `${scope.organizationId}:${scope.userId || params.userId || 'anonymous'}`;
     const cacheType = params.semanticCacheType;
+    const primary = this.selectProvider(params, preferred);
+    const cache = cacheType ? await this.answerCacheContext(params, primary, 'chat') : undefined;
 
-    if (cacheType) {
-      const lastUserMsg = [...params.messages].reverse().find((m) => m.role === 'user');
-      const queryText = lastUserMsg?.content || '';
-      const sem = await this.semanticCache.lookup({
-        userId,
-        cacheType,
-        query: queryText,
-      });
+    if (cache) {
+      const sem = await this.semanticCache.lookup({ cacheType, fingerprint: cache.fingerprint });
       if (sem.hit) {
         // 命中：直接构造响应（埋点 cacheHit）
         await this.recordCacheHit({
@@ -187,15 +184,15 @@ export class LlmGatewayService {
       }
     }
 
-    const primary = this.selectProvider(params, preferred);
     const startTime = Date.now();
     let response: ChatResponse;
     let isFallback = false;
+    let preparedMaxTokens: number;
 
     const invoke = async (provider: BaseLLMProvider, fallback: boolean) => {
       try {
         return await this.promptCache.wrapChat(
-          (prepared) => this.quotaChat(provider, prepared),
+          (prepared) => this.quotaChat(provider, prepared, p => { preparedMaxTokens = p.maxTokens; }),
           { ...params, interviewId, userId, isFallback: fallback },
           { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: provider.name, model: provider.defaultModel },
         );
@@ -238,16 +235,11 @@ export class LlmGatewayService {
       }
     }
 
-    // ===== P0-2: 异步写语义缓存 =====
-    if (cacheType && response.content) {
-      const lastUserMsg = [...params.messages].reverse().find((m) => m.role === 'user');
-      this.semanticCache.setAsync({
-        userId,
-        cacheType,
-        query: lastUserMsg?.content || '',
-        response: response.content,
-        metadata: { interviewId, model: response.model },
-      });
+    // Only complete primary text answers can be replayed. A plan change during
+    // reservation or a fallback must not populate the original request key.
+    if (cache && !isFallback && response.finishReason === 'stop' && response.content &&
+        preparedMaxTokens === cache.maxTokens) {
+      this.semanticCache.setAsync({ cacheType, fingerprint: cache.fingerprint, response: response.content });
     }
 
     return response;
@@ -268,16 +260,12 @@ export class LlmGatewayService {
     const scope = requireTenant();
     const userId = `${scope.organizationId}:${scope.userId || params.userId || 'anonymous'}`;
     const cacheType = params.semanticCacheType;
+    const primary = this.selectProvider(params, preferred);
+    const cache = cacheType ? await this.answerCacheContext(params, primary, 'stream') : undefined;
 
-    // 语义缓存查（流式命中直接 yield 整段）
-    if (cacheType) {
-      const lastUserMsg = [...params.messages].reverse().find((m) => m.role === 'user');
-      const queryText = lastUserMsg?.content || '';
-      const sem = await this.semanticCache.lookup({
-        userId,
-        cacheType,
-        query: queryText,
-      });
+    // Exact, complete request cache. Streaming has its own fingerprint.
+    if (cache) {
+      const sem = await this.semanticCache.lookup({ cacheType, fingerprint: cache.fingerprint });
       if (sem.hit) {
         await this.recordCacheHit({
           interviewId,
@@ -292,23 +280,28 @@ export class LlmGatewayService {
           durationMs: 0,
         });
         yield { content: sem.cachedResponse };
+        yield { usage: { promptTokens: 0, completionTokens: 0 }, provider: 'semantic_cache', model: `semantic_cache:${sem.cacheId}` };
         yield { finishReason: 'stop' };
         return;
       }
     }
 
-    const primary = this.selectProvider(params, preferred);
     let totalContent = '';
     let actualProvider = primary;
     let hasEmitted = false;
+    let finishReason: StreamChunk['finishReason'];
+    let hasToolCall = false;
+    let preparedMaxTokens: number;
 
     try {
       for await (const chunk of this.promptCache.wrapStream(
-        (prepared) => this.quotaStream(primary, prepared),
+        (prepared) => this.quotaStream(primary, prepared, p => { preparedMaxTokens = p.maxTokens; }),
         { ...params, interviewId, userId },
         { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: primary.name, model: primary.defaultModel },
       )) {
         if (chunk.content) totalContent += chunk.content;
+        if (chunk.finishReason) finishReason = chunk.finishReason;
+        if (chunk.toolCall) hasToolCall = true;
         if (chunk.content || chunk.toolCall || (chunk.finishReason && chunk.finishReason !== 'error')) hasEmitted = true;
         yield chunk;
       }
@@ -347,26 +340,37 @@ export class LlmGatewayService {
       }
     }
 
-    // 异步写语义缓存
-    if (cacheType && totalContent) {
-      const lastUserMsg = [...params.messages].reverse().find((m) => m.role === 'user');
-      this.semanticCache.setAsync({
-        userId,
-        cacheType,
-        query: lastUserMsg?.content || '',
-        response: totalContent,
-        metadata: { interviewId, model: actualProvider.name },
-      });
+    if (cache && actualProvider === primary && finishReason === 'stop' && !hasToolCall &&
+        totalContent && preparedMaxTokens === cache.maxTokens) {
+      this.semanticCache.setAsync({ cacheType, fingerprint: cache.fingerprint, response: totalContent });
     }
   }
 
-  private async quotaChat(provider: BaseLLMProvider, params: ChatParams) {
+  private async answerCacheContext(
+    params: ChatParams & { interviewId?: string }, provider: BaseLLMProvider, mode: 'chat' | 'stream',
+  ): Promise<{ fingerprint: string; maxTokens: number } | undefined> {
+    const scope = requireTenant();
+    // Never accept a caller-supplied identity as the cache security boundary.
+    if (!scope.userId || scope.quotaFailure || params.tools?.length) return;
+    try {
+      const limits = await this.quota.getAnswerCacheLimits();
+      const fingerprint = answerCacheFingerprint(params,
+        { organizationId: scope.organizationId, userId: scope.userId }, provider, limits, mode);
+      if (fingerprint) return { fingerprint, maxTokens: Math.min(params.maxTokens ?? limits.maxOutputTokens, limits.maxOutputTokens) };
+    } catch {
+      this.logger.debug({ event: 'answer_cache_policy_unavailable' });
+    }
+  }
+
+  private async quotaChat(provider: BaseLLMProvider, params: ChatParams, onPrepared?: (p: ChatParams) => void) {
     const prepared = await this.quota.reserveLlm(params);
+    onPrepared?.(prepared);
     return provider.chat(prepared);
   }
 
-  private async *quotaStream(provider: BaseLLMProvider, params: ChatParams): AsyncGenerator<StreamChunk, void, void> {
+  private async *quotaStream(provider: BaseLLMProvider, params: ChatParams, onPrepared?: (p: ChatParams) => void): AsyncGenerator<StreamChunk, void, void> {
     const prepared = await this.quota.reserveLlm(params);
+    onPrepared?.(prepared);
     yield* provider.streamChat(prepared);
   }
 

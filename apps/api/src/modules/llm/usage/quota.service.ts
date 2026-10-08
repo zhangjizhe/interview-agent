@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { requireTenant } from '../../organizations/tenant-context';
 import type { ChatParams } from '../providers/types';
+import type { AnswerCacheLimits } from '../cache/answer-cache.fingerprint';
 
 export class QuotaExceededException extends HttpException {
   constructor() { super({ code: 'QUOTA_EXCEEDED', message: '本月额度已用完，请联系管理员或下月重试。' }, 429); }
@@ -69,6 +70,20 @@ export class QuotaService {
       if (!Number.isInteger(requested) || requested < 1) throw new BadRequestException('maxTokens must be a positive integer');
       return { result: { ...params, maxTokens: Math.min(requested, plan.maxOutputTokens) } };
     });
+  }
+
+  /** Read current constraints without consuming a model call. Cache misses still
+   * go through the atomic reservation and input validation above. */
+  async getAnswerCacheLimits(): Promise<AnswerCacheLimits> {
+    const scope = requireTenant();
+    if (!scope.userId || scope.quotaFailure) throw new ServiceUnavailableException('Cache policy unavailable');
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: scope.organizationId },
+      select: { plan: { select: { id: true, maxInputBytes: true, maxOutputTokens: true, monthlyLlmCalls: true } } },
+    });
+    if (!organization?.plan) throw new ServiceUnavailableException('Cache policy unavailable');
+    const { id: planId, ...limits } = organization.plan;
+    return { planId, ...limits };
   }
 
   async createInterview(data: Prisma.InterviewUncheckedCreateInput) {

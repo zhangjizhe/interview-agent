@@ -44,4 +44,22 @@ describe('组织月度配额', () => {
     const service = new QuotaService({ $transaction: async () => { throw new Error('unavailable'); } } as any, {} as any);
     await expect(scope(() => service.reserveLlm({ messages: [] }))).rejects.toMatchObject({ status: 503 });
   });
+  it('读取当前缓存约束不产生额度账本，套餐更新立即可见', async () => {
+    const plan = { id: 'plan-a', maxInputBytes: 100, maxOutputTokens: 20, monthlyLlmCalls: 10 };
+    const prisma: any = { organization: { findUnique: jest.fn(async () => ({ plan: { ...plan } })) }, $transaction: jest.fn() };
+    const service = new QuotaService(prisma, {} as any);
+    expect(await scope(() => service.getAnswerCacheLimits())).toEqual({ planId: 'plan-a', maxInputBytes: 100, maxOutputTokens: 20, monthlyLlmCalls: 10 });
+    plan.maxOutputTokens = 10;
+    expect((await scope(() => service.getAnswerCacheLimits())).maxOutputTokens).toBe(10);
+    expect(prisma.organization.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'org-a' } }));
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+  it('缓存约束读取要求有效身份和组织，已有额度失败不能复用答案', async () => {
+    const prisma: any = { organization: { findUnique: jest.fn().mockResolvedValue(null) } };
+    const service = new QuotaService(prisma, {} as any);
+    await expect(scope(() => service.getAnswerCacheLimits())).rejects.toMatchObject({ status: 503 });
+    prisma.organization.findUnique.mockClear();
+    await expect(tenantContext.run({ organizationId: 'org-a', quotaFailure: { code: 'QUOTA_EXCEEDED', status: 429, message: 'exceeded' } }, () => service.getAnswerCacheLimits())).rejects.toMatchObject({ status: 503 });
+    expect(prisma.organization.findUnique).not.toHaveBeenCalled();
+  });
 });

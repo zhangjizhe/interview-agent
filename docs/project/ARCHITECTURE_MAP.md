@@ -1,5 +1,9 @@
 # 架构地图
 
+## 2026-10-08 · 产品答案缓存 v2
+
+普通 Gateway 在确定主路由后读取当前套餐限制，用完整请求、认证组织/用户/面试、模型与生成参数构造 SHA-256 指纹。兼容 SemanticCacheService 名称，内部改为 Redis 精确文本缓存（一小时 TTL）；不再写入或查询答案 Qdrant 集合。工具/截断/fallback 不缓存，miss 保留原子额度预留，Lab bypass 合同不变。无新增表/路由/依赖，详见 ADR 17。
+
 ## 2026-10-08 · 双端视觉层
 
 Interview 使用现有 Tailwind 主题、index.css 与 AppShell；Agent Lab 在既有样式之后导入 visual-theme.css，复用现有组件及请求合同。两端不增加 UI 框架、运行依赖、API、数据库表或模型调用。

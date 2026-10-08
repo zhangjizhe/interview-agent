@@ -1,5 +1,9 @@
 # 任务列表
 
+## 2026-10-08 · INTERVIEW-CACHE-CONTEXT-1 工程优化
+
+完成产品答案缓存完整请求/模型/套餐隔离，真实 Redis 合成并发和 TTL 验收通过；API 600、Cache 22、Web 83 与 lint/typecheck/build 通过。付费产品 canary 仍待额度/中断费用核验，不能标为真实质量验收。后续独立任务：评测异步 Job 与重复提交保护、Lab 拒绝原因/进度与过期 comparison 清除、完整训练闭环、干净生产检出与原有编辑整合、旧答案 Qdrant 数据保留/清理和旧 bench-cache-50 脚本改用新合同；不扩大本次修改。
+
 ## 2026-10-08 · DELIVERY-UI-REFRESH-1 完成
 
 双端设计改造通过工程和本机浏览器验收；既有本地编辑保留，未混入主题提交。完整交付顺序见 docs/product/COMPLETE_DELIVERY_PLAN.md；下一阶段是普通 Interview 缓存完整上下文/策略/模型隔离。LAB-CURATED-BENCHMARK-6 的额度/未知成本核验仍受阻，不重复付费重跑。

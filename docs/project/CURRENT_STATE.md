@@ -1,5 +1,9 @@
 # 当前状态
 
+## 2026-10-08 · Interview 完整请求答案缓存
+
+产品答案缓存升级为 SHA-256 完整请求精确匹配，纳入认证组织/用户、面试、系统/历史、主路由模型和套餐限制；工具、截断、fallback 与旧数据不复用。真实 Redis 合成隔离/并发/TTL/流式核验通过；API 600 tests（14 dedicated DB skipped）、Cache 22、Web 83、lint/typecheck/build 通过。Lab 评测继续 bypass；无新的业务模型评测，正式真实质量与生产验收仍未完成。报告见 docs/ACCEPTANCE-REPORT-2026-10-08-ANSWER-CACHE.md。
+
 ## 2026-10-08 · 双端浅色工作台验收
 
 Interview 与 Lab 已更换为暖灰/白色/靛蓝设计；候选人登录与工作台导航、Lab 表单/状态/手机退出改造完成。修复手机导航及控制中心网格溢出；Web 83 tests、lint/typecheck/build、两端 Docker build 和 30/30 布局检查通过。完整项目仍有普通 Interview 缓存隔离、可信评测及生产验收待办；没有新增付费调用或发布候选。
