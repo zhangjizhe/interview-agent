@@ -70,7 +70,7 @@
         "patched_versions": "<0.0.0"
       }
     ],
-    "source": "last successful GitHub Actions audit for f1c0cba; final head pending; local registry DNS unavailable during this verification"
+    "source": "Product verification #37 for commit 566e116; audit job passed"
   },
   "file_sha256": {
     "pnpm-lock.yaml": "9ca5c5facd0a765dded2ead6e219d149b0ff3597e67f235e9fcf8c075341c111",
@@ -88,5 +88,5 @@
     "recommendation": "REJECT",
     "new_paid_business_benchmark": false
   },
-  "merge_main": "user authorized merge; pending latest PR Actions checks"
+  "merge_main": "merged via PR #4 at 8b2e94c5b8c831fc027024d43f03cff478e5b5a0; agent-lab fast-forwarded to merge commit"
 }

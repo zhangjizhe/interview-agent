@@ -4,7 +4,7 @@
 
 | 优先级 | 任务 | 状态与验收条件 |
 | --- | --- | --- |
-| 当前 | DELIVERY-CLOSEOUT-1 | 用户要求今天合并；本地 lint/type/build、全量测试、数据库迁移/恢复、Milvus 写入与 Milvus+etcd/Qdrant 恢复通过；提交推送后等最新 CI，再合并并同步 `agent-lab` |
+| 完成 | DELIVERY-CLOSEOUT-1 | PR #4 已于 2026-10-08 合入 main（8b2e94c）；Product verification #37 全绿；agent-lab 已同步主线。真实质量、费用和生产结果边界据实记录 |
 | P0 | DEPENDENCY-SECURITY-1 | NestJS/Router/uuid 主版本迁移及 braces 完整输入补丁本地验收通过；API 663 / Cache 22 / 双端 99，audit moderate 0、上游 high 1 有回归缓解；无第三方审计或零漏洞声明 |
 | P0 | LAB-CURATED-BENCHMARK-6 | 额度失败与中断费用阻塞。核对额度/费用和新有界预算后才能续跑；同集真实隔离评测与人工审查后决定候选发布 |
 | P0 | PRODUCTION-ACCEPTANCE-1 | TLS、凭据/端口/网络隔离、备份与向量恢复、容量、监控和故障演练；工程 CI 不替代生产验收 |

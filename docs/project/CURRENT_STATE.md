@@ -32,7 +32,7 @@ NestJS 11.2.7 / Config 4.0.4、Router 7.18.4 和 mem0ai 定向 uuid 11.1.1 已�
 
 所有开发保留在 agent-lab。用户已要求完成后合并 main；待剩余工程主题和最新 CI 核验后合并。源码合并不能替代真实质量、账单或生产部署验收。
 
-此前工程候选已提交推送 247521d；后续安全、训练、题库和评测控制主题也已推送到 `origin/agent-lab`。[PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 目标是合并到 `main`。f1c0cba 的 PostgreSQL socket 探活竞态已改为 TCP readiness；dbff783 的恢复演练又发现 Milvus healthz 早于 QueryNode 可读，已增加有界实际查询重试并在本机完整通过。新提交的 PR Actions 全绿后立即按用户要求合并。安全 high 风险按报告披露，不伪称审计通过或生产发布。
+PR #4 已于 2026-10-08 合入 `main`，merge commit `8b2e94c5b8c831fc027024d43f03cff478e5b5a0`；本地 `agent-lab` 已快进同步该提交。Product verification #37 全绿。f1c0cba 的 PostgreSQL socket 探活竞态已改为 TCP readiness；dbff783 的恢复演练发现 Milvus healthz 早于 QueryNode 可读，566e116 加入有界实际查询重试后，远端完整验收通过。安全 high 风险按报告披露，不伪称审计通过或生产发布。
 
 ## 入口
 

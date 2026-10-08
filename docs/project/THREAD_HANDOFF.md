@@ -4,11 +4,11 @@
 
 ## 当前结论
 
-安全迁移与 braces AST 防护已完成，见 ADR 20。当前本机 API Jest 663 / Cache 22 / 双端 99 / 专用 PostgreSQL 18、lint/type/build 通过；隔离 API smoke 28/28，真实 Milvus 写入、准确主键补偿、PostgreSQL 完整转储比较及 Milvus+etcd/Qdrant 恢复读回通过。官方审计仍显示唯一无上游修复的 braces high；CI 固定补丁 SHA 并运行回归，不隐藏 advisory。剩余门槛是推送最终收尾提交并确认最新 PR Actions，再按用户授权合并 main。额度只读核验为 100/100；真实付费 Benchmark 不重置账本或冒用历史费用。生产环境仍未真实验收。
+DELIVERY-CLOSEOUT-1 已完成。PR #4 于 2026-10-08 合入 `main`，merge commit `8b2e94c5b8c831fc027024d43f03cff478e5b5a0`；Product verification #37 全绿，`agent-lab` 已快进同步 main。当前本机 API Jest 663 / Cache 22 / 双端 99 / 专用 PostgreSQL 18、lint/type/build 通过；隔离 API smoke 28/28，Milvus+etcd/Qdrant 恢复读回通过。唯一官方 high 是 braces advisory，补丁缓解不等于上游修复或第三方审计。真实 Benchmark、费用和生产环境验收仍未完成，不能将代码合并理解为候选发布。
 
 截至 f1c0cba，安全、退出、题库输入、取消、历史测试、训练与缓存生命周期已按主题提交推送。[PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 已关联；默认 Jest 已移除全部历史路径排除。当前收尾包含专用 PostgreSQL 18 项及 Milvus/etcd/Qdrant 隔离恢复。
 
-本轮优化与本地全量验证通过，详见[交付报告](../DELIVERY-REPORT-2026-10-08.md)。8067764 为评测任务，d17afec 为认证与题库整合；安全/CI/文档提交随后收尾。所有修改继续在 agent-lab。PostgreSQL TCP readiness 修正后，dbff783 的完整 CI 揭示 Milvus 健康端点早于 QueryNode 可读；实际恢复查询加有界重试后，本地整套隔离验收通过，下一轮远端 Actions 需覆盖此修正。
+本轮优化与本地全量验证通过，详见[交付报告](../DELIVERY-REPORT-2026-10-08.md)。8067764 为评测任务，d17afec 为认证与题库整合；安全/CI/文档提交随后收尾。所有后续修改继续在 `agent-lab`。566e116 的 Product verification #37 已覆盖并全绿，实际恢复查询的有界重试解决 Milvus QueryNode readiness 竞态。
 
 本轮官方 audit 为 0 critical / 1 high / 0 moderate；唯一 braces advisory 无上游修复，固定 SHA 补丁及真实 SDK 回归已完成。无独立审计声明。推送本地收尾后，等待最新 CI 并执行用户授权的 main 合并；真实质量、账单与生产验收保留未完成边界。
 

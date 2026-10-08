@@ -12,7 +12,7 @@ DELIVERY-CLOSEOUT-1
 
 ## 状态
 
-进行中：安全迁移、会话吊销、题库输入、评测取消、历史测试与训练闭环已按主题提交推送。真实 Milvus 写入、准确主键补偿、PostgreSQL 完整转储恢复、Milvus+etcd/Qdrant 隔离恢复、API smoke 28/28 及本机全量工程检查已通过。下一步提交推送最终收尾并等最新远端 CI，绿灯后按用户明确指令合并 PR #4 到 main，再同步 agent-lab。生产目标及正规新增额度/有界预算未获有效证据；不虚构生产环境、不重置账本、不追加付费业务调用。
+已完成：安全迁移、会话吊销、题库输入、评测取消、历史测试、训练闭环和缓存生命周期均按主题验证、提交并推送。真实 Milvus 写入、准确主键补偿、PostgreSQL 完整转储恢复、Milvus+etcd/Qdrant 隔离恢复及 API smoke 28/28 通过；本机全量工程检查和 Product verification #37 全绿。PR #4 于 2026-10-08 合入 main，merge commit `8b2e94c`；本地 `agent-lab` 已快进同步主线。真实模型质量、生产目标和账单未被此次工程合并代替；未重置账本或追加付费业务调用。
 
 官方审计 0 critical / 1 high / 0 moderate；唯一 braces high 无上游修复，已用固定 SHA 补丁和实际 SDK 回归缓解。不是零漏洞或第三方审计。真实 Agent 1.0.0 保持发布；1.0.1 仍 DRAFT，发布门 REJECT。代码合并与候选发布分开验收。
 
