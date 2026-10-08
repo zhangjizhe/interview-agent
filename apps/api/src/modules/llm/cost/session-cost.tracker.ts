@@ -18,6 +18,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { RedisService } from '../../../infra/redis/redis.service';
+import { LlmPricingCatalogService } from './llm-pricing-catalog.service';
 
 const REDIS_KEY_PREFIX = 'session_cost:';
 const REDIS_FLUSH_EVERY = 5; // 每 5 次调用刷一次 DB（防抖）
@@ -42,7 +43,11 @@ export class SessionCostTracker implements OnModuleInit {
   /** 内存 buffer：interviewId → 未刷盘计数 */
   private buffer: Map<string, number> = new Map();
 
-  constructor(private prisma: PrismaService, private redis: RedisService) {}
+  constructor(
+    private prisma: PrismaService,
+    private redis: RedisService,
+    private pricingCatalog: LlmPricingCatalogService,
+  ) {}
 
   async onModuleInit() {
     // 启动时从 Redis 恢复 buffer（用于崩溃恢复）
@@ -80,6 +85,13 @@ export class SessionCostTracker implements OnModuleInit {
     }
     const key = this.redisKey(m.interviewId);
     const redis = this.redis.getClient();
+    const pricing = this.pricingCatalog.estimateCall({
+      provider: m.provider,
+      model: m.model,
+      promptTokens: m.promptTokens,
+      completionTokens: m.completionTokens,
+      cachedPromptTokens: m.cachedTokens,
+    });
 
     // Redis HINCRBY pipeline - 实时 counter
     const pipe = redis.pipeline();
@@ -104,6 +116,14 @@ export class SessionCostTracker implements OnModuleInit {
     if (m.isRetry) pipe.hincrby(key, 'retries', 1);
     if (m.isFallback) pipe.hincrby(key, 'fallbacks', 1);
     if (m.isError) pipe.hincrby(key, 'errors', 1);
+    pipe.hset(key, 'pricingCatalogVersion', this.pricingCatalog.version);
+    if (pricing.status === 'available') {
+      pipe.hsetnx(key, 'costStatus', 'available');
+      pipe.hincrbyfloat(key, 'estimatedCostCny', pricing.totalCny);
+    } else {
+      // 任一实际计费调用缺少费率时，整个会话成本都不能继续声明为可用。
+      pipe.hset(key, 'costStatus', 'unavailable');
+    }
     await pipe.exec();
 
     // buffer 累加，5 次刷一次 DB
@@ -139,19 +159,12 @@ export class SessionCostTracker implements OnModuleInit {
     const raw = await this.redis.getClient().hgetall(key);
     if (!raw || Object.keys(raw).length === 0) return;
 
-    // 计算 cost（按 provider 单价，可从 env 读）
-    const inputPrice = parseFloat(process.env.QWEN_INPUT_PRICE || '0.004'); // 元/1k tokens
-    const outputPrice = parseFloat(process.env.QWEN_OUTPUT_PRICE || '0.012');
-    const cacheDiscount = 0.4; // Qwen context cache 折扣
-
     const totalPrompt = Number(raw.totalPromptTokens || 0);
     const totalCompletion = Number(raw.totalCompletionTokens || 0);
     const cachedTokens = Number(raw.cachedTokens || 0);
-    const uncachedPrompt = totalPrompt - cachedTokens;
-    const cost =
-      (uncachedPrompt / 1000) * inputPrice +
-      (cachedTokens / 1000) * inputPrice * cacheDiscount +
-      (totalCompletion / 1000) * outputPrice;
+    const costStatus = raw.costStatus === 'available' ? 'available' : 'unavailable';
+    const pricingCatalogVersion = raw.pricingCatalogVersion || null;
+    const cost = costStatus === 'available' ? Number(raw.estimatedCostCny || 0) : 0;
 
     await this.prisma.sessionCost.upsert({
       where: { interviewId },
@@ -170,9 +183,8 @@ export class SessionCostTracker implements OnModuleInit {
         retries: Number(raw.retries || 0),
         fallbacks: Number(raw.fallbacks || 0),
         errors: Number(raw.errors || 0),
-        inputCostPer1k: inputPrice,
-        outputCostPer1k: outputPrice,
-        cacheDiscount,
+        costStatus,
+        pricingCatalogVersion,
         estimatedCostCny: cost,
       },
       update: {
@@ -189,6 +201,8 @@ export class SessionCostTracker implements OnModuleInit {
         retries: Number(raw.retries || 0),
         fallbacks: Number(raw.fallbacks || 0),
         errors: Number(raw.errors || 0),
+        costStatus,
+        pricingCatalogVersion,
         estimatedCostCny: cost,
       },
     }).then(() => {
@@ -220,7 +234,9 @@ export class SessionCostTracker implements OnModuleInit {
         cacheSavedTokens: 0,
         retryRate: 0,
         fallbackRate: 0,
-        estimatedCostCny: 0,
+        costStatus: 'unavailable',
+        pricingCatalogVersion: null,
+        estimatedCostCny: null,
         durationMs: 0,
       };
     }
@@ -245,7 +261,11 @@ export class SessionCostTracker implements OnModuleInit {
       retryRate: row.llmCalls > 0 ? +(row.retries / row.llmCalls).toFixed(4) : 0,
       fallbackRate: row.llmCalls > 0 ? +(row.fallbacks / row.llmCalls).toFixed(4) : 0,
       errors: row.errors,
-      estimatedCostCny: +row.estimatedCostCny.toFixed(4),
+      costStatus: row.costStatus,
+      pricingCatalogVersion: row.pricingCatalogVersion,
+      estimatedCostCny: row.costStatus === 'available'
+        ? +row.estimatedCostCny.toFixed(6)
+        : null,
       durationMs,
     };
   }

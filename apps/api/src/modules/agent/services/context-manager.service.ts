@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { ChatMessage } from '../../llm/providers/types';
 
 export type CompactionTier = 0 | 1 | 2 | 3;
@@ -28,7 +29,7 @@ export class ContextManager {
   private readonly TIER_SUMMARIZE = 0.95;
   private readonly PROTECT_WINDOW_TOKENS = 4000;
   private readonly MAX_CACHE_SIZE = 1000; // LRU 上限，防止内存泄漏
-  // 用内容前 100 字符的 hash 做 key，避免切片下标错位问题
+  // Bounded content-addressed decisions; read hits refresh LRU order.
   private decisionCache: Map<string, StubCacheEntry> = new Map();
 
   compact(messages: ChatMessage[], currentTokens: number, maxTokens: number): CompactionResult {
@@ -64,9 +65,9 @@ export class ContextManager {
     const out: ChatMessage[] = [];
     let stubCount = 0;
     for (const msg of compactable) {
-      const id = this.cacheKey(msg);
+      const id = this.cacheKey(msg, 1);
       const cached = this.decisionCache.get(id);
-      if (cached) { if (cached.isStub) stubCount++; out.push({ ...msg, content: cached.content }); continue; }
+      if (cached) { this.setCache(id, cached); if (cached.isStub) stubCount++; out.push({ ...msg, content: cached.content }); continue; }
       let content = msg.content;
       let isStub = false;
       if (msg.role === 'user') {
@@ -89,9 +90,9 @@ export class ContextManager {
     const out: ChatMessage[] = [];
     let stubCount = 0;
     for (const msg of compactable) {
-      const id = this.cacheKey(msg);
+      const id = this.cacheKey(msg, 2);
       const cached = this.decisionCache.get(id);
-      if (cached) { if (cached.isStub) stubCount++; out.push({ ...msg, content: cached.content }); continue; }
+      if (cached) { this.setCache(id, cached); if (cached.isStub) stubCount++; out.push({ ...msg, content: cached.content }); continue; }
       let content = msg.content;
       let isStub = false;
       if (msg.role === 'user') {
@@ -128,23 +129,9 @@ export class ContextManager {
     return messages.reduce((s, m) => s + this.est(m.content), 0);
   }
 
-  /**
-   * 用内容前 256 字符的 64-bit djb2 hash 作为缓存 key
-   *
-   * R-P2-12 修复：原 32-bit djb2（hash 范围 -2^31 ~ 2^31-1）碰撞率高，
-   * 生日攻击约 6.5 万条就有 50% 碰撞概率。改用双 32-bit 组合成 64-bit
-   * 碰撞概率降至 ~4 billion 条 50%，实际 demo 场景（< 10K 条消息）安全。
-   */
-  private cacheKey(msg: ChatMessage): string {
-    const anchor = msg.content.slice(0, 256);
-    let h1 = 5381;
-    let h2 = 52711;
-    for (let i = 0; i < anchor.length; i++) {
-      const c = anchor.charCodeAt(i);
-      h1 = ((h1 << 5) + h1) ^ c;          // 32-bit djb2 variant
-      h2 = ((h2 * 31) + c) >>> 0;          // 32-bit java string hash
-    }
-    return `${msg.role}-${h1}-${h2}`;
+  /** Full content and tier prevent prefix collisions and cross-tier reuse. */
+  private cacheKey(msg: ChatMessage, tier: CompactionTier): string {
+    return createHash('sha256').update(JSON.stringify([tier, msg.role, msg.content])).digest('hex');
   }
 
   /**

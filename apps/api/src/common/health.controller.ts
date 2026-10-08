@@ -1,7 +1,13 @@
-import { Controller, Get } from '@nestjs/common';
+import { readdirSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { Prisma } from '@prisma/client';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma/prisma.service';
 import { RedisService } from '../infra/redis/redis.service';
 import { Public } from '../modules/auth/public.decorator';
+
+const migrationsDirectory = resolve(__dirname, '../../prisma/migrations');
+export const REQUIRED_MIGRATIONS = readdirSync(migrationsDirectory).filter(name => /^\d+_/.test(name) && existsSync(resolve(migrationsDirectory, name, 'migration.sql')));
 
 /**
  * 健康检查端点（docker healthcheck / 负载均衡探测用）
@@ -13,6 +19,14 @@ import { Public } from '../modules/auth/public.decorator';
 @Controller('health')
 @Public()
 export class HealthController {
+  private async withinDeadline<T>(operation: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
+    try {
+      return await Promise.race([operation, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('DEPENDENCY_PROBE_TIMEOUT')), 3000);
+      })]);
+    } finally { clearTimeout(timer!); }
+  }
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
@@ -30,24 +44,47 @@ export class HealthController {
 
     // Postgres
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      await this.withinDeadline(this.prisma.$queryRaw`SELECT 1`);
       checks.postgres = 'ok';
     } catch (e: any) {
-      checks.postgres = `fail: ${e.message}`;
+      checks.postgres = 'fail';
       ok = false;
     }
 
     // Redis
     try {
-      await this.redis.getClient().ping();
+      await this.withinDeadline(this.redis.getClient().ping());
       checks.redis = 'ok';
     } catch (e: any) {
-      checks.redis = `fail: ${e.message}`;
+      checks.redis = 'fail';
+      ok = false;
+    }
+
+    try {
+      const baseline = await this.withinDeadline(this.prisma.$queryRaw<Array<{ applied: number }>>`
+        SELECT COUNT(DISTINCT "migration_name")::int AS "applied"
+        FROM "_prisma_migrations"
+        WHERE "migration_name" IN (${Prisma.join(REQUIRED_MIGRATIONS)})
+          AND "finished_at" IS NOT NULL
+          AND "rolled_back_at" IS NULL
+      `);
+      if (REQUIRED_MIGRATIONS.length > 0 && baseline[0]?.applied === REQUIRED_MIGRATIONS.length) {
+        checks.migration = 'ok';
+      } else {
+        checks.migration = 'fail';
+        ok = false;
+      }
+    } catch {
+      checks.migration = 'fail';
       ok = false;
     }
 
     if (!ok) {
-      return { status: 'not_ready', checks, timestamp: new Date().toISOString() };
+      throw new ServiceUnavailableException({
+        status: 'not_ready',
+        checks,
+        timestamp: new Date().toISOString(),
+      });
     }
     return { status: 'ready', checks, timestamp: new Date().toISOString() };
   }

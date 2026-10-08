@@ -13,7 +13,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3001',
         changeOrigin: true,
         // 2026-06-29 修复：NestJS 有 setGlobalPrefix('api')，所以上游路由是 /api/...
         // 之前 rewrite: (path) => path.replace(/^\/api/, '') 把 /api/xxx → /xxx

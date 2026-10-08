@@ -1,0 +1,160 @@
+{
+  "uid": "interview-runtime",
+  "title": "Interview & Lab Runtime",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "LLM 请求 / 秒",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "interview-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (provider, outcome) (rate(llm_requests_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "LLM 错误率",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "interview-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(llm_requests_total{outcome=\"error\"}[5m])) / clamp_min(sum(rate(llm_requests_total[5m])), 0.000001)"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "LLM P95 延迟（秒）",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "interview-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, provider) (rate(llm_request_duration_seconds_bucket[5m])))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Provider Token / 秒",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "interview-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (provider, direction) (rate(llm_tokens_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "安全拒绝 / 分钟",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "interview-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind) (increase(security_rejections_total[1m]))"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "SSE 活跃连接",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "interview-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sse_active_connections"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "未返回 usage 的请求",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "interview-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (provider) (increase(llm_usage_missing_total[5m]))"
+        }
+      ]
+    }
+  ]
+}

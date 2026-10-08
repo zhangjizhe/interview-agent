@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { MetricsService } from '../../metrics/metrics.service';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { BaseLLMProvider } from './base.provider';
@@ -14,12 +15,15 @@ export class DeepseekProvider extends BaseLLMProvider {
   private client: OpenAI;
   private readonly logger = new Logger(DeepseekProvider.name);
 
-  constructor(private config: ConfigService) {
+  constructor(private config: ConfigService, @Optional() metrics?: MetricsService) {
     super();
-    this.defaultModel = this.config.get<string>('deepseek.model') || 'deepseek-chat';
+    this.defaultModel = this.config.get<string>('deepseek.model') || 'deepseek-flash';
     this.client = new OpenAI({
+      fetch: metrics?.modelFetch('deepseek') as any,
       apiKey: this.config.get<string>('deepseek.apiKey'),
       baseURL: this.config.get<string>('deepseek.baseUrl'),
+      timeout: 30_000,
+      maxRetries: 0, // 重试必须通过网关重新检查额度并记账
     });
   }
 
@@ -51,9 +55,10 @@ export class DeepseekProvider extends BaseLLMProvider {
         },
         finishReason: choice.finish_reason || 'stop',
         model: response.model,
+        provider: this.name,
       };
     } catch (err) {
-      this.logger.error(`DeepSeek chat failed: ${err.message}`);
+      this.logger.error({ event: 'provider_chat_failed', provider: this.name, status: err?.status });
       throw err;
     }
   }
@@ -68,6 +73,7 @@ export class DeepseekProvider extends BaseLLMProvider {
         tools: params.tools as any,
         tool_choice: params.toolChoice as any,
         stream: true,
+        stream_options: { include_usage: true },
       });
 
       for await (const chunk of stream) {
@@ -80,6 +86,8 @@ export class DeepseekProvider extends BaseLLMProvider {
         }
         if (chunk.usage) {
           yield {
+            provider: this.name,
+            model: chunk.model || this.defaultModel,
             usage: {
               promptTokens: chunk.usage.prompt_tokens,
               completionTokens: chunk.usage.completion_tokens,
@@ -88,8 +96,7 @@ export class DeepseekProvider extends BaseLLMProvider {
         }
       }
     } catch (err) {
-      this.logger.error(`DeepSeek stream failed: ${err.message}`);
-      yield { finishReason: 'error' };
+      this.logger.error({ event: 'provider_stream_failed', provider: this.name, status: err?.status });
       throw err;
     }
   }

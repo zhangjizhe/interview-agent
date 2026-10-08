@@ -81,6 +81,14 @@ export interface AppConfig {
   throttler: {
     ttl: number;
     limit: number;
+    authLimit: number;
+    sseLimit: number;
+  };
+  quota: {
+    monthlyInterviewLimit?: string;
+  };
+  agentLab: {
+    retentionDays?: string;
   };
 }
 
@@ -171,7 +179,7 @@ export const configuration = (): AppConfig => {
   deepseek: {
     apiKey: process.env.DEEPSEEK_API_KEY || '',
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1',
-    model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
   },
   bocha: {
     apiKey: process.env.BOCHA_API_KEY || '',
@@ -240,15 +248,24 @@ export const configuration = (): AppConfig => {
       }
       return 'INSECURE-DEV-DO-NOT-USE-IN-PRODUCTION-CHANGE-ME-PLEASE-32-CHARS';
     })(),
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '30m',
     adminUserIds: (process.env.ADMIN_USER_IDS || '')
       .split(',')
       .map((userId) => userId.trim().toLowerCase())
       .filter(Boolean),
   },
   throttler: {
-    ttl: parseInt(process.env.THROTTLER_TTL || '60', 10),
-    limit: parseInt(process.env.THROTTLER_LIMIT || '60', 10),
+    // 环境变量保持秒单位，throttler v6 接收毫秒。
+    ttl: parseSafeInt(process.env.THROTTLER_TTL, 60) * 1000,
+    limit: parseSafeInt(process.env.THROTTLER_LIMIT, 100),
+    authLimit: parseSafeInt(process.env.THROTTLER_AUTH_LIMIT, 10),
+    sseLimit: parseSafeInt(process.env.THROTTLER_SSE_LIMIT, 20),
+  },
+  quota: {
+    monthlyInterviewLimit: process.env.QUOTA_MONTHLY_INTERVIEW_LIMIT || undefined,
+  },
+  agentLab: {
+    retentionDays: process.env.AGENT_LAB_RETENTION_DAYS || undefined,
   },
   };
 }

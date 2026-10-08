@@ -32,6 +32,20 @@ export function clearSession(): void {
   localStorage.removeItem('ia_user_role');
 }
 
+/** Keep a failed logout retryable, and never erase a newer login. */
+export async function logoutSession(): Promise<boolean> {
+  const activeToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (!activeToken) return true;
+  const response = await fetch('/api/auth/logout', {
+    method: 'POST', headers: { Authorization: `Bearer ${activeToken}` }, signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok && response.status !== 401) throw new Error('退出未确认，请稍后重试。');
+  if (localStorage.getItem(ACCESS_TOKEN_KEY) !== activeToken && localStorage.getItem(ACCESS_TOKEN_KEY)) return false;
+  clearSession();
+  window.dispatchEvent(new Event('ia:session-expired'));
+  return true;
+}
+
 /**
  * All same-origin API requests receive the active access token. Keeping this at
  * the transport boundary prevents individual UI views from forgetting auth.
@@ -44,8 +58,15 @@ export function installAuthenticatedFetch(): void {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (!isApiRequest || !token) return nativeFetch(input, init);
 
-    const headers = new Headers(init?.headers);
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    new Headers(init?.headers).forEach((value, key) => headers.set(key, value));
     headers.set('Authorization', `Bearer ${token}`);
-    return nativeFetch(input, { ...init, headers });
+    const response = await nativeFetch(input, { ...init, headers });
+    // A response from the previous session must not erase a newly signed-in one.
+    if (response.status === 401 && localStorage.getItem(ACCESS_TOKEN_KEY) === token) {
+      clearSession();
+      window.dispatchEvent(new Event('ia:session-expired'));
+    }
+    return response;
   };
 }

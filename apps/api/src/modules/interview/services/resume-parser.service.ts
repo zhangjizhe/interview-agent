@@ -216,7 +216,6 @@ export class ResumeParserService {
   private async extractWithPdfJs(buffer: Buffer): Promise<string> {
     // pdfjs-dist 4 是纯 ESM，必须 dynamic import
     // legacy/build/pdf.mjs 是 Node 同步版本（无 worker、不需要 isEvalSupported）
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const loadingTask = pdfjs.getDocument({
       data: new Uint8Array(buffer),

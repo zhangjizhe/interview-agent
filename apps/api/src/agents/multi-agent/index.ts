@@ -132,7 +132,6 @@ export async function* streamInterviewAgent(
     agent: ReturnType<typeof createInterviewAgent>,
     userMessage: string,
 ): AsyncGenerator<string> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const stream = await (agent as any).stream({
         messages: [new HumanMessage(userMessage)],
     } as Partial<InterviewAgentStateType>);

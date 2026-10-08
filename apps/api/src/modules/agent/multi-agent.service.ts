@@ -18,7 +18,11 @@ import {
   INTERVIEW_GRAPH_RECURSION_LIMIT,
   type InterviewAgentStateType,
 } from '../../agents/multi-agent/graph';
-import { LlmGatewayChatModel, threadIdStorage } from '../../agents/multi-agent/llm-gateway-chat-model';
+import {
+  LlmGatewayChatModel,
+  LlmUsageAccumulator,
+  threadIdStorage,
+} from '../../agents/multi-agent/llm-gateway-chat-model';
 import { dedupFinalResponse } from '../../agents/multi-agent/dedup';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { BochaSearchTool } from './tools/bocha-search.tool';
@@ -28,13 +32,13 @@ import { MemoryService } from '../memory/memory.service';
 import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
 import { McpRegistry } from '../interview/services/mcp-registry';
 import { ReflectionService } from '../reflection/reflection.service';
+import { LlmPricingCatalogService } from '../llm/cost/llm-pricing-catalog.service';
 
 @Injectable()
 export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MultiAgentService.name);
   private graph: ReturnType<typeof buildInterviewGraph> | null = null;
   private checkpointer: BaseCheckpointSaver | null = null;
-  private checkpointerSetupDone = false;
   private enabled = false;
 
   constructor(
@@ -45,6 +49,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     private kb: KnowledgeBaseService,
     private github: GitHubTool,
     private notion: NotionTool,
+    private pricingCatalog: LlmPricingCatalogService,
     private reflectionService?: ReflectionService, // ADR #10 Phase 1：可选注入，避免循环依赖
   ) {}
 
@@ -62,7 +67,7 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     try {
       // P0-1 修复：不再直接 new ChatOpenAI，而是用 LlmGatewayChatModel 包装
       // 这样 LangGraph 节点的 model.invoke() 实际走 LlmGateway → 享受 P0 缓存工程
-      const providerName = (this.config.get<string>('qwen.model') || 'qwen-plus') as 'qwen' | 'deepseek';
+      const providerName = 'qwen' as const;
       const model = new LlmGatewayChatModel({
         llmGateway: this.llm,
         provider: providerName,
@@ -83,17 +88,14 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
 
       try {
         this.checkpointer = PostgresSaver.fromConnString(connString, { schema: 'public' });
-        await (this.checkpointer as any).setup();
-        this.checkpointerSetupDone = true;
-        this.logger.log(`✅ PostgresSaver ready (${connString.replace(/:[^:@]+@/, ':***@')})`);
+        this.logger.log(`✅ PostgresSaver connected (${connString.replace(/:[^:@]+@/, ':***@')})`);
       } catch (cpErr: any) {
-        this.logger.error(`PostgresSaver init failed, falling back to no-checkpoint: ${cpErr.message}`);
-        this.checkpointer = null;
+        throw new Error(`PostgresSaver connection failed after migration job: ${cpErr.message}`);
       }
 
-      this.graph = buildInterviewGraph(model, this.checkpointer || undefined);
+      this.graph = buildInterviewGraph(model, this.checkpointer);
       this.enabled = true;
-      this.logger.log(`✅ MultiAgent graph compiled (provider=${providerName}, llmGateway=ON, checkpoint=${this.checkpointer ? 'postgres' : 'none'})`);
+      this.logger.log(`✅ MultiAgent graph compiled (provider=${providerName}, llmGateway=ON, checkpoint=postgres)`);
     } catch (err: any) {
       this.logger.error(`MultiAgent init failed: ${err.message}`);
     }
@@ -181,20 +183,35 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     return this.enabled;
   }
 
-  async run(userMessage: string, threadId: string, history: BaseMessageLike[] = []) {
+  async run(
+    userMessage: string,
+    threadId: string,
+    history: BaseMessageLike[] = [],
+    interviewContext = '',
+    options: { bypassSemanticCache?: boolean } = {},
+  ) {
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
 
     const isFirstTurn = history.length === 0;
     const input: Partial<InterviewAgentStateType> = isFirstTurn
-      ? { messages: [new HumanMessage(userMessage)] }
-      : { messages: [new HumanMessage(userMessage)] };
+      ? { messages: [new HumanMessage(userMessage)], interview_context: interviewContext }
+      : { messages: [new HumanMessage(userMessage)], interview_context: interviewContext };
 
     // 用 AsyncLocalStorage 包装，让 _generate 拿到真实 threadId
     // （LangChain v1.x _generate 拿到的 options.configurable 已被剥离）
-    const result = await threadIdStorage.run({ threadId }, async () =>
+    const usage: LlmUsageAccumulator = {
+      promptTokens: 0,
+      completionTokens: 0,
+      calls: 0,
+      models: new Set<string>(),
+      samples: [],
+    };
+    const result = await threadIdStorage.run({ threadId, usage, bypassSemanticCache: options.bypassSemanticCache }, async () =>
       this.graph!.invoke(input as any, config),
     );
+
+    const pricing = this.pricingCatalog.estimateCalls(usage.samples);
 
     return {
       response: (result as any).final_response || '',
@@ -203,10 +220,26 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
       pastSteps: (result as any).past_steps,
       steps: ((result as any).past_steps || []).length,
       threadId,
+      tokenUsage: {
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.promptTokens + usage.completionTokens,
+        calls: usage.calls,
+        models: [...usage.models].sort(),
+      },
+      estimatedCostCny: pricing.status === 'available'
+        ? Number(pricing.totalCny.toFixed(6))
+        : undefined,
+      pricing,
     };
   }
 
-  async *stream(userMessage: string, threadId: string, userId?: string): AsyncGenerator<any, void, unknown> {
+  async *stream(
+    userMessage: string,
+    threadId: string,
+    userId?: string,
+    interviewContext = '',
+  ): AsyncGenerator<any, void, unknown> {
     this.logger.debug(`[stream-v6] ENTER threadId=${threadId} userId=${userId} content="${userMessage.slice(0, 30)}..."`);
     if (!this.graph) throw new Error('MultiAgent not initialized');
     const config: RunnableConfig = { configurable: { thread_id: threadId } };
@@ -260,7 +293,10 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
           let stream: any;
           try {
             stream = await self.graph!.stream(
-              { messages: [new HumanMessage(userMessage)] } as any,
+              {
+                messages: [new HumanMessage(userMessage)],
+                interview_context: interviewContext,
+              } as any,
               { ...config, streamMode: 'messages' as const, recursionLimit: INTERVIEW_GRAPH_RECURSION_LIMIT },
             );
             this.logger.debug(`[stream-v6] graph.stream returned: ${typeof stream}, has Symbol.asyncIterator=${typeof stream?.[Symbol.asyncIterator]}`);

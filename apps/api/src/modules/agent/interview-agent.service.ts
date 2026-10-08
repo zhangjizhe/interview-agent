@@ -56,6 +56,13 @@ export interface AgentContext {
   position: string;
   level: string;
   provider?: string; // P0-3 修复：按 provider 取 maxTokens 配置
+  answerMessageId?: string;
+  interviewMode?: 'FULL_SIMULATION' | 'SKILL_PRACTICE';
+  targetJobId?: string;
+  targetJobProfileVersion?: number;
+  practiceSkillId?: string;
+  practiceSkillName?: string;
+  approvedAgentPolicy?: string;
 }
 
 @Injectable()
@@ -122,7 +129,13 @@ export class InterviewAgentService {
 
       // ===== 动态任务队列驱动（统一题号追踪）=====
       // 初始化队列（幂等操作）
-      await this.taskQueue.initializeQueue(ctx.sessionId, ctx.position, ctx.level);
+      await this.taskQueue.initializeQueue(ctx.sessionId, ctx.position, ctx.level, {
+        mode: ctx.interviewMode || 'FULL_SIMULATION',
+        targetJobId: ctx.targetJobId,
+        targetJobProfileVersion: ctx.targetJobProfileVersion,
+        practiceSkillId: ctx.practiceSkillId,
+        practiceSkillName: ctx.practiceSkillName,
+      });
       
       // 获取当前任务（支持动态出题、follow-up、自适应）
       const currentTask = await this.taskQueue.getNextTask(ctx.sessionId);
@@ -151,6 +164,9 @@ export class InterviewAgentService {
         `【参考答案】\n${currentQuestion.referenceAnswer}\n` +
         `（请基于以上要点评估候选人的回答，必要时追问或过渡到下一题）`
         : `\n\n【题目已问完，进入收尾阶段】可以总结候选人表现并询问他有什么想问你的。`;
+      const modeContext = ctx.interviewMode === 'SKILL_PRACTICE'
+        ? `\n【本场模式】单技能练习，围绕「${ctx.practiceSkillName || '当前技能'}」提问与追问，不要将练习反馈当作正式评价。`
+        : '\n【本场模式】完整模拟面试，在结束前不要向候选人展示评分或评价结论。';
 
       const systemPrompt =
         `你是一位专业的 AI 面试官小面，正在面试【${ctx.position}】岗位（${ctx.level}）的候选人。\n\n` +
@@ -158,7 +174,11 @@ export class InterviewAgentService {
         `【对话原则】每次只问一个题，候选人回答后先简要认可或追问，再进入下一题。\n` +
         `【风格】专业、友好、像真人面试官，不要用 Markdown 标题。\n` +
         `【候选人历史】\n${context.longTermContext || '暂无'}` +
-        questionContext;
+        modeContext +
+        questionContext +
+        (ctx.approvedAgentPolicy
+          ? `\n\n【已批准的 Agent Lab 版本策略】\n${ctx.approvedAgentPolicy.slice(0, 12_000)}`
+          : '');
 
       // ===== 按用户偏好过滤工具 =====
       const userPrefs = await this.prisma.userToolPreference.findMany({
@@ -296,7 +316,21 @@ export class InterviewAgentService {
       if (useMultiAgent) {
         // 多 Agent（LangGraph Supervisor 拓扑）：planner → executor → replanner → reviewer
         // 注意：history 由 MultiAgentService 通过 PostgresSaver checkpointer 自动维护（thread_id = sessionId）
-        for await (const chunk of this.multiAgent.stream(userInput, ctx.sessionId, ctx.userId)) {
+        const interviewContext =
+          `【面试岗位】${ctx.position}（${ctx.level}）\n` +
+          `【出题范围】${bank === 'agent' ? 'AI Agent / LLM 工程' : '前端开发'}\n` +
+          `【当前题目】${currentQuestion?.question || '请生成一题与岗位强相关的开场题'}\n` +
+          `【首轮规则】当候选人说“开始面试”时，直接提出与上述岗位和出题范围匹配的问题。` +
+          `不得将 AI Agent / LLM 工程岗位误问为前端项目。` +
+          (ctx.approvedAgentPolicy
+            ? `\n【已批准的 Agent Lab 版本策略】\n${ctx.approvedAgentPolicy.slice(0, 12_000)}`
+            : '');
+        for await (const chunk of this.multiAgent.stream(
+          userInput,
+          ctx.sessionId,
+          ctx.userId,
+          interviewContext,
+        )) {
           if (chunk.type === 'token' && chunk.content) {
             fullResponse += chunk.content;
             yield { type: 'token', content: chunk.content };
@@ -374,6 +408,7 @@ export class InterviewAgentService {
             ctx.userId,
             currentTask.id,
             userInput,
+            ctx.answerMessageId,
           );
         } catch (e: any) {
           this.logger.warn(
@@ -443,6 +478,7 @@ export class InterviewAgentService {
     suggestions: string[];
     /** token 用量，controller 写入 session_costs */
     usage?: { promptTokens: number; completionTokens: number };
+    model?: string;
   }> {
     const answerHistory = await this.prisma.answerHistory.findMany({
       where: { interviewId: ctx.sessionId },
@@ -516,6 +552,7 @@ export class InterviewAgentService {
     return {
       ...result,
       usage: response.usage, // 把 token 透出给 controller
+      model: response.model,
     };
   }
 

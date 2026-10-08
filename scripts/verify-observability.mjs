@@ -1,0 +1,16 @@
+import { readFileSync } from 'node:fs';
+const check = (ok, label) => { if (!ok) throw new Error(label); console.log('PASS ' + label); };
+const ready = await fetch('http://localhost:3001/api/health/ready');
+check(ready.ok, 'API readiness');
+check(ready.headers.get('x-content-type-options') === 'nosniff', 'Helmet headers');
+check((await fetch('http://localhost:3001/api/metrics')).status === 401, 'metrics reject unauthenticated request');
+const token = readFileSync('.local-backups/observability/metrics-token','utf8').trim();
+const response = await fetch('http://localhost:3001/api/metrics', { headers: { authorization: `Bearer ${token}` } });
+const text = await response.text();
+check(response.ok && text.includes('# HELP llm_requests_total') && text.includes('sse_active_connections'), 'authenticated Prometheus text');
+const targets = await fetch('http://localhost:9090/api/v1/targets').then(r=>r.json());
+check(targets.data.activeTargets.some(t => t.labels.job === 'interview-api' && t.health === 'up'), 'Prometheus target UP');
+const password = readFileSync('.local-backups/observability/grafana-password', 'utf8').trim();
+const dashboard = await fetch('http://localhost:3000/api/dashboards/uid/interview-runtime', { headers: { authorization: `Basic ${Buffer.from(`admin:${password}`).toString('base64')}` }}).then(r=>r.json());
+check(dashboard.dashboard?.panels?.length === 7, 'Grafana dashboard provisioned');
+for (const port of [5173,5175]) check((await fetch(`http://localhost:${port}`)).ok, `frontend ${port}`);

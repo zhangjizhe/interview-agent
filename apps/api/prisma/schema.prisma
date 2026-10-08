@@ -7,7 +7,77 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Plan {
+  id String @id
+  name String
+  monthlyInterviews Int
+  monthlyLlmCalls Int
+  maxInputBytes Int
+  maxOutputTokens Int
+  organizations Organization[]
+  @@map("plans")
+}
+
+model Organization {
+  planId String @default("free")
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  quotaRevision Int @default(0)
+  id String @id @default(cuid())
+  name String
+  createdAt DateTime @default(now())
+  userRecords User[]
+  labDatasetRecords LabDataset[]
+  labAgentVersionRecords LabAgentVersion[]
+  labRunRecords LabRun[]
+  labRecordedImportRecords LabRecordedImport[]
+  labFailureRecords LabFailure[]
+  labExperimentRecords LabExperiment[]
+  labExperimentRunRecords LabExperimentRun[]
+  labReleaseDecisionRecords LabReleaseDecision[]
+  labOperationLogRecords LabOperationLog[]
+  workspaceRecords Workspace[]
+  workspaceMemberRecords WorkspaceMember[]
+  agentRecords Agent[]
+  agentVersionRecords AgentVersion[]
+  runRecords Run[]
+  traceEventRecords TraceEvent[]
+  decisionRecordRecords DecisionRecord[]
+  factAssertionRecords FactAssertion[]
+  decisionEvidenceRecords DecisionEvidence[]
+  applicationRecords Application[]
+  applicationRunRecords ApplicationRun[]
+  toolApprovalRecords ToolApproval[]
+  evaluationDatasetRecords EvaluationDataset[]
+  evaluationCaseRecords EvaluationCase[]
+  evaluatorRecords Evaluator[]
+  agentEvaluationRunRecords AgentEvaluationRun[]
+  evaluationResultRecords EvaluationResult[]
+  interviewRecords Interview[]
+  sessionCostRecords SessionCost[]
+  usageLedgerRecords UsageLedger[]
+  messageRecords Message[]
+  reportRecords Report[]
+  userToolPreferenceRecords UserToolPreference[]
+  interviewTaskRecords InterviewTask[]
+  answerHistoryRecords AnswerHistory[]
+  targetJobRecords TargetJob[]
+  jobSkillRequirementRecords JobSkillRequirement[]
+  interviewQuestionRecords InterviewQuestion[]
+  interviewAnswerRecords InterviewAnswer[]
+  evaluationRunRecords EvaluationRun[]
+  assessmentEvidenceRecords AssessmentEvidence[]
+  candidateSkillStateRecords CandidateSkillState[]
+  trainingRecommendationRecords TrainingRecommendation[]
+  trainingAttemptRecords TrainingAttempt[]
+  reflectionLogRecords ReflectionLog[]
+  @@map("organizations")
+}
+
 model User {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
@@ -19,8 +89,765 @@ model User {
 
   interviews      Interview[]
   reflectionLogs  ReflectionLog[]
+  targetJobs      TargetJob[]
+  candidateSkillStates CandidateSkillState[]
+  trainingRecommendations TrainingRecommendation[]
+  trainingAttempts TrainingAttempt[]
+  usageLedgerEntries UsageLedger[]
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  workspaceMembers WorkspaceMember[]
 
   @@map("users")
+}
+
+model LabDataset {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String          @id @default(cuid())
+  version        String          @unique
+  name           String
+  sourceHash     String
+  caseCount      Int
+  responseCount  Int
+  validationStatus LabValidationStatus
+  createdAt      DateTime        @default(now())
+  runs           LabRun[]
+  experiments    LabExperiment[]
+  releaseDecisions LabReleaseDecision[]
+
+  @@index([validationStatus, createdAt])
+  @@map("lab_datasets")
+}
+
+model LabAgentVersion {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id                 String          @id @default(cuid())
+  agentKey           String
+  version            String
+  runtimeVersion     String
+  promptVersion      String?
+  modelProvider      String?
+  modelVersion       String?
+  toolPolicyVersion  String?
+  createdAt          DateTime        @default(now())
+  runs               LabRun[]
+  controlExperiments LabExperiment[] @relation("LabExperimentControl")
+  treatmentExperiments LabExperiment[] @relation("LabExperimentTreatment")
+  releaseDecisions   LabReleaseDecision[]
+
+  @@unique([agentKey, version])
+  @@index([agentKey, createdAt])
+  @@map("lab_agent_versions")
+}
+
+model LabRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id                    String          @id @default(cuid())
+  agentVersionId        String
+  agentVersion          LabAgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  datasetId             String
+  dataset               LabDataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  runType               LabRunType
+  status                LabRunStatus    @default(PENDING)
+  traceRef              String?
+  inputHash             String
+  metrics               Json
+  traceSummary          Json
+  startedAt             DateTime        @default(now())
+  completedAt           DateTime?
+  durationMs            Int?
+  inputTokens           Int             @default(0)
+  outputTokens          Int             @default(0)
+  estimatedCostCny      Float           @default(0)
+  failures              LabFailure[]
+  experiments           LabExperimentRun[]
+  releaseDecisions     LabReleaseDecision[]
+  recordedImport       LabRecordedImport?
+
+  @@index([datasetId, startedAt])
+  @@index([agentVersionId, startedAt])
+  @@index([status, startedAt])
+  @@map("lab_runs")
+}
+
+model LabRecordedImport {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id              String          @id @default(cuid())
+  receiptHash     String          @unique
+  status          LabRecordedImportStatus @default(PENDING)
+  recordedRun     Json
+  submittedBy     String
+  importedBy      String?
+  runId           String?         @unique
+  run             LabRun?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+  error           String?         @db.Text
+  createdAt       DateTime        @default(now())
+  importedAt      DateTime?
+
+  @@index([status, createdAt])
+  @@map("lab_recorded_imports")
+}
+
+model LabFailure {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id              String       @id @default(cuid())
+  runId           String
+  run             LabRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  caseId          String
+  category        LabFailureCategory
+  severity        LabFailureSeverity
+  evidenceSummary String?
+  createdAt       DateTime     @default(now())
+
+  @@index([runId, severity])
+  @@index([category, createdAt])
+  @@map("lab_failures")
+}
+
+model LabExperiment {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id                 String          @id @default(cuid())
+  name               String
+  hypothesis         String
+  controlVersionId   String
+  controlVersion     LabAgentVersion @relation("LabExperimentControl", fields: [controlVersionId], references: [id], onDelete: Restrict)
+  treatmentVersionId String
+  treatmentVersion   LabAgentVersion @relation("LabExperimentTreatment", fields: [treatmentVersionId], references: [id], onDelete: Restrict)
+  datasetId          String
+  dataset            LabDataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  status             LabExperimentStatus @default(DRAFT)
+  comparison        Json?
+  createdBy         String
+  createdAt          DateTime        @default(now())
+  completedAt       DateTime?
+  runs               LabExperimentRun[]
+  releaseDecisions  LabReleaseDecision[]
+
+  @@index([datasetId, createdAt])
+  @@index([status, createdAt])
+  @@map("lab_experiments")
+}
+
+model LabExperimentRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id           String        @id @default(cuid())
+  experimentId String
+  experiment   LabExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  runId        String
+  run          LabRun        @relation(fields: [runId], references: [id], onDelete: Restrict)
+  arm          LabExperimentArm
+
+  @@unique([experimentId, runId])
+  @@index([experimentId, arm])
+  @@map("lab_experiment_runs")
+}
+
+model LabReleaseDecision {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id                 String          @id @default(cuid())
+  agentVersionId     String
+  agentVersion       LabAgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  datasetId          String
+  dataset            LabDataset      @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  runId              String?
+  run                LabRun?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+  experimentId       String?
+  experiment         LabExperiment?  @relation(fields: [experimentId], references: [id], onDelete: SetNull)
+  decision           LabReleaseDecisionStatus
+  thresholdSnapshot  Json
+  metricsSnapshot    Json
+  rationale          String
+  approvedBy         String
+  createdAt          DateTime        @default(now())
+
+  @@index([agentVersionId, createdAt])
+  @@index([decision, createdAt])
+  @@map("lab_release_decisions")
+}
+
+model LabOperationLog {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id         String              @id @default(cuid())
+  actorId    String
+  action     LabOperationAction
+  objectType LabOperationObject
+  objectId   String
+  outcome    LabOperationOutcome
+  createdAt  DateTime            @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([objectType, objectId])
+  @@index([outcome, createdAt])
+  @@map("lab_operation_logs")
+}
+
+model Workspace {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  ownerId   String
+  owner     User     @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members WorkspaceMember[]
+  agents  Agent[]
+  runs    Run[]
+  datasets       EvaluationDataset[]
+  evaluators     Evaluator[]
+  evaluationRuns AgentEvaluationRun[]
+  applications   Application[]
+
+  @@index([ownerId])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id          String          @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole  @default(OWNER)
+  createdAt   DateTime        @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+enum WorkspaceRole {
+  OWNER
+  MEMBER
+}
+
+model Agent {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id               String      @id @default(cuid())
+  workspaceId      String
+  key              String
+  name             String
+  description      String?     @db.Text
+  type             String
+  status           AgentStatus @default(DRAFT)
+  currentVersionId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  versions       AgentVersion[] @relation("AgentVersions")
+  currentVersion AgentVersion?  @relation("CurrentAgentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  runs           Run[]
+  evaluationRuns AgentEvaluationRun[]
+  applications   Application[]
+  decisionRecords DecisionRecord[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@map("agents")
+}
+
+model AgentVersion {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id               String             @id @default(cuid())
+  agentId          String
+  version          String
+  status           AgentVersionStatus @default(DRAFT)
+  modelConfig      Json?
+  systemPrompt     String             @default("") @db.Text
+  runtimeConfig    Json?
+  toolBindings     Json?
+  knowledgeBindings Json?
+  memoryBindings   Json?
+  inputSchema      Json?
+  outputSchema     Json?
+  changelog        String?            @db.Text
+  createdAt        DateTime           @default(now())
+  publishedAt      DateTime?
+
+  currentForAgents Agent[] @relation("CurrentAgentVersion")
+  parentAgent      Agent   @relation("AgentVersions", fields: [agentId], references: [id], onDelete: Cascade)
+  runs             Run[]
+  evaluationRuns  AgentEvaluationRun[]
+  decisionRecords DecisionRecord[]
+
+  @@unique([agentId, version])
+  @@index([agentId, createdAt])
+  @@map("agent_versions")
+}
+
+enum AgentStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum AgentVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Run {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String    @id @default(cuid())
+  workspaceId    String
+  agentId        String
+  agentVersionId String
+  application    String?
+  externalRunId  String?
+  parentRunId    String?
+  input          Json
+  output         Json?
+  status         RunStatus @default(PENDING)
+  latencyMs      Int?
+  tokenUsage     Json?
+  estimatedCost  Float?
+  error          String?   @db.Text
+  budget         Json?
+  traceSequence  Int       @default(0)
+  createdAt      DateTime  @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  cancelRequestedAt DateTime?
+
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion   AgentVersion @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  parentRun      Run?         @relation("RunChildren", fields: [parentRunId], references: [id], onDelete: SetNull)
+  childRuns      Run[]        @relation("RunChildren")
+  traceEvents    TraceEvent[]
+  evaluationResults EvaluationResult[]
+  toolApprovals ToolApproval[]
+  applicationRuns ApplicationRun[]
+
+  @@index([workspaceId, createdAt])
+  @@index([agentId, createdAt])
+  @@index([agentVersionId, createdAt])
+  @@index([externalRunId])
+  @@index([parentRunId, createdAt])
+  @@map("runs")
+}
+
+model TraceEvent {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id            String   @id @default(cuid())
+  formatVersion Int      @default(1)
+  runId         String
+  seq           Int      @map("sequence")
+  turnId        String?
+  step          String?
+  callId        String?
+  type          String
+  name          String
+  modelVisible  Boolean  @default(false)
+  payload       Json?
+  input         Json?
+  output        Json?
+  metadata      Json?
+  latencyMs     Int?
+  tokenUsage    Json?
+  estimatedCost Float?
+  error         String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, seq])
+  @@index([runId, seq])
+  @@index([runId, callId])
+  @@map("trace_events")
+}
+
+enum DecisionDomain {
+  INTERVIEW
+  AGENT_LAB
+}
+
+// 追加式决策账本：记录一次决定在何时、基于哪些输入和哪版规则得出。
+model DecisionRecord {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String         @id @default(cuid())
+  domain         DecisionDomain
+  decisionType   String
+  subjectType    String
+  subjectId      String
+  outcome        Json
+  ruleSetVersion String
+  inputSnapshot  Json
+  inputHash      String
+  effectiveAt    DateTime       @default(now())
+  recordedAt     DateTime       @default(now())
+  actorId        String?
+  interviewId    String?
+  agentId        String?
+  agentVersionId String?
+
+  interview    Interview?    @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  agent        Agent?        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion AgentVersion? @relation(fields: [agentVersionId], references: [id], onDelete: SetNull)
+  facts        FactAssertion[]
+  evidence     DecisionEvidence[]
+
+  @@index([domain, subjectType, subjectId, recordedAt])
+  @@index([interviewId, recordedAt])
+  @@index([agentVersionId, recordedAt])
+  @@map("decision_records")
+}
+
+// 一条事实永不覆盖；失效或撤销以新的反向 assertion 表达，支持按时间重放。
+model FactAssertion {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id         String   @id @default(cuid())
+  decisionId String
+  subjectType String
+  subjectId  String
+  predicate  String
+  value      Json
+  polarity   Boolean  @default(true)
+  validFrom  DateTime @default(now())
+  validTo    DateTime?
+  sourceType String?
+  sourceId   String?
+  recordedAt DateTime @default(now())
+
+  decision DecisionRecord @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId])
+  @@index([subjectType, subjectId, predicate, validFrom])
+  @@map("fact_assertions")
+}
+
+model DecisionEvidence {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id         String   @id @default(cuid())
+  decisionId String
+  kind       String
+  sourceType String
+  sourceId   String?
+  payload    Json?
+  contentHash String?
+  createdAt  DateTime @default(now())
+
+  decision DecisionRecord @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId, createdAt])
+  @@index([sourceType, sourceId])
+  @@map("decision_evidence")
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model Application {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id          String            @id @default(cuid())
+  workspaceId String
+  agentId     String
+  key         String
+  name        String
+  type        String
+  status      ApplicationStatus @default(ACTIVE)
+  config      Json?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent     Agent            @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  runs      ApplicationRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@index([agentId])
+  @@map("applications")
+}
+
+model ApplicationRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String   @id @default(cuid())
+  applicationId  String
+  runId          String   @unique
+  externalSessionId String?
+  turn           Int?
+  createdAt      DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  run         Run         @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@index([externalSessionId, createdAt])
+  @@map("application_runs")
+}
+
+enum ToolApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
+  CANCELLED
+  TIMED_OUT
+  ERROR
+}
+
+model ToolApproval {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String             @id @default(cuid())
+  runId          String
+  callId         String
+  toolName       String
+  status         ToolApprovalStatus @default(PENDING)
+  request        Json
+  decision       Json?
+  requestedAt    DateTime           @default(now())
+  resolvedAt     DateTime?
+
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, callId])
+  @@index([runId, status])
+  @@map("tool_approvals")
+}
+
+model EvaluationDataset {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id          String   @id @default(cuid())
+  workspaceId String
+  key         String
+  name        String
+  description String?  @db.Text
+  version     String   @default("1.0.0")
+  metadata    Json?
+  frozenAt    DateTime?
+  contentHash String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cases          EvaluationCase[]
+  evaluationRuns AgentEvaluationRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@index([workspaceId, frozenAt])
+  @@map("evaluation_datasets")
+}
+
+model EvaluationCase {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String   @id @default(cuid())
+  datasetId      String
+  key            String
+  input          Json
+  expectedOutput Json?
+  metadata       Json?
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  dataset EvaluationDataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  results EvaluationResult[]
+
+  @@unique([datasetId, key])
+  @@index([datasetId, enabled])
+  @@map("evaluation_dataset_cases")
+}
+
+enum EvaluatorType {
+  KEYWORD
+  JSON_SCHEMA
+  LATENCY
+}
+
+model Evaluator {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id          String        @id @default(cuid())
+  workspaceId String
+  key         String
+  name        String
+  type        EvaluatorType
+  config      Json?
+  enabled     Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  evaluationRuns AgentEvaluationRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, updatedAt])
+  @@map("evaluators")
+}
+
+enum EvaluationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model AgentEvaluationRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String           @id @default(cuid())
+  workspaceId    String
+  agentId        String
+  agentVersionId String
+  datasetId      String
+  evaluatorId    String
+  status         EvaluationStatus @default(PENDING)
+  score          Float?
+  totalCases     Int              @default(0)
+  passedCases    Int              @default(0)
+  failedCases    Int              @default(0)
+  metrics        Json?
+  error          String?          @db.Text
+  startedAt      DateTime?
+  completedAt    DateTime?
+  requestKey     String?
+  requestHash    String?
+  requestParams  Json?
+  requestedByUserId String?
+  cancelRequestedAt DateTime?
+  leaseOwner     String?
+  heartbeatAt    DateTime?
+  completedSamples Int @default(0)
+  completedCases Int @default(0)
+  createdAt      DateTime         @default(now())
+
+  workspace Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  agent     Agent                 @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentVersion AgentVersion       @relation(fields: [agentVersionId], references: [id], onDelete: Restrict)
+  dataset   EvaluationDataset     @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  evaluator Evaluator             @relation(fields: [evaluatorId], references: [id], onDelete: Restrict)
+  results   EvaluationResult[]
+
+  @@index([workspaceId, createdAt])
+  @@index([agentId, createdAt])
+  @@index([agentVersionId, createdAt])
+  @@unique([organizationId, workspaceId, requestKey])
+  @@index([organizationId, status, createdAt])
+  @@map("agent_evaluation_runs")
+}
+
+enum EvaluationCaseStatus {
+  COMPLETED
+  FAILED
+}
+
+model EvaluationResult {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id            String               @id @default(cuid())
+  evaluationRunId String
+  datasetCaseId String
+  runId         String?
+  status        EvaluationCaseStatus
+  score         Float?
+  passed        Boolean              @default(false)
+  metrics       Json?
+  evidence      Json?
+  outputSummary String?              @db.Text
+  failureCategory String?
+  failureMessage  String?            @db.Text
+  createdAt     DateTime             @default(now())
+
+  evaluationRun AgentEvaluationRun @relation(fields: [evaluationRunId], references: [id], onDelete: Cascade)
+  datasetCase   EvaluationCase @relation(fields: [datasetCaseId], references: [id], onDelete: Restrict)
+  run           Run?           @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@unique([evaluationRunId, datasetCaseId])
+  @@index([datasetCaseId])
+  @@index([runId])
+  @@map("evaluation_results")
 }
 
 enum UserRole {
@@ -29,16 +856,26 @@ enum UserRole {
 }
 
 model Interview {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id              String          @id @default(cuid())
   userId          String
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   position        String // 岗位，如"前端开发"
   level           String          @default("P5") // 职级
+  mode            InterviewMode   @default(FULL_SIMULATION)
   status          InterviewStatus @default(IN_PROGRESS)
   startedAt       DateTime        @default(now())
   endedAt         DateTime?
   summary         String? // 面试总结（AI 生成）
   resumeConfirmed Boolean         @default(false) // 用户是否确认过简历（false = 仍显示确认面板）
+  targetJobId     String?
+  targetJob       TargetJob? @relation(fields: [targetJobId], references: [id], onDelete: SetNull)
+  targetJobProfileVersion Int?
+  practiceSkillId String?
+  practiceSkill   SkillDefinition? @relation("PracticeInterviewSkill", fields: [practiceSkillId], references: [id], onDelete: SetNull)
 
   messages       Message[]
   report         Report?
@@ -46,6 +883,13 @@ model Interview {
   tasks          InterviewTask[]
   answerHistories AnswerHistory[]
   reflectionLogs ReflectionLog[]
+  questions      InterviewQuestion[]
+  answers        InterviewAnswer[]
+  evaluationRuns EvaluationRun[]
+  assessmentEvidence AssessmentEvidence[]
+  trainingAttempt TrainingAttempt? @relation("TrainingRetestInterview")
+  usageLedgerEntries UsageLedger[]
+  decisionRecords DecisionRecord[]
 
   @@index([userId, startedAt])
   @@map("interviews")
@@ -54,6 +898,10 @@ model Interview {
 /// 会话级成本面板（P0 缓存工程）
 /// 每场 interview 一行，累加式写入（llm.call 钩子 + 终态结算）
 model SessionCost {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id          String    @id @default(cuid())
   interviewId String    @unique
   interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -82,6 +930,8 @@ model SessionCost {
   outputCostPer1k  Float @default(0) // 输出 token 单价
   cacheDiscount    Float @default(0.4) // 缓存折扣（Qwen 0.4，DeepSeek 0.1）
   estimatedCostCny Float @default(0) // 估算总成本（元）
+  costStatus            String @default("unavailable")
+  pricingCatalogVersion String?
 
   // === 时间 ===
   startedAt DateTime  @default(now())
@@ -92,25 +942,61 @@ model SessionCost {
   @@map("session_costs")
 }
 
+model UsageLedger {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interviewId String?
+  interview   Interview? @relation(fields: [interviewId], references: [id], onDelete: SetNull)
+  periodStart DateTime
+  type        UsageLedgerType
+  units       Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  @@unique([interviewId, type])
+  @@index([userId, periodStart, type])
+  @@map("usage_ledger")
+}
+
 model Message {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id               String    @id @default(cuid())
   interviewId      String
   interview        Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
   role             String // 'system' | 'user' | 'assistant' | 'tool'
   content          String    @db.Text
+  clientMessageId  String?   @unique
+  replyToMessageId String?   @unique
+  replyToMessage   Message?  @relation("MessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replyMessage     Message?  @relation("MessageReply")
   metadata         Json? // 工具调用、token 消耗等
   promptTokens     Int       @default(0)
   completionTokens Int       @default(0)
   createdAt        DateTime  @default(now())
+  interviewAnswer  InterviewAnswer?
 
   @@index([interviewId, createdAt])
+  @@index([interviewId, clientMessageId])
   @@map("messages")
 }
 
 model Report {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id           String    @id @default(cuid())
   interviewId  String    @unique
   interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  currentEvaluationRunId String? @unique
+  currentEvaluationRun EvaluationRun? @relation("ReportCurrentEvaluationRun", fields: [currentEvaluationRunId], references: [id], onDelete: SetNull)
   overallScore Int // 总分 0-100
   scores       Json // 多维度评分：技术、表达、逻辑
   strengths    String    @db.Text // 优点
@@ -127,9 +1013,18 @@ enum InterviewStatus {
   ABANDONED
 }
 
+enum InterviewMode {
+  FULL_SIMULATION
+  SKILL_PRACTICE
+}
+
 // 用户级 MCP 工具偏好：用户可独立开关每个工具
 // 商用项目"工具治理"的体现
 model UserToolPreference {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id        String   @id @default(cuid())
   userId    String // email 桥接 demo user（与 User.email 形式一致）
   toolName  String // McpRegistry 的 name
@@ -145,6 +1040,10 @@ model UserToolPreference {
 
 // 动态任务队列 - 面试过程中生成的问题队列
 model InterviewTask {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id        String    @id @default(cuid())
   interviewId String
   interview  Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -157,6 +1056,7 @@ model InterviewTask {
   status    TaskStatus @default(PENDING)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  questionRecord InterviewQuestion?
 
   @@index([interviewId, status, priority])
   @@map("interview_tasks")
@@ -164,6 +1064,10 @@ model InterviewTask {
 
 // 答案历史 - 记录面试中的问答及评分
 model AnswerHistory {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id            String    @id @default(cuid())
   interviewId   String
   interview     Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -175,10 +1079,323 @@ model AnswerHistory {
   depth         Float     @default(0)     // 深度 0-1
   feedback      String?   @db.Text        // 反馈建议
   llmEvaluated  Boolean   @default(false) // 是否由 LLM 评分
+  questionId    String?
+  questionRecord InterviewQuestion? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+  answerId      String?   @unique
+  answerRecord  InterviewAnswer? @relation(fields: [answerId], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now())
 
   @@index([interviewId])
+  @@index([questionId])
+  @@index([answerId])
   @@map("answer_histories")
+}
+
+model TargetJob {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  level       String?
+  isActive    Boolean  @default(false)
+  source      String   @default("manual")
+  profileVersion Int   @default(1)
+  company     String?
+  jobDescription String? @db.Text
+  jobDescriptionHash String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidateSkillStates CandidateSkillState[]
+  skillRequirements JobSkillRequirement[]
+  interviews      Interview[]
+  trainingRecommendations TrainingRecommendation[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, isActive])
+  @@map("target_jobs")
+}
+
+model SkillDefinition {
+  id              String   @id @default(cuid())
+  slug            String
+  name            String
+  parentId        String?
+  parent          SkillDefinition? @relation("SkillHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children        SkillDefinition[] @relation("SkillHierarchy")
+  taxonomyVersion String
+  applicableRoles String[]
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  questions      InterviewQuestion[]
+  assessmentEvidence AssessmentEvidence[]
+  candidateSkillStates CandidateSkillState[]
+  jobRequirements JobSkillRequirement[]
+  practiceInterviews Interview[] @relation("PracticeInterviewSkill")
+  trainingRecommendations TrainingRecommendation[]
+
+  @@unique([slug, taxonomyVersion])
+  @@index([taxonomyVersion, isActive])
+  @@map("skill_definitions")
+}
+
+model JobSkillRequirement {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String   @id @default(cuid())
+  targetJobId    String
+  targetJob      TargetJob @relation(fields: [targetJobId], references: [id], onDelete: Cascade)
+  skillId        String
+  skill          SkillDefinition @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  importance     Int      @default(3)
+  expectedLevel  String?
+  source         String
+  matchedTerms   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([targetJobId, skillId])
+  @@index([targetJobId, importance])
+  @@map("job_skill_requirements")
+}
+
+model InterviewQuestion {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String   @id @default(cuid())
+  interviewId    String
+  interview      Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  sourceTaskId   String?  @unique
+  sourceTask     InterviewTask? @relation(fields: [sourceTaskId], references: [id], onDelete: SetNull)
+  parentQuestionId String?
+  parentQuestion InterviewQuestion? @relation("QuestionFollowUp", fields: [parentQuestionId], references: [id], onDelete: SetNull)
+  followUpQuestions InterviewQuestion[] @relation("QuestionFollowUp")
+  skillId        String?
+  skill          SkillDefinition? @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  subSkill       String?
+  externalQuestionId String?
+  version        Int      @default(1)
+  question       String   @db.Text
+  category       String
+  difficulty     String
+  expectedEvidence Json?
+  followUpPurpose String?
+  selectionMetadata Json?
+  source         String
+  createdAt      DateTime @default(now())
+
+  answers        InterviewAnswer[]
+  answerHistories AnswerHistory[]
+  assessmentEvidence AssessmentEvidence[]
+
+  @@index([interviewId, createdAt])
+  @@index([skillId])
+  @@index([parentQuestionId])
+  @@map("interview_questions")
+}
+
+model InterviewAnswer {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id             String   @id @default(cuid())
+  interviewId    String
+  interview      Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       InterviewQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  messageId      String   @unique
+  message        Message  @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  content        String   @db.Text
+  revision       Int      @default(1)
+  createdAt      DateTime @default(now())
+
+  answerHistories AnswerHistory[]
+  assessmentEvidence AssessmentEvidence[]
+
+  @@index([interviewId, createdAt])
+  @@index([questionId])
+  @@map("interview_answers")
+}
+
+model EvaluationDefinition {
+  id                    String   @id @default(cuid())
+  version               String   @unique
+  definitionHash        String   @unique
+  evaluatorVersion      String
+  promptVersion         String
+  rubricVersion         String
+  modelProvider         String
+  modelVersion          String
+  modelParameters       Json?
+  evaluationMode        EvaluationMode
+  fallbackPolicyVersion String
+  createdAt             DateTime @default(now())
+
+  evaluationRuns EvaluationRun[]
+
+  @@index([evaluationMode, createdAt])
+  @@map("evaluation_definitions")
+}
+
+model EvaluationRun {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id                   String   @id @default(cuid())
+  interviewId          String
+  interview            Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  definitionId         String
+  definition           EvaluationDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  inputRevision        String
+  mode                 EvaluationMode
+  status               EvaluationRunStatus @default(PENDING)
+  idempotencyKey       String   @unique
+  reportPayload        Json?
+  error                String?  @db.Text
+  degradedReason       String?  @db.Text
+  supersedesId         String?
+  supersedes           EvaluationRun? @relation("EvaluationRunSupersedes", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy         EvaluationRun[] @relation("EvaluationRunSupersedes")
+  createdAt            DateTime @default(now())
+  completedAt          DateTime?
+
+  assessmentEvidence   AssessmentEvidence[]
+  reportSnapshots      Report[] @relation("ReportCurrentEvaluationRun")
+  candidateSkillStates CandidateSkillState[]
+  trainingRecommendations TrainingRecommendation[]
+
+  @@unique([interviewId, inputRevision, definitionId, mode])
+  @@index([interviewId, createdAt])
+  @@index([status, createdAt])
+  @@map("evaluation_runs")
+}
+
+model AssessmentEvidence {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id                   String   @id @default(cuid())
+  evaluationRunId      String
+  evaluationRun        EvaluationRun @relation(fields: [evaluationRunId], references: [id], onDelete: Cascade)
+  interviewId          String
+  interview            Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  questionId           String
+  question             InterviewQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  answerId             String
+  answer               InterviewAnswer @relation(fields: [answerId], references: [id], onDelete: Restrict)
+  skillId              String?
+  skill                SkillDefinition? @relation(fields: [skillId], references: [id], onDelete: SetNull)
+  answerExcerpt        String   @db.Text
+  expectedEvidence     Json?
+  observedEvidence     Json?
+  dimensions           Json?
+  score                Float?
+  reason               String?  @db.Text
+  missingEvidence      Json?
+  recommendation       String?  @db.Text
+  confidence           Float    @default(0)
+  version              Int      @default(1)
+  createdAt            DateTime @default(now())
+
+  trainingRecommendations TrainingRecommendation[]
+
+  @@unique([evaluationRunId, answerId])
+  @@index([interviewId, createdAt])
+  @@index([skillId, createdAt])
+  @@map("assessment_evidence")
+}
+
+model CandidateSkillState {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetJobId     String
+  targetJob       TargetJob @relation(fields: [targetJobId], references: [id], onDelete: Cascade)
+  skillId         String
+  skill           SkillDefinition @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  score           Float
+  confidence      Float
+  trend           Float?
+  evidenceCount   Int      @default(0)
+  lastAssessedAt  DateTime
+  sourceRunId     String?
+  sourceRun       EvaluationRun? @relation(fields: [sourceRunId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, targetJobId, skillId])
+  @@index([userId, lastAssessedAt])
+  @@index([sourceRunId])
+  @@map("candidate_skill_states")
+}
+
+model TrainingRecommendation {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id                      String   @id @default(cuid())
+  userId                  String
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetJobId             String
+  targetJob               TargetJob @relation(fields: [targetJobId], references: [id], onDelete: Cascade)
+  targetJobProfileVersion Int
+  skillId                 String
+  skill                   SkillDefinition @relation(fields: [skillId], references: [id], onDelete: Restrict)
+  sourceRunId             String
+  sourceRun               EvaluationRun @relation(fields: [sourceRunId], references: [id], onDelete: Restrict)
+  sourceEvidenceId        String
+  sourceEvidence          AssessmentEvidence @relation(fields: [sourceEvidenceId], references: [id], onDelete: Restrict)
+  evidenceIds             Json
+  objective               String   @db.Text
+  prompts                 Json
+  expectedEvidence        Json
+  status                  TrainingRecommendationStatus @default(READY)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  attempts TrainingAttempt[]
+
+  @@unique([userId, targetJobId, skillId, sourceRunId])
+  @@index([userId, targetJobId, status])
+  @@map("training_recommendations")
+}
+
+model TrainingAttempt {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
+  id               String   @id @default(cuid())
+  recommendationId String
+  recommendation   TrainingRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status           TrainingAttemptStatus @default(COMPLETED)
+  completedAt      DateTime @default(now())
+  retestInterviewId String? @unique
+  retestInterview   Interview? @relation("TrainingRetestInterview", fields: [retestInterviewId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+
+  @@index([userId, completedAt])
+  @@map("training_attempts")
 }
 
 // ADR #10 Phase 1：Reviewer 反思日志
@@ -186,6 +1403,10 @@ model AnswerHistory {
 //   - Layer 1: 短期内给 planner 注入 reflection
 //   - Layer 2: cron 聚合高频 issue_tags，定位系统弱点
 model ReflectionLog {
+  organizationId String @default("default-organization")
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@index([organizationId])
+  @@unique([id, organizationId])
   id            String   @id @default(cuid())
   interviewId   String
   interview     Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
@@ -222,4 +1443,122 @@ enum TaskStatus {
   PENDING
   COMPLETED
   SKIPPED
+}
+
+enum EvaluationMode {
+  FINAL
+  PRACTICE
+  PREVIEW
+}
+
+enum EvaluationRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  DEGRADED
+  SUPERSEDED
+}
+
+enum TrainingRecommendationStatus {
+  READY
+  COMPLETED
+  RETEST_STARTED
+}
+
+enum TrainingAttemptStatus {
+  COMPLETED
+}
+
+enum UsageLedgerType {
+  LLM_CALL
+  INTERVIEW_START
+}
+
+enum LabValidationStatus {
+  VALID
+  INVALID
+}
+
+enum LabRunType {
+  RECORDED
+  REPLAY
+}
+
+enum LabRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum LabFailureCategory {
+  WRONG_QUESTION
+  BAD_FOLLOWUP
+  MISSING_EVIDENCE
+  HALLUCINATION
+  CONTEXT_MISS
+  MEMORY_MISS
+  RAG_MISS
+  DIFFICULTY_MISMATCH
+  REPETITIVE
+  OVER_SCORING
+  UNDER_SCORING
+  WRONG_SKILL
+  STRUCTURED_OUTPUT
+  SAFETY
+  UNKNOWN
+}
+
+enum LabFailureSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum LabExperimentStatus {
+  DRAFT
+  RUNNING
+  COMPLETED
+}
+
+enum LabExperimentArm {
+  CONTROL
+  TREATMENT
+}
+
+enum LabReleaseDecisionStatus {
+  APPROVE
+  NEEDS_REVIEW
+  REJECT
+}
+
+enum LabRecordedImportStatus {
+  PENDING
+  IMPORTING
+  IMPORTED
+  FAILED
+}
+
+enum LabOperationAction {
+  MCP_CONFIG_RELOAD
+  RECORDED_IMPORT_SUBMIT
+  RECORDED_IMPORT_EXECUTE
+  EXPERIMENT_CREATE
+  RELEASE_DECISION_RECORD
+  RETENTION_EXECUTE
+}
+
+enum LabOperationObject {
+  MCP_REGISTRY
+  RECORDED_IMPORT
+  EXPERIMENT
+  RELEASE_DECISION
+  RETENTION_POLICY
+}
+
+enum LabOperationOutcome {
+  SUCCEEDED
+  REJECTED
 }

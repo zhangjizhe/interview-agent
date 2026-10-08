@@ -10,12 +10,11 @@
  * - POST /api/tools/preferences  →  切换单个
  */
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Cpu, Search, Filter, CheckCircle2, XCircle, Wrench,
 } from 'lucide-react';
-import { getSession } from '../utils/auth';
 
 interface Tool {
   name: string;
@@ -79,7 +78,6 @@ export function ToolsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const userId = localStorage.getItem('ia_userId') || 'demo-user';
-  const isAdmin = getSession()?.role === 'ADMIN';
   const [keyword, setKeyword] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
@@ -90,21 +88,6 @@ export function ToolsPage() {
       const r = await fetch('/api/tools');
       return safeJson(r) as Promise<ToolsResponse>;
     },
-  });
-
-  // MCP server 运行时状态（admin 用）
-  const { data: mcpStatus } = useQuery({
-    queryKey: ['mcp-status'],
-    enabled: isAdmin,
-    queryFn: async () => {
-      const r = await fetch('/api/admin/mcp-servers');
-      return safeJson(r) as Promise<{
-        servers: Array<{ name: string; status: string; transport: string }>;
-        count: number;
-        runningCount: number;
-      }>;
-    },
-    refetchInterval: 30000,
   });
 
   // 切换用户偏好
@@ -123,25 +106,6 @@ export function ToolsPage() {
     },
   });
 
-  // 系统级启停（仅 admin 可见，简化：直接调 toggle）
-  const systemMut = useMutation({
-    mutationFn: async ({ toolName, enabled }: { toolName: string; enabled: boolean }) => {
-      const r = await fetch('/api/admin/mcp-servers/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toolName, enabled }),
-      });
-      return safeJson(r);
-    },
-    onSuccess: () => {
-      // R-AUTH-4 fix: ToolsPage 系统级切换也要刷 mcp-status + tools-count，
-      // 否则顶部「MCP 运行」统计会 stale，HomePage「技能市场」enabledCount 也不更新
-      queryClient.invalidateQueries({ queryKey: ['tools', userId] });
-      queryClient.invalidateQueries({ queryKey: ['tools-count'] });
-      queryClient.invalidateQueries({ queryKey: ['mcp-status'] });
-    },
-  });
-
   const filtered = (toolsData?.tools || []).filter((t) => {
     if (categoryFilter !== 'all' && t.category !== categoryFilter) return false;
     if (keyword) {
@@ -154,7 +118,6 @@ export function ToolsPage() {
   });
 
   const enabledCount = (toolsData?.tools || []).filter((t) => t.enabled).length;
-  const totalCount = toolsData?.count || 0;
   const userDisabled = (toolsData?.tools || []).filter((t) => !t.userEnabled).length;
 
   return (
@@ -181,12 +144,6 @@ export function ToolsPage() {
 
       {/* 统计 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-        {isAdmin && <div className="bg-white rounded-xl border border-slate-200 p-3 md:p-4">
-          <div className="text-xs text-slate-500">系统启用</div>
-          <div className="text-lg md:text-2xl font-semibold text-slate-900 font-mono mt-1">
-            {enabledCount} <span className="text-sm text-slate-400">/ {totalCount}</span>
-          </div>
-        </div>}
         <div className="bg-white rounded-xl border border-slate-200 p-3 md:p-4">
           <div className="text-xs text-slate-500">你关闭了</div>
           <div className="text-lg md:text-2xl font-semibold text-amber-600 font-mono mt-1">
@@ -199,52 +156,7 @@ export function ToolsPage() {
             {enabledCount - userDisabled}
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-3 md:p-4">
-          <div className="text-xs text-slate-500">MCP 运行</div>
-          <div className="text-lg md:text-2xl font-semibold text-blue-600 font-mono mt-1">
-            {mcpStatus?.runningCount ?? 0} <span className="text-sm text-slate-400">/ {mcpStatus?.count ?? 0}</span>
-          </div>
-        </div>
       </div>
-
-      {/* MCP server 状态条（admin） */}
-      {isAdmin && mcpStatus && mcpStatus.servers.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 md:p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-slate-400" />
-              <span className="text-xs font-semibold text-slate-700">MCP 服务运行时状态</span>
-            </div>
-            <span className="text-[10px] text-slate-400">每 30s 刷新 · 改 config 后调 POST /api/admin/mcp-servers/reload</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {mcpStatus.servers.map((s) => (
-              <span
-                key={s.name}
-                title={`${s.name} · ${s.status} · ${s.transport}`}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] ${
-                  s.status === 'running' || s.status === 'builtin'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : s.status === 'error'
-                      ? 'bg-red-50 text-red-700 border border-red-200'
-                      : 'bg-slate-50 text-slate-500 border border-slate-200'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    s.status === 'running' || s.status === 'builtin'
-                      ? 'bg-emerald-500'
-                      : s.status === 'error'
-                        ? 'bg-red-500'
-                        : 'bg-slate-300'
-                  }`}
-                />
-                {s.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* 搜索 + 分类筛选 */}
       <div className="bg-white rounded-2xl border border-slate-200 p-3 md:p-4 flex flex-col md:flex-row gap-2 md:gap-3">
@@ -301,9 +213,7 @@ export function ToolsPage() {
               key={tool.name}
               tool={tool}
               onToggleUser={(enabled) => toggleMut.mutate({ toolName: tool.name, enabled })}
-              onToggleSystem={isAdmin ? (enabled) => systemMut.mutate({ toolName: tool.name, enabled }) : undefined}
               isUserToggling={toggleMut.isPending}
-              isSystemToggling={systemMut.isPending}
             />
           ))}
         </div>
@@ -313,13 +223,7 @@ export function ToolsPage() {
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs md:text-sm text-blue-900 space-y-1">
         <div className="font-medium">💡 使用说明</div>
         <div>• <b>用户级</b>开关：只影响当前用户，系统重启/换用户不影响</div>
-        <div>• <b>系统级</b>开关：所有用户都受影响（如停用联网搜索避免 token 浪费）</div>
-        <div>• 添加新工具需在 <code className="bg-blue-100 px-1 rounded">apps/api/config/mcp-servers.json</code> 声明 + npm install 后重启 API</div>
-        {isAdmin && <div className="pt-1">
-          <Link to="/admin/mcp" className="text-blue-700 hover:underline font-medium">
-            → 前往 MCP 服务管理（系统级）
-          </Link>
-        </div>}
+        <div>• 系统级 MCP 服务由独立 Agent Lab 管理，不在候选人工具偏好中展示。</div>
       </div>
     </div>
   );
@@ -328,15 +232,11 @@ export function ToolsPage() {
 function ToolCard({
   tool,
   onToggleUser,
-  onToggleSystem,
   isUserToggling,
-  isSystemToggling,
 }: {
   tool: Tool & { userEnabled?: boolean };
   onToggleUser: (enabled: boolean) => void;
-  onToggleSystem?: (enabled: boolean) => void;
   isUserToggling: boolean;
-  isSystemToggling: boolean;
 }) {
   // 如果后端还没实现 userEnabled 字段，默认 true（与系统一致）
   const userEnabled = tool.userEnabled !== false;
@@ -369,15 +269,8 @@ function ToolCard({
         </div>
       </div>
 
-      {/* 双层开关 */}
+      {/* 用户级开关 */}
       <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-        {onToggleSystem && <SwitchRow
-          label="系统级"
-          checked={tool.enabled}
-          onChange={(v) => onToggleSystem(v)}
-          disabled={isSystemToggling}
-          tone={tool.enabled ? 'blue' : 'slate'}
-        />}
         <SwitchRow
           label="本用户"
           checked={userEnabled}

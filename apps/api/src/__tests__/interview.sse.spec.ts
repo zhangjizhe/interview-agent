@@ -1,89 +1,63 @@
-/**
- * P0-2 核心链路测试：SSE 流式输出验证
- *
- * 测试场景：
- * 1. SSE 端点返回正确的事件流格式
- * 2. 流式事件包含 delta token
- * 3. 流结束事件包含完整响应
- * 4. 错误处理
- */
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
-import { AppModule } from '../app.module';
+// Real NestJS HTTP/SSE boundary with synthetic agent and database fixtures.
+jest.mock('../modules/agent/interview-agent.service', () => ({ InterviewAgentService: class {} }));
+jest.mock('../modules/interview/services/question-generator.service', () => ({ QuestionGeneratorService: class {} }));
+jest.mock('../modules/interview/services/resume-parser.service', () => ({ ResumeParserService: class {} }));
+jest.mock('../modules/interview/services/scoring.service', () => ({ ScoringService: class {} }));
+jest.mock('../modules/agent-lab/interview-lab-bridge.service', () => ({ InterviewLabBridgeService: class {} }));
+import { Test } from '@nestjs/testing';
+import { InterviewFlowController } from '../modules/interview/controllers/interview-flow.controller';
+import { InterviewAgentService } from '../modules/agent/interview-agent.service';
+import { QuestionGeneratorService } from '../modules/interview/services/question-generator.service';
+import { ResumeParserService } from '../modules/interview/services/resume-parser.service';
+import { ScoringService } from '../modules/interview/services/scoring.service';
+import { InterviewLabBridgeService } from '../modules/agent-lab/interview-lab-bridge.service';
+import { StreamMessageDeliveryService } from '../modules/interview/services/stream-message-delivery.service';
+import { PrismaService } from '../infra/prisma/prisma.service';
 
-describe('InterviewController SSE Stream', () => {
-  let app: INestApplication;
-
+describe('Interview SSE current delivery contract', () => {
+  let app: any, base: string;
+  const agent = { processMessage: jest.fn() };
+  const prisma = { interview: { findFirst: jest.fn() } };
+  const delivery = { claimCandidateMessage: jest.fn(), persistAssistantResponse: jest.fn(), releaseUnansweredMessage: jest.fn().mockResolvedValue(undefined) };
+  const lab = { startTurn: jest.fn().mockRejectedValue(new Error('fixture disabled')) };
   beforeAll(async () => {
-    // 注意：完整集成测试需要真实数据库连接
-    // 这里提供测试框架，实际运行需要 docker-compose up
-    const module: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = module.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ transform: true }));
-    await app.init();
+    const module = await Test.createTestingModule({ controllers: [InterviewFlowController], providers: [
+      { provide: InterviewAgentService, useValue: agent }, { provide: PrismaService, useValue: prisma },
+      { provide: QuestionGeneratorService, useValue: {} }, { provide: ResumeParserService, useValue: {} }, { provide: ScoringService, useValue: {} },
+      { provide: StreamMessageDeliveryService, useValue: delivery }, { provide: InterviewLabBridgeService, useValue: lab },
+    ] }).compile();
+    app = module.createNestApplication(); app.use((req: any, _res: any, next: any) => { req.user = { userId: 'fixture-user' }; next(); });
+    await app.listen(0, '127.0.0.1'); base = await app.getUrl();
   });
-
-  afterAll(async () => {
-    await app?.close();
+  beforeEach(() => {
+    jest.clearAllMocks(); prisma.interview.findFirst.mockResolvedValue({ id: 'fixture', userId: 'fixture-user', status: 'ACTIVE', position: 'Engineer', level: 'P5' });
+    delivery.claimCandidateMessage.mockResolvedValue({ state: 'new', message: { id: 'fixture-message' } });
+    agent.processMessage.mockImplementation(async function* () { yield { type: 'thinking', content: 'private detail' }; yield { type: 'token', content: 'hello\nworld' }; });
   });
-
-  describe('SSE Endpoint Format', () => {
-    it('should validate SSE event format', () => {
-      // 验证 SSE 事件格式规范
-      const sseEvent = 'data: {"type":"token","content":"Hello"}\n\n';
-      expect(sseEvent).toMatch(/^data: .+\n\n$/);
-
-      const parsed = JSON.parse(sseEvent.replace('data: ', '').replace('\n\n', ''));
-      expect(parsed.type).toBe('token');
-      expect(parsed.content).toBe('Hello');
-    });
-
-    it('should handle multiple SSE events', () => {
-      const events = [
-        'data: {"type":"token","content":"Hello"}\n\n',
-        'data: {"type":"token","content":" World"}\n\n',
-        'data: {"type":"final_response","content":"Hello World"}\n\n',
-      ];
-
-      const parsedEvents = events.map(e => {
-        const match = e.match(/^data: (.+)\n\n$/);
-        return match ? JSON.parse(match[1]) : null;
-      });
-
-      expect(parsedEvents[0].type).toBe('token');
-      expect(parsedEvents[1].type).toBe('token');
-      expect(parsedEvents[2].type).toBe('final_response');
-    });
-
-    it('should handle error events', () => {
-      const errorEvent = 'data: {"type":"error","message":"Provider unavailable"}\n\n';
-      const parsed = JSON.parse(errorEvent.replace('data: ', '').replace('\n\n', ''));
-      expect(parsed.type).toBe('error');
-      expect(parsed.message).toBeDefined();
-    });
+  afterAll(async () => { await app?.close(); });
+  async function post(content = 'synthetic input') {
+    const response = await fetch(`${base}/interview/fixture/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, clientMessageId: 'fixture-request-1' }), signal: AbortSignal.timeout(3000) });
+    return { response, text: await response.text() };
+  }
+  it('flushes candidate tokens and DONE, drops internal events and persists exactly one response', async () => {
+    const { response, text } = await post();
+    expect(response.headers.get('content-type')).toContain('text/event-stream');
+    const tokens = text.split('\n\n').filter(line => line.startsWith('data: {')).map(line => JSON.parse(line.slice(6)));
+    expect(tokens.map(event => event.type)).toEqual(['heartbeat', 'token']);
+    expect(tokens[1].content).toBe('hello\nworld'); expect(text).toContain('data: [DONE]\n\n');
+    expect(text).not.toContain('private detail'); expect(delivery.persistAssistantResponse).toHaveBeenCalledTimes(1);
   });
-
-  describe('Stream Event Types', () => {
-    it('should define all required event types', () => {
-      const validEventTypes = ['token', 'final_response', 'error', 'step'];
-      expect(validEventTypes).toContain('token');
-      expect(validEventTypes).toContain('final_response');
-      expect(validEventTypes).toContain('error');
-    });
-
-    it('should include metadata in token events', () => {
-      const tokenEvent = {
-        type: 'token',
-        content: 'Hello',
-        node: 'supervisor',
-      };
-
-      expect(tokenEvent.type).toBe('token');
-      expect(tokenEvent.content).toBeDefined();
-    });
+  it('rejects empty input before claiming or invoking a model', async () => {
+    expect((await post('')).text).toContain('"type":"error"');
+    expect(delivery.claimCandidateMessage).not.toHaveBeenCalled(); expect(agent.processMessage).not.toHaveBeenCalled();
+  });
+  it('replays a persisted answer without new agent work', async () => {
+    delivery.claimCandidateMessage.mockResolvedValue({ state: 'replay', content: 'saved fixture' });
+    expect((await post()).text).toContain('saved fixture'); expect(agent.processMessage).not.toHaveBeenCalled();
+  });
+  it('does not expose provider errors or persist partial failed responses', async () => {
+    agent.processMessage.mockImplementation(async function* () { yield { type: 'error', error: 'provider-secret-detail' }; });
+    const { text } = await post(); expect(text).toContain('"type":"error"'); expect(text).not.toContain('provider-secret-detail');
+    expect(delivery.persistAssistantResponse).not.toHaveBeenCalled(); expect(delivery.releaseUnansweredMessage).toHaveBeenCalledWith('fixture-message');
   });
 });

@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Req,
+  ServiceUnavailableException,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -16,19 +17,10 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { QuestionBankService } from '../services/question-bank.service';
 import { QuestionGeneratorService } from '../services/question-generator.service';
 import { ResumeParserService } from '../services/resume-parser.service';
-import { assertSafeExternalUrl } from './external-url.util';
+import { fetchSafeExternalText } from './external-url.util';
 import { Roles } from '../../auth/roles.decorator';
 import { requireOwnedInterview } from '../../../common/ownership.util';
-
-interface QuestionDto {
-  questionId?: string;
-  position: string;
-  level?: string;
-  category?: string;
-  question: string;
-  answer: string;
-  tags?: string[];
-}
+import { GenerateDynamicQuestionsDto, GenerateQuestionsDto, QuestionBatchDto, QuestionDto, QuestionImportDto, QuestionSearchDto, QuestionUrlDto } from '../dto/question-bank.dto';
 
 /**
  * 面试题知识库 CRUD + 动态生成
@@ -65,7 +57,7 @@ export class QuestionBankController {
 
   @Post('question-bank/batch')
   @Roles('ADMIN')
-  async addQuestions(@Body() dto: { questions: QuestionDto[] }) {
+  async addQuestions(@Body() dto: QuestionBatchDto) {
     const result = await this.questionBank.addQuestions(
       (dto.questions || []).map((q) => ({
         questionId: q.questionId || `q-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -81,31 +73,30 @@ export class QuestionBankController {
   }
 
   @Get('question-bank/search')
+  @Roles('ADMIN')
   async searchQuestionBank(
-    @Query('q') query: string,
-    @Query('position') position?: string,
-    @Query('level') level?: string,
-    @Query('category') category?: string,
-    @Query('limit') limit?: string,
+    @Query() dto: QuestionSearchDto,
   ) {
+    const { q: query, position, level, category, limit = 5 } = dto;
     if (!query) return { query: '', results: [], count: 0 };
     const results = await this.questionBank.search(query, {
       position,
       level,
       category,
-      limit: limit ? parseInt(limit, 10) : 5,
+      limit,
     });
     return { query, position, level, category, results, count: results.length };
   }
 
   @Get('question-bank/list')
+  @Roles('ADMIN')
   async listQuestionBank(
-    @Query('position') position?: string,
-    @Query('limit') limit?: string,
+    @Query() dto: QuestionSearchDto,
   ) {
+    const { position, limit = 20 } = dto;
     const results = await this.questionBank.list(
       position,
-      limit ? parseInt(limit, 10) : 20,
+      limit,
     );
     return { position, results, count: results.length };
   }
@@ -113,7 +104,9 @@ export class QuestionBankController {
   @Delete('question-bank/:questionId')
   @Roles('ADMIN')
   async deleteQuestionBank(@Param('questionId') questionId: string) {
-    return this.questionBank.deleteQuestion(questionId);
+    const result = await this.questionBank.deleteQuestion(questionId);
+    if (!result.deleted) throw new ServiceUnavailableException('题目删除未确认，请稍后刷新核验');
+    return result;
   }
 
   /**
@@ -125,10 +118,9 @@ export class QuestionBankController {
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   async importQuestionBankFile(
     @UploadedFile() file: any,
-    @Body('position') position: string,
-    @Body('level') level?: string,
-    @Body('category') category?: string,
+    @Body() dto: QuestionImportDto,
   ) {
+    const { position, level, category } = dto;
     if (!file) throw new BadRequestException('No file uploaded');
     if (!position) throw new BadRequestException('position is required');
     const text = await this.resumeParser.parse(file); // 复用简历解析器
@@ -148,27 +140,13 @@ export class QuestionBankController {
   @Post('question-bank/import-url')
   @Roles('ADMIN')
   async importQuestionBankUrl(
-    @Body() dto: { url: string; position: string; level?: string; category?: string },
+    @Body() dto: QuestionUrlDto,
   ) {
     if (!dto.url) throw new BadRequestException('url is required');
     if (!dto.position) throw new BadRequestException('position is required');
 
-    // SSRF 防护：拒绝内网 / loopback / 非 https（修复 P0-3）
-    assertSafeExternalUrl(dto.url);
-
-    // 抓取网页 HTML
-    let html = '';
-    try {
-      const resp = await fetch(dto.url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; InterviewBot/1.0)' },
-      });
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
-      }
-      html = await resp.text();
-    } catch (err: any) {
-      throw new BadRequestException(`URL 抓取失败：${err.message}`);
-    }
+    // DNS/IP 固定连接与每跳重定向校验统一由抓取器执行，失败不进入模型导入流程。
+    const html = await fetchSafeExternalText(dto.url);
 
     // HTML → 纯文本（保留 title 和主要文本，供 LLM 从技术文档生成题目）
     const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]
@@ -208,7 +186,7 @@ export class QuestionBankController {
    */
   @Post('generate-questions')
   async generateInterviewQuestions(
-    @Body() dto: { text: string; position?: string; count?: number },
+    @Body() dto: GenerateQuestionsDto,
   ) {
     if (!dto.text || dto.text.trim().length < 20) {
       throw new BadRequestException('简历内容过短');
@@ -259,7 +237,7 @@ export class QuestionBankController {
   @Post(':interviewId/generate-dynamic-questions')
   async generateDynamicQuestions(
     @Param('interviewId') interviewId: string,
-    @Body() dto: { resumeText: string; count?: number },
+    @Body() dto: GenerateDynamicQuestionsDto,
     @Req() req: any,
   ) {
     const interview = await requireOwnedInterview(this.prisma, interviewId, req.user.userId);

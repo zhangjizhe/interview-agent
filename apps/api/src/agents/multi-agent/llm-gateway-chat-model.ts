@@ -51,9 +51,25 @@ export interface LlmGatewayChatModelFields extends BaseChatModelParams {
  * MultiAgentService.run/stream 用 threadIdStorage.run({threadId, userId}, ...) 包装，
  * _generate 读这个 store 拿真实 sessionId —— 避免硬编码 'unknown' 触发 session_costs FK 违反
  */
+export interface LlmUsageAccumulator {
+  promptTokens: number;
+  completionTokens: number;
+  calls: number;
+  models: Set<string>;
+  samples: Array<{
+    provider: string;
+    model: string;
+    promptTokens: number;
+    completionTokens: number;
+  }>;
+}
+
 interface ThreadContext {
   threadId?: string;
   userId?: string;
+  usage?: LlmUsageAccumulator;
+  /** 离线版本评测必须读取本次模型结果，不能复用其他策略的答案。 */
+  bypassSemanticCache?: boolean;
 }
 export const threadIdStorage = new AsyncLocalStorage<ThreadContext>();
 
@@ -111,10 +127,11 @@ export class LlmGatewayChatModel extends BaseChatModel {
         interviewId: resolvedInterviewId,
         userId: resolvedUserId,
         // 关键：传 semanticCacheType 让 llmGateway 内部处理 cache 查 + 计数 + 回写
-        semanticCacheType: this.cacheType as any,
+        semanticCacheType: threadIdStorage.getStore()?.bypassSemanticCache ? undefined : this.cacheType as any,
       },
       this.provider,
     );
+    this.recordUsage(response.usage, response.provider, response.model);
 
     const aiMessage = new AIMessage(response.content);
     return {
@@ -156,7 +173,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
         userId: resolvedUserId,
         // R-P1-6 修复：传 semanticCacheType 让 llmGateway 内部处理 cache 查 + 计数 + 回写。
         // 原 L148 漏传，导致流式调用绕开语义缓存（_generate 已传），缓存命中率偏低。
-        semanticCacheType: this.cacheType as any,
+        semanticCacheType: threadIdStorage.getStore()?.bypassSemanticCache ? undefined : this.cacheType as any,
       },
       this.provider,
     )) {
@@ -191,6 +208,7 @@ export class LlmGatewayChatModel extends BaseChatModel {
       }
       // 用量统计：最后一个 chunk 透传给 LangChain 用于 llmOutput.tokenUsage
       if (chunk.usage) {
+        this.recordUsage(chunk.usage, chunk.provider || this.provider, chunk.model || this.provider);
         yield new ChatGenerationChunk({
           message: new AIMessageChunk({ content: '' }),
           text: '',
@@ -201,6 +219,25 @@ export class LlmGatewayChatModel extends BaseChatModel {
         });
       }
     }
+  }
+
+  private recordUsage(
+    usage?: { promptTokens: number; completionTokens: number },
+    provider?: string,
+    model?: string,
+  ) {
+    const accumulator = threadIdStorage.getStore()?.usage;
+    if (!accumulator || !usage) return;
+    accumulator.promptTokens += usage.promptTokens;
+    accumulator.completionTokens += usage.completionTokens;
+    accumulator.calls += 1;
+    if (model) accumulator.models.add(model);
+    accumulator.samples.push({
+      provider: provider || 'unknown',
+      model: model || 'unknown',
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+    });
   }
 
   /**

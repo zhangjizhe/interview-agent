@@ -1,3 +1,4 @@
+import { tenantMiddleware } from '../../modules/organizations/tenant-policy';
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
@@ -7,6 +8,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   constructor() {
     super({ log: process.env.PRISMA_LOG === '1' ? [{ emit: 'event', level: 'query' }] : undefined });
+    this.$use(tenantMiddleware);
     if (process.env.PRISMA_LOG === '1') {
       // @ts-ignore
       this.$on('query', (e: any) => {

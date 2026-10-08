@@ -6,6 +6,7 @@ import { InterviewLifecycleController } from './controllers/interview-lifecycle.
 import { ResumeController } from './controllers/resume.controller';
 import { QuestionBankController } from './controllers/question-bank.controller';
 import { EvaluationController } from './controllers/evaluation.controller';
+import { SkillProfileController } from './controllers/skill-profile.controller';
 import { InterviewFlowController } from './controllers/interview-flow.controller';
 import { AgentModule } from '../agent/agent.module';
 import { TaskQueueModule } from '../agent/task-queue.module';
@@ -20,15 +21,23 @@ import { QuestionBankService } from './services/question-bank.service';
 import { QuestionGeneratorService } from './services/question-generator.service';
 import { ScoringService } from './services/scoring.service';
 import { HitlService } from './services/hitl.service';
+import { EvaluationService } from './services/evaluation.service';
+import { JobReadinessService } from './services/job-readiness.service';
+import { SkillStateAggregationService } from './services/skill-state-aggregation.service';
+import { StreamMessageDeliveryService } from './services/stream-message-delivery.service';
+import { TrainingService } from './services/training.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
+import { AgentLabModule } from '../agent-lab/agent-lab.module';
 
 @Module({
-  imports: [AgentModule, MemoryModule, LlmModule, TaskQueueModule, AuthModule],
+  imports: [AgentModule, MemoryModule, LlmModule, TaskQueueModule, AuthModule, AgentLabModule],
   // 注册顺序保证：LifecycleController（含 list/stats 等静态路由）必须最先注册，
   // FlowController（含 :interviewId/message 等参数路由）最后注册。
   // NestJS 跨 controller 按注册顺序匹配路由，避免 /interview/list 被
   // /interview/:interviewId 抢先匹配。
   controllers: [
+    // target-jobs/readiness 必须在 LifecycleController 的 :interviewId GET 之前注册。
+    SkillProfileController,
     InterviewLifecycleController,
     ResumeController,
     QuestionBankController,
@@ -44,6 +53,11 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
     QuestionBankService,
     QuestionGeneratorService,
     ScoringService,
+    EvaluationService,
+    SkillStateAggregationService,
+    JobReadinessService,
+    StreamMessageDeliveryService,
+    TrainingService,
     // RagService 已删除（2026-06-25 dead code 清理）
     HitlService,
     PrismaService,
@@ -54,6 +68,9 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
     QuestionBankService,
     QuestionGeneratorService,
     ScoringService,
+    EvaluationService,
+    SkillStateAggregationService,
+    JobReadinessService,
     HitlService,
   ],
 })

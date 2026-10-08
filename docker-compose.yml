@@ -1,31 +1,15 @@
-# ✅ 纯 Docker 化：真·一键部署（2026-06-26 NestJS 默认）
-#
-# 一键启动（git clone 后只跑这一条）：
-#   docker compose up -d --build
-#
-# 启动后：
-#   - 前端: http://localhost:5173
-#   - 后端: http://localhost:3001（NestJS · 默认）
-#   - 文档: http://localhost:3001/api/docs
-#
-# 容器清单（8 容器 · 2026-06-26 架构回退到 NestJS 默认）：
-#   postgres / redis / qdrant / milvus / milvus-etcd / api (NestJS) / web
-#   + py-api（默认不启，profile 选配）
-#
-# 选配启 py-api（薄壳版商用 best practice 后端）：
-#   docker compose --profile py up -d
-#   然后改 web/nginx.conf set $backend "http://py-api:3002" + 重 build web
-#
-# 必备前置（首次）：
-#   cp .env.example .env  ← 自动生成（deploy.sh 会做）
-#   在 .env 填 QWEN_API_KEY（必须）+ JWT_SECRET（自动生成占位）
+# Local product stack. Copy .env.example and configure private credentials first.
+# docker compose up -d --build
+# Interview :5173, Lab :5175, NestJS API :3001.
+# Loopback bindings are intentional; production requires a TLS ingress.
+# py-api is an experimental optional profile, not the default backend.
 
 services:
   postgres:
     image: postgres:16-alpine
     container_name: interview-postgres
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     environment:
       POSTGRES_DB: interview
       POSTGRES_USER: ${POSTGRES_USER:-dev}
@@ -34,16 +18,17 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U dev']
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     container_name: interview-redis
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -51,11 +36,11 @@ services:
       interval: 5s
 
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c
     container_name: interview-qdrant
     ports:
-      - '6333:6333'
-      - '6334:6334'
+      - '127.0.0.1:6333:6333'
+      - '127.0.0.1:6334:6334'
     volumes:
       - qdrant_data:/qdrant/storage
     # qdrant 镜像里没装 curl/wget，TCP 端口探测最稳
@@ -90,8 +75,8 @@ services:
     command: ["milvus", "run", "standalone"]
     container_name: interview-milvus
     ports:
-      - '19530:19530'
-      - '9091:9091'
+      - '127.0.0.1:19530:19530'
+      - '127.0.0.1:9091:9091'
     environment:
       ETCD_ENDPOINTS: milvus-etcd:2379
       COMMON_STORAGETYPE: local
@@ -107,15 +92,34 @@ services:
       retries: 8
       start_period: 90s
 
+  # Prisma DDL is isolated from the API runtime. It must finish successfully
+  # before the API becomes eligible to start.
+  migration:
+    image: interview-agent-api:latest
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: interview-migration
+    entrypoint: ["/usr/local/bin/migration-entrypoint.sh"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev123}@postgres:5432/interview
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   # NestJS 后端（2026-06-26 恢复为默认后端，端口 3001）
   # apps/api/（之前 apps/api-legacy/）git rename 回原路径
   api:
+    image: interview-agent-api:latest
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     container_name: interview-api
     ports:
-      - '3001:3001'
+      - '127.0.0.1:3001:3001'
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev123}@postgres:5432/interview
       REDIS_URL: redis://redis:6379
@@ -125,28 +129,29 @@ services:
       QWEN_API_KEY: ${QWEN_API_KEY:-}
       QWEN_MODEL: ${QWEN_MODEL:-qwen-plus}
       DEEPSEEK_BASE_URL: https://api.deepseek.com/v1
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      LLM_PRICING_CATALOG_JSON: ${LLM_PRICING_CATALOG_JSON:-}
+      AGENT_LAB_MAX_EVALUATION_COST_CNY: ${AGENT_LAB_MAX_EVALUATION_COST_CNY:-5}
       MEM0_API_KEY: ${MEM0_API_KEY:-}
       MEM0_HOST: ${MEM0_HOST:-}
-      # 商用 fail-fast：JWT_SECRET 未设置时 docker compose 立即报错（容器不启动）
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (deploy.sh 自动生成 dev 占位)}
       ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
+      QUOTA_MONTHLY_INTERVIEW_LIMIT: ${QUOTA_MONTHLY_INTERVIEW_LIMIT:-}
       PORT: 3001
       NODE_ENV: production
     env_file:
       - .env
     depends_on:
-      postgres:
-        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
       redis:
         condition: service_started
       milvus:
         condition: service_healthy
     healthcheck:
       # node 18+ 内置 fetch，不依赖 curl
-      # NestJS 用 setGlobalPrefix('api')，所以路径是 /api/health 不是 /health
-      test: ['CMD-SHELL', "node -e \"fetch('http://localhost:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ['CMD-SHELL', "node -e \"fetch('http://localhost:3001/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
       timeout: 10s
       retries: 15
@@ -163,7 +168,7 @@ services:
     container_name: interview-py-api
     profiles: ["py"]  # 只在 --profile py 时启动
     ports:
-      - '3002:3002'
+      - '127.0.0.1:3002:3002'
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-dev}:${POSTGRES_PASSWORD:-dev123}@postgres:5432/interview
       REDIS_URL: redis://redis:6379
@@ -203,11 +208,54 @@ services:
       dockerfile: apps/web/Dockerfile
     container_name: interview-web
     ports:
-      - '5173:80'
+      - '127.0.0.1:5173:80'
     depends_on:
       api:
         condition: service_healthy
     restart: unless-stopped
+
+  agent-lab:
+    build:
+      context: .
+      dockerfile: apps/agent-lab/Dockerfile
+    container_name: interview-agent-lab
+    ports:
+      - '127.0.0.1:5175:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: ["observability"]
+    ports: ["127.0.0.1:9090:9090"]
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    secrets: [metrics_token]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    profiles: ["observability"]
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    secrets: [grafana_password]
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    restart: unless-stopped
+
+secrets:
+  metrics_token:
+    file: ./.local-backups/observability/metrics-token
+  grafana_password:
+    file: ./.local-backups/observability/grafana-password
 
 volumes:
   postgres_data:
@@ -215,3 +263,5 @@ volumes:
   qdrant_data:
   milvus_etcd_data:
   milvus_data:
+  prometheus_data:
+  grafana_data:

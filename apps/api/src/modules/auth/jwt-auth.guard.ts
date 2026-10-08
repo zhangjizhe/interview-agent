@@ -1,12 +1,14 @@
+import { PrismaService } from '../../infra/prisma/prisma.service';
+import { AuthSessionService } from './auth-session.service';
 /**
  * JWT Auth Guard
  *
  * P0-1 修复：JWT 认证 + Rate Limiting
  * - 验证 Authorization: Bearer <token>
- * - demo 阶段：userId 放在 token subject 里，不需要密码
+ * - 签名通过后校验 Redis 会话版本与吊销状态
  * - 未登录请求返回 401 Unauthorized
  */
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -19,6 +21,8 @@ export class JwtAuthGuard implements CanActivate {
     private jwtService: JwtService,
     private config: ConfigService,
     private reflector: Reflector,
+    private sessions: AuthSessionService,
+    private prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -40,13 +44,20 @@ export class JwtAuthGuard implements CanActivate {
         secret: this.config.get<string>('auth.jwtSecret'),
         algorithms: ['HS256'],
       });
+      await this.sessions.assertActive(payload, token);
+      const identity = await this.prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, email: true, role: true, organizationId: true } });
+      if (!identity) throw new UnauthorizedException('Invalid identity');
+      (request as any).authPayload = payload;
+      (request as any).authToken = token;
       (request as any).user = {
         userId: payload.sub,
-        email: payload.email,
-        role: payload.role,
+        email: identity.email,
+        role: identity.role,
+        organizationId: identity.organizationId,
       };
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
       throw new UnauthorizedException('Invalid token');
     }
   }

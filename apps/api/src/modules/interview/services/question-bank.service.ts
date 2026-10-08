@@ -1,3 +1,9 @@
+import { LlmGatewayService } from '../../llm/llm.gateway.service';
+import { BadRequestException, HttpException, ServiceUnavailableException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validateSync } from 'class-validator';
+import { QUESTION_BATCH_LIMIT, QuestionDto } from '../dto/question-bank.dto';
+import { tenantCollection } from '../../organizations/tenant-context';
 /**
  * 面试题知识库（混合检索 + Rerank，lazy init）
  *
@@ -24,6 +30,7 @@ import {
   MetricType,
   IndexType,
   FunctionType,
+  ConsistencyLevelEnum,
 } from '@zilliz/milvus2-sdk-node';
 import { escapeMilvusString } from './escape-milvus.util';
 
@@ -67,21 +74,23 @@ export class QuestionBankService {
   private embedder: OpenAI;
 
   /** v2 collection：支持混合检索 */
-  private readonly COLLECTION = 'question_bank_v2';
+  private get COLLECTION() { return tenantCollection('question_bank_v2'); }
   private readonly VECTOR_DIM = 1024;
 
   /** Rerank 开关（默认开启，API Key 缺失时自动关闭） */
   private rerankEnabled = false;
   private dashscopeApiKey = '';
-  private initialized = false;
+  private readonly initializedCollections = new Set<string>();
+  private get initialized() { return this.initializedCollections.has(this.COLLECTION); }
+  private set initialized(value: boolean) { if (value) this.initializedCollections.add(this.COLLECTION); }
 
-  constructor(private config: ConfigService) {
+  constructor(private config: ConfigService, private llm: LlmGatewayService) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
     const qwenKey = this.config.get<string>('qwen.apiKey');
     const qwenBase = this.config.get<string>('qwen.baseUrl');
 
     this.client = new MilvusClient({ address: milvusUrl });
-    this.embedder = new OpenAI({ apiKey: qwenKey, baseURL: qwenBase });
+    this.embedder = new OpenAI({ apiKey: qwenKey, baseURL: qwenBase, maxRetries: 0, timeout: 15000 });
 
     // Rerank 用 DashScope API Key（和 Qwen 共用同一个 key）
     this.dashscopeApiKey = qwenKey || '';
@@ -207,71 +216,78 @@ export class QuestionBankService {
    * 把题目存进知识库
    */
   async addQuestion(item: Omit<QuestionItem, 'id' | 'createdAt'>): Promise<{ questionId: string }> {
-    await this.ensureCollection();
-    try {
-      const text = `${item.question}\n\n${item.answer}\n\n${item.tags}`;
-      const vector = await this.embedText(text);
+    await this.addQuestions([item]);
+    return { questionId: item.questionId };
+  }
 
-      await this.client.insert({
+  /** All embeddings must succeed before the single vector-store insertion. */
+  async addQuestions(items: Array<Omit<QuestionItem, 'id' | 'createdAt'>>): Promise<{ count: number }> {
+    if (!Array.isArray(items) || items.length < 1 || items.length > QUESTION_BATCH_LIMIT) throw new BadRequestException('QUESTION_BATCH_LIMIT');
+    const ids = new Set<string>();
+    for (const item of items) {
+      const dto = plainToInstance(QuestionDto, { ...item, tags: typeof item.tags === 'string' && item.tags ? item.tags.split('、') : [] });
+      if (validateSync(dto).length || typeof item.questionId !== 'string' || !item.questionId.trim() || ids.has(item.questionId)
+        || typeof item.tags !== 'string' || Buffer.byteLength(item.tags) > 500
+        || !item.position?.trim() || !item.question?.trim() || !item.answer?.trim()) throw new BadRequestException('QUESTION_INPUT_INVALID');
+      ids.add(item.questionId);
+    }
+    await this.ensureCollection();
+    const texts = items.map(it => `${it.question}\n\n${it.answer}\n\n${it.tags}`);
+    const vectors: number[][] = [];
+    for (let offset = 0; offset < texts.length; offset += 2) {
+      vectors.push(...await Promise.all(texts.slice(offset, offset + 2).map(text => this.embedText(text))));
+    }
+    const now = new Date().toISOString();
+    let insertedIds: string[] = [];
+    try {
+      const result = await this.client.insert({
         collection_name: this.COLLECTION,
-        data: [
-          {
-            vector,
-            text, // BM25 输入字段
-            questionId: item.questionId,
-            position: item.position,
-            level: item.level,
-            category: item.category,
-            question: item.question,
-            answer: item.answer,
-            tags: item.tags,
-            createdAt: new Date().toISOString(),
-          },
-        ],
+        timeout: 5000,
+        data: items.map((item, i) => ({ ...item, vector: vectors[i], text: texts[i], createdAt: now })),
       });
-      await (this.client as any).flushSync?.({ collection_names: [this.COLLECTION] });
-      this.logger.log(`Added question ${item.questionId} (${item.position}/${item.level})`);
-      return { questionId: item.questionId };
-    } catch (err: any) {
-      this.logger.error(`addQuestion failed: ${err.message}`);
-      throw err;
+      const rawIds = (result.IDs as any)?.int_id?.data;
+      if (Array.isArray(rawIds) && rawIds.every(id => /^\d+$/.test(String(id)) && (typeof id !== 'number' || Number.isSafeInteger(id)))) insertedIds = rawIds.map(String);
+      this.assertWrite(result);
+      if (insertedIds.length !== items.length || Number(result.insert_cnt) !== items.length) throw new Error('QUESTION_INSERT_INCOMPLETE');
+      await this.flushConfirmed();
+      return { count: items.length };
+    } catch {
+      let rollbackConfirmed = false;
+      if (insertedIds.length) {
+        try {
+          this.assertWrite(await this.client.delete({ collection_name: this.COLLECTION, filter: `id in [${insertedIds.join(',')}]`, timeout: 5000 }));
+          await this.flushConfirmed();
+          rollbackConfirmed = true;
+        } catch { /* Unknown persistence must never be reported as success. */ }
+      }
+      this.logger.warn({ event: 'question_batch_write_failed', rollbackConfirmed });
+      throw new ServiceUnavailableException(rollbackConfirmed ? 'QUESTION_WRITE_ROLLED_BACK' : 'QUESTION_WRITE_UNCONFIRMED: inspect storage before retry');
     }
   }
 
-  /**
-   * 批量上传题目
-   */
-  async addQuestions(items: Array<Omit<QuestionItem, 'id' | 'createdAt'>>): Promise<{ count: number }> {
-    if (items.length === 0) return { count: 0 };
-    await this.ensureCollection();
-    try {
-      const texts = items.map((it) => `${it.question}\n\n${it.answer}\n\n${it.tags}`);
-      const vectors = await Promise.all(texts.map((t) => this.embedText(t)));
-      const now = new Date().toISOString();
-      await this.client.insert({
-        collection_name: this.COLLECTION,
-        data: items.map((it, i) => ({
-          vector: vectors[i],
-          text: texts[i], // BM25 输入字段
-          questionId: it.questionId,
-          position: it.position,
-          level: it.level,
-          category: it.category,
-          question: it.question,
-          answer: it.answer,
-          tags: it.tags,
-          createdAt: now,
-        })),
-      });
-      // Milvus insert is asynchronous by default. Flush before returning so a
-      // successful import is immediately visible to the next search/list call.
-      await (this.client as any).flushSync?.({ collection_names: [this.COLLECTION] });
-      this.logger.log(`Added ${items.length} questions in batch`);
-      return { count: items.length };
-    } catch (err: any) {
-      this.logger.error(`addQuestions failed: ${err.message}`);
-      throw err;
+  private assertWrite(result: any) {
+    if (!result?.status || !['Success', '0'].includes(String(result.status.error_code)) || (result.status.code !== undefined && result.status.code !== 0)) throw new Error('QUESTION_STORAGE_FAILED');
+  }
+
+  private async flushConfirmed() {
+    const deadline = Date.now() + 30000;
+    let result: any;
+    // Only flush is retried: Milvus can rate-limit it to one operation / 10s.
+    // Never repeat insert or paid embeddings after an ambiguous outcome.
+    while (Date.now() < deadline) {
+      result = await this.client.flush({ collection_names: [this.COLLECTION], timeout: 5000 });
+      if (String(result?.status?.error_code) !== 'RateLimit') { this.assertWrite(result); break; }
+      await new Promise(done => setTimeout(done, Math.min(10000, Math.max(0, deadline - Date.now()))));
     }
+    this.assertWrite(result);
+    const segmentIDs = Object.values(result.coll_segIDs || {}).flatMap((value: any) => value.data || []);
+    while (Date.now() < deadline) {
+      const state = await this.client.getFlushState({ segmentIDs, timeout: 2000 });
+      this.assertWrite(state);
+      if (state.flushed) return;
+      await new Promise(done => setTimeout(done, 250));
+    }
+    throw new Error('QUESTION_FLUSH_TIMEOUT');
   }
 
   // ===== 搜索 =====
@@ -459,6 +475,7 @@ export class QuestionBankService {
       const filter = position ? `position == "${escapeMilvusString(position)}"` : undefined;
       const result = await this.client.query({
         collection_name: this.COLLECTION,
+        consistency_level: ConsistencyLevelEnum.Strong,
         filter,
         output_fields: ['questionId', 'position', 'level', 'category', 'question', 'answer', 'tags', 'createdAt'],
         limit,
@@ -543,16 +560,15 @@ export class QuestionBankService {
 ${text.slice(0, 6000)}
 `;
     try {
-      const res = await this.embedder.chat.completions.create({
-        model: 'qwen-plus',
+      const res = await this.llm.chat({
         messages: [
           { role: 'system', content: '你是一个专业的面试题整理 AI，只输出 JSON。' },
           { role: 'user', content: prompt },
         ],
         temperature: 0.1,
-        response_format: { type: 'json_object' },
+        maxTokens: 4096,
       });
-      const content = res.choices[0]?.message?.content || '{}';
+      const content = res.content || '{}';
       let parsed: any = {};
       try {
         parsed = JSON.parse(content);
@@ -567,7 +583,7 @@ ${text.slice(0, 6000)}
           : Array.isArray(parsed.items)
             ? parsed.items
             : [];
-      return items
+      return items.slice(0, QUESTION_BATCH_LIMIT)
         .filter((it) => it?.question && it?.answer)
         .map((it, idx) => ({
           questionId: `q-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
@@ -576,9 +592,10 @@ ${text.slice(0, 6000)}
           category,
           question: String(it.question).slice(0, 1000),
           answer: String(it.answer).slice(0, 2000),
-          tags: (it.tags || []).join('、').slice(0, 200),
+          tags: (Array.isArray(it.tags) ? it.tags.filter((tag: unknown) => typeof tag === 'string' && Buffer.byteLength(tag) <= 40).slice(0, 10) : []).join('、'),
         }));
     } catch (err: any) {
+      if (err instanceof HttpException) throw err;
       this.logger.error(`LLM extract questions failed: ${err.message}`);
       return [];
     }

@@ -1,5 +1,11 @@
+import { MetricsService } from '../../metrics/metrics.service';
+import { tenantContext } from '../../organizations/tenant-context';
+import { HttpException } from '@nestjs/common';
+import { RateLimitPolicy } from '../../auth/security-throttler.guard';
 import {
   BadRequestException,
+  NotFoundException,
+  Optional,
   Body,
   Controller,
   HttpStatus,
@@ -17,10 +23,14 @@ import { ScoringService } from '../services/scoring.service';
 import type { InterviewQuestion } from '../services/question-generator.service';
 import { extractKeywordsFromQuestion } from './keyword-extract.util';
 import { requireOwnedInterview } from '../../../common/ownership.util';
+import { toCandidateStreamEvent } from '../services/candidate-stream-event.util';
+import { StreamMessageDeliveryService } from '../services/stream-message-delivery.service';
+import { InterviewLabBridgeService } from '../../agent-lab/interview-lab-bridge.service';
 
 interface MessageDto {
   userId: string;
   content: string;
+  clientMessageId?: string;
 }
 
 /**
@@ -44,6 +54,9 @@ export class InterviewFlowController {
     private resumeParser: ResumeParserService,
     private scoring: ScoringService,
     private prisma: PrismaService,
+    private streamDelivery: StreamMessageDeliveryService,
+    private interviewLab: InterviewLabBridgeService,
+    @Optional() private metrics?: MetricsService,
   ) {}
 
   /**
@@ -149,6 +162,7 @@ export class InterviewFlowController {
     };
   }
 
+  @RateLimitPolicy('sse')
   @Post(':interviewId/message')
   async streamMessage(
     @Param('interviewId') interviewId: string,
@@ -156,12 +170,34 @@ export class InterviewFlowController {
     @Req() req: any,
     @Res() res: Response,
   ) {
+    const interview = await this.prisma.interview.findFirst({
+      where: { id: interviewId, userId: req.user.userId },
+      include: {
+        practiceSkill: { select: { id: true, name: true } },
+      },
+    });
+    if (!interview) throw new NotFoundException('Interview not found');
+
     res.status(HttpStatus.OK);
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
+    this.metrics?.openSse(res);
     res.flushHeaders();
+    // 图编排和模型首 token 可能超过几十秒。用轻量 SSE 心跳保持连接，
+    // 防止前端把“仍在处理”误判成断流。
+    const writeHeartbeat = () => {
+      if (res.writableEnded) return;
+      res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
+      (res as any).flush?.();
+    };
+    // Emit once immediately so the client and any intermediary know the stream
+    // is active before expensive interview setup starts.
+    writeHeartbeat();
+    const heartbeat = setInterval(writeHeartbeat, 15_000);
+    const stopHeartbeat = () => clearInterval(heartbeat);
+    res.once('close', stopHeartbeat);
 
     // R-P2-20 修复：user message 长度上限 10000 字符（约 2000-3000 tokens）。
     // 原 Prisma @db.Text 无限制，恶意用户可发超长消息导致 DB / LLM 上下文压力。
@@ -170,22 +206,14 @@ export class InterviewFlowController {
     if (!dto.content || typeof dto.content !== 'string' || dto.content.length === 0) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: '消息内容不能为空' })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
     if (dto.content.length > MAX_USER_MESSAGE_CHARS) {
       res.write(`data: ${JSON.stringify({ type: 'error', error: `消息超过 ${MAX_USER_MESSAGE_CHARS} 字符限制（当前 ${dto.content.length}）` })}\n\n`);
       (res as any).flush?.();
-      res.end();
-      return;
-    }
-
-    const interview = await this.prisma.interview.findFirst({
-      where: { id: interviewId, userId: req.user.userId },
-    });
-    if (!interview) {
-      res.write(`data: ${JSON.stringify({ type: 'error', error: 'Interview not found' })}\n\n`);
-      (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
@@ -195,22 +223,21 @@ export class InterviewFlowController {
     if (interview.status === 'COMPLETED') {
       res.write(`data: ${JSON.stringify({ type: 'error', error: '此面试已结束,不能继续发送消息' })}\n\n`);
       (res as any).flush?.();
+      stopHeartbeat();
       res.end();
       return;
     }
 
-    await this.prisma.message.create({
-      data: { interviewId, role: 'user', content: dto.content },
-    });
-
-    const ctx: AgentContext = {
-      userId: interview.userId,
-      sessionId: interviewId,
-      position: interview.position,
-      level: interview.level,
-      // P0-3 修复：传 provider，让 maxTokens 走对应 provider 配置
-      provider: (dto as any).provider || 'qwen',
-    };
+    if (
+      dto.clientMessageId
+      && (typeof dto.clientMessageId !== 'string' || !/^[A-Za-z0-9_-]{8,128}$/.test(dto.clientMessageId))
+    ) {
+      res.write(`data: ${JSON.stringify({ type: 'error', error: '请求标识无效，请重新发送。' })}\n\n`);
+      (res as any).flush?.();
+      stopHeartbeat();
+      res.end();
+      return;
+    }
 
     const writeEvent = (event: object) => {
       const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
@@ -219,7 +246,62 @@ export class InterviewFlowController {
       return Promise.resolve();
     };
 
+    const claim = await this.streamDelivery.claimCandidateMessage(
+      interviewId,
+      dto.content,
+      dto.clientMessageId,
+    );
+    if (claim.state === 'conflict') {
+      await writeEvent({ type: 'error', error: '请求标识与已有消息不匹配，请重新发送。' });
+      stopHeartbeat();
+      res.end();
+      return;
+    }
+    if (claim.state === 'pending') {
+      await writeEvent({ type: 'error', error: '上一次回答仍在处理中，请稍后重试。' });
+      stopHeartbeat();
+      res.end();
+      return;
+    }
+    if (claim.state === 'replay') {
+      await writeEvent({ type: 'token', content: claim.content });
+      await new Promise<void>((resolve) => {
+        res.write('data: [DONE]\n\n');
+        (res as any).flush?.();
+        stopHeartbeat();
+        res.end(() => resolve());
+      });
+      return;
+    }
+    const candidateMessage = claim.message;
+    let labRunId: string | null = null;
+    let approvedAgentPolicy = '';
+    try {
+      const labRun = await this.interviewLab.startTurn(req.user.userId, interview, dto.content);
+      labRunId = labRun.id;
+      approvedAgentPolicy = labRun.approvedPolicy;
+    } catch {
+      // Lab observability must not block candidate delivery.
+    }
+
+    const ctx: AgentContext = {
+      userId: interview.userId,
+      sessionId: interviewId,
+      position: interview.position,
+      level: interview.level,
+      // P0-3 修复：传 provider，让 maxTokens 走对应 provider 配置
+      provider: (dto as any).provider || 'qwen',
+      answerMessageId: candidateMessage.id,
+      interviewMode: interview.mode,
+      practiceSkillId: interview.practiceSkill?.id,
+      practiceSkillName: interview.practiceSkill?.name,
+      targetJobId: interview.targetJobId || undefined,
+      targetJobProfileVersion: interview.targetJobProfileVersion || undefined,
+      approvedAgentPolicy,
+    };
+
     let fullResponse = '';
+    let assistantPersisted = false;
 
     // 默认走 multi 模式（LangGraph Supervisor 拓扑），SSE 流式逐 token 推送
     // 路径：processMessage → MultiAgentService.stream → graph.stream(streamMode='messages')
@@ -227,31 +309,40 @@ export class InterviewFlowController {
     // llm-direct 模式走 LlmGatewayService.streamChat（纯 LLM，无 Agent 拓扑）
     try {
       for await (const event of this.agent.processMessage(ctx, dto.content)) {
+        const quotaFailure = tenantContext.getStore()?.quotaFailure;
+        if (quotaFailure) throw new HttpException(quotaFailure, quotaFailure.status);
+        if (event.type === 'error') {
+          throw new Error(event.error || 'Interview response failed');
+        }
         if (event.type === 'token' && event.content) {
           fullResponse += event.content;
         }
-        await writeEvent(event);
+        const candidateEvent = toCandidateStreamEvent(event);
+        if (candidateEvent) {
+          await writeEvent(candidateEvent);
+        }
       }
 
+      const quotaFailure = tenantContext.getStore()?.quotaFailure;
+      if (quotaFailure) throw new HttpException(quotaFailure, quotaFailure.status);
       const totalPrompt = Math.ceil((dto.content.length + fullResponse.length * 0.3) / 2);
       const totalCompletion = Math.ceil(fullResponse.length / 2);
 
-      if (fullResponse) {
-        await this.prisma.message.create({
-          data: {
-            interviewId,
-            role: 'assistant',
-            content: fullResponse,
-            promptTokens: totalPrompt,
-            completionTokens: totalCompletion,
-          },
-        });
-        await writeEvent({
-          type: 'token_usage',
-          promptTokens: totalPrompt,
-          completionTokens: totalCompletion,
-          total: totalPrompt + totalCompletion,
-        });
+      if (!fullResponse) {
+        throw new Error('Interview response was empty');
+      }
+      await this.streamDelivery.persistAssistantResponse(
+        interviewId,
+        candidateMessage.id,
+        fullResponse,
+        totalPrompt,
+        totalCompletion,
+      );
+      assistantPersisted = true;
+
+      // Token 用量仅持久化在受保护的成本记录中，不进入候选人 SSE 合同。
+      if (labRunId) {
+        await this.interviewLab.completeTurn(labRunId, fullResponse).catch(() => undefined);
       }
 
       // 2026-06-23 修复：等 [DONE] 真正 flush 到 TCP 再 res.end()
@@ -261,13 +352,19 @@ export class InterviewFlowController {
       await new Promise<void>((resolve) => {
         res.write('data: [DONE]\n\n');
         (res as any).flush?.();
+        stopHeartbeat();
         res.end(() => resolve());
       });
     } catch (err: any) {
+      if (!assistantPersisted) {
+        await this.streamDelivery.releaseUnansweredMessage(candidateMessage.id).catch(() => undefined);
+      }
+      if (labRunId) await this.interviewLab.failTurn(labRunId, err).catch(() => undefined);
       // 错误路径也要等 flush 完成
       await new Promise<void>((resolve) => {
-        res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'error', error: tenantContext.getStore()?.quotaFailure?.message || '当前回答暂时无法处理，请稍后重试。', ...(tenantContext.getStore()?.quotaFailure ? { code: tenantContext.getStore()!.quotaFailure!.code } : {}) })}\n\n`);
         (res as any).flush?.();
+        stopHeartbeat();
         res.end(() => resolve());
       });
     }

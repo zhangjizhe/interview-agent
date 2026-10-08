@@ -1,26 +1,4 @@
-/**
- * Auth Service
- *
- * P0-5 修复（最小可行版，demo 阶段保留）：
- * - demo 简化：userId 传进来即登录（不做密码 hash，商用前必须替换为密码/OAuth）
- * - 加 userId 格式校验：拒绝空 / 超长 / 非 cuid 格式，防止任意字符串构造 JWT
- * - 锁定 JWT 算法为 HS256：防 algorithm confusion attack（攻击者把 alg 改成 none
- *   或换成 RS256 让 server 用公钥验证）
- *
- * R-AUTH-1 登录页面化（2026-06-28）：
- * - 新增 /register endpoint：创建/复用 user by id（已存在 → 报错，由前端展示"该 ID 已被占用"）
- * - 新增 /check/:userId endpoint：检查 ID 是否可用（前端实时校验）
- * - 严格 userId 正则：^[a-z0-9][a-z0-9_-]{2,31}$（3-32 字符，小写 + 数字 + -/_，不能以 -_ 开头）
- * - 保留名黑名单：admin/api/system/root 等系统名不能注册
- * - 自动 upsert User by id（保证 DB 里永远有对应 user 记录）
- *
- * ⚠️ 商用前必须替换：
- * - 加密码（bcrypt/argon2）+ 注册流程
- * - 加 refresh token + token 黑名单
- * - 加 OAuth（GitHub/Google/飞书）
- * - 加 rate limiting + IP 风控
- * - 真正的"账号系统"远不止一个 JWT 签发服务
- */
+import { AuthSessionService } from './auth-session.service';
 import { Injectable, BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -32,6 +10,8 @@ const scrypt = promisify(scryptCallback);
 
 export interface LoginResult {
   accessToken: string;
+  refreshToken: string;
+  refreshExpiresIn: number;
   tokenType: string;
   expiresIn: string;
   userId: string;
@@ -102,6 +82,7 @@ export class AuthService {
     private jwtService: JwtService,
     private config: ConfigService,
     private prisma: PrismaService,
+    private sessions: AuthSessionService,
   ) {}
 
   /**
@@ -146,7 +127,7 @@ export class AuthService {
    * R-AUTH-1 注册新 ID：检查格式 + 保留名 + 是否已占用 → 创建 User
    *
    * 与 /login 区别：
-   * - /login 接受任何合规 userId（已存在或不存在都返回 token）— 适合 demo 临时登录
+   * - /login 只接受已注册且密码匹配的用户
    * - /register 严格拒绝已存在 ID（返回 409）— 适合"创建新身份"流程
    */
   async register(userId: string, password: string): Promise<RegisterResult> {
@@ -170,6 +151,7 @@ export class AuthService {
         name: userId,  // 默认 name = userId（前端可改）
         passwordHash: await this.hashPassword(password),
         role: isBootstrapAdmin ? 'ADMIN' : 'USER',
+        organization: { create: { name: `${lowerUserId} 的组织` } },
       },
     });
 
@@ -206,18 +188,14 @@ export class AuthService {
   }
 
   /**
-   * demo 登录：userId 传进来即生成 token
-   * 不做密码验证（demo 阶段；商用前必须替换）
-   *
-   * R-AUTH-1 改进：登录时自动 upsert User（保证 DB 里永远有 user 记录）
-   * - 已存在 user → update email
-   * - 不存在 user → create（与 /register 行为对齐，但 login 不要求"新"ID）
+   * 校验已注册用户密码后签发短期 access 与一次性 refresh token。
    */
   async login(dto: LoginDto): Promise<LoginResult> {
     this.validateUserId(dto.userId);
     this.validatePassword(dto.password);
 
     const lowerUserId = dto.userId.toLowerCase();
+    const version = await this.sessions.version(lowerUserId);
     const user = await this.prisma.user.findUnique({
       where: { id: lowerUserId },
     });
@@ -225,35 +203,35 @@ export class AuthService {
       throw new UnauthorizedException('用户名或密码错误');
     }
 
-    const expiresIn = this.config.get<string>('auth.jwtExpiresIn') || '7d';
+    return this.sessions.issue(user, version);
+  }
 
-  const payload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    };
+  async refresh(refreshToken: string): Promise<LoginResult> {
+    const session = await this.sessions.consumeRefresh(refreshToken);
+    const user = await this.prisma.user.findUnique({ where: { id: session.userId } });
+    if (!user) throw new UnauthorizedException('用户不存在。');
+    return this.sessions.issue(user, session.version, session.sid);
+  }
 
-    // 锁定算法为 HS256，防止 algorithm confusion（攻击者伪造 alg=none / RS256）
-    // @types/jsonwebtoken 9.x 升级：expiresIn 类型从 string 收紧到 StringValue | number
-    // （StringValue = `${number}d|h|m|s` 模板字面量）。config 读出的动态 string 不自动
-    // narrow 到 StringValue，所以显式 cast。
-    //
-    // 注：'ms' 是 @types/jsonwebtoken 的间接依赖，不在 apps/api/package.json 显式列出，
-    // 无法 `import type { StringValue } from 'ms'`。这里用内联模板字面量类型表达相同约束。
-    const accessToken = await this.jwtService.signAsync(payload, {
-      algorithm: 'HS256',
-      expiresIn: expiresIn as unknown as `${number}${'d' | 'h' | 'm' | 's'}`,
+  async logout(payload: Record<string, any>, rawToken: string) {
+    await this.sessions.logout(payload, rawToken);
+    return { success: true };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    this.validatePassword(currentPassword);
+    this.validatePassword(newPassword);
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.passwordHash || !(await this.verifyPassword(currentPassword, user.passwordHash))) {
+      throw new UnauthorizedException('当前密码错误。');
+    }
+    const passwordHash = await this.hashPassword(newPassword);
+    // 修改期间阻止签发/消费会话；完成后递增用户版本，使全部设备立即下线。
+    await this.sessions.changePassword(userId, async () => {
+      const result = await this.prisma.user.updateMany({ where: { id: userId, passwordHash: user.passwordHash }, data: { passwordHash } });
+      if (result.count !== 1) throw new ConflictException('密码已变更，请重新登录。');
     });
-
-    return {
-      accessToken,
-      tokenType: 'Bearer',
-      expiresIn,
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    };
+    return { success: true };
   }
 
   /**

@@ -15,6 +15,9 @@ import { MultiAgentService } from '../../agent/multi-agent.service';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { MemoryService } from '../../memory/memory.service';
 import { ResumeRAGService } from '../services/resume-rag.service';
+import { EvaluationService } from '../services/evaluation.service';
+import { TrainingService } from '../services/training.service';
+import { UsageService } from '../../llm/usage/usage.service';
 import type { ChatMessage } from '../../llm/providers/types';
 import { requireOwnedInterview } from '../../../common/ownership.util';
 
@@ -23,6 +26,10 @@ interface StartInterviewDto {
   position: string;
   level?: string;
   resumeText?: string;
+  targetJobId?: string;
+  mode?: 'FULL_SIMULATION' | 'SKILL_PRACTICE';
+  practiceSkillId?: string;
+  trainingRecommendationId?: string;
 }
 
 /**
@@ -47,6 +54,9 @@ export class InterviewLifecycleController {
     private prisma: PrismaService,
     private memory: MemoryService,
     private resumeRag: ResumeRAGService,
+    private evaluation: EvaluationService,
+    private training: TrainingService,
+    private usage: UsageService,
   ) {}
 
   // ===== 静态路由（必须在 :interviewId 之前）=====
@@ -105,6 +115,17 @@ export class InterviewLifecycleController {
   @Post('start')
   async startInterview(@Body() dto: StartInterviewDto, @Req() req: any) {
     const userId = req.user.userId;
+    await this.usage.assertInterviewAllowed(userId);
+    const mode = dto.mode || 'FULL_SIMULATION';
+    if (mode !== 'FULL_SIMULATION' && mode !== 'SKILL_PRACTICE') {
+      throw new BadRequestException('Unsupported interview mode');
+    }
+    if (mode === 'FULL_SIMULATION' && dto.practiceSkillId) {
+      throw new BadRequestException('Practice skill is only valid for skill practice');
+    }
+    if (dto.trainingRecommendationId && mode !== 'SKILL_PRACTICE') {
+      throw new BadRequestException('Training retest requires skill practice mode');
+    }
     const resumes = await this.resumeRag.searchByUser(userId, 1).catch(() => []);
     if (resumes.length === 0) {
       throw new BadRequestException(
@@ -112,15 +133,59 @@ export class InterviewLifecycleController {
       );
     }
 
-    const interview = await this.prisma.interview.create({
-      data: {
+    let targetJob: { id: string; title: string; level: string | null; profileVersion: number } | null = null;
+    if (dto.targetJobId) {
+      targetJob = await this.prisma.targetJob.findFirst({
+        where: { id: dto.targetJobId, userId },
+        select: { id: true, title: true, level: true, profileVersion: true },
+      });
+      if (!targetJob) {
+        throw new BadRequestException('Target job not found');
+      }
+    }
+
+    let practiceSkillId: string | null = null;
+    if (mode === 'SKILL_PRACTICE') {
+      if (!targetJob || !dto.practiceSkillId) {
+        throw new BadRequestException('Skill practice requires a target job and selected skill');
+      }
+      const requirement = await this.prisma.jobSkillRequirement.findFirst({
+        where: { targetJobId: targetJob.id, skillId: dto.practiceSkillId },
+        include: { skill: { select: { id: true, isActive: true } } },
+      });
+      if (!requirement?.skill.isActive) {
+        throw new BadRequestException('Selected skill is not available for this target job');
+      }
+      practiceSkillId = requirement.skillId;
+    }
+
+    const position = targetJob?.title || dto.position;
+    const level = targetJob?.level || dto.level || 'P5';
+    const interview = await this.usage.createInterview({
         userId,
-        position: dto.position,
-        level: dto.level || 'P5',
+        position,
+        level,
+        mode,
+        targetJobId: targetJob?.id,
+        targetJobProfileVersion: targetJob?.profileVersion,
+        practiceSkillId,
         status: 'IN_PROGRESS',
         summary: resumes[0]?.name ? `候选：${resumes[0].name}` : null,
-      },
     });
+    if (dto.trainingRecommendationId && practiceSkillId && targetJob) {
+      try {
+        await this.training.attachRetest(
+          userId,
+          dto.trainingRecommendationId,
+          interview.id,
+          targetJob.id,
+          practiceSkillId,
+        );
+      } catch (error) {
+        await this.usage.cancelFailedInterview(interview.id);
+        throw error;
+      }
+    }
     return {
       interviewId: interview.id,
       interview,
@@ -303,13 +368,22 @@ export class InterviewLifecycleController {
     const durationMs = endedAt.getTime() - interview.startedAt.getTime();
     const durationMin = Math.max(1, Math.round(durationMs / 60000));
 
-    let report: any;
+    let report: any = null;
     let savedReport: any;
+    let evaluationRunId: string | null = null;
     let workingState: any = { coveredSkills: [], scoreHistory: [] };
     let user: any = null;
     let resume: any = null;
 
     try {
+      const evaluation = await this.evaluation.beginFinalEvaluation(interviewId);
+      evaluationRunId = evaluation.run.id;
+      if (evaluation.existing) {
+        savedReport = await this.prisma.report.findFirst({
+          where: { currentEvaluationRunId: evaluation.run.id },
+        });
+        report = evaluation.run.reportPayload;
+      } else {
       report = await this.agent.generateReport(
         {
           userId: interview.userId,
@@ -319,25 +393,12 @@ export class InterviewLifecycleController {
         },
         conversation,
       );
-
-      savedReport = await this.prisma.report.upsert({
-        where: { interviewId },
-        create: {
-          interviewId,
-          overallScore: report.overallScore,
-          scores: report.scores as any,
-          strengths: report.strengths.join('\n'),
-          weaknesses: report.weaknesses.join('\n'),
-          suggestions: report.suggestions.join('\n'),
-        },
-        update: {
-          overallScore: report.overallScore,
-          scores: report.scores as any,
-          strengths: report.strengths.join('\n'),
-          weaknesses: report.weaknesses.join('\n'),
-          suggestions: report.suggestions.join('\n'),
-        },
-      });
+      savedReport = await this.evaluation.completeFinalEvaluation(
+        evaluation.run.id,
+        report,
+        report.model,
+      );
+      }
 
       // 候选人画像构建（失败不阻塞 status 更新）
       workingState = await this.memory.getWorkingState(interviewId);
@@ -345,33 +406,10 @@ export class InterviewLifecycleController {
       const resumes = await this.resumeRag.searchByUser(interview.userId, 1).catch(() => []);
       resume = resumes[0] || null;
     } catch (err: any) {
-      // generateReport 失败：fallback 到"评估失败"占位 report，保证 status 仍能切到 COMPLETED
-      this.logger.error(`[end] report generation failed: ${err.message}, fallback to error report`);
-      report = {
-        overallScore: 0,
-        scores: { completeness: 0, correctness: 0, depth: 0 },
-        strengths: [],
-        weaknesses: [`生成报告失败：${err.message}`],
-        suggestions: ['请稍后重试或联系管理员'],
-      };
-      savedReport = await this.prisma.report.upsert({
-        where: { interviewId },
-        create: {
-          interviewId,
-          overallScore: 0,
-          scores: { error: err.message } as any,
-          strengths: '',
-          weaknesses: `生成报告失败：${err.message}`,
-          suggestions: '请稍后重试或联系管理员',
-        },
-        update: {
-          overallScore: 0,
-          scores: { error: err.message } as any,
-          strengths: '',
-          weaknesses: `生成报告失败：${err.message}`,
-          suggestions: '请稍后重试或联系管理员',
-        },
-      });
+      this.logger.error(`[end] final evaluation failed: ${err.message}`);
+      if (evaluationRunId) {
+        await this.evaluation.failFinalEvaluation(evaluationRunId, err);
+      }
     } finally {
       // 无论 try/catch 结果如何，status 必须切到 COMPLETED
       // 这是关键：保证二次进入看到 status='COMPLETED'，前端正确显示报告 + 禁用输入
@@ -395,9 +433,9 @@ export class InterviewLifecycleController {
         level: interview.level,
         skills: [...(workingState.coveredSkills || []), ...(resume?.skills || [])],
         scoreHistory: workingState.scoreHistory || [],
-        overallScore: report.overallScore,
-        strengths: report.strengths,
-        weaknesses: report.weaknesses,
+        overallScore: report?.overallScore ?? null,
+        strengths: report?.strengths ?? [],
+        weaknesses: report?.weaknesses ?? [],
         durationMin,
         messageCount: interview.messages.length,
         startedAt: interview.startedAt.toISOString(),
@@ -414,7 +452,8 @@ export class InterviewLifecycleController {
 
     return {
       report: savedReport,
-      ...report,
+      ...(report || {}),
+      evaluationRunId,
       totalTokens,
       candidate: {
         userId: interview.userId,

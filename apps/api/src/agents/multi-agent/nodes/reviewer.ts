@@ -137,6 +137,9 @@ export function createReviewerNode(model: BaseChatModel) {
                 content: `你是一位专业的 AI 面试官小面。
 
 ${roundContext}
+【面试上下文】
+${state.interview_context || '未提供岗位上下文。'}
+
 【用户最新消息】
 ${lastMessage}
 

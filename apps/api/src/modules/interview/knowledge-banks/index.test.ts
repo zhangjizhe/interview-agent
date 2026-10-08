@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest';
 import { matchBank, pickQuestions } from '../knowledge-banks';
 
 describe('matchBank', () => {

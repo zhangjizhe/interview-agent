@@ -17,6 +17,9 @@ node_modules
 .env
 .env.local
 .env.*.local
+.local-backups
+.codex
+.agents
 
 # 构建产物
 dist

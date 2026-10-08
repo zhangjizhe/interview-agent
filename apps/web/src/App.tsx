@@ -1,9 +1,9 @@
-import { Routes, Route, Link, Navigate, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { useState, lazy, Suspense, useEffect } from 'react';
-import { Cpu, Database } from 'lucide-react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { AppShell } from './components/AppShell';
 import { HomePage } from './pages/HomePage';
+import { SettingsPage } from './pages/SettingsPage';
 import { initWebVitals } from './utils/web-vitals';
 import { getSession, saveSession } from './utils/auth';
 
@@ -25,18 +25,15 @@ async function safeJson(res: Response): Promise<any> {
   }
 }
 
-// 路由级懒加载 — 首屏不加载 InterviewPage / QuestionBankPage / ToolsPage / AdminMcpPage
+// 路由级懒加载 — 首屏不加载面试房间、评价和管理兼容页面
 const InterviewPage = lazy(() =>
   import('./pages/InterviewPage').then((m) => ({ default: m.InterviewPage })),
 );
-const QuestionBankPage = lazy(() =>
-  import('./pages/QuestionBankPage').then((m) => ({ default: m.QuestionBankPage })),
+const ReportPage = lazy(() =>
+  import('./pages/ReportPage').then((m) => ({ default: m.ReportPage })),
 );
-const ToolsPage = lazy(() =>
-  import('./pages/ToolsPage').then((m) => ({ default: m.ToolsPage })),
-);
-const AdminMcpPage = lazy(() =>
-  import('./pages/AdminMcpPage').then((m) => ({ default: m.AdminMcpPage })),
+const TrainingPage = lazy(() =>
+  import('./pages/TrainingPage').then((m) => ({ default: m.TrainingPage })),
 );
 
 function PageSpinner() {
@@ -47,159 +44,6 @@ function PageSpinner() {
   );
 }
 
-function WallEIcon({ className = 'w-8 h-8' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 512 512" className={className} aria-hidden="true">
-      <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="#1e1b4b" />
-      <rect x="128" y="200" width="256" height="200" rx="20" ry="20" fill="none" stroke="#a5b4fc" strokeWidth="10" strokeLinejoin="round" />
-      <rect x="108" y="360" width="76" height="56" rx="28" ry="28" fill="none" stroke="#a5b4fc" strokeWidth="10" />
-      <rect x="328" y="360" width="76" height="56" rx="28" ry="28" fill="none" stroke="#a5b4fc" strokeWidth="10" />
-      <rect x="216" y="160" width="80" height="56" rx="8" ry="8" fill="none" stroke="#a5b4fc" strokeWidth="10" />
-      <line x1="216" y1="188" x2="296" y2="188" stroke="#a5b4fc" strokeWidth="6" />
-      <path d="M 176 80 L 336 80 L 320 160 L 192 160 Z" fill="none" stroke="#a5b4fc" strokeWidth="10" strokeLinejoin="round" />
-      <rect x="200" y="96" width="44" height="44" rx="6" ry="6" fill="none" stroke="#a5b4fc" strokeWidth="8" />
-      <circle cx="222" cy="118" r="10" fill="#a5b4fc" />
-      <rect x="268" y="96" width="44" height="44" rx="6" ry="6" fill="none" stroke="#a5b4fc" strokeWidth="8" />
-      <circle cx="290" cy="118" r="10" fill="#a5b4fc" />
-      <line x1="256" y1="80" x2="256" y2="48" stroke="#a5b4fc" strokeWidth="8" strokeLinecap="round" />
-      <circle cx="256" cy="40" r="8" fill="#a5b4fc" />
-      <path d="M 128 240 L 88 280" stroke="#a5b4fc" strokeWidth="10" strokeLinecap="round" />
-      <circle cx="80" cy="288" r="10" fill="none" stroke="#a5b4fc" strokeWidth="8" />
-      <path d="M 384 240 L 424 280" stroke="#a5b4fc" strokeWidth="10" strokeLinecap="round" />
-      <circle cx="432" cy="288" r="10" fill="none" stroke="#a5b4fc" strokeWidth="8" />
-    </svg>
-  );
-}
-
-function TopBar() {
-  const navigate = useNavigate();
-  const userId = localStorage.getItem('ia_userId') || 'demo-user';
-  const [showStart, setShowStart] = useState(false);
-
-  const { data: stats } = useQuery({
-    queryKey: ['token-stats', userId],
-    queryFn: async () => {
-      const r = await fetch(`/api/interview/stats?userId=${userId}`);
-      if (!r.ok) throw new Error(`Stats API ${r.status}`);
-      return safeJson(r);
-    },
-    refetchInterval: 5000,
-    retry: 3,
-    staleTime: 0,
-    refetchOnMount: 'always',
-  });
-
-  return (
-    <nav className="bg-white border-b border-slate-200 pt-safe sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-3">
-        <Link to="/" className="flex items-center gap-2 md:gap-3 min-w-0">
-          <WallEIcon className="w-8 h-8 md:w-10 md:h-10 flex-shrink-0" />
-          <div className="min-w-0">
-            <div className="text-base md:text-xl font-semibold text-slate-900 truncate">小面 · AI 面试官</div>
-            <div className="text-xs text-slate-400 hidden md:block">自研 Agent 循环 + Mem0 + MCP</div>
-          </div>
-        </Link>
-
-        <div className="flex items-center gap-2 md:gap-4">
-          {/* 工具/MCP 状态指示 */}
-          <ToolsIndicator />
-
-          {/* 面试题知识库入口 */}
-          <Link
-            to="/question-bank"
-            className="flex items-center gap-1.5 text-xs md:text-sm text-slate-600 bg-violet-50 hover:bg-violet-100 px-2.5 py-1.5 rounded-lg transition"
-            title="面试题知识库"
-          >
-            <Database className="w-3.5 h-3.5 text-violet-500" />
-            <span className="font-medium text-slate-900">题库</span>
-          </Link>
-
-          {/* token 统计 */}
-          <div className="hidden sm:flex items-center gap-1.5 text-xs md:text-sm text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded-lg">
-            <span className="text-slate-400">⚡</span>
-            <span className="font-mono font-medium text-slate-900">
-              {(stats?.totalTokens || 0).toLocaleString()}
-            </span>
-            <span className="text-slate-400">tokens</span>
-          </div>
-
-          {/* 开始面试按钮 */}
-          <div className="relative">
-            <button
-              onClick={() => setShowStart(!showStart)}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base font-medium px-3 md:px-4 py-2 rounded-lg flex items-center gap-1.5"
-            >
-              <span>+</span>
-              <span className="hidden sm:inline">开始新面试</span>
-              <span className="sm:hidden">新面试</span>
-            </button>
-            {showStart && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-lg p-2 z-30">
-                <button
-                  onClick={() => { setShowStart(false); navigate('/?new=1&t=' + Date.now()); }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
-                >
-                  🚀 自定义岗位
-                </button>
-                <button
-                  onClick={() => {
-                    setShowStart(false);
-                    navigate('/?new=1&position=AI+Agent+工程师&level=P5&t=' + Date.now());
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
-                >
-                  🤖 AI Agent 工程师
-                </button>
-                <button
-                  onClick={() => {
-                    setShowStart(false);
-                    navigate('/?new=1&position=前端开发工程师&level=P5&t=' + Date.now());
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
-                >
-                  🎨 前端开发工程师
-                </button>
-                <button
-                  onClick={() => {
-                    setShowStart(false);
-                    navigate('/?new=1&position=高级测试工程师&level=P6&t=' + Date.now());
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg"
-                >
-                  🧪 高级测试工程师
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </nav>
-  );
-}
-
-function ToolsIndicator() {
-  const { data } = useQuery({
-    queryKey: ['tools-count'],
-    queryFn: async () => {
-      const r = await fetch('/api/tools');
-      return safeJson(r) as Promise<{ count: number; enabledCount: number }>;
-    },
-    refetchInterval: 30000,
-  });
-
-  return (
-    <Link
-      to="/tools"
-      className="flex items-center gap-1.5 text-xs md:text-sm text-slate-600 bg-slate-50 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg transition"
-      title="工具偏好"
-    >
-      <Cpu className="w-3.5 h-3.5 text-slate-400" />
-      <span className="font-medium text-slate-900">{data?.enabledCount ?? 0}</span>
-      <span className="text-slate-400">/ {data?.count ?? 0}</span>
-    </Link>
-  );
-}
-
 function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState(getSession);
   const [userId, setUserId] = useState('');
@@ -207,6 +51,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [registering, setRegistering] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const handleExpired = () => {
+      setError('登录已过期，请重新登录。');
+      setSession(null);
+    };
+    window.addEventListener('ia:session-expired', handleExpired);
+    return () => window.removeEventListener('ia:session-expired', handleExpired);
+  }, []);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -249,10 +102,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (session) return <>{children}</>;
 
   return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-sm bg-white border border-slate-200 rounded-lg shadow-sm p-6 space-y-4">
+    <main className="studio-auth">
+      <section className="studio-auth-story" aria-label="面试训练介绍">
+        <div className="studio-auth-brand"><span className="brand-mark" aria-hidden="true">面</span>小面训练</div>
+        <h2>准备得更清楚，<br />面试得更从容。</h2>
+        <p>从目标岗位出发，把每一次模拟面试，变成有证据、有方向的成长。</p>
+        <div className="studio-auth-steps"><div><span>01</span>明确你的目标岗位</div><div><span>02</span>进行有针对性的模拟面试</div><div><span>03</span>依据评价证据，继续练习</div></div>
+      </section>
+      <div className="studio-auth-form">
+      <form onSubmit={submit} className="space-y-5">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">小面</h1>
+          <p className="mb-3 text-xs font-semibold tracking-wider text-blue-700">INTERVIEW STUDIO</p>
+          <h1 className="font-semibold text-slate-900">{registering ? '创建你的训练空间' : '欢迎回来'}</h1>
           <p className="mt-1 text-sm text-slate-500">{registering ? '创建账号以保护你的面试与简历数据' : '登录以继续你的面试记录'}</p>
         </div>
         <label className="block text-sm text-slate-700">
@@ -271,12 +132,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           {registering ? '已有账号，去登录' : '没有账号，创建账号'}
         </button>
       </form>
+      </div>
     </main>
   );
-}
-
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  return getSession()?.role === 'ADMIN' ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 export default function App() {
@@ -285,22 +143,24 @@ export default function App() {
 
   return (
     <AuthGate>
-      <div className="min-h-screen">
-        <TopBar />
-        <main>
-          <ErrorBoundary>
-            <Suspense fallback={<PageSpinner />}>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/interview/:id" element={<InterviewPage />} />
-                <Route path="/question-bank" element={<QuestionBankPage />} />
-                <Route path="/tools" element={<ToolsPage />} />
-                <Route path="/admin/mcp" element={<AdminRoute><AdminMcpPage /></AdminRoute>} />
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
-        </main>
-      </div>
+      <ErrorBoundary>
+        <Suspense fallback={<PageSpinner />}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/practice" element={<HomePage openPractice />} />
+              <Route path="/interviews" element={<HomePage view="interviews" />} />
+              <Route path="/training" element={<TrainingPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/question-bank" element={<Navigate to="/" replace />} />
+              <Route path="/tools" element={<Navigate to="/settings" replace />} />
+              <Route path="/admin/mcp" element={<Navigate to="/" replace />} />
+              <Route path="/reports/:id" element={<ReportPage />} />
+            </Route>
+            <Route path="/interview/:id" element={<InterviewPage />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </AuthGate>
   );
 }

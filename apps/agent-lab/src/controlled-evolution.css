@@ -1,0 +1,92 @@
+.lab-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.lab-section-head {
+  align-items: end;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+
+.lab-section-head h2 {
+  margin: 4px 0 8px;
+}
+
+.lab-section-head p {
+  margin: 0;
+}
+
+.lab-form-grid {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lab-form-grid label {
+  display: grid;
+  gap: 7px;
+}
+
+.lab-form-grid select {
+  min-width: 0;
+}
+
+.lab-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lab-feedback {
+  border-left: 3px solid #65b891;
+  margin: 0;
+  padding: 10px 14px;
+}
+
+.evolution-assets {
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.evolution-assets[open] summary {
+  margin-bottom: 12px;
+}
+
+.evolution-assets p {
+  margin: 0 0 12px;
+}
+
+.evolution-assets .lab-form-grid {
+  margin-bottom: 12px;
+}
+
+.evolution-jobs { display: grid; gap: 16px; margin-top: 14px; }
+.evolution-jobs h3 { margin: 4px 0 8px; }
+.evolution-jobs p { line-height: 1.6; }
+.evolution-job { padding: 18px; background: #fff; border: 1px solid #e2e4ec; border-radius: 12px; min-width: 0; }
+.evolution-job p { overflow-wrap: anywhere; color: #61697c; font-size: 13px; }
+.evolution-job-head, .evolution-job-metrics { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.evolution-job-metrics { justify-content: flex-start; font-variant-numeric: tabular-nums; font-size: 13px; }
+.evolution-status { font-size: 11px; letter-spacing: .04em; border-radius: 20px; padding: 5px 10px; background: #f0f1f7; color: #4f46c8; }
+.status-failed { background: #fff0f0; color: #a33838; }
+.status-completed { background: #edf7f2; color: #236849; }
+.evolution-job progress { width: 100%; height: 6px; accent-color: #4f46c8; margin: 16px 0 8px; }
+.evolution-job time { font-size: 12px; color: #798092; }
+.evolution-rejection { color: #a33838 !important; overflow-wrap: anywhere; line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .lab-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

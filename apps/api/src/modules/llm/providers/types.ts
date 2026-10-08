@@ -28,6 +28,8 @@ export interface StreamChunk {
   content?: string;
   finishReason?: 'stop' | 'length' | 'tool_calls' | 'error';
   usage?: { promptTokens: number; completionTokens: number };
+  provider?: string;
+  model?: string;
   toolCall?: {
     id: string;
     name: string;
@@ -50,6 +52,7 @@ export interface ChatResponse {
   usage: { promptTokens: number; completionTokens: number };
   finishReason: string;
   model: string;
+  provider: string;
 }
 
 export type LLMProviderName = 'qwen' | 'deepseek';
