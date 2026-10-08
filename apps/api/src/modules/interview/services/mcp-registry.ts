@@ -107,7 +107,7 @@ class McpRegistryClass {
   // ============ 新 API：配置驱动加载 ============
 
   /**
-   * 启动时从 JSON 加载。已存在的（in-code register）会被覆盖。
+   * 加载前完整校验；重载保留执行绑定与管理员关闭状态。
    * 失败也不抛错——商用项目降级到 in-code 列表。
    */
   async loadFromConfig(configPath: string): Promise<{ loaded: number; errors: string[] }> {
@@ -121,13 +121,23 @@ class McpRegistryClass {
       const raw = await fs.readFile(absPath, 'utf-8');
       const config = JSON.parse(raw);
 
-      for (const srv of config.servers || []) {
-        try {
-          this.registerFromConfig(srv);
-          loaded++;
-        } catch (e: any) {
-          errors.push(`${srv.name}: ${e.message}`);
+      if (!Array.isArray(config.servers)) throw new Error('servers array required');
+      const names = new Set<string>();
+      for (const srv of config.servers) {
+        if (!srv || typeof srv.name !== 'string' || !srv.name.trim() || names.has(srv.name)) {
+          throw new Error('unique nonempty server.name required');
         }
+        names.add(srv.name);
+        const previous = this.entries.get(srv.name);
+        // A live connection cannot be rebound by a metadata reload. Apply such changes at restart.
+        if (this.configLoaded && previous && ['transport', 'command', 'args', 'url', 'env'].some(
+          (key) => JSON.stringify((previous as any)[key]) !== JSON.stringify(srv[key] ?? (key === 'transport' ? 'builtin' : undefined)),
+        )) throw new Error('connection changes require API restart');
+      }
+      // Validate the entire file before mutating any entry.
+      for (const srv of config.servers) {
+        this.registerFromConfig(srv);
+        loaded++;
       }
       this.configLoaded = true;
       logInfo(`[McpRegistry] ✅ Loaded ${loaded} MCP servers from config (${errors.length} errors)`);
@@ -150,7 +160,9 @@ class McpRegistryClass {
       author: srv.author,
       version: srv.version,
     };
+    const previous = this.entries.get(srv.name);
     this.entries.set(srv.name, {
+      ...previous,
       meta,
       transport: srv.transport || 'builtin',
       builtin: srv.builtin === true || srv.transport === 'builtin',
@@ -158,7 +170,7 @@ class McpRegistryClass {
       args: srv.args,
       url: srv.url,
       env: srv.env,
-      status: srv.transport === 'builtin' ? 'builtin' : 'stopped',
+      status: previous?.status ?? (srv.transport === 'builtin' ? 'builtin' : 'stopped'),
     });
   }
 
@@ -235,6 +247,7 @@ class McpRegistryClass {
     lastHealthCheck?: string;
     errorMessage?: string;
     pid?: number;
+    executable: boolean;
   }> {
     return Array.from(this.entries.values()).map((e) => {
       const systemEnabled = e.systemOverride !== undefined ? e.systemOverride : e.meta.enabled;
@@ -247,6 +260,7 @@ class McpRegistryClass {
         lastHealthCheck: e.lastHealthCheck?.toISOString(),
         errorMessage: e.errorMessage,
         pid: e.pid,
+        executable: typeof e.execute === 'function',
       };
     });
   }
@@ -262,26 +276,22 @@ class McpRegistryClass {
   }
 
   /**
-   * 健康检查：builtin 工具永远 running；stdio 用 service-level connect；streamable-http 用 TCP 端口探测
-   *
-   * 2026-06-24 升级：补全 streamable-http 健康检查（之前是占位 "not implemented"）。
-   * 实现策略：TCP 端口可达性探测（最稳，比 HTTP HEAD 简单且不依赖 server 响应 HEAD）。
-   * 不发 MCP initialize 消息——那是 service 层异步启动时做（listTools 失败会触发重连）。
-   *
-   * 适用场景：
-   * - builtin: 永远 ok（无外部依赖）
-   * - streamable-http: TCP 端口探测（github_official 走 SaaS endpoint / 自托管 supergateway 都适用）
-   * - stdio: 返回 unknown（不报错），service 层异步 connect 失败会在 listTools 抛错
+   * Non-billable readiness check. A builtin binding does not prove dependency health;
+   * TCP reachability and unimplemented stdio probes never count as protocol success.
    */
   async healthCheck(name: string): Promise<{ ok: boolean; latencyMs: number; error?: string }> {
     const e = this.entries.get(name);
     if (!e) return { ok: false, latencyMs: 0, error: 'not found' };
     const start = Date.now();
+    if (!(e.systemOverride ?? e.meta.enabled)) {
+      return { ok: false, latencyMs: 0, error: '工具已被系统禁用' };
+    }
     try {
       if (e.builtin) {
         e.status = 'builtin';
         e.lastHealthCheck = new Date();
-        return { ok: true, latencyMs: Date.now() - start };
+        const ok = typeof e.execute === 'function';
+        return { ok, latencyMs: Date.now() - start, error: ok ? undefined : '尚未绑定执行器' };
       }
       // streamable-http：TCP 端口探测
       let host: string | null = null;
@@ -293,15 +303,15 @@ class McpRegistryClass {
       }
       if (host && port) {
         const ok = await this.tcpProbe(host, port, 2000);
-        e.status = ok ? 'running' : 'error';
+        e.status = ok ? 'unknown' : 'error';
         e.lastHealthCheck = new Date();
         if (!ok) e.errorMessage = `TCP probe failed: ${host}:${port}`;
-        return { ok, latencyMs: Date.now() - start, error: ok ? undefined : e.errorMessage };
+        return { ok: false, latencyMs: Date.now() - start, error: ok ? 'TCP 可达；MCP 协议及调用尚未验证' : e.errorMessage };
       }
       // stdio 或未配置 URL 的：返回 unknown（不报错，service 层负责真实 connect）
       e.status = 'unknown';
       e.lastHealthCheck = new Date();
-      return { ok: true, latencyMs: Date.now() - start, error: 'stdio probe not implemented (use service-level connect)' };
+      return { ok: false, latencyMs: Date.now() - start, error: '尚未验证 MCP 协议及调用' };
     } catch (err: any) {
       e.status = 'error';
       e.errorMessage = err.message;

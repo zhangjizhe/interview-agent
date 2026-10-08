@@ -2,6 +2,10 @@
 
 更新：2026-10-08 · PROVIDER-HEALTH-PROBE-METERING-1
 
+## Lab 基础阻断阶段（2026-10-08）
+
+PRODUCT-REACCEPTANCE-1 基础阻断修复完成，整体仍 NOT_ACCEPTED。修复题库空岗位导致400、MCP重载假成功/丢失执行绑定与系统关闭、健康检查及汇总误导。独立测试Agent 8项包含在相关API 42项内；组件6项、type/build/lint与镜像43/43/恢复通过。本机已部署，浏览器题库正确空状态及禁用MCP失败反馈确认。配置路径原本正确，审计误判已撤回。报告 `docs/ACCEPTANCE-REPORT-2026-10-08-LAB-FOUNDATION.md`。用户新增Agent/编排及独立测试范围见 `docs/acceptance/LAB_AGENT_WORKFLOW_CONTRACT.md`；下一阶段完成Agent配置和受控运行，随后编排和整体双证据，不把CRUD/静态画布算交付。外部MCP真实协议、题库计费写入/搜索及完整交互验收未完成；无新付费请求。按AGENTS每阶段完成等待继续。
+
 ## 全产品重新验收（2026-10-08）
 
 PRODUCT-REACCEPTANCE-1 为当前唯一活动主题。用户要求测试确认后再交付；产品整体 NOT_ACCEPTED。Phase 0 建立34功能合同、673源码模板项（144交互/529展示，全部未验收），要求API/持久化与浏览器独立二次确认，条件/动态/响应式需逐项展开。发现旧产品规格和全流程脚本过时、CI没有浏览器验收门。计划 `docs/acceptance/PRODUCT_REACCEPTANCE_PLAN.md`。按AGENTS分阶段等待继续；真实模型测试须核对额度/未知账单并确定新预算，当前无新推理或产品通过声明。

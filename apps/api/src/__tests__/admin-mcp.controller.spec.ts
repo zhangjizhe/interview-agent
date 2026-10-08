@@ -35,6 +35,24 @@ describe('AdminMcpController reload audit', () => {
     });
   });
 
+  it('rejects returned config errors instead of recording false success', async () => {
+    (McpRegistry.loadFromConfig as jest.Mock).mockResolvedValue({ errors: ['invalid config'], loaded: 0 });
+    const controller = new AdminMcpController(prisma as any);
+    await expect(controller.reload(req)).rejects.toThrow('MCP 配置重载失败');
+    expect(prisma.labOperationLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ outcome: 'REJECTED' }),
+    }));
+  });
+
+  it('counts only enabled servers with execution bindings', () => {
+    (McpRegistry.listWithStatus as jest.Mock).mockReturnValue([
+      { status: 'builtin', enabled: false, executable: true },
+      { status: 'running', enabled: true, executable: false },
+      { status: 'builtin', enabled: true, executable: true },
+    ]);
+    expect(new AdminMcpController(prisma as any).list().runningCount).toBe(1);
+  });
+
   it('records a fixed rejected operation without copying the reload error', async () => {
     (McpRegistry.loadFromConfig as jest.Mock).mockRejectedValue(new Error('sensitive configuration detail'));
     const controller = new AdminMcpController(prisma as any);

@@ -20,6 +20,7 @@ import { createRoot } from 'react-dom/client';
 import { useEffect, useRef, useState } from 'react';
 import { api, logoutSession, role, token } from './api';
 import { QuestionBankWorkspace, type QuestionBankItem } from './QuestionBankWorkspace';
+import { questionBankQuery } from './question-bank-query';
 import './styles.css';
 import './lab.css';
 import { ControlledEvolutionWorkspace } from './ControlledEvolutionWorkspace';
@@ -181,7 +182,7 @@ function ControlCenter() {
   });
   const questions = useQuery({
     queryKey: ['agent-lab-question-bank', questionPosition],
-    queryFn: () => api(`/interview/question-bank/list?position=${encodeURIComponent(questionPosition)}&limit=50`),
+    queryFn: () => api(`/interview/question-bank/list?${questionBankQuery(questionPosition, 50)}`),
     enabled: role() === 'ADMIN',
   });
 
@@ -206,8 +207,10 @@ function ControlCenter() {
   });
   const health = useMutation({
     mutationFn: (name: string) => api(`/admin/mcp-servers/${name}/health`),
-    onSuccess: (_result, name) => {
-      setFeedback(`${name} 健康检查完成。`);
+    onSuccess: (result, name) => {
+      setFeedback(result.ok
+        ? `${name} 执行绑定已就绪；依赖及实际调用仍需验收。`
+        : `${name} 未通过检查：${result.error || '尚未验证可调用性'}`);
       refresh();
     },
   });
@@ -269,7 +272,7 @@ function ControlCenter() {
     const version = ++questionSearchVersion.current;
     setQuestionMessage('');
     try {
-      const data = await api(`/interview/question-bank/search?q=${encodeURIComponent(questionQuery)}&position=${encodeURIComponent(questionPosition)}&limit=20`);
+      const data = await api(`/interview/question-bank/search?${questionBankQuery(questionPosition, 20, questionQuery)}`);
       if (version !== questionSearchVersion.current) return;
       setQuestionSearch(JSON.stringify(data.results || []));
     } catch (error) {
@@ -384,7 +387,7 @@ function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: numbe
       <div className="agent-hero-actions"><button onClick={onRuntime}><Workflow size={16}/>查看编排</button><button className="quiet" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button></div>
     </section>
     <section className="agent-metric-grid">
-      <article><span>MCP 服务</span><strong>{data.runningCount} / {data.count}</strong><small>当前可用</small></article>
+      <article><span>MCP 服务</span><strong>{data.runningCount} / {data.count}</strong><small>已启用且执行绑定就绪</small></article>
       <article><span>运行编排</span><strong>受控</strong><small>阶段可见，内部推理不可见</small></article>
       <article><span>录制报告发布记录</span><strong>{lab.summary.latestDecision || '无记录'}</strong><small>{latestDecision ? `${new Date(latestDecision.createdAt).toLocaleString()} · 仅记录人工决定，不触发部署` : '尚无人工发布决定'}</small></article>
     </section>
@@ -580,7 +583,7 @@ function McpWorkspace({ data, health, toggle }: {
   toggle: { isPending: boolean; variables?: { toolName: string; enabled: boolean }; mutate: (input: { toolName: string; enabled: boolean }) => void };
 }) {
   return <section className="mcp-workspace">
-    <div className="mcp-summary"><Activity size={17}/><strong>{data.runningCount} / {data.count}</strong><span>服务可用</span></div>
+    <div className="mcp-summary"><Activity size={17}/><strong>{data.runningCount} / {data.count}</strong><span>已启用且执行绑定就绪</span></div>
     <div className="mcp-list">
       {data.servers.map((server) => {
         const healthBusy = health.isPending && health.variables === server.name;
