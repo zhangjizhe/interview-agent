@@ -29,6 +29,7 @@ type Evaluation = {
   requestKey?: string | null;
   totalCases: number;
   completedSamples: number;
+  cancelRequestedAt?: string | null;
   completedCases: number;
   createdAt: string;
   completedAt?: string;
@@ -257,6 +258,11 @@ export function ControlledEvolutionWorkspace() {
     onSuccess: (result) => { setComparison(result); setFeedback(`对比完成：${result.releaseRecommendation}。`); },
     onError: (error: Error) => { setFeedback(error.message); setComparison(null); },
   });
+  const cancelEvaluation = useMutation({
+    mutationFn: (id: string) => api(`/agent-lab/evaluations/${id}/cancel`, { method: 'POST' }),
+    onSuccess: async () => { setFeedback('取消已受理；在途调用可能仍产生费用，等待样本边界结算。'); await refresh(); },
+    onError: (error: Error) => setFeedback(error.message),
+  });
   const publish = useMutation({
     mutationFn: () => api(`/agent-lab/agents/${agentId}/versions/${candidateVersionId}/publish`, { method: 'POST' }),
     onSuccess: async () => {
@@ -369,6 +375,7 @@ export function ControlledEvolutionWorkspace() {
           <p>{item.id} · {item.evaluator.name}</p>
           <div className="evolution-job-metrics"><span>样本 {samples ?? '未记录'}/{total ?? '总数未记录'}</span><span>得分 {item.score == null ? '—' : item.score.toFixed(1)}</span><span>费用小计 {typeof item.metrics?.budget?.spentCny === 'number' ? `¥${item.metrics.budget.spentCny.toFixed(6)}` : '未核验'}</span></div>
           <progress aria-label="已完成样本" max={Math.max(total ?? completed, 1)} value={total == null || samples == null ? undefined : completed} />
+          {(item.status === 'PENDING' || item.status === 'RUNNING') && <button disabled={Boolean(item.cancelRequestedAt) || cancelEvaluation.isPending} onClick={() => cancelEvaluation.mutate(item.id)}>{item.cancelRequestedAt ? '等待停止与结算' : '取消后续样本'}</button>}
           {item.error && <p className="evolution-rejection">{item.error}</p>}
           {item.metrics?.budget?.costEvidenceStatus === 'unavailable' && <p className="evolution-rejection">中断费用未知；以上仅为已核验样本小计。</p>}
           {item.status === 'COMPLETED' && item.metrics?.cachePolicy !== 'semantic-cache-bypass/v1' && <p>旧运行缺少答案缓存隔离证据，不能作为发布质量依据。</p>}

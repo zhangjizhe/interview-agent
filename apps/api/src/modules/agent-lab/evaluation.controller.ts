@@ -82,4 +82,9 @@ export class EvaluationController {
   getEvaluation(@Req() req: any, @Param('evaluationId') evaluationId: string) {
     return this.evaluations.getEvaluation(req.user.userId, evaluationId);
   }
+  @Post('evaluations/:evaluationId/cancel')
+  @HttpCode(200)
+  cancelEvaluation(@Req() req: any, @Param('evaluationId') evaluationId: string) {
+    return this.jobs.cancel(req.user.userId, evaluationId);
+  }
 }

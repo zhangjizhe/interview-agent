@@ -6,6 +6,8 @@
 
 ## DELIVERY-CLOSEOUT-1（进行中）
 
+- 评测控制：加性 CANCELLED / cancelRequestedAt、ADMIN 工作区取消、样本边界停止及实际费用保留；并发/幂等/分页回归，相关 40 项 / PostgreSQL 18 项、lint/type/build 通过。
+
 - 题库主题：运行时 DTO、嵌套/UTF-8/数量/查询约束；有界 embedding 并发与零隐式重试，准确主键补偿、有界 flush 与未知写入 503；相关 12 项、lint/type/build 通过。
 
 - 退出主题：双端服务端吊销、失败重试与新登录竞态保护，服务端 Lua 原子撤销；认证 13 项、双端 99 项、lint/type/build 通过，镜像 HTTP 验收已扩充。

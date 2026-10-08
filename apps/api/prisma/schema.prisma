@@ -767,6 +767,7 @@ enum EvaluationStatus {
   RUNNING
   COMPLETED
   FAILED
+  CANCELLED
 }
 
 model AgentEvaluationRun {
@@ -793,6 +794,7 @@ model AgentEvaluationRun {
   requestHash    String?
   requestParams  Json?
   requestedByUserId String?
+  cancelRequestedAt DateTime?
   leaseOwner     String?
   heartbeatAt    DateTime?
   completedSamples Int @default(0)

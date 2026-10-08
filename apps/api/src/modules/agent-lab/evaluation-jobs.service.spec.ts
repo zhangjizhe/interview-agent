@@ -13,7 +13,7 @@ describe('durable evaluation jobs', () => {
     prisma = { organization: { findMany: jest.fn().mockResolvedValue([{ id: 'org' }]) }, user: { findFirst: jest.fn().mockResolvedValue({ role: 'ADMIN' }) },
       agentEvaluationRun: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(async ({ data }) => ({ id: 'job', ...data })), updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
-    evaluations = { prepareEvaluation: jest.fn().mockResolvedValue(prepared), runEvaluation: jest.fn().mockResolvedValue({}) };
+    evaluations = { prepareEvaluation: jest.fn().mockResolvedValue(prepared), runEvaluation: jest.fn().mockResolvedValue({}), getEvaluation: jest.fn() };
     jobs = new EvaluationJobsService(prisma, evaluations);
   });
   afterEach(() => jobs.onModuleDestroy());
@@ -39,6 +39,32 @@ describe('durable evaluation jobs', () => {
   it('rejects an untrusted caller identity', async () => {
     await expect(scope(() => jobs.enqueue('another-admin', 'agent', dto))).rejects.toMatchObject({ status: 403 });
     expect(evaluations.prepareEvaluation).not.toHaveBeenCalled();
+  });
+  it('cancels queued work without invoking a model and requests cooperative cancellation for running work', async () => {
+    evaluations.getEvaluation.mockResolvedValue({ id: 'job', requestKey: 'fixture', status: 'PENDING' });
+    await scope(() => jobs.cancel('admin', 'job'));
+    expect(prisma.agentEvaluationRun.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'job', status: 'PENDING' }, data: expect.objectContaining({ status: 'CANCELLED', metrics: expect.objectContaining({ budget: expect.objectContaining({ spentCny: 0 }) }) }) }));
+    evaluations.getEvaluation.mockResolvedValue({ id: 'job', requestKey: 'fixture', status: 'RUNNING' });
+    await scope(() => jobs.cancel('admin', 'job'));
+    expect(prisma.agentEvaluationRun.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: { id: 'job', status: 'RUNNING', cancelRequestedAt: null }, data: { cancelRequestedAt: expect.any(Date) } }));
+    expect(evaluations.runEvaluation).not.toHaveBeenCalled();
+  });
+  it('checks cancellation at sample boundaries and preserves measured progress first', async () => {
+    prisma.agentEvaluationRun.findFirst.mockResolvedValue({ ...pending(), cancelRequestedAt: new Date() });
+    evaluations.runEvaluation.mockImplementation(async (_u, _a, _d, job) => {
+      await expect(job.progress({ completedSamples: 1, completedCases: 0, spentCny: 0.02, limitCny: 1, costEvidenceStatus: 'available' })).rejects.toThrow('EVALUATION_CANCELLED');
+    });
+    await jobs.tick();
+    expect(prisma.agentEvaluationRun.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ completedSamples: 1, metrics: expect.objectContaining({ budget: expect.objectContaining({ spentCny: 0.02 }) }) }) }));
+  });
+  it('continues past a page of idle tenants rather than starving later organizations', async () => {
+    prisma.organization.findMany.mockResolvedValueOnce(Array.from({ length: 50 }, (_, i) => ({ id: `org-${String(i).padStart(2, '0')}` }))).mockResolvedValueOnce([{ id: 'org-50' }]);
+    prisma.agentEvaluationRun.findFirst.mockResolvedValueOnce(null);
+    await jobs.tick();
+    prisma.agentEvaluationRun.findFirst.mockResolvedValue(pending());
+    await jobs.tick();
+    expect(prisma.organization.findMany).toHaveBeenLastCalledWith(expect.objectContaining({ where: { id: { gt: 'org-49' } } }));
+    expect(evaluations.runEvaluation).toHaveBeenCalledTimes(1);
   });
   function pending() {
     return { id: 'job', agentId: 'agent', requestedByUserId: 'admin', totalCases: 1,

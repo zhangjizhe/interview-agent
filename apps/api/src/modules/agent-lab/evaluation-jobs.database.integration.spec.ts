@@ -70,4 +70,22 @@ const url = process.env.TENANT_TEST_DATABASE_URL;
     expect((await raw.agentEvaluationRun.findUniqueOrThrow({ where: { id: revoked.id } })).error).toContain('PERMISSION_REVOKED');
     expect(runtime.runAgent).toHaveBeenCalledTimes(1);
   });
+  it('cancels queued work durably, keeps idempotency and stops running work at the next sample boundary', async () => {
+    await raw.user.update({ where: { id: fixture }, data: { role: 'ADMIN' } });
+    const queued = await scope(() => jobs.enqueue(fixture, `${fixture}-agent`, request('cancel-queued')));
+    expect(await scope(() => jobs.cancel(fixture, queued.id))).toMatchObject({ status: 'CANCELLED' });
+    expect(await scope(() => jobs.enqueue(fixture, `${fixture}-agent`, request('cancel-queued')))).toMatchObject({ id: queued.id, reused: true, status: 'CANCELLED' });
+    const running = await scope(() => jobs.enqueue(fixture, `${fixture}-agent`, request('cancel-running')));
+    const original = runtime.runAgent.getMockImplementation();
+    runtime.runAgent.mockImplementationOnce(async (...args) => {
+      const result = await original(...args);
+      await jobs.cancel(fixture, running.id);
+      return result;
+    });
+    await drain();
+    const stopped = await raw.agentEvaluationRun.findUniqueOrThrow({ where: { id: running.id } });
+    expect(stopped).toMatchObject({ status: 'CANCELLED', completedSamples: 1, metrics: { budget: { spentCny: 0.001, costEvidenceStatus: 'available' } } });
+    expect(runtime.runAgent).toHaveBeenCalledTimes(2);
+    await expect(scope(() => jobs.cancel(`${fixture}-other`, running.id), `${fixture}-other`)).rejects.toMatchObject({ status: 404 });
+  });
 });

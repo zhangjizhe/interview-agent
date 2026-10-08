@@ -14,6 +14,7 @@ import {
   RunEvaluationDto,
 } from './dto/agent.dto';
 import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-statistics';
+import { EvaluationCancellationError } from './evaluation-job.errors';
 import {
   CURATED_INTERVIEW_RELEASE_DATASET,
   CURATED_INTERVIEW_RELEASE_EVALUATOR,
@@ -450,7 +451,7 @@ export class EvaluationService {
             samples.push({ rule: this.evaluateRule(evaluator, datasetCase, run), run });
             await progress();
           } catch (error: any) {
-            if (error instanceof ReleaseEvaluationBudgetError) throw error;
+            if (error instanceof ReleaseEvaluationBudgetError || error instanceof EvaluationCancellationError) throw error;
             if (effectiveBudgetCny !== null) {
               interruptedRunId = error?.agentLabRunId ?? null;
               costEvidenceUnavailable = true;
@@ -553,17 +554,18 @@ export class EvaluationService {
     } catch (error: any) {
       const message = error?.message || '评测执行失败';
       await finish({
-          status: 'FAILED',
+          status: error instanceof EvaluationCancellationError ? 'CANCELLED' : 'FAILED',
           error: message,
           metrics: {
                 repeatCount,
                 totalSamples: dataset.cases.length * repeatCount,
                 budget: {
-                  status: error instanceof ReleaseEvaluationBudgetError ? 'stopped' : 'failed',
+                  status: error instanceof EvaluationCancellationError ? 'cancelled' : error instanceof ReleaseEvaluationBudgetError ? 'stopped' : 'failed',
                   limitCny: effectiveBudgetCny,
                   spentCny: Number(spentCostCny.toFixed(6)),
                   completedSamples,
-                  ...(costEvidenceUnavailable || effectiveBudgetCny === null ? {
+                  costEvidenceStatus: costEvidenceUnavailable ? 'unavailable' : 'available',
+                  ...(costEvidenceUnavailable ? {
                     costEvidenceStatus: 'unavailable',
                     interruptedRunId,
                   } : {}),

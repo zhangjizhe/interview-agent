@@ -14,6 +14,8 @@ main 暂不合并：生产审计仍有 1 high / 6 moderate，braces 本地补丁
 
 ## 禁止遗忘的边界
 
+- EVALUATION-CONTROL-1：相关 40 项 / PostgreSQL 18 项通过；加性取消迁移须由独立 migration 部署。取消停止后续样本，保留在途租约和实际费用；新键才可明确重跑，不能把合作取消等同零费用或账单结算。
+
 - QUESTION-INPUT-1 本地 12 项通过；批量 20、embedding 并发 2 / 零隐式重试，嵌套 DTO/字节数约束。Milvus 写后故障只在准确 PK 可得时补偿，未知结果 503 且需检查后重试；不保证分布式事务或人民币硬预算。
 
 - 本轮 AUTH-LOGOUT-1 已完成本地验证：两端请求服务端后清会话、失败可重试、迟到成功不清新登录；Lua 原子吊销。最终镜像 HTTP 脚本已加入 access/refresh 复用拒绝及另一设备保留。

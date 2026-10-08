@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import { requireTenant, tenantContext } from '../organizations/tenant-context';
 import { EvaluationService } from './evaluation.service';
+import { EvaluationCancellationError } from './evaluation-job.errors';
 import type { StartEvaluationJobDto, RunEvaluationDto } from './dto/agent.dto';
 
 export const EVALUATION_JOB_LEASE_MS = 6 * 60_000;
@@ -78,6 +79,26 @@ export class EvaluationJobsService implements OnModuleInit, OnModuleDestroy {
       reused, statusUrl: `/api/agent-lab/evaluations/${job.id}` };
   }
 
+  async cancel(userId: string, evaluationId: string) {
+    const scope = requireTenant();
+    if (scope.userId !== userId) throw new ForbiddenException('取消需要当前认证身份');
+    const job = await this.evaluations.getEvaluation(userId, evaluationId);
+    if (!job.requestKey) throw new ConflictException('历史同步任务不能由新队列取消');
+    const requestedAt = new Date();
+    const metrics = (job.metrics ?? {}) as Record<string, any>;
+    if (job.status === 'PENDING') {
+      await this.prisma.agentEvaluationRun.updateMany({ where: { id: job.id, status: 'PENDING' }, data: {
+        status: 'CANCELLED', cancelRequestedAt: requestedAt, completedAt: requestedAt, leaseOwner: null,
+        error: 'EVALUATION_CANCELLED：排队任务已取消，未启动模型。',
+        metrics: { ...metrics, budget: { ...metrics.budget, status: 'cancelled', spentCny: 0, costEvidenceStatus: 'available' } },
+      } });
+    }
+    // Claim and cancellation can race. Recheck RUNNING regardless of the earlier
+    // read; keep the lease and active-job constraint until in-flight work settles.
+    await this.prisma.agentEvaluationRun.updateMany({ where: { id: job.id, status: 'RUNNING', cancelRequestedAt: null }, data: { cancelRequestedAt: requestedAt } });
+    return this.evaluations.getEvaluation(userId, evaluationId);
+  }
+
   /** Poll durable records, rotate organizations fairly, and atomically claim
    * one job per API process. Tenant queries always run in an explicit scope. */
   async tick() {
@@ -146,6 +167,8 @@ export class EvaluationJobsService implements OnModuleInit, OnModuleDestroy {
           if (lost || this.stopping) throw new Error('EVALUATION_LEASE_LOST');
           const currentUser = await this.prisma.user.findFirst({ where: { id: job.requestedByUserId }, select: { role: true } });
           if (currentUser?.role !== 'ADMIN') throw new Error('EVALUATION_PERMISSION_REVOKED');
+          const currentJob = await this.prisma.agentEvaluationRun.findFirst({ where });
+          if (!currentJob) throw new Error('EVALUATION_LEASE_LOST');
           const update = await this.prisma.agentEvaluationRun.updateMany({ where, data: {
             heartbeatAt: new Date(), completedSamples: progress.completedSamples, completedCases: progress.completedCases,
             metrics: { jobContract: JOB_CONTRACT, repeatCount: request.dto.repeatCount,
@@ -153,6 +176,7 @@ export class EvaluationJobsService implements OnModuleInit, OnModuleDestroy {
               budget: { status: 'running', spentCny: progress.spentCny, limitCny: progress.limitCny, costEvidenceStatus: progress.costEvidenceStatus } },
           } });
           if (update.count !== 1) throw new Error('EVALUATION_LEASE_LOST');
+          if (currentJob.cancelRequestedAt) throw new EvaluationCancellationError();
         },
         finish: async data => {
           const update = await this.prisma.agentEvaluationRun.updateMany({ where, data: { ...data, leaseOwner: null } });
