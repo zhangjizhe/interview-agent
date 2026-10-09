@@ -15,7 +15,29 @@ try {
   await page.goto(url);
   await page.getByLabel('用户名', { exact: true }).fill('fixture-ci-admin');
   await page.getByLabel('密码', { exact: true }).fill('isolated-fixture-password');
+  const dashboardResponse = page.waitForResponse(response => response.url().endsWith('/api/agent-lab/dashboard') && response.ok());
+  const mcpResponse = page.waitForResponse(response => response.url().endsWith('/api/admin/mcp-servers') && response.ok());
   await page.getByRole('button', { name: '登录控制台', exact: true }).click();
+  const dashboard = await (await dashboardResponse).json();
+  const mcp = await (await mcpResponse).json();
+  await page.getByRole('heading', { name: '控制中心', level: 1, exact: true }).waitFor();
+  // Actual synthetic API responses, not substituted dashboard values.
+  await textContains(`Golden Dataset ${dashboard.dataset.version}`);
+  await textContains(`${dashboard.dataset.caseCount} 个 Case`);
+  await textContains(`${dashboard.dataset.responseCount} 个回答`);
+  assert.equal(await page.locator('.agent-metric-grid article').nth(0).locator('strong').innerText(), `${mcp.runningCount} / ${mcp.count}`);
+  assert.equal(await page.locator('.agent-metric-grid article').nth(2).locator('strong').innerText(), dashboard.summary.latestDecision || '无记录');
+  assert.equal(await page.locator('.lab-summary-grid article').nth(0).locator('strong').innerText(), dashboard.dataset.validationStatus);
+  assert.equal(await page.locator('.lab-summary-grid article').nth(1).locator('strong').innerText(), String(dashboard.summary.failedRunCount));
+  assert.equal(await page.locator('.lab-summary-grid article').nth(2).locator('strong').innerText(), `${Math.round(dashboard.thresholds.qualityScore * 100)}%`);
+  await textContains('静态架构示意，不表示正在运行');
+  await textContains('不展示思维链');
+  await page.getByRole('button', { name: '治理 MCP', exact: true }).click();
+  await page.getByRole('heading', { name: 'MCP 与工具治理', level: 1, exact: true }).waitFor();
+  await page.getByRole('button', { name: '控制中心', exact: true }).click();
+  await page.getByRole('button', { name: '查看编排', exact: true }).click();
+  await page.getByRole('heading', { name: 'Agent 与工作流编排', level: 1, exact: true }).waitFor();
+  console.log('PASS overview: actual API fields, static boundary and two shortcut targets');
   await page.getByRole('button', { name: '运行编排', exact: true }).click();
   await page.getByRole('button', { name: '新增 Agent / 工作流', exact: true }).click();
   await page.getByLabel('名称', { exact: true }).fill('browser-ci-agent');
@@ -96,6 +118,10 @@ try {
   for (const [label, title] of navigation) {
     await page.getByRole('button', { name: label, exact: true }).click();
     await page.getByRole('heading', { name: title, exact: true, level: 1 }).waitFor();
+    const nav = page.getByRole('navigation', { name: 'Agent Lab 导航', exact: true });
+    assert.equal(await nav.locator('button.is-active').count(), 1);
+    assert.equal(await nav.locator('button.is-active').innerText(), label);
+    assert.equal(await nav.getByRole('button', { name: label, exact: true }).isEnabled(), true);
   }
   await page.getByRole('button', { name: '退出控制台', exact: true }).click();
   await page.getByRole('button', { name: '登录控制台', exact: true }).waitFor();

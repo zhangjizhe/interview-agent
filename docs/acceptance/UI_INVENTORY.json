@@ -7124,10 +7124,13 @@
       "tag": "button",
       "labelOrExpression": "<button key={id} type=\"button\" className={`agent-nav-item ${view === id ? 'is-active' : ''}`} disabled={!enabled} onClick={() => enabled && setView(id)} > <Icon size={16}/><span>{label}</span>{!enabled && <em>未配置</em>} </button>",
       "attributes": "key={id} type=\"button\" className={`agent-nav-item ${view === id ? 'is-active' : ''}`} disabled={!enabled} onClick={() => enabled && setView(id)}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7140,10 +7143,13 @@
       "tag": "span",
       "labelOrExpression": "<span>{label}</span>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7284,10 +7290,13 @@
       "tag": "h1",
       "labelOrExpression": "<h1>{titleFor(view)}</h1>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7412,10 +7421,13 @@
       "tag": "p",
       "labelOrExpression": "<p>合成基准：Golden Dataset {lab.dataset.version}，格式校验覆盖 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。录制指标用于回放与工程验证；当前业务版本的质量结论见受控自进化证据。</p>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7444,10 +7456,13 @@
       "tag": "button",
       "labelOrExpression": "<button onClick={onRuntime}><Workflow size={16}/>查看编排</button>",
       "attributes": "onClick={onRuntime}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7460,10 +7475,13 @@
       "tag": "button",
       "labelOrExpression": "<button className=\"quiet\" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button>",
       "attributes": "className=\"quiet\" onClick={onMcp}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7524,10 +7542,13 @@
       "tag": "strong",
       "labelOrExpression": "<strong>{data.runningCount} / {data.count}</strong>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7652,10 +7673,13 @@
       "tag": "strong",
       "labelOrExpression": "<strong>{lab.summary.latestDecision || '无记录'}</strong>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7732,10 +7756,13 @@
       "tag": "strong",
       "labelOrExpression": "<strong>{lab.dataset.validationStatus}</strong>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7796,10 +7823,13 @@
       "tag": "strong",
       "labelOrExpression": "<strong>{lab.summary.failedRunCount}</strong>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -7860,10 +7890,13 @@
       "tag": "strong",
       "labelOrExpression": "<strong>{Math.round(lab.thresholds.qualityScore * 100)}%</strong>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -10548,10 +10581,13 @@
       "tag": "span",
       "labelOrExpression": "<span>不展示思维链</span>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -10676,10 +10712,13 @@
       "tag": "span",
       "labelOrExpression": "<span>静态架构示意，不表示正在运行</span>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": {
+        "report": "docs/acceptance/LAB_OVERVIEW_EVIDENCE.md",
+        "scope": "Only explicitly enumerated synthetic states; final verdict remains NOT_ACCEPTED"
+      },
       "verdict": "NOT_ACCEPTED"
     },
     {
