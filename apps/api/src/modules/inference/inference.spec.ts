@@ -7,6 +7,7 @@ function releaseMetrics(overrides: Record<string, unknown> = {}, scores = Array(
   return {
     repeatCount: 3,
     cachePolicy: 'semantic-cache-bypass/v1',
+    outputContractVersion: 'final-output/v1',
     latency: { p95Ms: 1000 },
     tokenUsage: { status: 'available', totalTokens: 300 },
     estimatedCost: { status: 'available', totalCny: 0.01 },
@@ -222,7 +223,7 @@ describe('Release gate inference', () => {
     const decision = inferReleaseGate(candidate, { required: true, baseline });
 
     expect(decision.outcome.allowed).toBe(true);
-    expect(decision.ruleSetVersion).toBe('release-gate/v4');
+    expect(decision.ruleSetVersion).toBe('release-gate/v5');
     expect(decision.evidence.statisticalComparison).toMatchObject({
       status: 'available', pairedCaseCount: 10, nonInferior: true,
     });

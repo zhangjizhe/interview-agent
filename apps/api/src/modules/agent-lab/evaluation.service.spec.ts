@@ -649,3 +649,33 @@ describe('EvaluationService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 });
+
+ describe('final-output evaluation contracts', () => {
+  const evaluate = (type: string, expectedOutput: any, output: any, config = {}) => {
+    const service: any = new EvaluationService(createPrismaMock(), {} as any);
+    return service.evaluateRule({ type, config }, { expectedOutput }, { output });
+  };
+  it('does not pass keywords present only in intermediate workflow nodes', () => {
+    expect(evaluate('KEYWORD', { keywords: ['essential'] }, { response: 'missing', nodes: [{ output: { response: 'essential' } }] }).passed).toBe(false);
+    expect(evaluate('KEYWORD', { keywords: ['essential'] }, { response: 'essential', nodes: [] }).passed).toBe(true);
+  });
+  it('retains legacy keyword output compatibility without a response property', () => {
+    expect(evaluate('KEYWORD', { keywords: ['essential'] }, { legacy: 'essential' }).passed).toBe(true);
+  });
+  it.each(['expected', 'config'])('validates types from %s schema rather than key presence', (location) => {
+    const schema = { type: 'object', required: ['response'], properties: { response: { type: 'string', maxLength: 20 } }, additionalProperties: false };
+    const expected = location === 'expected' ? { schema } : {};
+    const config = location === 'config' ? { schema } : {};
+    expect(evaluate('JSON_SCHEMA', expected, { response: 42, nodes: [] }, config).passed).toBe(false);
+    expect(evaluate('JSON_SCHEMA', expected, { response: 'valid', nodes: [] }, config).passed).toBe(true);
+  });
+  it('retains legacy requiredKeys semantics', () => {
+    expect(evaluate('JSON_SCHEMA', { requiredKeys: ['legacy'] }, { legacy: true }).passed).toBe(true);
+    expect(evaluate('JSON_SCHEMA', { requiredKeys: ['legacy'] }, {}).passed).toBe(false);
+  });
+  it('rejects empty assertions even with a zero keyword threshold', () => {
+    expect(evaluate('KEYWORD', { keywords: [] }, { response: 'anything' }, { minScore: 0 })).toMatchObject({ score: 0, passed: false });
+    expect(evaluate('JSON_SCHEMA', { requiredKeys: [] }, { response: 'anything' })).toMatchObject({ score: 0, passed: false });
+  });
+
+ });

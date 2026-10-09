@@ -85,6 +85,27 @@ try {
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: '删除题目', exact: true }).click();
   await page.getByText('暂无题目', { exact: true }).waitFor({ timeout: 20000 });
+  await page.getByRole('button', { name: '自进化', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Agent', exact: true }).selectOption({ label: 'browser-ci-agent · 无当前版本' });
+  await page.getByRole('button', { name: '核验首次发布门禁', exact: true }).click();
+  await textContains('版本必须先完成一次评测，才可以发布。');
+  assert.equal(await page.getByRole('button', { name: '管理员发布', exact: true }).isDisabled(), true);
+  const navigation = [['控制中心', '控制中心'], ['运行编排', 'Agent 与工作流编排'], ['MCP 与工具', 'MCP 与工具治理'],
+    ['题库治理', '题库治理'], ['Trace', 'Trace 运行记录'], ['评测', '评测证据'], ['自进化', '受控自进化'],
+    ['实验', '实验比较'], ['发布', '发布决策'], ['审计', '审计查询'], ['操作日志', '操作日志']];
+  for (const [label, title] of navigation) {
+    await page.getByRole('button', { name: label, exact: true }).click();
+    await page.getByRole('heading', { name: title, exact: true, level: 1 }).waitFor();
+  }
+  await page.getByRole('button', { name: '退出控制台', exact: true }).click();
+  await page.getByRole('button', { name: '登录控制台', exact: true }).waitFor();
+  await page.reload();
+  await page.getByRole('button', { name: '登录控制台', exact: true }).waitFor();
+  await page.getByLabel('用户名', { exact: true }).fill('fixture-ci-admin');
+  await page.getByLabel('密码', { exact: true }).fill('isolated-fixture-password');
+  await page.getByRole('button', { name: '登录控制台', exact: true }).click();
+  await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
+  console.log('PASS browser first-release denial, eleven navigation headings, logout/reload/new login');
   assert.deepEqual(errors, []);
   console.log('PASS isolated browser: login/create/draft/run/trace/dedupe/reload/workflow/question create/search/delete/answer');
 } catch (error) {

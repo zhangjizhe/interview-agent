@@ -23,7 +23,11 @@ cleanup() {
   fi
   docker rm -fv "$fixture_lab" "$fixture_api" "$fixture_pg" "$fixture_redis" "$fixture_milvus" "$fixture_etcd" "$fixture_qdrant" >/dev/null 2>&1 || true
   docker network rm "$fixture_network" >/dev/null 2>&1 || true
-  rm -rf "$fixture_backup"
+  if [[ "$status" -ne 0 && "${FIXTURE_KEEP_FAILURE:-}" == "1" ]]; then
+    echo "Synthetic recovery diagnostics retained: $fixture_backup" >&2
+  else
+    rm -rf "$fixture_backup"
+  fi
 }
 trap cleanup EXIT
 # Internal Docker network blocks external providers. No host ports or real .env.
@@ -66,6 +70,7 @@ if [[ "$fixture_ready" != true ]]; then
   exit 1
 fi
 docker cp scripts/ci/fixture-model-server.mjs "$fixture_api:/tmp/fixture-model-server.mjs"
+docker cp scripts/ci/verify-configured-release.mjs "$fixture_api:/tmp/verify-configured-release.mjs"
 docker cp scripts/ci/verify-question-gateway.mjs "$fixture_api:/tmp/verify-question-gateway.mjs"
 docker cp scripts/ci/verify-configured-runtime.mjs "$fixture_api:/tmp/verify-configured-runtime.mjs"
 docker exec -d "$fixture_api" node /tmp/fixture-model-server.mjs
@@ -117,13 +122,14 @@ docker exec "$fixture_api" node -e "(async()=>{const start=Date.now();const r=aw
 # offline storage are restored into newly created fixture engines.
 docker stop "$fixture_api" >/dev/null
 docker exec "$fixture_pg" pg_dump -U postgres -Fc fixture > "$fixture_backup/database.dump"
+node --test scripts/ci/pg-dump-compare.test.mjs
+PG_DUMP_FIXTURE_CONTAINER="$fixture_pg" node --test scripts/ci/pg-dump-compare.database.test.mjs
 docker exec "$fixture_pg" createdb -U postgres fixture_restored
 docker exec -i "$fixture_pg" pg_restore -U postgres -d fixture_restored < "$fixture_backup/database.dump"
 for database in fixture fixture_restored; do
   docker exec "$fixture_pg" pg_dump -U postgres --no-owner --no-privileges "$database" | sed '/^\\restrict /d; /^\\unrestrict /d' > "$fixture_backup/$database.sql"
 done
-cmp "$fixture_backup/fixture.sql" "$fixture_backup/fixture_restored.sql"
-echo 'PASS complete normalized PostgreSQL schema/data/sequence dump equality after restore'
+node scripts/ci/pg-dump-compare.mjs "$fixture_backup/fixture.sql" "$fixture_backup/fixture_restored.sql"
 
 docker stop "$fixture_milvus" "$fixture_qdrant" >/dev/null
 docker stop "$fixture_etcd" >/dev/null

@@ -1,3 +1,4 @@
+import { validateConfiguredVersion } from './configured-runtime.contract';
 import {
   ConflictException,
   Injectable,
@@ -34,6 +35,9 @@ export class ControlledEvolutionService {
     if (!agent.currentVersion || agent.currentVersion.status !== 'PUBLISHED') {
       throw new ConflictException('Agent 必须先有已发布的当前版本，才能生成改进候选');
     }
+
+    const adapter = (agent.currentVersion.runtimeConfig as any)?.adapter;
+    if (adapter === 'finite-workflow-v1') throw new ConflictException('工作流改进必须更新实际节点版本并重新验证依赖；暂不支持仅修改父提示词的自动候选');
 
     const evaluation = await this.prisma.agentEvaluationRun.findFirst({
       where: {
@@ -74,8 +78,9 @@ export class ControlledEvolutionService {
     const strategyBlock = `${POLICY_HEADING}\n${uniqueStrategies.map((item, index) => `${index + 1}. ${item}`).join('\n')}`;
     const systemPrompt = [agent.currentVersion.systemPrompt.trim(), strategyBlock]
       .filter(Boolean)
-      .join('\n\n')
-      .slice(0, 100_000);
+      .join('\n\n');
+    if (systemPrompt.length > (adapter === 'single-agent-v1' ? 20000 : 100000)) throw new ConflictException('改进提示词超过运行时长度上限，请精简后重新生成');
+    if (adapter === 'single-agent-v1') validateConfiguredVersion({ ...agent.currentVersion, systemPrompt });
 
     const candidate = await this.prisma.agentVersion.create({
       data: {

@@ -1,6 +1,10 @@
 # 当前状态
 
-更新：2026-10-08 · PROVIDER-HEALTH-PROBE-METERING-1
+更新：2026-10-09 · PRODUCT-REACCEPTANCE-1
+
+## 正式发布闭环阻断修复（2026-10-09）
+
+题库批次68ac78c已提交并核验origin/agent-lab，GitHub API已恢复，题库push CI37901603421成功，PR #6最新CI37936555073全绿，已合入main bb11d4353034d6c6d322a62eefcaa2cff8d4712c；20迁移尚未业务部署。继续独立审计发现首次发布UI、工作流无效自动候选、最终输出评分和并发基线阻断；按ADR23复用修复，后端独立43、组件5及全部API744/组件116通过。真实隔离HTTP80/80，单Agent/工作流各30合成样本评测→首次发布、浏览器11导航/退出登录、严格恢复全通过；首次原始转储差异根因未知如实保留，比较器独立13及真实PG损坏拒绝通过；源码尚未提交，整体NOT_ACCEPTED，外部付费0。报告 `docs/ACCEPTANCE-REPORT-2026-10-09-RELEASE-CLOSURE.md`。
 
 ## 题库计量与持续验收（2026-10-09）
 

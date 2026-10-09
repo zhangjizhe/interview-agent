@@ -46,6 +46,7 @@ export function ControlledEvolutionWorkspace() {
   const [datasetId, setDatasetId] = useState('');
   const [evaluatorId, setEvaluatorId] = useState('');
   const [comparison, setComparison] = useState<any>(null);
+  const [firstReleaseGate, setFirstReleaseGate] = useState<any>(null);
   const [feedback, setFeedback] = useState('');
   const pendingRequest = useRef<{ signature: string; key: string }>();
   const [datasetKey, setDatasetKey] = useState('interview-regression');
@@ -263,24 +264,35 @@ export function ControlledEvolutionWorkspace() {
     onSuccess: async () => { setFeedback('取消已受理；在途调用可能仍产生费用，等待样本边界结算。'); await refresh(); },
     onError: (error: Error) => setFeedback(error.message),
   });
+  const checkFirstRelease = useMutation({
+    mutationFn: async () => {
+      const gate = await api(`/agent-lab/agents/${agentId}/versions/${candidateVersionId}/release-gate`);
+      if (gate.expectedCurrentVersionId !== null) throw new Error('基线已改变，请刷新后执行同集对比。');
+      return { gate, agentId, versionId: candidateVersionId };
+    },
+    onMutate: () => setFirstReleaseGate(null),
+    onSuccess: result => { setFirstReleaseGate(result); setFeedback(`首次发布门禁：${result.gate.outcome.reason}`); },
+    onError: (error: Error) => { setFirstReleaseGate(null); setFeedback(error.message); },
+  });
   const publish = useMutation({
     mutationFn: () => api(`/agent-lab/agents/${agentId}/versions/${candidateVersionId}/publish`, { method: 'POST' }),
     onSuccess: async () => {
-      setFeedback('管理员发布完成，Interview 将从下一回合使用该版本。');
+      setFeedback('管理员发布完成，该版本已成为当前正式版本。');
+      setFirstReleaseGate(null);
       setComparison(null);
       await refresh();
     },
-    onError: (error: Error) => setFeedback(error.message),
+    onError: (error: Error) => { setFeedback(error.message); setFirstReleaseGate(null); setComparison(null); },
   });
 
   const activeEvaluation = evaluations.data?.some(item => item.status === 'PENDING' || item.status === 'RUNNING');
-  useEffect(() => { setComparison(null); }, [agentId, candidateVersionId, datasetId, evaluatorId, repeatCount, maxEstimatedCostCny, selectedAgent?.currentVersion?.id, activeEvaluation]);
+  useEffect(() => { setComparison(null); setFirstReleaseGate(null); }, [agentId, candidateVersionId, datasetId, evaluatorId, repeatCount, maxEstimatedCostCny, selectedAgent?.currentVersion?.id, activeEvaluation]);
 
-  const busy = Boolean(activeEvaluation) || bootstrap.isPending || bootstrapReleaseDataset.isPending || createDataset.isPending || createEvaluator.isPending || addCase.isPending || freezeDataset.isPending || approveDataset.isPending || generate.isPending || runEvaluation.isPending || compare.isPending || publish.isPending;
+  const busy = Boolean(activeEvaluation) || bootstrap.isPending || bootstrapReleaseDataset.isPending || createDataset.isPending || createEvaluator.isPending || addCase.isPending || freezeDataset.isPending || approveDataset.isPending || generate.isPending || runEvaluation.isPending || compare.isPending || checkFirstRelease.isPending || publish.isPending;
 
   return <section className="lab-panel">
     <div className="lab-section-head">
-      <div><p className="agent-eyebrow">CONTROLLED EVOLUTION</p><h2>受控自进化</h2><p>失败证据生成草稿，同集评测确认无回归，管理员发布后才作用于 Interview。</p></div>
+      <div><p className="agent-eyebrow">CONTROLLED EVOLUTION</p><h2>受控自进化</h2><p>失败证据生成草稿，同集评测确认无回归，管理员发布后才成为所选 Agent 的正式版本。首次发布核验单版本门禁，更新版本须同集对比。</p></div>
       <button onClick={() => bootstrap.mutate()} disabled={busy}>注册 Interview Agent</button>
     </div>
 
@@ -351,8 +363,9 @@ export function ControlledEvolutionWorkspace() {
     <div className="lab-actions">
       <button onClick={() => selectedAgent?.currentVersion && runEvaluation.mutate(selectedAgent.currentVersion.id)} disabled={busy || !selectedAgent?.currentVersion || !datasetId || !evaluatorId || !releaseEvidenceReady}>评测当前基线</button>
       <button onClick={() => runEvaluation.mutate(candidateVersionId)} disabled={busy || !candidateVersionId || !datasetId || !evaluatorId || !releaseEvidenceReady}>评测候选</button>
-      <button onClick={() => compare.mutate()} disabled={busy || !candidateVersionId || !datasetId || !evaluatorId}>同集对比</button>
-      <button onClick={() => publish.mutate()} disabled={busy || comparison?.releaseRecommendation !== 'APPROVE'}>管理员发布</button>
+      <button onClick={() => compare.mutate()} disabled={busy || !selectedAgent?.currentVersion || !candidateVersionId || !datasetId || !evaluatorId}>同集对比</button>
+      {selectedAgent && !selectedAgent.currentVersion && <button onClick={() => checkFirstRelease.mutate()} disabled={busy || !candidateVersionId}>核验首次发布门禁</button>}
+      <button onClick={() => publish.mutate()} disabled={busy || (selectedAgent?.currentVersion ? comparison?.releaseRecommendation !== 'APPROVE' : !(firstReleaseGate?.agentId === agentId && firstReleaseGate?.versionId === candidateVersionId && firstReleaseGate?.gate.outcome.allowed === true))}>管理员发布</button>
     </div>
 
     {selectedDataset && !releaseEvidenceReady && <p className="lab-feedback">发布评测要求 Dataset 已冻结、至少 10 个带完整业务切片的 Case，并由管理员逐条审查批准。</p>}

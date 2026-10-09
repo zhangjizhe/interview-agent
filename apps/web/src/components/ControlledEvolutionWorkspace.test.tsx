@@ -5,15 +5,16 @@ import { ControlledEvolutionWorkspace } from '../../../agent-lab/src/ControlledE
 
 // Reuse the existing browser-test toolchain for the independent Lab component.
 describe('Lab evaluation evidence presentation', () => {
-  let records: any[], fetchMock: any, posted: any[];
+  let records: any[], fetchMock: any, posted: any[], initialRelease: boolean, gateAllowed: boolean;
   beforeEach(() => {
-    records = []; posted = [];
+    records = []; posted = []; initialRelease = false; gateAllowed = false;
     vi.stubGlobal('crypto', { randomUUID: () => 'synthetic-browser-request-key' });
     fetchMock = vi.fn(async (path: string, init: any) => {
       let body: any = [];
-      if (init?.method === 'POST') { posted.push(JSON.parse(init.body)); body = { id: 'job-1', status: 'PENDING', reused: false }; }
-      else if (path === '/api/agent-lab/agents') body = [{ id: 'agent', name: 'Interview', currentVersion: { id: 'baseline', version: '1.0.0' } }];
-      else if (path.endsWith('/versions')) body = [{ id: 'candidate', version: '1.0.1', status: 'DRAFT' }];
+      if (init?.method === 'POST') { posted.push(init.body ? JSON.parse(init.body) : {}); body = { id: 'job-1', status: 'PENDING', reused: false }; }
+      else if (path === '/api/agent-lab/agents') body = [{ id: 'agent', name: 'Interview', currentVersion: initialRelease ? null : { id: 'baseline', version: '1.0.0' } }];
+      else if (path.endsWith('/versions')) body = [{ id: 'candidate', version: '1.0.1', status: 'DRAFT' }, { id: 'candidate-2', version: '1.0.2', status: 'DRAFT' }];
+      else if (path.endsWith('/release-gate')) body = { expectedCurrentVersionId: null, outcome: { allowed: gateAllowed, reason: gateAllowed ? 'gate allowed' : 'missing evidence' } };
       else if (path.endsWith('/evaluations')) body = records;
       else if (path === '/api/agent-lab/datasets') body = ['dataset-1', 'dataset-2'].map(id => ({ id, name: id, version: '1', frozenAt: '2026-10-08', contentHash: 'hash', _count: { cases: 12 }, metadata: { review: { status: 'APPROVED' } } }));
       else if (path === '/api/agent-lab/evaluators') body = [{ id: 'evaluator', name: 'Keywords', type: 'KEYWORD' }];
@@ -63,4 +64,35 @@ describe('Lab evaluation evidence presentation', () => {
     expect(screen.getByText(/中断费用未知/)).toBeInTheDocument();
     expect(screen.getByRole('progressbar')).not.toHaveAttribute('value');
   });
+  it('requires a successful first release gate and clears it when assets change', async () => {
+    initialRelease = true; gateAllowed = true;
+    mount();
+    const check = await screen.findByRole('button', { name: '核验首次发布门禁' });
+    await waitFor(() => expect(check).toBeEnabled());
+    expect(screen.getByRole('button', { name: '管理员发布' })).toBeDisabled();
+    fireEvent.click(check);
+    await waitFor(() => expect(screen.getByRole('button', { name: '管理员发布' })).toBeEnabled());
+    expect(fetchMock.mock.calls.some(([url, init]: any[]) => url.endsWith('/candidate/release-gate') && !init?.method)).toBe(true);
+    fireEvent.change(screen.getByLabelText('Dataset'), { target: { value: 'dataset-2' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: '管理员发布' })).toBeDisabled());
+    fireEvent.click(check);
+    await waitFor(() => expect(screen.getByRole('button', { name: '管理员发布' })).toBeEnabled());
+    fireEvent.change(screen.getByLabelText('候选版本'), { target: { value: 'candidate-2' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: '管理员发布' })).toBeDisabled());
+    fireEvent.click(check);
+    await waitFor(() => expect(screen.getByRole('button', { name: '管理员发布' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '管理员发布' }));
+    await screen.findByText('管理员发布完成，该版本已成为当前正式版本。');
+    expect(screen.queryByText(/Interview 将从下一回合/)).not.toBeInTheDocument();
+  });
+  it('keeps first publication disabled when the server gate denies', async () => {
+    initialRelease = true;
+    mount();
+    const check = await screen.findByRole('button', { name: '核验首次发布门禁' });
+    await waitFor(() => expect(check).toBeEnabled()); fireEvent.click(check);
+    await screen.findByText(/首次发布门禁：missing evidence/);
+    expect(screen.getByRole('button', { name: '管理员发布' })).toBeDisabled();
+    expect(posted).toHaveLength(0);
+  });
+
 });
