@@ -39,6 +39,7 @@ export interface McpToolMetadata {
   author?: string;
   version?: string;
   configSchema?: any;
+  parentServer?: string;
 }
 
 export interface McpTool extends McpToolMetadata {
@@ -63,6 +64,7 @@ interface RegistryEntry {
   systemOverride?: boolean;
   /** 真实执行函数（由 NestJS 模块初始化时 bindExecute 注入） */
   execute?: (args: any) => Promise<any>;
+  protocolHealth?: () => Promise<void>;
 }
 
 /**
@@ -91,6 +93,19 @@ class McpRegistryClass {
    */
   unregister(name: string): boolean {
     return this.entries.delete(name);
+  }
+
+  isSystemEnabled(name: string): boolean {
+    const entry = this.entries.get(name);
+    if (!entry || !(entry.systemOverride ?? entry.meta.enabled)) return false;
+    return !entry.meta.parentServer || this.isSystemEnabled(entry.meta.parentServer);
+  }
+
+  bindProtocolHealth(name: string, probe: () => Promise<void>): boolean {
+    const entry = this.entries.get(name);
+    if (!entry) return false;
+    entry.protocolHealth = probe;
+    return true;
   }
 
   /**
@@ -183,9 +198,7 @@ class McpRegistryClass {
   list(userId?: string): (McpToolMetadata & { userEnabled?: boolean })[] {
     const list: (McpToolMetadata & { userEnabled?: boolean })[] = [];
     for (const entry of this.entries.values()) {
-      const systemEnabled = entry.systemOverride !== undefined
-        ? entry.systemOverride
-        : entry.meta.enabled;
+      const systemEnabled = this.isSystemEnabled(entry.meta.name);
       const item: any = { ...entry.meta, enabled: systemEnabled };
       if (userId !== undefined) {
         // 占位：调用方会传 userId，由 service 层合并 UserToolPreference
@@ -204,10 +217,8 @@ class McpRegistryClass {
   async getAvailableTools(userId: string, userPrefMap: Map<string, boolean>): Promise<McpToolMetadata[]> {
     const out: McpToolMetadata[] = [];
     for (const entry of this.entries.values()) {
-      const systemEnabled = entry.systemOverride !== undefined
-        ? entry.systemOverride
-        : entry.meta.enabled;
-      if (!systemEnabled) continue;
+      const systemEnabled = this.isSystemEnabled(entry.meta.name);
+      if (!systemEnabled || !this.isSystemEnabled(entry.meta.name)) continue;
       const userWants = userPrefMap.get(entry.meta.name);
       if (userWants === false) continue;     // 用户明确关掉
       out.push({ ...entry.meta, enabled: true });
@@ -229,7 +240,7 @@ class McpRegistryClass {
   enabledCount(): number {
     let n = 0;
     for (const e of this.entries.values()) {
-      const enabled = e.systemOverride !== undefined ? e.systemOverride : e.meta.enabled;
+      const enabled = this.isSystemEnabled(e.meta.name);
       if (enabled) n++;
     }
     return n;
@@ -250,7 +261,7 @@ class McpRegistryClass {
     executable: boolean;
   }> {
     return Array.from(this.entries.values()).map((e) => {
-      const systemEnabled = e.systemOverride !== undefined ? e.systemOverride : e.meta.enabled;
+      const systemEnabled = this.isSystemEnabled(e.meta.name);
       return {
         ...e.meta,
         enabled: systemEnabled,
@@ -283,10 +294,17 @@ class McpRegistryClass {
     const e = this.entries.get(name);
     if (!e) return { ok: false, latencyMs: 0, error: 'not found' };
     const start = Date.now();
-    if (!(e.systemOverride ?? e.meta.enabled)) {
+    if (!this.isSystemEnabled(name)) {
       return { ok: false, latencyMs: 0, error: '工具已被系统禁用' };
     }
     try {
+      if (e.protocolHealth) {
+        await e.protocolHealth();
+        e.status = 'running';
+        e.errorMessage = undefined;
+        e.lastHealthCheck = new Date();
+        return { ok: true, latencyMs: Date.now() - start };
+      }
       if (e.builtin) {
         e.status = 'builtin';
         e.lastHealthCheck = new Date();

@@ -13,6 +13,7 @@ import {
 import { AgentRegistryService } from './agent-registry.service';
 import {
   CloneAgentDto,
+  CreateConfiguredAgentDto,
   CreateAgentDto,
   CreateAgentVersionDto,
   UpdateAgentDto,
@@ -26,6 +27,11 @@ export class AgentRegistryController {
   @Post('bootstrap/interview-agent')
   bootstrapInterviewAgent(@Req() req: any) {
     return this.registry.bootstrapInterviewAgent(req.user.userId);
+  }
+
+  @Post('configured-agents')
+  createConfigured(@Req() req: any, @Body() dto: CreateConfiguredAgentDto) {
+    return this.registry.createConfiguredAgent(req.user.userId, dto);
   }
 
   @Get('agents')

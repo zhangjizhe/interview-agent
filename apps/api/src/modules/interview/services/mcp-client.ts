@@ -116,10 +116,7 @@ export class McpClient {
 
     const timeoutMs = this.config.timeoutMs ?? 30_000;
     try {
-      await Promise.race([
-        this.client.connect(this.transport),
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error('connect timeout')), timeoutMs)),
-      ]);
+      await this.withTimeout(this.client.connect(this.transport), timeoutMs, 'connect');
       this.connected = true;
       this.log.log(`✅ connected (transport=${this.config.transport})`);
     } catch (e: any) {
@@ -139,10 +136,7 @@ export class McpClient {
     if (!this.client) throw new Error('client not initialized');
 
     const timeoutMs = this.config.timeoutMs ?? 30_000;
-    const result = await Promise.race([
-      this.client.listTools(),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('listTools timeout')), timeoutMs)),
-    ]);
+    const result = await this.withTimeout(this.client.listTools(), timeoutMs, 'listTools');
 
     this.cachedTools = (result.tools || []).map((t: any) => ({
       name: t.name,
@@ -161,10 +155,7 @@ export class McpClient {
     if (!this.client) throw new Error('client not initialized');
 
     const timeoutMs = this.config.timeoutMs ?? 30_000;
-    const result = await Promise.race([
-      this.client.callTool({ name: toolName, arguments: args }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('callTool timeout')), timeoutMs)),
-    ]);
+    const result = await this.withTimeout(this.client.callTool({ name: toolName, arguments: args }), timeoutMs, 'callTool');
 
     return result;
   }
@@ -184,6 +175,15 @@ export class McpClient {
     this.cachedTools = null;
     this.client = null;
     this.transport = null;
+  }
+
+  private async withTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([operation, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timeout`)), timeoutMs);
+      })]);
+    } finally { if (timer) clearTimeout(timer); }
   }
 
   isConnected(): boolean {

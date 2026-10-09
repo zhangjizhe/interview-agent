@@ -683,3 +683,13 @@ await fs.writeFile(`docs/reflect-${formatDate(new Date())}.md`, report);
 - 日期：2026-10-08。加性迁移引入 CANCELLED 与 cancelRequestedAt，ADMIN 在自己的工作区调用 POST evaluations/:id/cancel。排队 CAS 取消不调用模型；领取竞态重新检查 RUNNING。运行任务保留租约及唯一活动约束，直到在途结果落库并在样本边界停止，不提前释放而触发重叠付费请求。
 - 后台先保存完成计数与实际费用小计再响应取消；终态取消保留幂等键，不自动重放。未知费用仍标不可用，取消不意味着 Provider 退费或精确账单结算。停机/网络中断仍按既有租约失败合同处理。
 - 不新增队列依赖。轮询组织分页与轮转增加越过 50 个空闲组织的回归；当前小规模公平性合同已验证，不宣称跨副本全局公平或高吞吐容量。相关 40 项与专用 PostgreSQL 18 项通过，模型为离线 fixture。
+
+## ADR 22：版本化配置 Agent 与有限工作流（2026-10-08，实施中）
+
+Lab原有Registry/Version/Run/Trace与发布门可复用，但执行器仅Interview、拓扑仅静态示意。新增single-agent-v1及finite-workflow-v1，保留Interview/LangGraph，拒绝未实现的tool/knowledge/memory绑定。定义保存在不可变AgentVersion.runtimeConfig；工作流1至10节点、仅前向边、固定单Agent版本与SHA-256配置指纹，支持顺序/结束与文本条件分支，输入映射仅原始message或前一response。运行前核对所有依赖workspace/状态/hash；发布要求依赖已发布。使用现有Run父子关系，每个实际节点生成并完成子Run/Trace，不把配置或静态图当执行结果。
+
+队列202入口增加Run nullable requestKey/requestHash/requestedByUserId/leaseOwner/heartbeatAt，workspace/key唯一且每workspace最多一活动任务。组织分页轮转、CAS领取、15秒心跳/90秒租约、过期失败且不自动重播。取消pending无请求；running在调用边界停止，完成CAS须租约匹配且无取消请求，迟到结果计量留Trace但不能覆盖终态output。执行前重新核对管理员身份。创建Agent与初始版本使用事务；新版本不改变currentVersion，发布仍复用既有门。
+
+每节点强制Provider/输出Token/预算/时限，父预算覆盖实际节点；全部模型调用通过Gateway/Quota，关闭自动fallback，SDK零自动重试，Provider单次30秒超时。费用目录缺失或保守估算不足不发请求；成功请求先保留usage/价格，再验证有界Schema和取消。UTF-8字节数加协议开销作为保守Token上界；Schema是明确拒绝不支持关键词的有界子集。取消/时限不撤回在途调用、不承诺退款。UI用已保存版本确认预算，版本保存/切换清旧确认，幂等重试不增加请求。
+
+不采用新工作流表/通用并行循环引擎：当前串行有界需求可复用版本JSON，降低迁移与恢复成本。并行、持久化断点自动恢复、动态工具注册后续独立规划。加性迁移先备份再独立部署，旧API回滚可保留nullable字段；禁止清任务/账本当恢复。验收要求独立合同测试、真实PG空/旧库、隔离HTTP/Gateway/子Run/Trace及浏览器双证据。合成Provider不证明模型质量；真实质量与账单仍过明确预算门。

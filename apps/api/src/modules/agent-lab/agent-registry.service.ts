@@ -1,12 +1,16 @@
+import type { ConfiguredRuntimeService } from './configured-runtime.service';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Optional,
+  Inject,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../infra/prisma/prisma.service';
 import {
   CloneAgentDto,
+  CreateConfiguredAgentDto,
   CreateAgentDto,
   CreateAgentVersionDto,
   UpdateAgentDto,
@@ -77,6 +81,7 @@ export class AgentRegistryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly decisionLedger: DecisionLedgerService,
+    @Optional() @Inject('CONFIGURED_RUNTIME') private readonly configured?: ConfiguredRuntimeService,
   ) {}
 
   async listAgents(userId: string) {
@@ -115,6 +120,23 @@ export class AgentRegistryService {
       if (error?.code === 'P2002') {
         throw new ConflictException(`Agent key "${dto.key}" 已存在`);
       }
+      throw error;
+    }
+  }
+
+  async createConfiguredAgent(userId: string, dto: CreateConfiguredAgentDto) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    if (!dto.initialVersion || !this.configured) throw new BadRequestException('须提供完整初始版本');
+    await this.configured.prepare(dto.initialVersion, workspace.id, true, true);
+    try {
+      return await this.prisma.$transaction(async tx => {
+        const agent = await tx.agent.create({ data: { workspaceId: workspace.id, key: dto.key,
+          name: dto.name.trim(), description: dto.description, type: dto.type } });
+        const version = await tx.agentVersion.create({ data: { ...dto.initialVersion as any, agentId: agent.id, status: 'DRAFT' } });
+        return { ...agent, versions: [version], currentVersion: null };
+      });
+    } catch (error: any) {
+      if (error.code === 'P2002') throw new ConflictException('Agent key或初始版本已存在，请刷新列表核验');
       throw error;
     }
   }
@@ -194,6 +216,10 @@ export class AgentRegistryService {
   async createVersion(userId: string, agentId: string, dto: CreateAgentVersionDto) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     await this.requireAgent(workspace.id, agentId);
+    if (['single-agent-v1', 'finite-workflow-v1'].includes(String(dto.runtimeConfig?.adapter))) {
+      if (!this.configured) throw new BadRequestException('配置运行时不可用');
+      await this.configured.prepare(dto, workspace.id, true, true);
+    }
     try {
       return await this.prisma.agentVersion.create({
         data: {
@@ -230,6 +256,9 @@ export class AgentRegistryService {
   async publishVersion(userId: string, agentId: string, versionId: string) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const version = await this.requireVersion(workspace.id, agentId, versionId);
+    if (['single-agent-v1', 'finite-workflow-v1'].includes(String((version.runtimeConfig as any)?.adapter))) {
+      await this.configured!.prepare(version, workspace.id, false);
+    }
     if (version.status === 'PUBLISHED') {
       const result = {
         ...version,

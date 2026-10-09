@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
-// Isolated synthetic fixtures. Never call model, embedding or evaluation execution.
+// Isolated synthetic fixtures. Configured runs use a deterministic localhost provider; no external models.
 const base = process.env.API_BASE_URL || 'http://127.0.0.1:3001/api';
 let passed = 0;
 async function request(path, { method = 'GET', token, body } = {}) {
@@ -75,6 +75,7 @@ const reloadedBuiltin = afterReload.data.servers.find(server => server.name === 
 check('real HTTP reload retains shutdown and binding', reloadedBuiltin?.enabled === false && reloadedBuiltin?.executable === true);
 check('MCP count reflects enabled execution bindings', afterReload.data.runningCount === afterReload.data.servers.filter(server => server.enabled && server.executable).length);
 await request('/admin/mcp-servers/toggle', { method: 'POST', token: admin, body: { toolName: 'knowledge_bank', enabled: true } });
+await (await import('/tmp/verify-configured-runtime.mjs')).verifyConfigured({ request, admin, owner, check });
 check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: sibling.data.accessToken })).status === 200);
 check('logged out access token rejected', (await request('/auth/profile', { token: sibling.data.accessToken })).status === 401);
 check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: sibling.data.refreshToken } })).status === 401);
@@ -82,4 +83,4 @@ check('other device remains authenticated', (await request('/auth/profile', { to
 const require = createRequire(`${process.cwd()}/package.json`);
 await require('/tmp/verify-training-loop.cjs')({ request, owner, targetJobId: created.data.id, check });
 await require('/tmp/verify-question-store.cjs')({ check });
-console.log(`Built API smoke: ${passed}/${passed} passed (synthetic, no model work).`);
+console.log(`Built API smoke: ${passed}/${passed} passed (synthetic local provider, no external model work).`);

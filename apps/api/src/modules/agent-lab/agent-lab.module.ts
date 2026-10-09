@@ -1,3 +1,6 @@
+import { ConfiguredRunJobsService } from './configured-run-jobs.service';
+import { LlmModule } from '../llm/llm.module';
+import { ConfiguredRuntimeService } from './configured-runtime.service';
 import { AgentLabController } from './agent-lab.controller';
 import { AgentLabService } from './agent-lab.service';
 import { Module } from '@nestjs/common';
@@ -25,10 +28,13 @@ import { ControlledEvolutionController } from './controlled-evolution.controller
 import { ControlledEvolutionService } from './controlled-evolution.service';
 
 @Module({
-  imports: [PrismaModule, AgentModule, InferenceModule],
+  imports: [PrismaModule, AgentModule, InferenceModule, LlmModule],
   controllers: [AgentLabController, AgentRegistryController, AgentRuntimeController, EvaluationController, ApplicationController, ControlledEvolutionController],
   providers: [
     AgentLabService,
+    ConfiguredRuntimeService,
+    { provide: 'CONFIGURED_RUNTIME', useExisting: ConfiguredRuntimeService },
+    ConfiguredRunJobsService,
     AgentRegistryService,
     AgentRuntimeService,
     EvaluationService,

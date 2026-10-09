@@ -1,9 +1,14 @@
+import { assertSchema } from './configured-runtime.contract';
+import type { ConfiguredRuntimeService } from './configured-runtime.service';
+import { RuntimeCancelledError } from './configured-runtime.contract';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
+  Inject,
 } from '@nestjs/common';
 import { MultiAgentService } from '../agent/multi-agent.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
@@ -20,13 +25,28 @@ export class AgentRuntimeService {
     private readonly multiAgent: MultiAgentService,
     private readonly trace: TraceEventService,
     private readonly traceBundles: TraceBundleService,
+    @Optional() @Inject('CONFIGURED_RUNTIME') private readonly configured?: ConfiguredRuntimeService,
   ) {}
+
+  async prepareConfiguredRun(userId: string, agentId: string, dto: RunAgentDto, allowDraft: boolean) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    const agent = await this.prisma.agent.findFirst({ where: { id: agentId, workspaceId: workspace.id }, include: { currentVersion: true } });
+    if (!agent) throw new NotFoundException('Agent不存在或无权访问');
+    const version = await this.resolveVersion(agent, dto.agentVersionId, allowDraft);
+    if (!this.configured) throw new ConflictException('配置运行时不可用');
+    await this.configured.prepare(version, workspace.id, allowDraft);
+    assertSchema(version.inputSchema ?? { type: 'object' }, dto.input);
+    if (typeof dto.input.message !== 'string' || !dto.input.message.trim() || dto.input.message.length > 10000) throw new BadRequestException('input.message须为1至10000字符');
+    return { workspace, version };
+  }
+
+  configuredModels() { return this.configured?.models() ?? []; }
 
   async runAgent(
     userId: string,
     agentId: string,
     dto: RunAgentDto,
-    options: { allowDraftVersion?: boolean; bypassSemanticCache?: boolean } = {},
+    options: { allowDraftVersion?: boolean; bypassSemanticCache?: boolean; queuedRun?: any } = {},
   ) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const agent = await this.prisma.agent.findFirst({
@@ -44,21 +64,27 @@ export class AgentRuntimeService {
     );
     const message = dto.input.message;
     if (typeof message !== 'string' || message.trim().length === 0) {
-      throw new BadRequestException('当前 Interview 运行时要求 input.message 为非空字符串');
+      throw new BadRequestException('运行时要求 input.message 为非空字符串');
     }
     if (message.length > 10_000) {
       throw new BadRequestException('input.message 不能超过 10000 个字符');
     }
 
     const runtimeConfig = (version.runtimeConfig || {}) as Record<string, unknown>;
-    if (runtimeConfig.adapter !== 'interview-multi-agent') {
+    const isConfigured = ['single-agent-v1', 'finite-workflow-v1'].includes(String(runtimeConfig.adapter));
+    if (isConfigured && !options.queuedRun && !options.allowDraftVersion) {
+      throw new ConflictException('配置运行必须通过带 requestKey 的 runs 队列入口启动');
+    }
+    const prepared = isConfigured && this.configured
+      ? await this.configured.prepare(version, workspace.id, options.allowDraftVersion === true) : undefined;
+    if (runtimeConfig.adapter !== 'interview-multi-agent' && !prepared) {
       throw new BadRequestException(
         `当前仅支持 interview-multi-agent 适配器，版本 ${version.version} 未配置该适配器`,
       );
     }
 
     const startedAt = new Date();
-    const run = await this.prisma.run.create({
+    const run = options.queuedRun || await this.prisma.run.create({
       data: {
         workspaceId: workspace.id,
         agentId: agent.id,
@@ -88,11 +114,13 @@ export class AgentRuntimeService {
     });
 
     try {
-      if (!this.multiAgent.isEnabled()) {
+      if (!prepared && !this.multiAgent.isEnabled()) {
         throw new ConflictException('interview-multi-agent 运行时当前未启用');
       }
 
-      const graphResult = await this.multiAgent.run(
+      const graphResult: any = prepared
+        ? await this.configured!.execute(userId, run, version, dto.input, prepared)
+        : await this.multiAgent.run(
         message,
         dto.externalRunId || run.id,
         [],
@@ -101,7 +129,7 @@ export class AgentRuntimeService {
       );
       const completedAt = new Date();
       const latencyMs = completedAt.getTime() - startedAt.getTime();
-      const output = {
+      const output = graphResult.output || {
         response: graphResult.response,
         intent: graphResult.intent,
         plan: graphResult.plan,
@@ -110,17 +138,22 @@ export class AgentRuntimeService {
         threadId: graphResult.threadId,
       };
 
-      const completed = await this.prisma.run.update({
-        where: { id: run.id },
+      const completion = {
         data: {
-          status: 'COMPLETED',
+          status: 'COMPLETED' as const,
           output: output as any,
           latencyMs,
           tokenUsage: graphResult.tokenUsage as any,
           estimatedCost: graphResult.estimatedCostCny,
           completedAt,
         },
-      });
+      };
+      let completed: any;
+      if (options.queuedRun) {
+        const updated = await this.prisma.run.updateMany({ where: { id: run.id, status: 'RUNNING', cancelRequestedAt: null, leaseOwner: run.leaseOwner }, ...completion });
+        if (!updated.count) throw new RuntimeCancelledError('运行租约已失效，不覆盖终态');
+        completed = await this.prisma.run.findFirst({ where: { id: run.id } });
+      } else completed = await this.prisma.run.update({ where: { id: run.id }, ...completion });
       await this.writeTrace(run.id, {
         type: 'turn.end',
         name: 'Agent Run Completed',
@@ -140,20 +173,22 @@ export class AgentRuntimeService {
       const completedAt = new Date();
       const latencyMs = completedAt.getTime() - startedAt.getTime();
       const message = error?.message || '运行时执行失败';
-      await this.prisma.run.update({
-        where: { id: run.id },
+      await (options.queuedRun ? this.prisma.run.updateMany({
+        where: { id: run.id, status: 'RUNNING', ...(options.queuedRun ? { leaseOwner: run.leaseOwner } : {}) },
         data: {
-          status: 'FAILED',
+          status: error instanceof RuntimeCancelledError ? 'CANCELLED' : 'FAILED',
           error: message,
           latencyMs,
           completedAt,
         },
-      });
+      }) : this.prisma.run.update({ where: { id: run.id }, data: {
+        status: error instanceof RuntimeCancelledError ? 'CANCELLED' : 'FAILED', error: message, latencyMs, completedAt,
+      } }));
       await this.writeTrace(run.id, {
-        type: 'run.failed',
-        name: 'Agent Run Failed',
+        type: error instanceof RuntimeCancelledError ? 'run.cancelled' : 'run.failed',
+        name: error instanceof RuntimeCancelledError ? 'Agent Run Cancelled' : 'Agent Run Failed',
         step: 'runtime',
-        payload: { status: 'FAILED', error: message },
+        payload: { status: error instanceof RuntimeCancelledError ? 'CANCELLED' : 'FAILED', error: message },
         latencyMs,
         error: message,
       });

@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsObject,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   MaxLength,
   IsIn,
   IsNumber,
+  ValidateNested,
 } from 'class-validator';
 
 const AGENT_KEY_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
@@ -23,6 +25,7 @@ export class CreateAgentDto {
 
   @IsString()
   @MaxLength(120)
+  @Matches(/\S/, { message: '名称不能只包含空白字符' })
   name!: string;
 
   @IsOptional()
@@ -32,6 +35,7 @@ export class CreateAgentDto {
 
   @IsString()
   @MaxLength(80)
+  @Matches(/\S/, { message: '类型不能只包含空白字符' })
   type!: string;
 }
 
@@ -39,6 +43,7 @@ export class UpdateAgentDto {
   @IsOptional()
   @IsString()
   @MaxLength(120)
+  @Matches(/\S/, { message: '名称不能只包含空白字符' })
   name?: string;
 
   @IsOptional()
@@ -49,6 +54,7 @@ export class UpdateAgentDto {
   @IsOptional()
   @IsString()
   @MaxLength(80)
+  @Matches(/\S/, { message: '类型不能只包含空白字符' })
   type?: string;
 }
 
@@ -61,6 +67,7 @@ export class CloneAgentDto {
 
   @IsString()
   @MaxLength(120)
+  @Matches(/\S/, { message: '名称不能只包含空白字符' })
   name!: string;
 }
 
@@ -139,6 +146,7 @@ export class CreateEvaluationDatasetDto {
 
   @IsString()
   @MaxLength(120)
+  @Matches(/\S/, { message: '名称不能只包含空白字符' })
   name!: string;
 
   @IsOptional()
@@ -183,6 +191,7 @@ export class CreateEvaluatorDto {
 
   @IsString()
   @MaxLength(120)
+  @Matches(/\S/, { message: '名称不能只包含空白字符' })
   name!: string;
 
   @IsString()
@@ -235,4 +244,16 @@ export class SpawnSubRunDto {
   @IsOptional()
   @IsObject()
   budget?: Record<string, unknown>;
+}
+
+export class StartConfiguredRunDto extends RunAgentDto {
+  @IsString()
+  @Matches(/^[a-zA-Z0-9_-]{16,100}$/)
+  requestKey!: string;
+}
+
+export class CreateConfiguredAgentDto extends CreateAgentDto {
+  @ValidateNested()
+  @Type(() => CreateAgentVersionDto)
+  initialVersion!: CreateAgentVersionDto;
 }

@@ -1,3 +1,4 @@
+import { AgentBuilderWorkspace } from './AgentBuilderWorkspace';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -324,7 +325,7 @@ function ControlCenter() {
         {feedback && <p className="agent-feedback">{feedback}</p>}
 
         {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} />}
-        {view === 'runtime' && <RuntimeCanvas />}
+        {view === 'runtime' && <AgentBuilderWorkspace />}
         {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} />}
         {view === 'question-bank' && <QuestionBankWorkspace
           questions={questionItems}

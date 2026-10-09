@@ -2,13 +2,18 @@
 
 更新：2026-10-08 · DELIVERY-CLOSEOUT-1
 
+## Agent配置与MCP执行边界（2026-10-09）
+
+自定义单Agent/有限工作流已实现，独立后端29/29、组件7/7、相关API50/50、最终镜像HTTP59/59及Redis/数据库/向量库恢复重跑通过；隔离浏览器创建、运行、Trace、持久化和分支核验通过。尚未更新业务预览和迁移。MCP父服务/子工具即时禁用与协议健康探测已修复，相关24项及无网络容器真实stdio/HTTP initialize/listTools/echo/关闭阻止调用通过，尚需整合镜像回归及界面验收。报告 `docs/ACCEPTANCE-REPORT-2026-10-09-CONFIGURED-RUNTIME.md`。用户授权单次≤0.5CNY、新发布前测试累计≤3CNY；本阶段外部付费调用0，历史未知账单不记零。下一步题库网关计量、浏览器覆盖和真实模型有界评测。整体NOT_ACCEPTED，按用户要求自主连续推进。
+
+
 ## Lab 基础阻断阶段（2026-10-08）
 
-PRODUCT-REACCEPTANCE-1 基础阻断修复完成，整体仍 NOT_ACCEPTED。修复题库空岗位导致400、MCP重载假成功/丢失执行绑定与系统关闭、健康检查及汇总误导。独立测试Agent 8项包含在相关API 42项内；组件6项、type/build/lint与镜像43/43/恢复通过。本机已部署，浏览器题库正确空状态及禁用MCP失败反馈确认。配置路径原本正确，审计误判已撤回。报告 `docs/ACCEPTANCE-REPORT-2026-10-08-LAB-FOUNDATION.md`。用户新增Agent/编排及独立测试范围见 `docs/acceptance/LAB_AGENT_WORKFLOW_CONTRACT.md`；下一阶段完成Agent配置和受控运行，随后编排和整体双证据，不把CRUD/静态画布算交付。外部MCP真实协议、题库计费写入/搜索及完整交互验收未完成；无新付费请求。按AGENTS每阶段完成等待继续。
+PRODUCT-REACCEPTANCE-1 基础阻断修复完成，整体仍 NOT_ACCEPTED。修复题库空岗位导致400、MCP重载假成功/丢失执行绑定与系统关闭、健康检查及汇总误导。独立测试Agent 8项包含在相关API 42项内；组件6项、type/build/lint与镜像43/43/恢复通过。本机已部署，浏览器题库正确空状态及禁用MCP失败反馈确认。配置路径原本正确，审计误判已撤回。报告 `docs/ACCEPTANCE-REPORT-2026-10-08-LAB-FOUNDATION.md`。用户新增Agent/编排及独立测试范围见 `docs/acceptance/LAB_AGENT_WORKFLOW_CONTRACT.md`；下一阶段完成Agent配置和受控运行，随后编排和整体双证据，不把CRUD/静态画布算交付。外部MCP真实协议、题库计费写入/搜索及完整交互验收未完成；无新付费请求。用户最新指令要求连续推进，不再按阶段等待。
 
 ## 全产品重新验收（2026-10-08）
 
-PRODUCT-REACCEPTANCE-1 为当前唯一活动主题。用户要求测试确认后再交付；产品整体 NOT_ACCEPTED。Phase 0 建立34功能合同、673源码模板项（144交互/529展示，全部未验收），要求API/持久化与浏览器独立二次确认，条件/动态/响应式需逐项展开。发现旧产品规格和全流程脚本过时、CI没有浏览器验收门。计划 `docs/acceptance/PRODUCT_REACCEPTANCE_PLAN.md`。按AGENTS分阶段等待继续；真实模型测试须核对额度/未知账单并确定新预算，当前无新推理或产品通过声明。
+PRODUCT-REACCEPTANCE-1 为当前唯一活动主题。用户要求测试确认后再交付；产品整体 NOT_ACCEPTED。Phase 0 建立34功能合同、673源码模板项（144交互/529展示，全部未验收），要求API/持久化与浏览器独立二次确认，条件/动态/响应式需逐项展开。发现旧产品规格和全流程脚本过时、CI没有浏览器验收门。计划 `docs/acceptance/PRODUCT_REACCEPTANCE_PLAN.md`。按用户最新指令自主连续推进；真实模型测试须核对额度/未知账单并确定新预算，当前无新推理或产品通过声明。
 
 ## 新组织管理员控制面修复（2026-10-08）
 

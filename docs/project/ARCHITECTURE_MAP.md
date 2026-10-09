@@ -25,3 +25,7 @@
 安全迁移保持 Node 20/React 18，braces 补丁覆盖字符串与 AST；CI 保留上游 high 并验证固定补丁。ContextManager 缓存以完整内容/role/tier SHA-256 区分决策，容量 1000、命中刷新 LRU。全部旧 Jest 排除已解除；真实模型与生产验收另核验。
 
 Lab Golden Dataset 版本按 organizationId/version 唯一，可信租户上下文 upsert；不同组织有独立同版本记录，旧 ID/关系保留。首次新组织 dashboard 已纳入实际镜像 HTTP 与专用 PG 回归。
+
+## 配置运行时演进（2026-10-08）
+
+AgentLab扩展ConfiguredRuntimeService与ConfiguredRunJobsService；AgentVersion.runtimeConfig保存single-agent-v1/finite-workflow-v1，Run保存队列幂等/租约与父子节点。调用统一Gateway且禁用自动fallback，Trace记录真实节点；发布门不变。新增202 test-runs/runs/cancel、runtime/models和事务configured-agents入口。加性迁移 `20261008030000_configured_run_jobs`。实施/验收中，不代表整产品交付，详见 `docs/architecture-decisions.md` ADR 22。
