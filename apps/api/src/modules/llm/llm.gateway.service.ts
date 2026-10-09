@@ -1,7 +1,8 @@
 import { QuotaService } from './usage/quota.service';
 import { requireTenant } from '../organizations/tenant-context';
 import { HttpException } from '@nestjs/common';
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException, BadRequestException, Optional } from '@nestjs/common';
+import { LlmPricingCatalogService } from './cost/llm-pricing-catalog.service';
 import { QwenProvider } from './providers/qwen.provider';
 import { DeepseekProvider } from './providers/deepseek.provider';
 import { BaseLLMProvider } from './providers/base.provider';
@@ -56,6 +57,7 @@ export class LlmGatewayService {
     private semanticCache: SemanticCacheService,
     private costTracker: SessionCostTracker,
     private quota: QuotaService,
+    @Optional() private pricing: LlmPricingCatalogService = new LlmPricingCatalogService(),
   ) {
     this.providers = new Map<LLMProviderName, BaseLLMProvider>([
       ['qwen', this.qwen],
@@ -144,6 +146,47 @@ export class LlmGatewayService {
       provider: provider.name, model: provider.defaultModel,
       enabled: this.providerEnabled.get(provider.name as LLMProviderName) === true,
     }));
+  }
+
+  private async auxiliary<T extends { promptTokens?: number }>(task: 'embedding' | 'rerank', model: string, inputBytes: number, invoke: () => Promise<T>): Promise<T> {
+    requireTenant();
+    if (!this.providerEnabled.get('qwen')) throw new ServiceUnavailableException('Qwen当前不可用');
+    const bound = this.pricing.estimateCall({ provider: 'qwen', model, promptTokens: inputBytes, completionTokens: 0 });
+    if (bound.status !== 'available' || bound.totalCny > 0.05) throw new BadRequestException('辅助模型估算费用未知或超过单次0.05CNY上限');
+    const receiptId = await this.quota.reserveAuxiliary(task, model, inputBytes);
+    let result: T;
+    try { result = await invoke(); } catch (error) {
+      await this.quota.settleAuxiliary(receiptId, { task, provider: 'qwen', model, state: 'FAILED', estimatedCostCny: null, usage: null });
+      throw error;
+    }
+    const evidence = Number.isInteger(result.promptTokens) && result.promptTokens! > 0
+      ? this.pricing.estimateCall({ provider: 'qwen', model, promptTokens: result.promptTokens!, completionTokens: 0 }) : null;
+    await this.quota.settleAuxiliary(receiptId, { task, provider: 'qwen', model,
+      state: evidence?.status === 'available' ? 'COMPLETED' : 'COST_UNKNOWN',
+      usage: typeof result.promptTokens === 'number' ? { promptTokens: result.promptTokens, completionTokens: 0 } : null,
+      estimatedCostCny: evidence?.status === 'available' ? evidence.totalCny : null,
+      catalogVersion: this.pricing.version });
+    if (evidence?.status !== 'available') throw new ServiceUnavailableException('辅助模型费用未知，已保留调用记录；请核查后再试');
+    return result;
+  }
+
+  async embedText(text: string): Promise<number[]> {
+    const result = await this.auxiliary('embedding', 'text-embedding-v3', Buffer.byteLength(text, 'utf8'), () => this.qwen.embedText(text));
+    if (!Array.isArray(result.vector) || result.vector.length !== 1024 || !result.vector.every(Number.isFinite)) {
+      throw new ServiceUnavailableException('Embedding返回无效向量，未写入题库');
+    }
+    return result.vector;
+  }
+
+  async rerank(query: string, documents: string[]): Promise<Array<{ index: number; relevance_score: number }>> {
+    const bytes = documents.reduce((sum, document) => sum + Buffer.byteLength(query + document, 'utf8'), 0);
+    const result = await this.auxiliary('rerank', 'gte-rerank-v2', bytes, () => this.qwen.rerank(query, documents));
+    const ranks = result.rankings;
+    if (!Array.isArray(ranks) || ranks.length !== documents.length || new Set(ranks.map(rank => rank.index)).size !== documents.length
+      || ranks.some(rank => !Number.isInteger(rank.index) || rank.index < 0 || rank.index >= documents.length || !Number.isFinite(rank.relevance_score))) {
+      throw new ServiceUnavailableException('Rerank返回无效排序，保留原始召回结果');
+    }
+    return ranks;
   }
 
   /**

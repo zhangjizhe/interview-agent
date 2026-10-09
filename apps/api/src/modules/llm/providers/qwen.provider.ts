@@ -82,6 +82,22 @@ export class QwenProvider extends BaseLLMProvider {
     }
   }
 
+  async embedText(text: string) {
+    const response = await this.client.embeddings.create({ model: 'text-embedding-v3', input: text, dimensions: 1024, encoding_format: 'float' });
+    return { vector: response.data[0]?.embedding, promptTokens: response.usage?.prompt_tokens };
+  }
+
+  async rerank(query: string, documents: string[]) {
+    const response = await fetch(this.config.get<string>('qwen.rerankUrl') || 'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank', {
+      method: 'POST', signal: AbortSignal.timeout(15000),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.config.get<string>('qwen.apiKey') || ''}` },
+      body: JSON.stringify({ model: 'gte-rerank-v2', input: { query, documents }, parameters: { return_documents: false, top_n: documents.length } }),
+    });
+    if (!response.ok) throw Object.assign(new Error('Rerank provider request failed'), { status: response.status });
+    const data: any = await response.json();
+    return { rankings: data.output?.results, promptTokens: data.usage?.total_tokens };
+  }
+
   async *streamChat(params: ChatParams): AsyncGenerator<StreamChunk, void, void> {
     try {
       const extraBody: Record<string, any> = {};

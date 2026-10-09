@@ -41,6 +41,21 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it.each([{ rows: [] }, { rows: [{ id: 'delayed-run', status: 'COMPLETED' }] }])('shows loading instead of a false empty history until the response arrives (%j)', async ({ rows }) => {
+    let complete!: (rows: any[]) => void;
+    const deferred = new Promise<any[]>(resolve => { complete = resolve; });
+    const defaultTransport = transport.getMockImplementation()!;
+    transport.mockImplementation((path: string, options?: any) => path.startsWith('/agent-lab/runs?') ? deferred : defaultTransport(path, options));
+    mount(); await selectSaved();
+    expect(screen.getByText('正在读取运行记录…')).toBeInTheDocument();
+    expect(screen.queryByText('暂无运行')).not.toBeInTheDocument();
+    complete(rows);
+    if (rows.length) {
+      await screen.findByRole('button', { name: 'delayed-run · COMPLETED' });
+      expect(screen.queryByText('暂无运行')).not.toBeInTheDocument();
+    } else await screen.findByText('暂无运行');
+    expect(screen.queryByText('正在读取运行记录…')).not.toBeInTheDocument();
+  });
   it('reports creation failure without a saved-success claim', async () => {
     post.mockRejectedValue(new Error('Synthetic persistence failed')); mount();
     fireEvent.click(screen.getByRole('button', { name: '新增 Agent / 工作流' }));

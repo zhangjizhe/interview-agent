@@ -73,7 +73,21 @@ jobs:
           docker build -f apps/api/Dockerfile -t interview-api:verification .
           docker build -f apps/web/Dockerfile -t interview-web:verification .
           docker build -f apps/agent-lab/Dockerfile -t interview-lab:verification .
-      - name: Verify built API against isolated PostgreSQL and Redis
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+      - name: Install browser acceptance dependencies
+        run: |
+          pnpm install --frozen-lockfile --registry=https://registry.npmjs.org
+          pnpm --filter web exec playwright install --with-deps chromium
+      - name: Verify isolated API, browser and recovery
+        env:
+          FIXTURE_BROWSER_TEST: '1'
+          FIXTURE_LAB_IMAGE: interview-lab:verification
         run: bash scripts/ci/verify-built-api.sh interview-api:verification
 
   ci-summary:

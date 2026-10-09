@@ -73,7 +73,9 @@ export class ConfiguredRuntimeService {
         { role: 'system', content: target.systemPrompt }, { role: 'user', content: message },
       ], maxTokens: config.maxTokens, temperature: config.temperature, userId,
       interviewId: childRun.id, allowFallback: false }, config.provider);
-      const cost = this.pricing.estimateCall({ provider: result.provider, model: result.model, ...result.usage });
+      const cost = result.usage.promptTokens + result.usage.completionTokens > 0
+        ? this.pricing.estimateCall({ provider: result.provider, model: result.model, ...result.usage })
+        : { status: 'unavailable' as const, reason: 'Provider未返回有效usage，不能将未知费用记零' };
       // Preserve successful billable evidence even if schema/cancellation fails after the call.
       promptTokens += result.usage.promptTokens;
       completionTokens += result.usage.completionTokens;

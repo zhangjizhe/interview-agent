@@ -38,3 +38,38 @@ describe('Lab question bank governance', () => {
     expect(params.get('q')).toBe('A+B & C');
   });
 });
+
+describe('Question bank pending search and reference answer controls', () => {
+  function setup(answer: string) {
+    const search = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const question: any = { id: 'synthetic', questionId: 'synthetic-id', position: 'Fixture', question: 'Synthetic retrieval question', answer, tags: [] };
+    const tree = (searching: boolean, message = '') => <QueryClientProvider client={client}><QuestionBankWorkspace questions={[question]} searchResults={null} query="synthetic" position="" message={message} searching={searching} onQuery={vi.fn()} onPosition={vi.fn()} onSearch={search} onClearSearch={vi.fn()}/></QueryClientProvider>;
+    const view = render(tree(false));
+    return { search, view, tree };
+  }
+  it('disables repeat search while pending and permits a retry after a displayed failure', () => {
+    const { search, view, tree } = setup('Synthetic reference');
+    fireEvent.click(screen.getByRole('button', { name: '搜索', exact: true }));
+    expect(search).toHaveBeenCalledTimes(1);
+    view.rerender(tree(true));
+    expect(screen.getByRole('button', { name: '搜索中', exact: true })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '搜索中', exact: true }));
+    expect(search).toHaveBeenCalledTimes(1);
+    view.rerender(tree(false, 'Synthetic search failed'));
+    expect(screen.getByText('Synthetic search failed')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '搜索', exact: true }));
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+  it.each(['Synthetic reference answer', ''])('places reference content in a closed native details disclosure (%s)', answer => {
+    setup(answer);
+    const summary = screen.getByText('参考答案', { exact: true });
+    const disclosure = summary.closest('details');
+    expect(disclosure).not.toHaveAttribute('open');
+    expect(disclosure).toContainElement(screen.getByText(answer || '未提供参考答案'));
+    fireEvent.click(summary);
+    expect(disclosure).toHaveAttribute('open');
+    fireEvent.click(summary);
+    expect(disclosure).not.toHaveAttribute('open');
+  });
+});

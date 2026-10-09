@@ -17,6 +17,7 @@ export interface AppConfig {
     apiKey: string;
     baseUrl: string;
     model: string;
+    rerankUrl: string;
   };
   deepseek: {
     apiKey: string;
@@ -175,6 +176,7 @@ export const configuration = (): AppConfig => {
     apiKey: process.env.QWEN_API_KEY || '',
     baseUrl: process.env.QWEN_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     model: process.env.QWEN_MODEL || 'qwen-plus',
+    rerankUrl: process.env.QWEN_RERANK_URL || 'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank',
   },
   deepseek: {
     apiKey: process.env.DEEPSEEK_API_KEY || '',

@@ -17,7 +17,7 @@ describe('LlmPricingCatalogService', () => {
       { provider: 'deepseek', model: 'deepseek-flash', promptTokens: 1000, completionTokens: 500 },
     ])).toMatchObject({
       status: 'available',
-      catalogVersion: '2026-10-05.1',
+      catalogVersion: '2026-10-09.1',
       totalCny: 0.0078,
       calls: [
         { provider: 'qwen', model: 'qwen-plus', totalCny: 0.0018 },

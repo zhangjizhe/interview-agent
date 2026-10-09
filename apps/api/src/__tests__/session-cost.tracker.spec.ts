@@ -61,7 +61,7 @@ describe('SessionCostTracker', () => {
     });
 
     expect(pipeline.hset).toHaveBeenCalledWith(
-      'session_cost:interview-1', 'pricingCatalogVersion', '2026-10-05.1',
+      'session_cost:interview-1', 'pricingCatalogVersion', '2026-10-09.1',
     );
     expect(pipeline.hsetnx).toHaveBeenCalledWith(
       'session_cost:interview-1', 'costStatus', 'available',

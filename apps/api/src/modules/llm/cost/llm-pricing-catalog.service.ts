@@ -78,10 +78,22 @@ export type LlmPricingReconciliation =
 // 价格来自 Provider 官方公开按量价格；使用高峰价或不享受缓存折扣的价格做保守估算。
 // 费率变更必须新增 catalogVersion，并在验收报告中记录账单抽样对账结果。
 const BUILTIN_CATALOG: PricingCatalog = {
-  catalogVersion: '2026-10-05.1',
+  catalogVersion: '2026-10-09.1',
   currency: 'CNY',
-  effectiveAt: '2026-10-05T00:00:00+08:00',
+  effectiveAt: '2026-10-09T00:00:00+08:00',
   entries: [
+    {
+      provider: 'qwen', models: ['text-embedding-v3'],
+      source: 'https://help.aliyun.com/zh/model-studio/embedding',
+      pricingBasis: '华北2北京，文本向量同步按量，2026-10-09核对',
+      tiers: [{ inputCnyPer1k: 0.0005, outputCnyPer1k: 0 }],
+    },
+    {
+      provider: 'qwen', models: ['gte-rerank-v2'],
+      source: 'https://help.aliyun.com/en/model-studio/model-pricing',
+      pricingBasis: '华北2北京，文本精排按输入Token，2026-10-09核对',
+      tiers: [{ inputCnyPer1k: 0.0008, outputCnyPer1k: 0 }],
+    },
     {
       provider: 'qwen',
       models: ['qwen-plus', 'qwen-plus-2025-12-01'],

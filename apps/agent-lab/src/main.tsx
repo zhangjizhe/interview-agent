@@ -133,6 +133,8 @@ function ControlCenter() {
   const [operationObjectType, setOperationObjectType] = useState('');
   const [operationPage, setOperationPage] = useState(1);
   const [questionQuery, setQuestionQuery] = useState('');
+  const [questionSearching, setQuestionSearching] = useState(false);
+  const questionSearchPending = useRef(false);
   const [questionPosition, setQuestionPosition] = useState('');
   const [questionSearch, setQuestionSearch] = useState('');
   const [questionMessage, setQuestionMessage] = useState('');
@@ -269,7 +271,9 @@ function ControlCenter() {
   const questionItems = ((questions.data as { results?: QuestionBankItem[] })?.results || []);
   const currentMutationError = toggle.error || health.error || reload.error || executeImport.error || createExperiment.error || recordDecision.error;
   const searchQuestions = async () => {
-    if (!questionQuery.trim()) return;
+    if (!questionQuery.trim() || questionSearchPending.current) return;
+    questionSearchPending.current = true;
+    setQuestionSearching(true);
     const version = ++questionSearchVersion.current;
     setQuestionMessage('');
     try {
@@ -280,7 +284,7 @@ function ControlCenter() {
       if (version !== questionSearchVersion.current) return;
       setQuestionSearch('');
       setQuestionMessage(error instanceof Error ? error.message : '搜索失败');
-    }
+    } finally { questionSearchPending.current = false; setQuestionSearching(false); }
   };
   return (
     <div className="agent-shell">
@@ -334,6 +338,7 @@ function ControlCenter() {
           searchResults={questionSearch ? JSON.parse(questionSearch) as QuestionBankItem[] : null}
           message={questionMessage || (questions.isError ? '题库暂不可用，请重试；未将读取失败显示为空数据。' : '')}
           loading={questions.isLoading}
+          searching={questionSearching}
           onQuery={(value) => { clearQuestionSearch(); setQuestionQuery(value); }}
           onPosition={(value) => { clearQuestionSearch(); setQuestionPosition(value); }}
           onSearch={searchQuestions}

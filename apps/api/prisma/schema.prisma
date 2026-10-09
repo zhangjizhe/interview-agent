@@ -962,6 +962,7 @@ model UsageLedger {
   interview   Interview? @relation(fields: [interviewId], references: [id], onDelete: SetNull)
   periodStart DateTime
   type        UsageLedgerType
+  metadata    Json?
   units       Int      @default(1)
   createdAt   DateTime @default(now())
 

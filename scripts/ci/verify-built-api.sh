@@ -51,7 +51,7 @@ docker run -d --name "$fixture_api" --network "$fixture_network" --network-alias
   -e DATABASE_URL=postgresql://postgres@fixture-pg:5432/fixture -e REDIS_URL=redis://fixture-redis:6379 \
   -e JWT_SECRET=isolated_ci_fixture_secret_at_least_32_characters \
   -e ADMIN_USER_IDS=fixture-ci-admin -e NODE_ENV=production \
-  -e QWEN_API_KEY=synthetic-fixture -e QWEN_BASE_URL=http://127.0.0.1:3335/v1 \
+  -e QWEN_API_KEY=synthetic-fixture -e QWEN_BASE_URL=http://127.0.0.1:3335/v1 -e QWEN_RERANK_URL=http://127.0.0.1:3335/fixture/rerank \
   -e DEEPSEEK_API_KEY=synthetic-fixture -e DEEPSEEK_BASE_URL=http://127.0.0.1:1 \
   -e MILVUS_URL=http://fixture-milvus:19530 -e QDRANT_URL=http://fixture-qdrant:6333 "$fixture_image" >/dev/null
 fixture_ready=false
@@ -66,6 +66,7 @@ if [[ "$fixture_ready" != true ]]; then
   exit 1
 fi
 docker cp scripts/ci/fixture-model-server.mjs "$fixture_api:/tmp/fixture-model-server.mjs"
+docker cp scripts/ci/verify-question-gateway.mjs "$fixture_api:/tmp/verify-question-gateway.mjs"
 docker cp scripts/ci/verify-configured-runtime.mjs "$fixture_api:/tmp/verify-configured-runtime.mjs"
 docker exec -d "$fixture_api" node /tmp/fixture-model-server.mjs
 docker cp scripts/ci/fixture-mcp-server.cjs "$fixture_api:/tmp/fixture-mcp-server.cjs"
@@ -76,18 +77,28 @@ docker cp scripts/ci/verify-training-loop.cjs "$fixture_api:/tmp/verify-training
 docker cp scripts/ci/verify-question-store.cjs "$fixture_api:/tmp/verify-question-store.cjs"
 docker cp scripts/ci/verify-vector-recovery.cjs "$fixture_api:/tmp/verify-vector-recovery.cjs"
 docker exec -i "$fixture_api" node --input-type=module < scripts/ci/verify-built-api.mjs
-if [[ "${FIXTURE_BROWSER_GATE:-}" != "" ]]; then
-  docker run -d --name "$fixture_lab" --network "$fixture_network" -p 127.0.0.1:5176:80 interview-agent-agent-lab >/dev/null
+if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]; then
+  docker run -d --name "$fixture_lab" --network "$fixture_network" -p 127.0.0.1:5176:80 "${FIXTURE_LAB_IMAGE:-interview-agent-agent-lab}" >/dev/null
   # Docker internal networks do not expose published ports to the host browser.
   # Only the static frontend joins bridge; API and synthetic providers stay isolated.
   docker network connect bridge "$fixture_lab"
-  echo 'BROWSER FIXTURE READY at http://localhost:5176; waiting for local gate file'
-  fixture_browser_ready=false
-  for attempt in {1..900}; do
-    if [[ -f "$FIXTURE_BROWSER_GATE" ]]; then fixture_browser_ready=true; break; fi
+  fixture_lab_ready=false
+  for attempt in {1..20}; do
+    if docker exec "$fixture_lab" wget -q -O /dev/null http://127.0.0.1/; then fixture_lab_ready=true; break; fi
     sleep 1
   done
-  test "$fixture_browser_ready" = true
+  test "$fixture_lab_ready" = true
+  if [[ "${FIXTURE_BROWSER_TEST:-}" == "1" ]]; then
+    LAB_FIXTURE_SYNTHETIC=1 pnpm --filter @interview-agent/web exec node e2e/lab-isolated-acceptance.mjs
+  else
+    echo 'BROWSER FIXTURE READY at http://localhost:5176; waiting for local gate file'
+    fixture_browser_ready=false
+    for attempt in {1..900}; do
+      if [[ -f "$FIXTURE_BROWSER_GATE" ]]; then fixture_browser_ready=true; break; fi
+      sleep 1
+    done
+    test "$fixture_browser_ready" = true
+  fi
   docker rm -fv "$fixture_lab" >/dev/null
 fi
 docker exec "$fixture_api" node /tmp/verify-vector-recovery.cjs seed

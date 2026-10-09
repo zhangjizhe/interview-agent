@@ -23,7 +23,7 @@ export class QuotaService {
   }
 
   /** 组织行锁串行化检查与记账；事务内不调用外部服务。失败调用也占用已提交的次数。 */
-  private async consume<T>(type: UsageLedgerType, create: (tx: Prisma.TransactionClient, plan: Plan) => Promise<{ result: T; interviewId?: string }>): Promise<T> {
+  private async consume<T>(type: UsageLedgerType, create: (tx: Prisma.TransactionClient, plan: Plan, receiptId: string) => Promise<{ result: T; interviewId?: string; metadata?: Prisma.InputJsonValue }>): Promise<T> {
     const scope = requireTenant();
     const { organizationId, userId } = scope;
     if (scope.quotaFailure) throw new HttpException(scope.quotaFailure, scope.quotaFailure.status);
@@ -45,8 +45,8 @@ export class QuotaService {
             if (userUsed >= userLimit) throw new QuotaExceededException();
           }
         }
-        const { result, interviewId } = await create(tx, plan);
-        await tx.usageLedger.create({ data: { id: receiptId, userId, organizationId, interviewId, type, periodStart, units: 1 } });
+        const { result, interviewId, metadata } = await create(tx, plan, receiptId);
+        await tx.usageLedger.create({ data: { id: receiptId, userId, organizationId, interviewId, type, periodStart, units: 1, ...(metadata ? { metadata } : {}) } });
         return { result, warning: used < limit * 0.9 && used + 1 >= limit * 0.9 };
       }, { maxWait: 5000, timeout: 10000 });
       if (accepted.warning) this.logger.warn({ event: 'quota_warning', organizationId, type, periodStart: periodStart.toISOString(), threshold: 0.9 });
@@ -70,6 +70,21 @@ export class QuotaService {
       if (!Number.isInteger(requested) || requested < 1) throw new BadRequestException('maxTokens must be a positive integer');
       return { result: { ...params, maxTokens: Math.min(requested, plan.maxOutputTokens) } };
     });
+  }
+
+  async reserveAuxiliary(task: 'embedding' | 'rerank', model: string, inputBytes: number) {
+    return this.consume('LLM_CALL', async (_tx, plan, receiptId) => {
+      if (!Number.isInteger(inputBytes) || inputBytes < 1 || inputBytes > plan.maxInputBytes) {
+        throw new BadRequestException('辅助模型输入超过套餐单次大小限制');
+      }
+      return { result: receiptId, metadata: { task, provider: 'qwen', model, state: 'RESERVED', inputBytes, estimatedCostCny: null } };
+    });
+  }
+
+  async settleAuxiliary(receiptId: string, metadata: Prisma.InputJsonValue) {
+    const { organizationId, userId } = requireTenant();
+    const updated = await this.prisma.usageLedger.updateMany({ where: { id: receiptId, organizationId, userId, type: 'LLM_CALL' }, data: { metadata } });
+    if (updated.count !== 1) throw new ServiceUnavailableException('辅助模型费用记录无法确认');
   }
 
   /** Read current constraints without consuming a model call. Cache misses still

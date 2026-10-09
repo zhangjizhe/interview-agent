@@ -23,7 +23,6 @@ import { tenantCollection } from '../../organizations/tenant-context';
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
 import {
   MilvusClient,
   DataType,
@@ -71,7 +70,6 @@ export interface RerankedQuestion extends QuestionItem {
 export class QuestionBankService {
   private readonly logger = new Logger(QuestionBankService.name);
   private client: MilvusClient;
-  private embedder: OpenAI;
 
   /** v2 collection：支持混合检索 */
   private get COLLECTION() { return tenantCollection('question_bank_v2'); }
@@ -79,7 +77,6 @@ export class QuestionBankService {
 
   /** Rerank 开关（默认开启，API Key 缺失时自动关闭） */
   private rerankEnabled = false;
-  private dashscopeApiKey = '';
   private readonly initializedCollections = new Set<string>();
   private get initialized() { return this.initializedCollections.has(this.COLLECTION); }
   private set initialized(value: boolean) { if (value) this.initializedCollections.add(this.COLLECTION); }
@@ -87,14 +84,11 @@ export class QuestionBankService {
   constructor(private config: ConfigService, private llm: LlmGatewayService) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
     const qwenKey = this.config.get<string>('qwen.apiKey');
-    const qwenBase = this.config.get<string>('qwen.baseUrl');
 
     this.client = new MilvusClient({ address: milvusUrl });
-    this.embedder = new OpenAI({ apiKey: qwenKey, baseURL: qwenBase, maxRetries: 0, timeout: 15000 });
 
     // Rerank 用 DashScope API Key（和 Qwen 共用同一个 key）
-    this.dashscopeApiKey = qwenKey || '';
-    if (this.dashscopeApiKey) {
+    if (qwenKey) {
       this.rerankEnabled = true;
     }
   }
@@ -231,8 +225,9 @@ export class QuestionBankService {
         || !item.position?.trim() || !item.question?.trim() || !item.answer?.trim()) throw new BadRequestException('QUESTION_INPUT_INVALID');
       ids.add(item.questionId);
     }
-    await this.ensureCollection();
     const texts = items.map(it => `${it.question}\n\n${it.answer}\n\n${it.tags}`);
+    if (texts.some(text => Buffer.byteLength(text, 'utf8') > 8000)) throw new BadRequestException('题目、答案与标签合计不能超过8000字节，未调用模型');
+    await this.ensureCollection();
     const vectors: number[][] = [];
     for (let offset = 0; offset < texts.length; offset += 2) {
       vectors.push(...await Promise.all(texts.slice(offset, offset + 2).map(text => this.embedText(text))));
@@ -352,6 +347,7 @@ export class QuestionBankService {
         output_fields: outputFields,
       });
 
+      this.assertRpcSuccess(hybridResult, 'hybrid search');
       let results: Array<RerankedQuestion> = (hybridResult.results || []).map((r: any) => ({
         id: String(r.id),
         questionId: r.questionId,
@@ -377,6 +373,7 @@ export class QuestionBankService {
           filter,
           output_fields: outputFields,
         } as any);
+        this.assertRpcSuccess(denseResult, 'dense search');
         results = ((denseResult.results || []) as any[]).map((r: any) => ({
           id: String(r.id),
           questionId: r.questionId,
@@ -420,31 +417,7 @@ export class QuestionBankService {
         `【${r.category}·${r.level}】${r.question}\n${r.answer}\n标签: ${r.tags}`,
       );
 
-      const res = await fetch(
-        'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.dashscopeApiKey}`,
-          },
-          body: JSON.stringify({
-            model: 'gte-rerank-v2',
-            input: { query, documents },
-            parameters: { return_documents: false, top_n: results.length },
-          }),
-        },
-      );
-
-      if (!res.ok) {
-        const txt = await res.text();
-        this.logger.warn(`Rerank API failed: ${res.status} ${txt.slice(0, 200)}`);
-        return results; // 降级返回原始结果
-      }
-
-      const data: any = await res.json();
-      const rankings: Array<{ index: number; relevance_score: number }> =
-        data.output?.results || [];
+      const rankings = await this.llm.rerank(query, documents);
 
       // 按 rerank 分数重排
       const reranked = rankings
@@ -459,8 +432,9 @@ export class QuestionBankService {
       );
       return reranked;
     } catch (err: any) {
-      this.logger.warn(`Rerank failed: ${err.message}, using raw results`);
-      return results;
+      if (err instanceof HttpException) throw err;
+      this.logger.warn({ event: 'question_rerank_failed', status: err?.status });
+      return results.map(result => ({ ...result, rerankUnavailable: true }));
     }
   }
 
@@ -480,6 +454,7 @@ export class QuestionBankService {
         output_fields: ['questionId', 'position', 'level', 'category', 'question', 'answer', 'tags', 'createdAt'],
         limit,
       });
+      this.assertRpcSuccess(result, 'list');
       return ((result.data as any) || []).map((r: any) => ({
         id: String(r.id),
         questionId: r.questionId,
@@ -503,10 +478,15 @@ export class QuestionBankService {
   async deleteQuestion(questionId: string): Promise<{ deleted: boolean }> {
     await this.ensureCollection();
     try {
-      await this.client.delete({
+      const result = await this.client.delete({
         collection_name: this.COLLECTION,
         filter: `questionId == "${escapeMilvusString(questionId)}"`,
       });
+      this.assertRpcSuccess(result, 'delete');
+      const remaining = await this.client.query({ collection_name: this.COLLECTION, consistency_level: ConsistencyLevelEnum.Strong,
+        filter: `questionId == "${escapeMilvusString(questionId)}"`, output_fields: ['questionId'], limit: 1 });
+      this.assertRpcSuccess(remaining, 'delete verification');
+      if (!Array.isArray(remaining.data) || remaining.data.length > 0) return { deleted: false };
       return { deleted: true };
     } catch (err: any) {
       this.logger.error(`deleteQuestion failed: ${err.message}`);
@@ -516,18 +496,18 @@ export class QuestionBankService {
 
   // ===== 内部工具 =====
 
+  private assertRpcSuccess(result: any, operation: string) {
+    const code = result?.status?.error_code ?? result?.error_code;
+    if ((code !== 0 && code !== '0' && code !== 'Success') || Number(result?.status?.code ?? 0) !== 0) throw new ServiceUnavailableException(`题库${operation}未确认成功`);
+  }
+
   private async embedText(text: string): Promise<number[]> {
-    const res = await this.embedder.embeddings.create({
-      model: 'text-embedding-v3',
-      input: text.slice(0, 4000),
-      dimensions: this.VECTOR_DIM,
-    });
-    return res.data[0].embedding;
+    return this.llm.embedText(text);
   }
 
   /**
    * LLM 从文本中提取结构化面试题
-   * 用 Qwen（embedder 同源）跑 chat.completions
+   * 通过统一网关调用 Qwen chat.completions
    */
   async extractQuestionsFromText(
     text: string,
