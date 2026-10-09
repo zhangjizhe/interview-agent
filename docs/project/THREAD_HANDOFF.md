@@ -2,13 +2,42 @@
 
 更新：2026-10-08 · DELIVERY-CLOSEOUT-1
 
+## Agent配置与MCP执行边界（2026-10-09）
+
+自定义单Agent/有限工作流已实现，独立后端29/29、组件7/7、相关API50/50、最终镜像HTTP59/59及Redis/数据库/向量库恢复重跑通过；隔离浏览器创建、运行、Trace、持久化和分支核验通过。尚未更新业务预览和迁移。MCP父服务/子工具即时禁用与协议健康探测已修复，相关24项及无网络容器真实stdio/HTTP initialize/listTools/echo/关闭阻止调用通过，尚需整合镜像回归及界面验收。报告 `docs/ACCEPTANCE-REPORT-2026-10-09-CONFIGURED-RUNTIME.md`。用户授权单次≤0.5CNY、新发布前测试累计≤3CNY；本阶段外部付费调用0，历史未知账单不记零。下一步题库网关计量、浏览器覆盖和真实模型有界评测。整体NOT_ACCEPTED，按用户要求自主连续推进。
+
+
+## Lab 基础阻断阶段（2026-10-08）
+
+PRODUCT-REACCEPTANCE-1 基础阻断修复完成，整体仍 NOT_ACCEPTED。修复题库空岗位导致400、MCP重载假成功/丢失执行绑定与系统关闭、健康检查及汇总误导。独立测试Agent 8项包含在相关API 42项内；组件6项、type/build/lint与镜像43/43/恢复通过。本机已部署，浏览器题库正确空状态及禁用MCP失败反馈确认。配置路径原本正确，审计误判已撤回。报告 `docs/ACCEPTANCE-REPORT-2026-10-08-LAB-FOUNDATION.md`。用户新增Agent/编排及独立测试范围见 `docs/acceptance/LAB_AGENT_WORKFLOW_CONTRACT.md`；下一阶段完成Agent配置和受控运行，随后编排和整体双证据，不把CRUD/静态画布算交付。外部MCP真实协议、题库计费写入/搜索及完整交互验收未完成；无新付费请求。用户最新指令要求连续推进，不再按阶段等待。
+
+## 全产品重新验收（2026-10-08）
+
+PRODUCT-REACCEPTANCE-1 为当前唯一活动主题。用户要求测试确认后再交付；产品整体 NOT_ACCEPTED。Phase 0 建立34功能合同、673源码模板项（144交互/529展示，全部未验收），要求API/持久化与浏览器独立二次确认，条件/动态/响应式需逐项展开。发现旧产品规格和全流程脚本过时、CI没有浏览器验收门。计划 `docs/acceptance/PRODUCT_REACCEPTANCE_PLAN.md`。按用户最新指令自主连续推进；真实模型测试须核对额度/未知账单并确定新预算，当前无新推理或产品通过声明。
+
+## 新组织管理员控制面修复（2026-10-08）
+
+LAB-FIRST-ADMIN-1：LabDataset 全局版本唯一与组织隔离冲突，dashboard 404 被误导为重新登录。改为组织/版本复合唯一和按组织 upsert，新增重试连接。真实 PG 19/19、Lab 服务 15/15、认证 10/10、相关 lint/type/build 和实际镜像 36/36 通过；隔离恢复演练通过。备份后部署新迁移 18/18，本机 Lab readiness 200，用户浏览器实际显示控制中心及 VALID 数据集。旧测试固定管理员、mock 初始化和未访问 dashboard 导致漏测，见 `docs/ACCEPTANCE-REPORT-2026-10-08-LAB-FIRST-ADMIN.md`。没有改权限/组织归属或调用模型；本次不是所有业务功能的完整验收。
+
+## 权限管理 SOP（2026-10-08）
+
+ADMIN-ACCESS-SOP-1：新增 `docs/ADMIN-ACCESS-SOP.md`，明确部署所有者控制、ADMIN 与私有名单区别、确认式单账号角色操作、旧会话吊销、验证与回滚。已核对现有鉴权代码及脚本语法；未新增权限变更或完整生产演练。当前缺少持久授权审计和管理员授权页面，作为后续主题保留。
+
+## Lab 登录代理修复（2026-10-08）
+
+LAB-AUTH-PROXY-1：Lab nginx 缓存 API 容器旧地址，登录/注册请求 502。复用 Interview 的动态 Docker DNS 配置并重建部署 Lab。镜像 tsc/Vite build、严格 lint、nginx -t 通过；实际 Lab readiness 200、空凭据登录返回 API 结构化 400。用户实际账号登录待刷新重试确认；未读取密码、修改账号/权限/数据库或发起模型调用。
+
 ## 当前结论
 
-安全迁移与 braces AST 防护已完成，见 ADR 20。当前本机 API Jest 663 / Cache 22 / 双端 99 / 专用 PostgreSQL 18、lint/type/build 通过；隔离 API smoke 28/28，真实 Milvus 写入、准确主键补偿、PostgreSQL 完整转储比较及 Milvus+etcd/Qdrant 恢复读回通过。官方审计仍显示唯一无上游修复的 braces high；CI 固定补丁 SHA 并运行回归，不隐藏 advisory。剩余门槛是推送最终收尾提交并确认最新 PR Actions，再按用户授权合并 main。额度只读核验为 100/100；真实付费 Benchmark 不重置账本或冒用历史费用。生产环境仍未真实验收。
+`PROVIDER-HEALTH-PROBE-METERING-1` 已完成：移除 `LlmHealthBootstrap` 和绕过 Gateway 的 `healthCheckProviders()`；业务模型调用继续由 quota reservation 保护。网关回归 16/16，API lint/typecheck/build、Docker build 通过。当前容器健康，API readiness 与 Interview/Lab HTTP 200；启动日志无 Provider probe。部署了既有加性 `20261008010000_evaluation_cancellation` migration，17/17 成功。未新增模型推理、费用或质量评测。报告：`docs/ACCEPTANCE-REPORT-2026-10-08-PROVIDER-HEALTH-METERING.md`。
+
+`REAL-PROVIDER-SMOKE-1` 已完成：恢复本机 Postgres/Redis/Qdrant/Milvus 后，API readiness、Web、Lab 返回 HTTP 200；API 启动探针曾真实调用 Qwen、DeepSeek。该历史探针直接调用 Provider，绕过 Gateway Usage Ledger，实际 token/费用未知，不是零成本或账单对账证据。该探针已由 `PROVIDER-HEALTH-PROBE-METERING-1` 移除。详细结果见 `docs/ACCEPTANCE-REPORT-2026-10-08-REAL-PROVIDER-SMOKE.md`。后续真实推理/评测前先核对额度与中断账单并确认费用上限。
+
+DELIVERY-CLOSEOUT-1 已完成。PR #4 于 2026-10-08 合入 `main`，merge commit `8b2e94c5b8c831fc027024d43f03cff478e5b5a0`；Product verification #37 全绿，`agent-lab` 已快进同步 main。当前本机 API Jest 663 / Cache 22 / 双端 99 / 专用 PostgreSQL 18、lint/type/build 通过；隔离 API smoke 28/28，Milvus+etcd/Qdrant 恢复读回通过。唯一官方 high 是 braces advisory，补丁缓解不等于上游修复或第三方审计。真实 Benchmark、费用和生产环境验收仍未完成，不能将代码合并理解为候选发布。
 
 截至 f1c0cba，安全、退出、题库输入、取消、历史测试、训练与缓存生命周期已按主题提交推送。[PR #4](https://github.com/zhangjizhe/interview-agent/pull/4) 已关联；默认 Jest 已移除全部历史路径排除。当前收尾包含专用 PostgreSQL 18 项及 Milvus/etcd/Qdrant 隔离恢复。
 
-本轮优化与本地全量验证通过，详见[交付报告](../DELIVERY-REPORT-2026-10-08.md)。8067764 为评测任务，d17afec 为认证与题库整合；安全/CI/文档提交随后收尾。所有修改继续在 agent-lab。PostgreSQL TCP readiness 修正后，dbff783 的完整 CI 揭示 Milvus 健康端点早于 QueryNode 可读；实际恢复查询加有界重试后，本地整套隔离验收通过，下一轮远端 Actions 需覆盖此修正。
+本轮优化与本地全量验证通过，详见[交付报告](../DELIVERY-REPORT-2026-10-08.md)。8067764 为评测任务，d17afec 为认证与题库整合；安全/CI/文档提交随后收尾。所有后续修改继续在 `agent-lab`。566e116 的 Product verification #37 已覆盖并全绿，实际恢复查询的有界重试解决 Milvus QueryNode readiness 竞态。
 
 本轮官方 audit 为 0 critical / 1 high / 0 moderate；唯一 braces advisory 无上游修复，固定 SHA 补丁及真实 SDK 回归已完成。无独立审计声明。推送本地收尾后，等待最新 CI 并执行用户授权的 main 合并；真实质量、账单与生产验收保留未完成边界。
 
@@ -26,7 +55,7 @@
 
 - 正式 Agent 1.0.0，候选 1.0.1 DRAFT；v4 REJECT/RG-021。旧 36+36 缓存证据无效。
 - 隔离基线 FAILED，13/36 成功样本、小计 ¥0.069285，中断调用费用未知。先核验额度和费用，再确定新预算，不重置账本或盲目重跑。
-- 本轮无新付费业务 Benchmark；API 启动健康探测可能产生 Provider 调用。
+- Provider 启动聊天探针已移除；当前 API 启动不调用模型。此前真实冒烟触发探针的实际 usage/费用仍未知。
 - 录制 fixture 的 APPROVE 不发布 Agent。30 Case Golden Dataset 与 12 Case 发布集均为合成数据，不代表生产效果。
 - `.local-backups/release-20261008/` 为私有备份，Git 忽略，不提交。隔离恢复匹配 schema 和全表行数；不证明向量库/异地灾备。
 - 旧失败成本报告及历史截图的原有未提交编辑保留，不纳入本轮主题提交。六份旧上下文连同本地补充已[归档](archive/release-readiness-2026-10-08/THREAD_HANDOFF.md)，当前文件不再累积历史流水。

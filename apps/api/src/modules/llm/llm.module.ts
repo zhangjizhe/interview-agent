@@ -1,5 +1,5 @@
 import { QuotaService } from './usage/quota.service';
-import { Module, OnApplicationBootstrap, Injectable } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { QwenProvider } from './providers/qwen.provider';
 import { DeepseekProvider } from './providers/deepseek.provider';
 import { LlmGatewayService } from './llm.gateway.service';
@@ -11,16 +11,6 @@ import { UsageService } from './usage/usage.service';
 import { UsageController } from './usage/usage.controller';
 import { QdrantModule } from '../../infra/qdrant/qdrant.module';
 import { LlmPricingCatalogService } from './cost/llm-pricing-catalog.service';
-
-/** LLM provider health check bootstrap */
-@Injectable()
-class LlmHealthBootstrap implements OnApplicationBootstrap {
-  constructor(private gateway: LlmGatewayService) {}
-  async onApplicationBootstrap() {
-    // 异步不阻塞启动
-    setImmediate(() => this.gateway.healthCheckProviders().catch(() => {}));
-  }
-}
 
 @Module({
   imports: [QdrantModule],
@@ -34,7 +24,6 @@ class LlmHealthBootstrap implements OnApplicationBootstrap {
     LlmPricingCatalogService,
     UsageService,
     QuotaService,
-    LlmHealthBootstrap,
   ],
   controllers: [SessionCostController, UsageController],
   exports: [

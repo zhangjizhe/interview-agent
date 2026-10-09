@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { tenantMiddleware } from './tenant-policy';
 import { DEFAULT_ORGANIZATION_ID, tenantContext } from './tenant-context';
+import { AgentLabService } from '../agent-lab/agent-lab.service';
 import { requireOwnedInterview } from '../../common/ownership.util';
 
 // 只接受明确指定的隔离验收库，绝不复用应用 DATABASE_URL。
@@ -33,6 +34,22 @@ suite('真实 PostgreSQL 组织隔离', () => {
     const old = await raw.interview.findUnique({ where: { id: 'legacy-interview' } });
     expect(old?.organizationId).toBe(DEFAULT_ORGANIZATION_ID);
     expect(old?.userId).toBe('legacy-fixture');
+  });
+  it('不同组织首次进入 Lab 使用独立同版本数据集，并发初始化幂等且旧数据不变', async () => {
+    const service = new AgentLabService(scoped as any);
+    const first = await inA(() => service.dashboard());
+    const snapshots = await raw.labDataset.findUnique({ where: { id: first.dataset.id } });
+    const results = await Promise.all([inB(() => service.dashboard()), inB(() => service.dashboard())]);
+    expect(results[0].dataset.id).toBe(results[1].dataset.id);
+    expect(results[0].dataset.id).not.toBe(first.dataset.id);
+    expect(results[0].dataset.version).toBe(first.dataset.version);
+    expect(results[0].dataset.organizationId).toBe(b);
+    expect(await raw.labDataset.findUnique({ where: { id: first.dataset.id } })).toEqual(snapshots);
+    expect(await inA(() => scoped.labDataset.findUnique({ where: { id: results[0].dataset.id } }))).toBeNull();
+    await expect(inA(() => scoped.labDataset.create({ data: {
+      version: first.dataset.version, name: 'duplicate', sourceHash: 'fixture',
+      caseCount: 0, responseCount: 0, validationStatus: 'VALID',
+    } }))).rejects.toMatchObject({ code: 'P2002' });
   });
   it('findUnique 不返回另一组织的数据', async () => {
     expect(await inA(() => scoped.interview.findUnique({ where: { id: interviewB.id } }))).toBeNull();

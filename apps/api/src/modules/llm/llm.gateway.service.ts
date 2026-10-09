@@ -139,6 +139,13 @@ export class LlmGatewayService {
     return out;
   }
 
+  getConfiguredModels() {
+    return Array.from(this.providers.values()).map(provider => ({
+      provider: provider.name, model: provider.defaultModel,
+      enabled: this.providerEnabled.get(provider.name as LLMProviderName) === true,
+    }));
+  }
+
   /**
    * 同步调用 - 接入 P0 缓存层
    */
@@ -147,6 +154,7 @@ export class LlmGatewayService {
       interviewId?: string;
       userId?: string;
       semanticCacheType?: SemanticCacheType;
+      allowFallback?: boolean;
     },
     preferred?: LLMProviderName,
   ): Promise<ChatResponse> {
@@ -155,6 +163,9 @@ export class LlmGatewayService {
     const scope = requireTenant();
     const userId = `${scope.organizationId}:${scope.userId || params.userId || 'anonymous'}`;
     const cacheType = params.semanticCacheType;
+    if (params.allowFallback === false && preferred && !this.providerEnabled.get(preferred)) {
+      throw new ServiceUnavailableException('所选Provider当前不可用');
+    }
     const primary = this.selectProvider(params, preferred);
     const cache = cacheType ? await this.answerCacheContext(params, primary, 'chat') : undefined;
 
@@ -206,7 +217,7 @@ export class LlmGatewayService {
     try {
       response = await invoke(primary, false);
     } catch (err) {
-      if (err instanceof HttpException) throw err;
+      if (err instanceof HttpException || params.allowFallback === false) throw err;
       const fallbackName = this.fallbackMap.get(primary.name as LLMProviderName);
       if (!fallbackName || !this.providerEnabled.get(fallbackName)) throw err;
       isFallback = true;
@@ -394,26 +405,4 @@ export class LlmGatewayService {
     await this.costTracker.endSession(interviewId);
   }
 
-  /**
-   * 启动时 health check：每个 provider 试一次，永久错立即 disable
-   * 非阻塞：失败也不影响模块启动
-   */
-  async healthCheckProviders(): Promise<void> {
-    for (const [name, provider] of this.providers) {
-      try {
-        await provider.chat({
-          messages: [{ role: 'user', content: 'ping' }],
-          maxTokens: 1,
-          temperature: 0,
-        });
-        this.logger.log(`[${name}] health check OK`);
-      } catch (err: any) {
-        if (this.isPermanentProviderError(err)) {
-          this.disableProvider(name, `health check failed: ${err?.message}`);
-        } else {
-          this.logger.warn(`[${name}] health check transient: ${err?.message}`);
-        }
-      }
-    }
-  }
 }

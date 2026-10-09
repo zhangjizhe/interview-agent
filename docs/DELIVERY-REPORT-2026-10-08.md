@@ -2,7 +2,7 @@
 
 **Interview Agent / Agent Lab · 2026-10-08 · DELIVERY-CLOSEOUT-1**
 
-本版完成评测任务可靠性、认证与题库治理、依赖兼容升级、可信 CI 和文档整理，并通过本地全量工程、数据库、真实 Milvus/Qdrant 隔离恢复和浏览器验收。代码位于 `agent-lab`，通过 PR #4 合入 `main` 前仍需最新远端 CI 全绿。本报告不把本地部署称为生产发布，不把合成或录制指标称为真实模型效果。
+本版完成评测任务可靠性、认证与题库治理、依赖兼容升级、可信 CI 和文档整理，并通过本地全量工程、数据库、真实 Milvus/Qdrant 隔离恢复和浏览器验收。PR #4 已于 2026-10-08 合入 `main`（merge commit `8b2e94c`）；`agent-lab` 已同步该主线提交，后续开发继续在该分支进行。本报告不把本地部署称为生产发布，不把合成或录制指标称为真实模型效果。
 
 ## 交付内容
 
@@ -14,7 +14,7 @@
 | 题库治理 | ADMIN 列表与检索、真实删除结果、搜索竞态处理、来源缺失与错误态 | 删除失败返回明确错误；未新增模型题库写入验收 |
 | 依赖 | 固定 pnpm、冻结锁文件、官方 registry、NestJS 11 / Router 7 / Multer 2 / uuid 兼容升级与 braces 补丁 | 唯一剩余官方 high 为无上游修复的 braces advisory；补丁缓解不等于上游修复或独立审计 |
 | 交付呈现 | 暖灰/白/靛蓝界面，标注合成与录制来源，README 与当前上下文精简 | 不填充虚构用户、增长、质量或费用指标；历史上下文保留归档 |
-| CI | 严格 lint、真实 Redis、PostgreSQL 新库/升级、测试和三端镜像；API 真实 Milvus 写入、Qdrant/Milvus 恢复读回 | 移除失败后继续的 lint 行为；最新 Actions 仍须核对。未添加“审计零漏洞”声明 |
+| CI | 严格 lint、真实 Redis、PostgreSQL 新库/升级、测试和三端镜像；API 真实 Milvus 写入、Qdrant/Milvus 恢复读回 | Product verification #37 对合入 head 全绿；未添加“审计零漏洞”声明 |
 
 专题证据：[评测任务](ACCEPTANCE-REPORT-2026-10-08-EVALUATION-JOBS.md)、[认证与题库](ACCEPTANCE-REPORT-2026-10-08-AUTH-GOVERNANCE.md)、[缓存](ACCEPTANCE-REPORT-2026-10-08-ANSWER-CACHE.md)。设计复用既有 React / NestJS / Prisma / LangGraph；没有引入新队列、数据库或付费供应商。
 
@@ -77,7 +77,7 @@ Multer、MCP SDK、proxy-addr、axios、grpc、protobufjs、hono 等采用兼容
 | --- | --- | --- |
 | braces 3.0.3 | GHSA-vfj7-8cjw-p6xm，high | 本地补丁与 SDK 可达路径有回归，持续跟踪上游；官方 audit 仍报告 high |
 
-仍有一个 high，因此不能宣称达到零高危商业发布基线。CI 的工程绿灯不能替代风险复核；main 合并状态和远端检查记录在[当前状态](project/CURRENT_STATE.md)。
+仍有一个 high，因此不能宣称达到零高危商业发布基线。CI 的工程绿灯不能替代风险复核；合并状态和远端检查记录在[当前状态](project/CURRENT_STATE.md)。
 
 ## 未完成与建议
 

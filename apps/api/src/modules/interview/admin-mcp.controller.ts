@@ -31,7 +31,7 @@ export class AdminMcpController {
     return {
       servers,
       count: servers.length,
-      runningCount: servers.filter((s) => s.status === 'running' || s.status === 'builtin').length,
+      runningCount: servers.filter((s) => s.enabled && s.executable).length,
     };
   }
 
@@ -55,6 +55,9 @@ export class AdminMcpController {
     try {
       const path = require('path').resolve(__dirname, '../../../config/mcp-servers.json');
       const result = await McpRegistry.loadFromConfig(path);
+      if (result.errors.length) {
+        throw new BadRequestException('MCP 配置重载失败；保留原有配置，请检查服务端配置。');
+      }
       await this.prisma.labOperationLog.create({
         data: {
           actorId: req.user.userId,

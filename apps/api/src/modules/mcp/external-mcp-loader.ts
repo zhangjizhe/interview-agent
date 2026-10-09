@@ -197,6 +197,7 @@ class ExternalMcpLoaderClass {
         const registryName = `ext_${srv.name}_${td.name}`.replace(/[^a-zA-Z0-9_]/g, '_');
         const meta: McpToolMetadata = {
           name: registryName,
+          parentServer: srv.name,
           displayName: `${srv.name} / ${td.name}`,
           description: td.description || `External MCP tool from ${srv.name}`,
           emoji: '🔌',
@@ -219,6 +220,7 @@ class ExternalMcpLoaderClass {
         McpRegistry.register({
           ...meta,
           execute: async (args: any) => {
+            if (!McpRegistry.isSystemEnabled(registryName)) throw new Error('MCP工具或父服务已禁用');
             try {
               const result = await client.callTool(td.name, args);
               return result;
@@ -233,6 +235,7 @@ class ExternalMcpLoaderClass {
       }
 
       this.clients.set(srv.name, client);
+      McpRegistry.bindProtocolHealth(srv.name, async () => { await client.listTools(true); });
       this.serverStatus.set(srv.name, {
         name: srv.name,
         transport: srv.transport,
@@ -305,6 +308,7 @@ class ExternalMcpLoaderClass {
       const registryName = `ext_${serverName}_${td.name}`.replace(/[^a-zA-Z0-9_]/g, '_');
       McpRegistry.register({
         name: registryName,
+        parentServer: McpRegistry.get(serverName) ? serverName : undefined,
         displayName: `${serverName} / ${td.name}`,
         description: td.description || `External MCP tool from ${serverName}`,
         emoji: '🔌',
@@ -314,6 +318,7 @@ class ExternalMcpLoaderClass {
         version: '1.0.0',
         configSchema: td.inputSchema,
         execute: async (args: any) => {
+          if (!McpRegistry.isSystemEnabled(registryName)) throw new Error('MCP工具或父服务已禁用');
           try {
             return await client.callTool(td.name, args);
           } catch (e: any) {
@@ -325,6 +330,7 @@ class ExternalMcpLoaderClass {
       registeredNames.push(registryName);
     }
     this.clients.set(serverName, client);
+    McpRegistry.bindProtocolHealth(serverName, async () => { await client.listTools(true); });
     this.serverStatus.set(serverName, {
       name: serverName,
       transport: options?.transport || 'mock',

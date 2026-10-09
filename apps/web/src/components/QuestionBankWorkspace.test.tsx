@@ -1,3 +1,4 @@
+import { questionBankQuery } from '../../../agent-lab/src/question-bank-query';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,5 +22,19 @@ describe('Lab question bank governance', () => {
   it.each([503, 200])('exposes deletion failure at HTTP %s without claiming success or discarding the current search', async status => {
     transport.mockResolvedValue(new Response('{"deleted":false}', { status })); mount();
     fireEvent.click(screen.getByTitle('删除题目')); await screen.findByRole('alert'); expect(clear).not.toHaveBeenCalled();
+  });
+});
+
+ describe('question bank optional filters', () => {
+  it.each(['', '   '])('omits an unset position for both list and search (%s)', position => {
+    expect(new URLSearchParams(questionBankQuery(position, 50)).has('position')).toBe(false);
+    const search = new URLSearchParams(questionBankQuery(position, 20, 'system design'));
+    expect(search.has('position')).toBe(false);
+    expect(search.get('q')).toBe('system design');
+  });
+  it('preserves encoded filter and query values', () => {
+    const params = new URLSearchParams(questionBankQuery(' 前端 & Agent ', 20, 'A+B & C'));
+    expect(params.get('position')).toBe('前端 & Agent');
+    expect(params.get('q')).toBe('A+B & C');
   });
 });

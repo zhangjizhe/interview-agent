@@ -29,6 +29,15 @@ describe('LLM gateway failure boundaries (offline fault injection)', () => {
     expect(primary.chat.mock.calls[0][0].__promptCacheKey).toContain('test-org:test-user::sys-v1::');
     expect(params).not.toHaveProperty('__promptCacheKey');
   });
+  it('calls a provider only after the gateway has reserved quota', async () => {
+    quota.reserveLlm.mockImplementation(async request => {
+      expect(primary.chat).not.toHaveBeenCalled();
+      return request;
+    });
+    await gateway.chat(params, 'qwen');
+    expect(quota.reserveLlm).toHaveBeenCalledTimes(1);
+    expect(primary.chat).toHaveBeenCalledTimes(1);
+  });
   it('falls back on primary failure and records the actual provider', async () => {
     primary.chat.mockRejectedValue(Object.assign(new Error('upstream'), { status: 503 }));
     expect((await gateway.chat(params, 'qwen')).model).toBe('deepseek-test');

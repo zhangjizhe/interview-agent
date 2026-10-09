@@ -1,3 +1,4 @@
+import { ConfiguredRunJobsService } from './configured-run-jobs.service';
 import { Roles } from '../auth/roles.decorator';
 import {
   Controller,
@@ -8,10 +9,12 @@ import {
   Body,
   Query,
   Req,
+  HttpCode,
+  Optional,
 } from '@nestjs/common';
 import { AgentRuntimeService } from './agent-runtime.service';
 import { SubRunService } from './sub-run.service';
-import { RunAgentDto, SpawnSubRunDto } from './dto/agent.dto';
+import { RunAgentDto, SpawnSubRunDto, StartConfiguredRunDto } from './dto/agent.dto';
 
 @Controller('agent-lab')
 @Roles('ADMIN')
@@ -19,7 +22,26 @@ export class AgentRuntimeController {
   constructor(
     private readonly runtime: AgentRuntimeService,
     private readonly subRuns: SubRunService,
+    @Optional() private readonly jobs?: ConfiguredRunJobsService,
   ) {}
+
+  @Get('runtime/models')
+  models() { return this.runtime.configuredModels(); }
+
+  @Post('agents/:agentId/test-runs')
+  @HttpCode(202)
+  testRun(@Req() req: any, @Param('agentId') agentId: string, @Body() dto: StartConfiguredRunDto) {
+    return this.jobs!.enqueue(req.user.userId, agentId, dto, true);
+  }
+
+  @Post('agents/:agentId/runs')
+  @HttpCode(202)
+  startRun(@Req() req: any, @Param('agentId') agentId: string, @Body() dto: StartConfiguredRunDto) {
+    return this.jobs!.enqueue(req.user.userId, agentId, dto, false);
+  }
+
+  @Post('runs/:runId/cancel')
+  cancel(@Req() req: any, @Param('runId') runId: string) { return this.jobs!.cancel(req.user.userId, runId); }
 
   @Post('agents/:agentId/run')
   runAgent(
