@@ -1,6 +1,11 @@
 # 当前变更摘要
 
-更新：2026-10-08。历史流水与既有本地补充[归档](archive/release-readiness-2026-10-08/CHANGELOG.md)。
+更新：2026-10-09。历史流水与既有本地补充[归档](archive/release-readiness-2026-10-08/CHANGELOG.md)。
+
+## PRODUCT-REACCEPTANCE-1
+
+- 已提交并部署自定义Agent及有限工作流、持久化幂等Run队列、MCP父子执行门与真实协议健康探测；PR #5最新CI全绿。用户授权每2小时验收，合格批次合并main，整体产品保持NOT_ACCEPTED。
+- 题库向量/精排统一进入模型网关，新增可空UsageLedger metadata保存无正文费用凭证；保留未知费用，明确无SDK重试。读取/删除须存储成功确认及删除强读。本机隔离API67、浏览器实际Agent/工作流/题库链路及恢复通过；新批次远端CI/业务20迁移尚未完成。
 
 ## RELEASE-READINESS-2
 

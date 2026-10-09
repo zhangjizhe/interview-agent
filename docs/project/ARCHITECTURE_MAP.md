@@ -29,3 +29,5 @@ Lab Golden Dataset 版本按 organizationId/version 唯一，可信租户上下�
 ## 配置运行时演进（2026-10-08）
 
 AgentLab扩展ConfiguredRuntimeService与ConfiguredRunJobsService；AgentVersion.runtimeConfig保存single-agent-v1/finite-workflow-v1，Run保存队列幂等/租约与父子节点。调用统一Gateway且禁用自动fallback，Trace记录真实节点；发布门不变。新增202 test-runs/runs/cancel、runtime/models和事务configured-agents入口。加性迁移 `20261008030000_configured_run_jobs`。实施/验收中，不代表整产品交付，详见 `docs/architecture-decisions.md` ADR 22。
+
+题库embedding/rerank统一走LlmGateway→QwenProvider，并由QuotaService在外部请求前预留LLM_CALL、在UsageLedger.metadata结算usage/估算或未知；正文不入receipt。辅助模型价格目录2026-10-09.1。此变更20迁移部署状态见当前活动任务。

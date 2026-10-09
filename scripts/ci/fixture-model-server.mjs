@@ -1,5 +1,5 @@
 import http from 'node:http';
-const stats = { chat: 0, embedding: 0, externalRequests: 0 };
+const stats = { chat: 0, embedding: 0, rerank: 0, externalRequests: 0 };
 http.createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url === '/fixture/stats') return res.end(JSON.stringify(stats));
@@ -18,6 +18,10 @@ http.createServer(async (req, res) => {
     stats.embedding++;
     const inputs = Array.isArray(body.input) ? body.input : [body.input];
     return res.end(JSON.stringify({ object: 'list', model: body.model, data: inputs.map((_, index) => ({ object: 'embedding', index, embedding: Array.from({ length: 1024 }, (_, i) => i === 0 ? 1 : 0) })), usage: { prompt_tokens: inputs.length * 10, total_tokens: inputs.length * 10 } }));
+  }
+  if (req.url === '/fixture/rerank') {
+    stats.rerank++;
+    return res.end(JSON.stringify({ output: { results: body.input.documents.map((_, index) => ({ index, relevance_score: 1 - index / 100 })) }, usage: { total_tokens: 20 } }));
   }
   res.statusCode = 404; res.end(JSON.stringify({ error: { message: 'Unsupported fixture endpoint' } }));
 }).listen(3335, '127.0.0.1');

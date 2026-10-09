@@ -28,7 +28,8 @@ describe('Lab evaluation evidence presentation', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     return render(<QueryClientProvider client={client}><ControlledEvolutionWorkspace /></QueryClientProvider>);
   }
-  async function ready() { await waitFor(() => expect(screen.getByRole('button', { name: '同集对比' })).toBeEnabled()); }
+  // Registry/dataset/evaluator queries and default selections require several React commits.
+  async function ready() { await waitFor(() => expect(screen.getByRole('button', { name: '同集对比' })).toBeEnabled(), { timeout: 5000 }); }
   it('shows a real denial reason and invalidates the comparison on dataset changes', async () => {
     mount(); await ready(); fireEvent.click(screen.getByRole('button', { name: '同集对比' }));
     await screen.findByText('RG-021:answer-cache-isolation-required');

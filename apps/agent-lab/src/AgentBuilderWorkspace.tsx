@@ -106,6 +106,6 @@ export function AgentBuilderWorkspace() {
       {run.data.output?.response && <pre>{run.data.output.response}</pre>}
       <h4>节点与 Trace</h4><ol>{trace.data?.map(event => <li key={event.id}>{event.seq} · {event.type} · {event.step} {event.error && `· ${event.error}`}</li>)}</ol>
     </section>}
-    {agentId && <section><h3>运行记录</h3>{!history.data?.length && !history.error && <p>暂无运行</p>}{history.data?.map(item => <button key={item.id} onClick={() => setRunId(item.id)}>{item.id} · {item.status}</button>)}</section>}
+    {agentId && <section><h3>运行记录</h3>{history.isLoading && <p role="status">正在读取运行记录…</p>}{history.isSuccess && Array.isArray(history.data) && history.data.length === 0 && <p>暂无运行</p>}{history.data?.map(item => <button key={item.id} onClick={() => setRunId(item.id)}>{item.id} · {item.status}</button>)}</section>}
   </section>;
 }

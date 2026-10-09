@@ -15,3 +15,7 @@ Phase 0 验收清单完成，产品整体 NOT_ACCEPTED。计划见 `docs/accepta
 ## 2026-10-09 进行中
 
 自定义Agent/有限工作流已实现，独立后端29项通过、真实镜像HTTP59/59及数据库/向量库恢复完整重跑通过，合成浏览器创建/运行/Trace/持久化已核验。报告见 `docs/ACCEPTANCE-REPORT-2026-10-09-CONFIGURED-RUNTIME.md`。尚未部署新迁移与预览；下一步题库费用计量与MCP协议/开关验收。用户授权单次测试≤0.5CNY、发布前新测试累计≤3CNY；本阶段外部费用0，历史未知账单保持未知。自主连续推进，整体仍NOT_ACCEPTED。
+
+## 题库计量与CI浏览器门（进行中）
+
+统一辅助网关、费用receipt加性20迁移和存储确认实现完成，API728/PG19、真实镜像HTTP67通过；浏览器门首次缺Chromium失败，正在补临时依赖后重跑，未记通过。报告 `docs/ACCEPTANCE-REPORT-2026-10-09-QUESTION-GATEWAY.md`。Agent/编排23d65ec已推送并备份后部署19迁移，本机浏览器刷新可见且保持会话。题库本批尚未部署/提交；外部付费0。

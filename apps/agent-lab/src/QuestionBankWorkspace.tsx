@@ -23,6 +23,7 @@ export function QuestionBankWorkspace({
   searchResults,
   message,
   loading = false,
+  searching = false,
   onQuery,
   onPosition,
   onSearch,
@@ -34,6 +35,7 @@ export function QuestionBankWorkspace({
   searchResults: QuestionBankItem[] | null;
   message: string;
   loading?: boolean;
+  searching?: boolean;
   onQuery: (value: string) => void;
   onPosition: (value: string) => void;
   onSearch: () => void;
@@ -67,17 +69,17 @@ export function QuestionBankWorkspace({
 
   return <div className="agent-page-grid">
     <section className="lab-command-form question-bank-toolbar">
-      <div><p className="agent-eyebrow">QUESTION BANK</p><h2>题库治理</h2><p className="question-bank-note">管理员维护题目覆盖、来源和质量；候选人端不展示此工作区。</p></div>
+      <div><p className="agent-eyebrow">QUESTION BANK</p><h2>题库治理</h2><p className="question-bank-note">管理员维护题目覆盖、来源和质量。新增会调用一次向量模型；搜索会调用向量与精排模型，每次模型请求估算上限0.05元。列表与删除不调用模型。</p></div>
       <label>岗位<input value={position} onChange={(event) => onPosition(event.target.value)} placeholder="筛选岗位" /></label>
       <label>搜索题目<input value={query} onChange={(event) => onQuery(event.target.value)} placeholder="输入关键词" /></label>
       <div className="question-bank-actions">
-        <button className="agent-command" type="button" onClick={onSearch} disabled={!query.trim()}><Search size={16}/>搜索</button>
+        <button className="agent-command" type="button" onClick={onSearch} disabled={!query.trim() || searching}><Search size={16}/>{searching ? '搜索中' : '搜索'}</button>
         {searchResults && <button className="agent-command quiet-command" type="button" onClick={onClearSearch}>清除</button>}
         <button className="agent-command" type="button" onClick={() => setShowCreate((value) => !value)}><Plus size={16}/>{showCreate ? '关闭新增' : '新增题目'}</button>
       </div>
     </section>
     {message && <p className="agent-error">{message}</p>}
-    {createQuestion.isError && <p className="agent-error">题目保存失败，请检查字段后重试。</p>}
+    {createQuestion.isError && <p className="agent-error">{createQuestion.error instanceof Error ? createQuestion.error.message : '题目保存失败'}。若结果未知，请先刷新核验，避免重复调用模型。</p>}
     {deleteQuestion.isError && <p className="agent-error" role="alert">题目删除失败，请刷新核验后重试。</p>}
     {showCreate && <form className="lab-command-form question-bank-create" onSubmit={(event) => { event.preventDefault(); createQuestion.mutate(); }}>
       <label>岗位<input required value={form.position} onChange={(event) => setForm({ ...form, position: event.target.value })} /></label>
@@ -89,7 +91,7 @@ export function QuestionBankWorkspace({
       <button className="agent-command" type="submit" disabled={createQuestion.isPending}><Plus size={16}/>{createQuestion.isPending ? '保存中' : '保存题目'}</button>
     </form>}
     {!visibleQuestions.length ? loading ? <EmptyState title="正在读取题库" text="请稍候" /> : message ? null : <EmptyState title="暂无题目" text={searchResults ? '没有匹配的题目。' : '题库列表为空，可新增题目或导入脱敏题库。'} /> : <section className="lab-list">{visibleQuestions.map((item) => <article className="lab-row question-bank-row" key={item.questionId || item.id}>
-      <div><p className="agent-eyebrow">{item.position} / {item.level || '未指定'} / {item.category || '通用'}</p><h2>{item.question}</h2><p>{item.source || '来源未记录'} · {Array.isArray(item.tags) ? item.tags.join('、') : item.tags || '无标签'}</p></div>
+      <div><p className="agent-eyebrow">{item.position} / {item.level || '未指定'} / {item.category || '通用'}</p><h2>{item.question}</h2><details><summary>参考答案</summary><p>{item.answer || '未提供参考答案'}</p></details><p>{item.source || '来源未记录'} · {Array.isArray(item.tags) ? item.tags.join('、') : item.tags || '无标签'}</p></div>
       <div className="question-bank-row-actions"><button className="icon-command danger-command" type="button" title="删除题目" onClick={() => { if (item.questionId && window.confirm('删除这道题目？')) deleteQuestion.mutate(item.questionId); }} disabled={deleteQuestion.isPending || !item.questionId}><Trash2 size={16}/></button></div>
     </article>)}</section>}
   </div>;

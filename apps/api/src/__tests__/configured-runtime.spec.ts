@@ -140,6 +140,15 @@ describe('Configured runtime independent regression', () => {
     expect(unsafeOutputWrites).toEqual([]);
     expect(h.trace.append).toHaveBeenCalledWith('parent', expect.objectContaining({ type: 'model.end', tokenUsage: { promptTokens: 10, completionTokens: 5 } }));
   });
+  it('treats zeroed missing Provider usage as unknown cost and stops downstream nodes', async () => {
+    const h = harness(), one = single('one'), two = single('two');
+    const version = workflow([{ id: 'aa', agentVersionId: 'one', inputFrom: 'input', next: 'bb' }, { id: 'bb', agentVersionId: 'two', inputFrom: 'previous' }]);
+    h.gateway.chat.mockResolvedValue({ content: 'Provider omitted usage', provider: 'qwen', model: 'synthetic-model', usage: { promptTokens: 0, completionTokens: 0 } });
+    h.pricing.estimateCall.mockImplementation((usage: any) => ({ status: 'available', totalCny: usage.promptTokens + usage.completionTokens === 0 ? 0 : 0.01 }));
+    await expect(h.service.execute('user', h.run, version, { message: 'synthetic' }, { definition: validateConfiguredVersion(version), versions: new Map([['one', one], ['two', two]]) })).rejects.toThrow();
+    expect(h.gateway.chat).toHaveBeenCalledTimes(1);
+    expect(h.prisma.run.updateMany.mock.calls.some(call => call[0].data.estimatedCost === null)).toBe(true);
+  });
   it('does not execute after another worker owns the lease', async () => {
     const h = harness(), version = single();
     h.prisma.run.findFirst.mockResolvedValue({ ...h.run, leaseOwner: 'owner-two' });
