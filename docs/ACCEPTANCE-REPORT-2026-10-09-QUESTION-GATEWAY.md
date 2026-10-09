@@ -25,3 +25,5 @@
 2026-10-09核对[阿里云向量模型](https://help.aliyun.com/zh/model-studio/embedding)北京text-embedding-v3同步按量输入0.0005CNY/千Token；[官方模型价格](https://help.aliyun.com/en/model-studio/model-pricing)北京gte-rerank-v2输入0.8CNY/百万Token。目录新增版本2026-10-09.1，既有聊天费率未修改。估算不替代Provider账单，缺usage不能记零。
 
 新metadata迁移尚未应用业务数据库；本机业务运行Agent/编排已在备份后部署19迁移，刷新浏览器会话及入口已确认。题库此批变更暂未部署；历史中断账单保持未知。
+
+后续部署确认：PR #6及发布闭环PR #7经各自最新CI全绿合并；本机备份后部署20迁移，API/Lab入口200，用户会话刷新保持。未进行新外部推理，仍非全产品验收或生产交付。

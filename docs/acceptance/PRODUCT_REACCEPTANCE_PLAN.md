@@ -1,6 +1,6 @@
 # 产品全链路重新验收计划
 
-更新：2026-10-08 · PRODUCT-REACCEPTANCE-1 · 基线 e515afa
+更新：2026-10-09 · PRODUCT-REACCEPTANCE-1 · 当前清单基线 ea4f68f
 
 状态：Phase 0 清单与验收门完成；产品全链路尚未重新验收，不交付为“全部通过”。这是当前真实可达产品的验收规划，未来愿景功能不能冒充已实现功能。旧验收结果仅作回归线索，所有条目本轮从未验收开始。
 
@@ -24,7 +24,7 @@
 
 ## 源码控件台账
 
-[UI_INVENTORY.json](UI_INVENTORY.json) 枚举12个当前可达页面/组件的 JSX：673项，其中144个交互节点、529个展示节点，全部 NOT_ACCEPTED。这是源码模板清单，不是673项运行时通过证据；包装元素可能重叠，动态模板会展开为多项，CSS伪元素及实际无障碍状态仍需浏览器补齐。没有按数量推导覆盖率。
+[UI_INVENTORY.json](UI_INVENTORY.json) 按TypeScript AST枚举13个明确产品页面/组件文件，包含新增AgentBuilder及首次发布入口：980源码模板项，178交互/802展示，全部PENDING/NOT_ACCEPTED。旧e515afa清单673项保留在[旧基线](../project/archive/ui-inventory/e515afa.json)，不能与新项按编号混用。数量不是运行时通过证据或覆盖率；包装标签可能重叠，动态/条件/响应式及文件内实际可达仍需浏览器逐状态展开。生成器 `scripts/ci/generate-ui-inventory.mjs` 在存在已审查结论时拒绝覆盖，必须显式保留/协调证据。
 
 ## 功能级产品合同与验收矩阵
 
