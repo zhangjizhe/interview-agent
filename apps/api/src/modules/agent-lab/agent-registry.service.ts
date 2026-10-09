@@ -280,18 +280,16 @@ export class AgentRegistryService {
     }
 
     const published = await this.prisma.$transaction(async (tx) => {
+      const changed = await tx.agent.updateMany({
+        where: { id: agentId, workspaceId: workspace.id, currentVersionId: releaseGate.expectedCurrentVersionId },
+        data: { status: 'ACTIVE', currentVersionId: version.id },
+      });
+      if (changed.count !== 1) throw new ConflictException('当前基线已改变，请重新核验发布门禁');
       const published = await tx.agentVersion.update({
         where: { id: version.id },
         data: {
           status: 'PUBLISHED',
           publishedAt: version.publishedAt ?? new Date(),
-        },
-      });
-      await tx.agent.update({
-        where: { id: agentId },
-        data: {
-          status: 'ACTIVE',
-          currentVersionId: published.id,
         },
       });
       return published;
@@ -303,6 +301,9 @@ export class AgentRegistryService {
   async getReleaseGate(userId: string, agentId: string, versionId: string) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const version = await this.requireVersion(workspace.id, agentId, versionId);
+    if (['single-agent-v1', 'finite-workflow-v1'].includes(String((version.runtimeConfig as any)?.adapter))) {
+      await this.configured!.prepare(version, workspace.id, false);
+    }
     return this.getReleaseGateForVersion(agentId, version.id);
   }
 
@@ -500,10 +501,10 @@ export class AgentRegistryService {
       datasetFrozenAt: baseline.dataset.frozenAt,
       datasetContentHash: baseline.dataset.contentHash,
     } : null;
-    return inferReleaseGate(candidateEvidence, {
+    return { ...inferReleaseGate(candidateEvidence, {
       required: comparisonRequired,
       baseline: baselineEvidence,
-    });
+    }), expectedCurrentVersionId: agent?.currentVersionId ?? null };
   }
 
   private async recordReleaseGate(

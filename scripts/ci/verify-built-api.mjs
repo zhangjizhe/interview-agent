@@ -77,6 +77,7 @@ check('MCP count reflects enabled execution bindings', afterReload.data.runningC
 await request('/admin/mcp-servers/toggle', { method: 'POST', token: admin, body: { toolName: 'knowledge_bank', enabled: true } });
 await (await import('/tmp/verify-configured-runtime.mjs')).verifyConfigured({ request, admin, owner, check });
 await (await import('/tmp/verify-question-gateway.mjs')).verifyQuestionGateway({ request, admin, check });
+await (await import('/tmp/verify-configured-release.mjs')).verifyConfiguredRelease({ request, admin, check });
 check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: sibling.data.accessToken })).status === 200);
 check('logged out access token rejected', (await request('/auth/profile', { token: sibling.data.accessToken })).status === 401);
 check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: sibling.data.refreshToken } })).status === 401);

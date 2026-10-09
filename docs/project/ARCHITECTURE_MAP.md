@@ -10,7 +10,7 @@
 | 面试 | apps/api/src/modules/interview | 持久化业务状态、回答/正式证据、手动 SSE、训练关联 |
 | Agent | apps/api/src/agents/multi-agent、modules/agent | LangGraph、checkpoint、受控版本与 Gateway adapter |
 | 模型 | apps/api/src/modules/llm | Qwen/DeepSeek、原子额度、集中费率证据、完整请求答案缓存 |
-| 平台 | apps/api/src/modules/agent-lab | AgentVersion/Application/Run/Trace/Evaluation 与 v4 发布门 |
+| 平台 | apps/api/src/modules/agent-lab | AgentVersion/Application/Run/Trace/Evaluation 与 v5 发布门 |
 | 评测任务 | 同模块 EvaluationJobsService | PostgreSQL PENDING/RUNNING、requestKey、资产指纹、CAS 租约/进度及 CANCELLED；取消在样本边界结算、不重放 |
 | 检索 | modules/knowledge-base、modules/memory | Milvus 混合检索、Qdrant；旧答案相似缓存不再读取 |
 | 数据 | apps/api/prisma | PostgreSQL，租户/额度/冻结证据约束与加性任务迁移 |
@@ -31,3 +31,5 @@ Lab Golden Dataset 版本按 organizationId/version 唯一，可信租户上下�
 AgentLab扩展ConfiguredRuntimeService与ConfiguredRunJobsService；AgentVersion.runtimeConfig保存single-agent-v1/finite-workflow-v1，Run保存队列幂等/租约与父子节点。调用统一Gateway且禁用自动fallback，Trace记录真实节点；发布门不变。新增202 test-runs/runs/cancel、runtime/models和事务configured-agents入口。加性迁移 `20261008030000_configured_run_jobs`。实施/验收中，不代表整产品交付，详见 `docs/architecture-decisions.md` ADR 22。
 
 题库embedding/rerank统一走LlmGateway→QwenProvider，并由QuotaService在外部请求前预留LLM_CALL、在UsageLedger.metadata结算usage/估算或未知；正文不入receipt。辅助模型价格目录2026-10-09.1。此变更20迁移部署状态见当前活动任务。
+
+发布闭环ADR23：首次无基线调用Registry单版本门禁，事务currentVersionId CAS；评测最终response与有界schema契约final-output/v1，发布门v5拒绝旧规则记录。恢复验收按完整COPY行多重集合、DDL及sequence严格比较，失败保留合成诊断选项；不推断未知历史差异根因。

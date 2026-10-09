@@ -6,7 +6,7 @@ import {
   NON_INFERIORITY_MARGIN_POINTS,
 } from './evaluation-statistics';
 
-export const RELEASE_GATE_RULESET_VERSION = 'release-gate/v4';
+export const RELEASE_GATE_RULESET_VERSION = 'release-gate/v5';
 export const MIN_RELEASE_SCORE = 90;
 export const MIN_RELEASE_REPEATS = 3;
 export const MAX_RESOURCE_REGRESSION_RATIO = 1.2;
@@ -69,6 +69,12 @@ export function inferReleaseGate(
   if (!evaluation.datasetFrozenAt || !evaluation.datasetContentHash) {
     matchedRules.push('RG-008:frozen-dataset-required');
     return denied('发布评测必须使用已冻结且带内容指纹的 Dataset。', matchedRules, { evaluation });
+  }
+
+  const outputContract = (metrics: unknown) => (metrics as any)?.outputContractVersion === 'final-output/v1';
+  if (!outputContract(evaluation.metrics) || (comparison.baseline && !outputContract(comparison.baseline.metrics))) {
+    matchedRules.push('RG-023:final-output-contract-required');
+    return denied('发布需要最终输出规则版本一致的评测证据；旧规则记录不可复用，请执行新的有界评测。', matchedRules, { evaluation, baselineEvaluation: comparison.baseline });
   }
 
   const evidence = resourceEvidence(evaluation.metrics);

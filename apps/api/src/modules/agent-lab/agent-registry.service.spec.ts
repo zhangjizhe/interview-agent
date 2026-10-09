@@ -4,6 +4,7 @@ import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-stati
 
 function releaseMetrics(score = 100) {
   return {
+    outputContractVersion: 'final-output/v1',
     repeatCount: 3,
     cachePolicy: 'semantic-cache-bypass/v1',
     latency: { p95Ms: 100 },
@@ -38,6 +39,7 @@ function createPrismaMock() {
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       upsert: jest.fn(),
     },
     agentVersion: {
@@ -130,8 +132,8 @@ describe('AgentRegistryService', () => {
         data: expect.objectContaining({ status: 'PUBLISHED' }),
       }),
     );
-    expect(prisma.agent.update).toHaveBeenCalledWith({
-      where: { id: 'agent-1' },
+    expect(prisma.agent.updateMany).toHaveBeenCalledWith({
+      where: { id: 'agent-1', workspaceId: 'workspace-1', currentVersionId: null },
       data: {
         status: 'ACTIVE',
         currentVersionId: 'version-2',
@@ -288,3 +290,31 @@ describe('AgentRegistryService', () => {
     expect(prisma.agent.update).not.toHaveBeenCalled();
   });
 });
+
+ describe('publication baseline concurrency', () => {
+  it.each([null, 'baseline-old'])('rejects a changed baseline %s before publishing the draft', async (baseline) => {
+    const prisma = createPrismaMock();
+    prisma.agentVersion.findFirst.mockResolvedValue({ id: 'candidate', agentId: 'agent', status: 'DRAFT' });
+    prisma.agent.updateMany.mockResolvedValue({ count: 0 });
+    const service: any = new AgentRegistryService(prisma, createDecisionLedgerMock() as any);
+    jest.spyOn(service, 'getReleaseGateForVersion').mockResolvedValue({ outcome: { allowed: true }, expectedCurrentVersionId: baseline, evidence: {} });
+    await expect(service.publishVersion('user', 'agent', 'candidate')).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.agent.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'agent', workspaceId: 'workspace-1', currentVersionId: baseline } }));
+    expect(prisma.agentVersion.update).not.toHaveBeenCalled();
+  });
+ });
+
+ describe('historic evaluation evidence', () => {
+  it('denies first publication backed only by pre-final-output records', async () => {
+    const prisma = createPrismaMock();
+    prisma.agentVersion.findFirst.mockResolvedValue({ id: 'candidate', agentId: 'agent', status: 'DRAFT' });
+    prisma.agent.findFirst.mockResolvedValue({ currentVersionId: null });
+    const metrics: any = releaseMetrics(); delete metrics.outputContractVersion;
+    prisma.agentEvaluationRun.findFirst.mockResolvedValue({ id: 'old', status: 'COMPLETED', score: 100, totalCases: 10, passedCases: 10, failedCases: 0, completedAt: new Date(), dataset: { frozenAt: new Date(), contentHash: 'hash' }, metrics });
+    const ledger = createDecisionLedgerMock();
+    await expect(new AgentRegistryService(prisma, ledger as any).publishVersion('user', 'agent', 'candidate')).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.agentVersion.update).not.toHaveBeenCalled();
+    expect(prisma.agent.updateMany).not.toHaveBeenCalled();
+    expect(JSON.stringify(ledger.record.mock.calls)).toContain('RG-023:final-output-contract-required');
+  });
+ });

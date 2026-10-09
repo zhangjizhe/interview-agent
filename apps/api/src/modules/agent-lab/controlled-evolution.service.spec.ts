@@ -9,6 +9,7 @@ import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-stati
 
 function releaseMetrics(score: number, p95Ms: number) {
   return {
+    outputContractVersion: 'final-output/v1',
     repeatCount: 3,
     cachePolicy: 'semantic-cache-bypass/v1',
     latency: { p95Ms },
@@ -195,3 +196,30 @@ describe('ControlledEvolutionService', () => {
     expect(prisma.agentEvaluationRun.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: expect.objectContaining({ datasetId: 'dataset-1', evaluatorId: 'evaluator-1', agentVersionId: 'version-2' }) }));
   });
 });
+
+ describe('configured candidate safety', () => {
+  function setup(adapter: string, prompt = 'base', modelConfig: any = { provider: 'qwen', maxTokens: 128, temperature: 0.2 }) {
+    const prisma: any = createPrismaMock();
+    prisma.agent.findFirst.mockResolvedValue({ id: 'agent', currentVersion: { ...currentVersion, systemPrompt: prompt, modelConfig, toolBindings: {}, runtimeConfig: { adapter, maxEstimatedCostCny: 0.1, maxDurationMs: 30000 } } });
+    prisma.agentEvaluationRun.findFirst.mockResolvedValue({ id: 'evaluation', status: 'COMPLETED', failedCases: 1, agentVersionId: currentVersion.id, results: [{ passed: false, failureCategory: 'KEYWORD_MISMATCH' }] });
+    prisma.agentVersion.findMany.mockResolvedValue([{ version: '1.0.0' }]);
+    return prisma;
+  }
+  it('rejects automatic workflow candidates instead of making an inert prompt change', async () => {
+    const prisma = setup('finite-workflow-v1');
+    await expect(new ControlledEvolutionService(prisma).generateCandidate('user', 'agent', { sourceEvaluationId: 'evaluation' })).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.agentVersion.create).not.toHaveBeenCalled();
+  });
+  it.each(['long-prompt', 'invalid-model'])('rejects %s before candidate persistence', async (kind) => {
+    const prisma = setup('single-agent-v1', kind === 'long-prompt' ? 'x'.repeat(20000) : 'base', kind === 'invalid-model' ? {} : { provider: 'qwen', maxTokens: 128, temperature: 0.2 });
+    await expect(new ControlledEvolutionService(prisma).generateCandidate('user', 'agent', { sourceEvaluationId: 'evaluation' })).rejects.toThrow();
+    expect(prisma.agentVersion.create).not.toHaveBeenCalled();
+  });
+  it('creates a valid configured single-agent candidate with the unchanged runtime contract', async () => {
+    const prisma = setup('single-agent-v1');
+    prisma.agentVersion.create.mockResolvedValue({ id: 'new', status: 'DRAFT' });
+    await new ControlledEvolutionService(prisma).generateCandidate('user', 'agent', { sourceEvaluationId: 'evaluation' });
+    expect(prisma.agentVersion.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ systemPrompt: expect.stringContaining('base'), status: 'DRAFT', runtimeConfig: expect.objectContaining({ adapter: 'single-agent-v1' }) }) }));
+  });
+
+ });

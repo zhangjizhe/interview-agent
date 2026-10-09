@@ -16,6 +16,7 @@
 | Lab Dataset 唯一性 | organizationId/version 复合唯一，按可信租户上下文初始化；不以跨组织共享记录或迁移用户解决 dashboard 初始化冲突 |
 | ADR 22 | 版本JSON定义单Agent/有限工作流，复用Run/Trace/Gateway；持久队列幂等/租约/取消、固定依赖指纹、预算与有界Schema；合成不替代质量 |
 | 自动推进 | 用户2026-10-08明确要求自行推进，覆盖每Phase等待；必要信息/授权仍需核实 |
+| ADR 23 | 首发复用单版本门禁；发布基线CAS；最终输出规则final-output/v1与门禁v5，旧评测拒绝复用；无效工作流自动候选拒绝 |
 | 持续验收 | 用户授权每2小时检查；阶段相关测试与最新CI全绿后合并main；仅重要进展/失败/需操作通知；不将源码合并记作整体验收 |
 | 辅助模型计量 | 题库embedding/rerank复用Gateway；调用前组织额度预留、调用后无正文费用凭证，usage缺失保持未知；加性可空metadata，不自动重试 |
 | 分支 | 开发 agent-lab，验证提交推送并核对远端；main 合并与真实 Agent 发布分别核验 |

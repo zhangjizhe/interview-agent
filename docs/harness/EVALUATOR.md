@@ -25,6 +25,8 @@
 
 - 每个 Case 先在 3–5 次重复运行内计算平均分和通过率，再以 Case 为统计单位，避免把同一 Case 的重复调用误当成独立业务样本。
 - 候选与基线必须来自同一 Dataset 内容指纹，并按 Case key 完整配对；标签不一致或配对缺失时证据不可用。
-- `release-gate/v4` 对成对分差使用双侧 95% Student t 区间；下界不得低于 `-2` 分的非劣效边界，并要求两版均具备答案缓存隔离证据。
+- `release-gate/v5` 对成对分差使用双侧 95% Student t 区间；下界不得低于 `-2` 分的非劣效边界，并要求两版均具备答案缓存隔离证据。
 - 任一岗位族、技能或难度切片的平均分回归超过 5 分时拒绝发布，即使整体均分未下降。
 - 该区间是工程发布门，不等于产品效果的因果证明；真实业务提升仍需要更大样本和独立实验。
+
+Lab规则评测使用final-output/v1：KEYWORD只检查最终response（兼容无response历史非工作流输出）；JSON_SCHEMA可提供expected.schema/config.schema，复用运行时有界Schema子集，工作流只评估最终{response}，不把nodes/pricing算业务输出；legacy requiredKeys保留存在检查。没有关键词、schema或requiredKeys的空断言不得通过。关键词与结构验证不能声称业务质量或语义正确性。

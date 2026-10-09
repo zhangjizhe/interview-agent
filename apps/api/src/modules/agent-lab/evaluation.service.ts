@@ -1,3 +1,4 @@
+import { assertSchema } from './configured-runtime.contract';
 import {
   BadRequestException,
   ConflictException,
@@ -528,6 +529,7 @@ export class EvaluationService {
           completedAt,
           metrics: {
             evaluatorType: evaluator.type,
+            outputContractVersion: 'final-output/v1',
             cachePolicy: 'semantic-cache-bypass/v1',
             datasetContentHash: dataset.contentHash ?? null,
             datasetFrozenAt: dataset.frozenAt ?? null,
@@ -621,16 +623,17 @@ export class EvaluationService {
     const config = this.toRecord(evaluator.config);
     if (evaluator.type === 'KEYWORD') {
       const keywords = this.stringList(expected.keywords);
-      const output = JSON.stringify(run.output ?? {}).toLowerCase();
+      const finalOutput = Object.hasOwn(run.output ?? {}, 'response') ? run.output.response : run.output;
+      const output = (typeof finalOutput === 'string' ? finalOutput : JSON.stringify(finalOutput ?? {})).toLowerCase();
       const matched = keywords.filter((keyword) => output.includes(keyword.toLowerCase()));
-      const score = keywords.length === 0 ? 100 : (matched.length / keywords.length) * 100;
+      const score = keywords.length === 0 ? 0 : (matched.length / keywords.length) * 100;
       const minScore = this.numberConfig(config.minScore, 100);
-      const passed = score >= minScore;
+      const passed = keywords.length > 0 && score >= minScore;
       return {
         score,
         passed,
         metrics: { expectedKeywords: keywords, matchedKeywords: matched, minScore },
-        evidence: { output: run.output ?? null },
+        evidence: { output: finalOutput ?? null, outputPath: Object.hasOwn(run.output ?? {}, 'response') ? 'response' : '$' },
         ...(passed
           ? {}
           : {
@@ -642,15 +645,24 @@ export class EvaluationService {
 
     if (evaluator.type === 'JSON_SCHEMA') {
       const requiredKeys = this.stringList(expected.requiredKeys ?? config.requiredKeys);
-      const output = this.toRecord(run.output);
+      const output = Array.isArray(run.output?.nodes) ? { response: run.output.response } : this.toRecord(run.output);
+      const schema = expected.schema ?? config.schema;
+      if (schema !== undefined) {
+        try {
+          assertSchema(schema, output);
+          return { score: 100, passed: true, metrics: { schema, outputPath: '$final' }, evidence: { output } };
+        } catch (error: any) {
+          return { score: 0, passed: false, metrics: { schema, outputPath: '$final' }, evidence: { output }, failureCategory: 'JSON_SCHEMA_MISMATCH', failureMessage: error.message };
+        }
+      }
       const missingKeys = requiredKeys.filter((key) => !(key in output));
-      const score = requiredKeys.length === 0 ? 100 : ((requiredKeys.length - missingKeys.length) / requiredKeys.length) * 100;
+      const score = requiredKeys.length === 0 ? 0 : ((requiredKeys.length - missingKeys.length) / requiredKeys.length) * 100;
       return {
         score,
-        passed: missingKeys.length === 0,
+        passed: requiredKeys.length > 0 && missingKeys.length === 0,
         metrics: { requiredKeys, missingKeys },
         evidence: { output: run.output ?? null },
-        ...(missingKeys.length === 0
+        ...(requiredKeys.length > 0 && missingKeys.length === 0
           ? {}
           : {
               failureCategory: 'JSON_SCHEMA_MISMATCH',

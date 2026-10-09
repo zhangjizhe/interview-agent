@@ -380,7 +380,7 @@ function ControlCenter() {
 }
 
 function titleFor(view: View) {
-  return { overview: '控制中心', runtime: '架构视图', mcp: 'MCP 与工具治理', 'question-bank': '题库治理', trace: 'Trace 运行记录', evaluation: '评测证据', evolution: '受控自进化', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
+  return { overview: '控制中心', runtime: 'Agent 与工作流编排', mcp: 'MCP 与工具治理', 'question-bank': '题库治理', trace: 'Trace 运行记录', evaluation: '评测证据', evolution: '受控自进化', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
 }
 
 function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void }) {
