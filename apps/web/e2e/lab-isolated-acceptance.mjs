@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
+import { verifyControlRecovery } from './lab-control-recovery.mjs';
 
 // This entry point is restricted to the synthetic Docker fixture, never a business account.
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic fixture authorization required');
@@ -21,6 +22,7 @@ try {
   const dashboard = await (await dashboardResponse).json();
   const mcp = await (await mcpResponse).json();
   await page.getByRole('heading', { name: '控制中心', level: 1, exact: true }).waitFor();
+  await verifyControlRecovery(page, context, url);
   // Actual synthetic API responses, not substituted dashboard values.
   await textContains(`Golden Dataset ${dashboard.dataset.version}`);
   await textContains(`${dashboard.dataset.caseCount} 个 Case`);
