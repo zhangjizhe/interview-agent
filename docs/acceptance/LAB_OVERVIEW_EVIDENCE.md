@@ -14,6 +14,6 @@
 
 后端第二来源核对：AgentLabService.dashboard从当前组织Golden Dataset及最近20条LabRun/决定读取，失败数按HIGH/CRITICAL分类，质量门来自RELEASE_THRESHOLDS；AdminMcpController.list按enabled && executable统计。浏览器新增断言复核由独立测试Agent完成，覆盖范围与源码字段一致；没有据字段对照证明真实模型质量。
 
-执行证据：`apps/web/e2e/lab-isolated-acceptance.mjs`的overview/导航断言；`scripts/ci/verify-built-api.sh`本机完整隔离执行退出0，HTTP80/80、浏览器新增断言/既有编排题库发布拒绝及严格PG/向量恢复通过。首轮HTTP80/80后因默认Chromium路径缺失而在浏览器启动前失败；显式复用本机已安装浏览器路径重跑通过，首轮不计通过。CI尚待本轮测试提交后最新对应构建核验。
+执行证据：`apps/web/e2e/lab-isolated-acceptance.mjs`的overview/导航断言；`scripts/ci/verify-built-api.sh`本机完整隔离执行退出0，HTTP80/80、浏览器新增断言/既有编排题库发布拒绝及严格PG/向量恢复通过。首轮HTTP80/80后因默认Chromium路径缺失而在浏览器启动前失败；显式复用本机已安装浏览器路径重跑通过，首轮不计通过。提交5a9fe42的push CI37941329046及PR #9最新CI37941403045均全绿，已合入并核验远端main 3eb2ccd5ff812a0af8ea8fdb08d8356691529784。
 
 全部条目保留NOT_ACCEPTED，PARTIAL仅表示上述限定状态证据；包装元素不因其子节点断言而自动通过。后续补齐加载/故障重试、MCP重载、键盘与响应式后才决定各项最终结论。

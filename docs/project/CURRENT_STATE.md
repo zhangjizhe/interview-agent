@@ -86,4 +86,4 @@ PR #4 已于 2026-10-08 合入 `main`，merge commit `8b2e94c5b8c831fc027024d43f
 - [后续任务](TASKS.md) / [交接](THREAD_HANDOFF.md)
 - [历史上下文快照](archive/release-readiness-2026-10-08/CURRENT_STATE.md)：保存本轮整理前内容与既有本地补充，旧结论不作当前验收。
 
-2026-10-09增量验收：PR #8最新CI37939851039全绿并合入main e7745aae；控制中心真实API字段/两个快捷入口/11导航活动态新增浏览器断言经独立复核，完整隔离HTTP80/80及浏览器/严格恢复退出0。首轮浏览器路径缺失已如实记录，重跑通过。13个模板登记限定PARTIAL证据，最终仍NOT_ACCEPTED；报告见 `docs/acceptance/LAB_OVERVIEW_EVIDENCE.md`。新测试尚待对应CI，外部付费0。
+2026-10-09增量验收：PR #8最新CI37939851039全绿并合入main e7745aae；控制中心真实API字段/两个快捷入口/11导航活动态新增浏览器断言经独立复核，完整隔离HTTP80/80及浏览器/严格恢复退出0。首轮浏览器路径缺失已如实记录，重跑通过。13个模板登记限定PARTIAL证据，最终仍NOT_ACCEPTED；报告见 `docs/acceptance/LAB_OVERVIEW_EVIDENCE.md`。新测试5a9fe42的push CI37941329046及PR #9最新CI37941403045全绿，已合入并核验main 3eb2ccd5ff812a0af8ea8fdb08d8356691529784，agent-lab已快进同步；外部付费0。下一组为控制面503/重试与MCP重载确认的限定浏览器证据，不重跑未变更已通过的检查。

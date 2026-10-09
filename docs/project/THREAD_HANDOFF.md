@@ -76,4 +76,4 @@ DELIVERY-CLOSEOUT-1 已完成。PR #4 于 2026-10-08 合入 `main`，merge commi
 
 完成真实 Milvus 写入确认、隔离数据恢复与最新 CI。缓存治理工程已完成（相关 74 项、维护工具 1 项、Redis 合成合同 50 检查），详见 CACHE-LIFECYCLE.md；尚无真实费用收益。Docker 服务中途停止已尝试恢复，恢复前不将新镜像检查记为通过。
 
-2026-10-09增量验收：PR #8最新CI37939851039全绿并合入main e7745aae；控制中心真实API字段/两个快捷入口/11导航活动态新增浏览器断言经独立复核，完整隔离HTTP80/80及浏览器/严格恢复退出0。首轮浏览器路径缺失已如实记录，重跑通过。13个模板登记限定PARTIAL证据，最终仍NOT_ACCEPTED；报告见 `docs/acceptance/LAB_OVERVIEW_EVIDENCE.md`。新测试尚待对应CI，外部付费0。
+2026-10-09增量验收：PR #8最新CI37939851039全绿并合入main e7745aae；控制中心真实API字段/两个快捷入口/11导航活动态新增浏览器断言经独立复核，完整隔离HTTP80/80及浏览器/严格恢复退出0。首轮浏览器路径缺失已如实记录，重跑通过。13个模板登记限定PARTIAL证据，最终仍NOT_ACCEPTED；报告见 `docs/acceptance/LAB_OVERVIEW_EVIDENCE.md`。新测试5a9fe42的push CI37941329046及PR #9最新CI37941403045全绿，已合入并核验main 3eb2ccd5ff812a0af8ea8fdb08d8356691529784，agent-lab已快进同步；外部付费0。下一组为控制面503/重试与MCP重载确认的限定浏览器证据，不重跑未变更已通过的检查。
