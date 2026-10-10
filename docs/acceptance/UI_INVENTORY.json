@@ -11371,10 +11371,10 @@
       "tag": "input",
       "labelOrExpression": "<input value={position} onChange={(event) => onPosition(event.target.value)} placeholder=\"筛选岗位\" />",
       "attributes": "value={position} onChange={(event) => onPosition(event.target.value)} placeholder=\"筛选岗位\"",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11403,10 +11403,10 @@
       "tag": "input",
       "labelOrExpression": "<input value={query} onChange={(event) => onQuery(event.target.value)} placeholder=\"输入关键词\" />",
       "attributes": "value={query} onChange={(event) => onQuery(event.target.value)} placeholder=\"输入关键词\"",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11435,10 +11435,10 @@
       "tag": "button",
       "labelOrExpression": "<button className=\"agent-command\" type=\"button\" onClick={onSearch} disabled={!query.trim() || searching}><Search size={16}/>{searching ? '搜索中' : '搜索'}</button>",
       "attributes": "className=\"agent-command\" type=\"button\" onClick={onSearch} disabled={!query.trim() || searching}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11451,10 +11451,10 @@
       "tag": "button",
       "labelOrExpression": "<button className=\"agent-command quiet-command\" type=\"button\" onClick={onClearSearch}>清除</button>",
       "attributes": "className=\"agent-command quiet-command\" type=\"button\" onClick={onClearSearch}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11563,10 +11563,10 @@
       "tag": "input",
       "labelOrExpression": "<input required value={form.position} onChange={(event) => setForm({ ...form, position: event.target.value })} />",
       "attributes": "required value={form.position} onChange={(event) => setForm({ ...form, position: event.target.value })}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11595,10 +11595,10 @@
       "tag": "input",
       "labelOrExpression": "<input value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })} />",
       "attributes": "value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11627,10 +11627,10 @@
       "tag": "input",
       "labelOrExpression": "<input value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} />",
       "attributes": "value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11659,10 +11659,10 @@
       "tag": "textarea",
       "labelOrExpression": "<textarea required rows={3} value={form.question} onChange={(event) => setForm({ ...form, question: event.target.value })} />",
       "attributes": "required rows={3} value={form.question} onChange={(event) => setForm({ ...form, question: event.target.value })}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11691,10 +11691,10 @@
       "tag": "textarea",
       "labelOrExpression": "<textarea required rows={4} value={form.answer} onChange={(event) => setForm({ ...form, answer: event.target.value })} />",
       "attributes": "required rows={4} value={form.answer} onChange={(event) => setForm({ ...form, answer: event.target.value })}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11723,10 +11723,10 @@
       "tag": "input",
       "labelOrExpression": "<input value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder=\"架构,性能\" />",
       "attributes": "value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder=\"架构,性能\"",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11739,10 +11739,10 @@
       "tag": "button",
       "labelOrExpression": "<button className=\"agent-command\" type=\"submit\" disabled={createQuestion.isPending}><Plus size={16}/>{createQuestion.isPending ? '保存中' : '保存题目'}</button>",
       "attributes": "className=\"agent-command\" type=\"submit\" disabled={createQuestion.isPending}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11803,10 +11803,10 @@
       "tag": "p",
       "labelOrExpression": "<p className=\"agent-eyebrow\">{item.position} / {item.level || '未指定'} / {item.category || '通用'}</p>",
       "attributes": "className=\"agent-eyebrow\"",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11819,10 +11819,10 @@
       "tag": "h2",
       "labelOrExpression": "<h2>{item.question}</h2>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11851,10 +11851,10 @@
       "tag": "summary",
       "labelOrExpression": "<summary>参考答案</summary>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11867,10 +11867,10 @@
       "tag": "p",
       "labelOrExpression": "<p>{item.answer || '未提供参考答案'}</p>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11883,10 +11883,10 @@
       "tag": "p",
       "labelOrExpression": "<p>{item.source || '来源未记录'} · {Array.isArray(item.tags) ? item.tags.join('、') : item.tags || '无标签'}</p>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11915,10 +11915,10 @@
       "tag": "button",
       "labelOrExpression": "<button className=\"icon-command danger-command\" type=\"button\" title=\"删除题目\" onClick={() => { if (item.questionId && window.confirm('删除这道题目？')) deleteQuestion.mutate(item.questionId); }} disabled={deleteQuestion.isPending || !item.questionId}><Trash2 size={16}/></button>",
       "attributes": "className=\"icon-command danger-command\" type=\"button\" title=\"删除题目\" onClick={() => { if (item.questionId && window.confirm('删除这道题目？')) deleteQuestion.mutate(item.questionId); }} disabled={deleteQuestion.isPending || !item.questionId}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11947,10 +11947,10 @@
       "tag": "h2",
       "labelOrExpression": "<h2>{title}</h2>",
       "attributes": "",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
