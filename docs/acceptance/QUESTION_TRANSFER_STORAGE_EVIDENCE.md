@@ -15,3 +15,11 @@
 锁是单进程测试hook，收据为内存；不证明真实跨进程锁、持久收据、普通写入协调、产品租户鉴权、embedding来源、旧16题归属或业务迁移完成。SDK可能内置SchemaMismatch重试，本测试只证明无应用主动重插；不作SDK零重试声明。
 
 实现仅新增验收脚本与CI步骤，无应用API/数据库迁移/运行时/业务权限变更，费用0，整体NOT_ACCEPTED。
+
+## 2026-10-11 隔离PG跨进程/持久收据增量
+
+增强harness退出0，四组PASS日志核对完成；新增真实PG16专用空数据库，两个独立Node worker执行同目标迁移。父进程先持目标advisory锁，查询PG两个真实等待者后才释放；worker锁覆盖读计划/写入/flush/Strong核对与收据。最终总insertCount2、skipCount2，目标仅源两题，无重复，源/B指纹保持。
+
+收据在独立连接autocommit，worker退出后新PG连接读到两任务PREPARED→VERIFIED；未知ack任务仅PREPARED→WRITE_UNKNOWN，新核对任务才VERIFIED。PREPARED收据失败拒绝且零insert。表仅存执行器元数据，无题干/答案/向量。脚本语法/diff与独立审查通过；基线main a5a8610，API镜像沿用上述digest。CI新head仍须核验。
+
+此增量替代的是fixture单进程锁/内存sink，不是生产迁移能力。fixture URL与synthetic标志限制，无生产schema/API/权限改动；只追加由当前代码保证，未验证生产数据库权限。连接失效检查不能fence已在途Milvus写入，普通生产写入协调、真实授权与来源、浏览器和业务旧题迁移仍未完成。外部模型费用0，整体NOT_ACCEPTED。
