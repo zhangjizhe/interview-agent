@@ -10,7 +10,7 @@ export async function verifyQuestionEvidence(page, context, origin) {
     const response = await context.request.get(`${origin}${questionPath}/list?limit=50${position ? `&position=${encodeURIComponent(position)}` : ''}`, { headers: { Authorization: `Bearer ${token}` } });
     assert.equal(response.status(), 200); return response.json();
   };
-  const responseFor = (path, method = 'GET') => page.waitForResponse(response => new URL(response.url()).pathname === path && response.request().method() === method);
+  const responseFor = (path, method = 'GET') => page.waitForResponse(response => new URL(response.url()).pathname === path && response.request().method() === method, { timeout: 75000 });
   await page.getByRole('button', { name: '题库治理', exact: true }).click();
   await page.getByText('暂无题目', { exact: true }).waitFor({ timeout: 20000 });
   await page.getByRole('button', { name: '新增题目', exact: true }).click();
@@ -19,7 +19,24 @@ export async function verifyQuestionEvidence(page, context, origin) {
   for (const [label, value] of [['岗位', input.position], ['职级', input.level], ['分类', input.category], ['题目', input.question], ['参考答案', input.answer], ['标签', input.tags.join(',')]]) await form.getByLabel(label, { exact: true }).fill(value);
   const create = responseFor(questionPath, 'POST');
   const refreshed = responseFor(`${questionPath}/list`);
-  await form.getByRole('button', { name: '保存题目', exact: true }).click();
+  // Observe rejections immediately; cleanup must not mask the first assertion failure.
+  void create.catch(() => {}); void refreshed.catch(() => {});
+  let releaseCreate; const createGate = new Promise(resolve => { releaseCreate = resolve; });
+  const createPattern = `${origin}${questionPath}`;
+  await page.route(createPattern, async route => { const started = Date.now(); const actual = await route.fetch({ timeout: 75000 }); console.log('Synthetic question POST actual response', actual.status(), 'elapsed_ms', Date.now() - started); await createGate; await route.fulfill({ response: actual }); });
+  try {
+    await form.getByRole('button', { name: '保存题目', exact: true }).click();
+    try {
+      await page.getByRole('button', { name: '保存中', exact: true }).waitFor();
+      assert.equal(await page.getByRole('button', { name: '保存中', exact: true }).isDisabled(), true);
+      assert.equal(await page.getByRole('button', { name: '关闭新增', exact: true }).isDisabled(), true);
+      // Filled textarea text participates in its wrapping label text; inspect all six controls directly.
+      const fields = form.locator('input, textarea');
+      assert.equal(await fields.count(), 6);
+      for (const field of await fields.all()) assert.equal(await field.isDisabled(), true);
+    } finally { releaseCreate(); }
+    await create;
+  } finally { releaseCreate(); await page.unroute(createPattern); }
   const createdResponse = await create; assert.equal(createdResponse.ok(), true);
   const created = await createdResponse.json(); assert.equal(created.success, true); assert.ok(created.questionId);
   const listResponse = await refreshed; assert.equal(listResponse.ok(), true);

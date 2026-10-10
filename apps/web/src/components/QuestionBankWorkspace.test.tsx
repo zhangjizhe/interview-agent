@@ -73,3 +73,50 @@ describe('Question bank pending search and reference answer controls', () => {
     expect(disclosure).not.toHaveAttribute('open');
   });
 });
+
+describe('Question creation protects edits during pending requests', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it.each([503, 200])('freezes pending fields and handles HTTP %s without losing a failed draft', async status => {
+    let deliver!: (response: Response) => void;
+    const transport = vi.fn((_url: string, _init: RequestInit) => new Promise<Response>(resolve => { deliver = resolve; }));
+    vi.stubGlobal('fetch', transport);
+    const clear = vi.fn();
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    render(<QueryClientProvider client={client}><QuestionBankWorkspace questions={[]} searchResults={null} query="" position="" message="" onQuery={vi.fn()} onPosition={vi.fn()} onSearch={vi.fn()} onClearSearch={clear}/></QueryClientProvider>);
+    fireEvent.click(screen.getByRole('button', { name: '新增题目', exact: true }));
+    const form = document.querySelector('form.question-bank-create')!;
+    const fields = ['岗位', '职级', '分类', '题目', '参考答案', '标签'];
+    const values = ['Synthetic position', 'P6', 'Synthetic category', 'Synthetic question', 'Synthetic answer', 'queue,fixture'];
+    const inputs = fields.map(label => screen.getAllByLabelText(label, { exact: true }).find(input => form.contains(input))!);
+    inputs.forEach((input, index) => fireEvent.change(input, { target: { value: values[index] } }));
+    fireEvent.click(screen.getByRole('button', { name: '保存题目', exact: true }));
+    await waitFor(() => expect(transport).toHaveBeenCalledTimes(1));
+    expect(transport.mock.calls[0][0]).toBe('/api/interview/question-bank');
+    expect(JSON.parse(transport.mock.calls[0][1].body as string)).toEqual({ position: values[0], level: values[1], category: values[2], question: values[3], answer: values[4], tags: ['queue', 'fixture'] });
+    await waitFor(() => expect(screen.getByRole('button', { name: '保存中', exact: true })).toBeDisabled());
+    inputs.forEach(input => expect(input).toBeDisabled());
+    const close = screen.getByRole('button', { name: '关闭新增', exact: true });
+    expect(close).toBeDisabled();
+    fireEvent.click(close); fireEvent.click(screen.getByRole('button', { name: '保存中', exact: true }));
+    expect(document.querySelector('form.question-bank-create')).toBe(form);
+    expect(transport).toHaveBeenCalledTimes(1);
+    deliver(new Response(JSON.stringify(status === 200 ? { success: true, questionId: 'synthetic-created' } : { message: 'Synthetic create unavailable' }), { status }));
+    if (status === 503) {
+      await screen.findByText(/Synthetic create unavailable/);
+      expect(screen.getByText(/若结果未知，请先刷新核验/)).toBeInTheDocument();
+      inputs.forEach((input, index) => { expect(input).toBeEnabled(); expect(input).toHaveValue(values[index]); });
+      expect(screen.getByRole('button', { name: '关闭新增', exact: true })).toBeEnabled();
+      expect(screen.getByRole('button', { name: '保存题目', exact: true })).toBeEnabled();
+      expect(clear).not.toHaveBeenCalled();
+    } else {
+      await waitFor(() => expect(document.querySelector('form.question-bank-create')).toBeNull());
+      expect(clear).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(screen.getByRole('button', { name: '新增题目', exact: true })).toBeEnabled());
+      fireEvent.click(screen.getByRole('button', { name: '新增题目', exact: true }));
+      expect(screen.getByLabelText('题目', { exact: true })).toHaveValue('');
+      expect(screen.getByLabelText('参考答案', { exact: true })).toHaveValue('');
+      expect(screen.getByLabelText('标签', { exact: true })).toHaveValue('');
+    }
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+});
