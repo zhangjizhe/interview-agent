@@ -11,3 +11,13 @@
 ## SDK桥接限定证据
 
 2026-10-10 SDK桥接阶段：Strong=0/1001读取上限/拒绝超量与假空/插入全量ack+PK校验/flush确认/源写禁用；独立审计新增稀疏、重复及超int64主键3红测，修复后累计43/43、lint/diff通过。实际SDK只读Strong旧16条通过，未复制业务题或写入SDK验收，不证明真实锁/审批/model provenance/真实迁移完成。PR12 head ff02020最新CI38013238845全绿；GraphQL连接重置后REST核实开放并成功合并，核验远端main 32d9c8ab580760d8ce6a4f189398b65fa204087b，agent-lab快进同步；后续SDK批次新head需重验CI。新模型费用0，整体NOT_ACCEPTED。
+
+## 下一阶段真实隔离验收设计（未执行）
+
+独立测试Agent复核：建立全新Milvus/etcd私有Docker网络，合成源3题、组织A既有题、组织B独立题。复用生产schema及固定1024维合成向量；不读取业务16条或启动模型。
+
+真实SDK插入/flush/Strong读回应验证A完整并集、源/B不变；二次零插入、冲突及授权错配写前拒绝。两个独立进程须持真实共享锁并记录持久收据；普通写入也需参与锁或维护窗口排他。真实insert/flush成功后丢弃ack须记WRITE_UNKNOWN、无重试或假VERIFIED，再经Strong读回及新任务幂等恢复。直接读两个集合只证明存储分离，产品隔离另须可信身份HTTP验收。
+
+实施前补齐共享锁、持久收据、schema校验、合成审批/revision来源与失败诊断保留。短隔离脚本避免重复全量验收。这是待执行方案，不是通过证据，不证明旧题归属或真实embedding来源。
+
+真实存储限定增强验收已通过，见[限定证据](QUESTION_TRANSFER_STORAGE_EVIDENCE.md)。共享锁/持久收据/产品身份及业务迁移仍未完成。
