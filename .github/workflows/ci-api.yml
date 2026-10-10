@@ -56,7 +56,7 @@ jobs:
       - name: Interview and Lab component tests
         run: pnpm --filter web test
       - name: Offline question transfer preview checks
-        run: node --test scripts/question-bank-transfer-plan.test.mjs
+        run: node --test scripts/question-bank-transfer-plan.test.mjs scripts/question-bank-transfer-executor.test.mjs
       - name: Golden Dataset contract
         run: pnpm --filter api eval:validate
       - name: PostgreSQL fresh install and legacy upgrade
