@@ -122,6 +122,7 @@ try {
   assert.deepEqual(errors, []);
   console.log('PASS isolated browser: login/create/draft/run/trace/dedupe/reload/workflow/question create/search/delete/answer');
 } catch (error) {
+  console.error('Synthetic browser original failure:', error);
   console.error('Synthetic browser state:', (await page.locator('body').innerText()).slice(0, 5000));
   throw error;
 } finally { await context.close(); await browser.close(); }

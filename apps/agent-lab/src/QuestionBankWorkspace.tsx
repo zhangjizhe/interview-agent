@@ -75,19 +75,19 @@ export function QuestionBankWorkspace({
       <div className="question-bank-actions">
         <button className="agent-command" type="button" onClick={onSearch} disabled={!query.trim() || searching}><Search size={16}/>{searching ? '搜索中' : '搜索'}</button>
         {searchResults && <button className="agent-command quiet-command" type="button" onClick={onClearSearch}>清除</button>}
-        <button className="agent-command" type="button" onClick={() => setShowCreate((value) => !value)}><Plus size={16}/>{showCreate ? '关闭新增' : '新增题目'}</button>
+        <button className="agent-command" type="button" disabled={createQuestion.isPending} onClick={() => setShowCreate((value) => !value)}><Plus size={16}/>{showCreate ? '关闭新增' : '新增题目'}</button>
       </div>
     </section>
     {message && <p className="agent-error">{message}</p>}
     {createQuestion.isError && <p className="agent-error">{createQuestion.error instanceof Error ? createQuestion.error.message : '题目保存失败'}。若结果未知，请先刷新核验，避免重复调用模型。</p>}
     {deleteQuestion.isError && <p className="agent-error" role="alert">题目删除失败，请刷新核验后重试。</p>}
-    {showCreate && <form className="lab-command-form question-bank-create" onSubmit={(event) => { event.preventDefault(); createQuestion.mutate(); }}>
-      <label>岗位<input required value={form.position} onChange={(event) => setForm({ ...form, position: event.target.value })} /></label>
-      <label>职级<input value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })} /></label>
-      <label>分类<input value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} /></label>
-      <label className="question-bank-wide">题目<textarea required rows={3} value={form.question} onChange={(event) => setForm({ ...form, question: event.target.value })} /></label>
-      <label className="question-bank-wide">参考答案<textarea required rows={4} value={form.answer} onChange={(event) => setForm({ ...form, answer: event.target.value })} /></label>
-      <label>标签<input value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder="架构,性能" /></label>
+    {showCreate && <form className="lab-command-form question-bank-create" onSubmit={(event) => { event.preventDefault(); if (!createQuestion.isPending) createQuestion.mutate(); }}>
+      <label>岗位<input required disabled={createQuestion.isPending} value={form.position} onChange={(event) => setForm({ ...form, position: event.target.value })} /></label>
+      <label>职级<input disabled={createQuestion.isPending} value={form.level} onChange={(event) => setForm({ ...form, level: event.target.value })} /></label>
+      <label>分类<input disabled={createQuestion.isPending} value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} /></label>
+      <label className="question-bank-wide">题目<textarea required rows={3} disabled={createQuestion.isPending} value={form.question} onChange={(event) => setForm({ ...form, question: event.target.value })} /></label>
+      <label className="question-bank-wide">参考答案<textarea required rows={4} disabled={createQuestion.isPending} value={form.answer} onChange={(event) => setForm({ ...form, answer: event.target.value })} /></label>
+      <label>标签<input disabled={createQuestion.isPending} value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder="架构,性能" /></label>
       <button className="agent-command" type="submit" disabled={createQuestion.isPending}><Plus size={16}/>{createQuestion.isPending ? '保存中' : '保存题目'}</button>
     </form>}
     {!visibleQuestions.length ? loading ? <EmptyState title="正在读取题库" text="请稍候" /> : message ? null : <EmptyState title="暂无题目" text={searchResults ? '没有匹配的题目。' : '题库列表为空，可新增题目或导入脱敏题库。'} /> : <section className="lab-list">{visibleQuestions.map((item) => <article className="lab-row question-bank-row" key={item.questionId || item.id}>

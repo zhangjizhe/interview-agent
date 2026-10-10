@@ -44,3 +44,11 @@
 2026-10-11用户再次授权验收通过即合并：PR15精确head06f7177adf5819aadbfa62ef40a8fe0e3de9006a的push/PR六项checks全部completed/success；按冻结SHA合并并核验远端main 8c0e364d20a30524545508e0ef8e96dee1820299，本地agent-lab快进同步。此批仅隔离PG锁/持久收据验收，无生产接线/业务题迁移/模型费用，整体NOT_ACCEPTED。未重复已通过检查；后续合格批次遵循同门。
 
 2026-10-11 02:09：题库新增真实API逐字段/浏览器答案开关、搜索清除/岗位过滤、取消删除零DELETE/持有真实删除响应期间禁用/Strong无题双证据；API80/80与完整浏览器/严格PG及向量恢复退出0，独立审查无阻断。18模板仅PARTIAL，累计31，最终980仍NOT_ACCEPTED。证据LAB_QUESTION_EVIDENCE.md；仅测试/台账，无业务题复制或外部模型费用。新headCI通过后才合并。
+
+题库双证据批次75e59c6054df50336886cb3ee3155812a3716bf5已推送并核验origin/agent-lab。gh PR创建GraphQL连接重置，随后REST查开放PR也重置，是否创建未知；未盲目重复创建，未核实最新CI/未合并。下次先查询agent-lab开放PR并附到聊天，核验精确head全部CI后才合并；若确认无PR再创建。此状态暂存本地。
+
+2026-10-11 04:11：网络恢复确认无开放PR后创建题库双证据PR16并附到聊天，head75e59c6054df50336886cb3ee3155812a3716bf5。此前push三项CI成功，新PR两项job in_progress；后续精确checks读取连接重置，最新结论未知、未合并。下一轮核验新PR对应全部checks成功后按SHA合并并核验远端，不重复已通过测试。
+
+- 题库下一验收组：独立审计提出不转发API的创建/搜索/删除503，pending禁用/字段保留/恢复/零模型转发证据。新增发现创建pending字段/关闭仍可编辑，成功回调无条件重置会丢弃在途新编辑；后续最小修复冻结pending编辑或保留新编辑，需产品合同和组件/真实浏览器回归。此次未修改已提交head。
+
+2026-10-11 06:30：PR16精确head75e59c6对应六项CI成功，按SHA合并并核验远端main a7ad13f099e766d6b37d375e1a8c4bab5431083c；agent-lab快进同步。新增题目在途冻结六字段/保存/关闭，独立组件旧2红修复11/11、lint/type/build通过。三轮浏览器失败如实保留：实际POST201约2.6s排除后端超时猜测，原因为已填textarea包装label精确定位失败且未处理response拒绝掩盖首错；修正测试定位/错误记录后第四轮API80/80、完整浏览器及严格PG/Milvus/Qdrant恢复退出0。32模板限定PARTIAL，最终980/整体NOT_ACCEPTED。旧16题未复制，外部费用0；新批次待提交及最新CI，绿后才合并。证据LAB_QUESTION_PENDING_EVIDENCE.md。
