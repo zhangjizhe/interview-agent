@@ -101,3 +101,9 @@ DELIVERY-CLOSEOUT-1 已完成。PR #4 于 2026-10-08 合入 `main`，merge commi
 2026-10-10 18:07：独立测试Agent复核真实隔离迁移下一阶段方案，见QUESTION_TRANSFER_PREVIEW.md；共享锁/持久收据/schema及短隔离SDK写入验收仍待实施，无业务写入或模型调用，整体NOT_ACCEPTED。
 
 2026-10-10 20:08：新增短私有Milvus/etcd迁移存储harness，首轮及两次诊断flush限流失败如实保留；按0.1/s预先限速不重试后基础/独立增强版均退出0。真实SDK并集/幂等/源B不变、授权及冲突零insert、丢弃真实ack为UNKNOWN并新任务Strong核对恢复通过。仅单进程hook/内存收据，不证明共享锁、持久收据、API/浏览器或业务16题迁移；外部模型0，整体NOT_ACCEPTED。CI接入，精确新head通过后才合并。证据QUESTION_TRANSFER_STORAGE_EVIDENCE.md。
+
+存储限定验收提交52a4c97102c5fb46e390ed64e4556848d5bfce32已推送并核验origin/agent-lab；PR14已创建并附到聊天。精确head check-runs读取连接重置，最新CI未知，未合并。下一轮先核验PR14精确最新CI，绿后方合并并核验远端。此状态暂存本地。
+
+2026-10-10 22:04：PR14精确head52a4c97102c5fb46e390ed64e4556848d5bfce32的push/PR六项checks均completed/success；按冻结SHA合并成功并核验远端main a5a8610ff3e104928aad42dad171c54e78092b07，本地agent-lab快进同步。真实隔离存储测试已进入CI门禁；不代表跨进程锁/持久收据/产品页面/业务旧题迁移验收完成。整体NOT_ACCEPTED，未重复已通过检查，无业务数据写入或模型费用。后续优先真实共享锁与持久收据合同，旧题归属/embedding来源和历史费用前置保持。
+
+2026-10-11 00:07：隔离PG跨进程锁/持久收据增强harness退出0，实际两个Node进程在同目标锁等待后串行，insert2/skip2、无重复、PG新连接读回PREPARED/VERIFIED及UNKNOWN保留；独立审查与语法/diff通过。仅fixture，不证明生产普通写入协调/丢锁fencing/权限/浏览器/业务迁移；外部费用0，整体NOT_ACCEPTED。当前待新提交CI；证据QUESTION_TRANSFER_STORAGE_EVIDENCE.md。
