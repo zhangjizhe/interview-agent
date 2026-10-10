@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { verifyControlRecovery } from './lab-control-recovery.mjs';
+import { verifyQuestionEvidence } from './lab-question-evidence.mjs';
 
 // This entry point is restricted to the synthetic Docker fixture, never a business account.
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic fixture authorization required');
@@ -92,23 +93,7 @@ try {
   await textContains('workflow.node.end');
   await textContains('fixture-response:route-yes');
   console.log('PASS browser workflow: saved new fixed-version draft and executed real branching nodes');
-  await page.getByRole('button', { name: '题库治理', exact: true }).click();
-  await page.getByRole('button', { name: '新增题目', exact: true }).click();
-  const form = page.locator('form.question-bank-create');
-  await form.getByLabel('岗位', { exact: true }).fill('Browser Fixture');
-  await form.getByLabel('题目', { exact: true }).fill('Browser synthetic queue constraint');
-  await form.getByLabel('参考答案', { exact: true }).fill('Use an immutable request key.');
-  await form.getByRole('button', { name: '保存题目', exact: true }).click();
-  await textContains('Browser synthetic queue constraint');
-  await page.getByText('参考答案', { exact: true }).click();
-  await textContains('Use an immutable request key.');
-  await page.getByLabel('搜索题目', { exact: true }).fill('queue');
-  await page.getByRole('button', { name: '搜索', exact: true }).click();
-  await page.getByRole('button', { name: '清除', exact: true }).waitFor();
-  await textContains('Browser synthetic queue constraint');
-  page.once('dialog', dialog => dialog.accept());
-  await page.getByRole('button', { name: '删除题目', exact: true }).click();
-  await page.getByText('暂无题目', { exact: true }).waitFor({ timeout: 20000 });
+  await verifyQuestionEvidence(page, context, url);
   await page.getByRole('button', { name: '自进化', exact: true }).click();
   await page.getByRole('combobox', { name: 'Agent', exact: true }).selectOption({ label: 'browser-ci-agent · 无当前版本' });
   await page.getByRole('button', { name: '核验首次发布门禁', exact: true }).click();

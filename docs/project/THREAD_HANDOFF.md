@@ -107,3 +107,9 @@ DELIVERY-CLOSEOUT-1 已完成。PR #4 于 2026-10-08 合入 `main`，merge commi
 2026-10-10 22:04：PR14精确head52a4c97102c5fb46e390ed64e4556848d5bfce32的push/PR六项checks均completed/success；按冻结SHA合并成功并核验远端main a5a8610ff3e104928aad42dad171c54e78092b07，本地agent-lab快进同步。真实隔离存储测试已进入CI门禁；不代表跨进程锁/持久收据/产品页面/业务旧题迁移验收完成。整体NOT_ACCEPTED，未重复已通过检查，无业务数据写入或模型费用。后续优先真实共享锁与持久收据合同，旧题归属/embedding来源和历史费用前置保持。
 
 2026-10-11 00:07：隔离PG跨进程锁/持久收据增强harness退出0，实际两个Node进程在同目标锁等待后串行，insert2/skip2、无重复、PG新连接读回PREPARED/VERIFIED及UNKNOWN保留；独立审查与语法/diff通过。仅fixture，不证明生产普通写入协调/丢锁fencing/权限/浏览器/业务迁移；外部费用0，整体NOT_ACCEPTED。当前待新提交CI；证据QUESTION_TRANSFER_STORAGE_EVIDENCE.md。
+
+隔离PG增强批次06f7177adf5819aadbfa62ef40a8fe0e3de9006a已推送并核验origin/agent-lab，PR15已创建/附到聊天；精确head四项push/PR jobs为in_progress（无结论），未合并。后续优先核验最新对应CI，全部成功后按冻结SHA合并并核验远端。此状态暂存本地。
+
+2026-10-11用户再次授权验收通过即合并：PR15精确head06f7177adf5819aadbfa62ef40a8fe0e3de9006a的push/PR六项checks全部completed/success；按冻结SHA合并并核验远端main 8c0e364d20a30524545508e0ef8e96dee1820299，本地agent-lab快进同步。此批仅隔离PG锁/持久收据验收，无生产接线/业务题迁移/模型费用，整体NOT_ACCEPTED。未重复已通过检查；后续合格批次遵循同门。
+
+2026-10-11 02:09：题库新增真实API逐字段/浏览器答案开关、搜索清除/岗位过滤、取消删除零DELETE/持有真实删除响应期间禁用/Strong无题双证据；API80/80与完整浏览器/严格PG及向量恢复退出0，独立审查无阻断。18模板仅PARTIAL，累计31，最终980仍NOT_ACCEPTED。证据LAB_QUESTION_EVIDENCE.md；仅测试/台账，无业务题复制或外部模型费用。新headCI通过后才合并。
