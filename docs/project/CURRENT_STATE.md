@@ -102,4 +102,12 @@ PR #4 已于 2026-10-08 合入 `main`，merge commit `8b2e94c5b8c831fc027024d43f
 
 2026-10-10本轮定期核验：PR13 head a0df788 的REST状态与check-runs读取均连接重置，未能核验最新CI，未尝试合并、不将本轮记交付。既有43测试与只读结果未变，未重复测试。旧题复制归属确认仍未回复，业务源/目标未写，无模型费用。待网络可用时重新读取精确head对应最新CI；本记录暂存本地，勿混入历史费用/截图。
 
-2026-10-10用户确认今晚为内部预发布验收；材料见 `docs/acceptance/PRE_RELEASE_REVIEW_2026-10-10.md`。独立只读复核及链接核对完成，整体仍NOT_ACCEPTED；不表示生产上线、真实质量或旧题迁移通过。PR13当前CI全绿，合并请求连接重置尚未核实成功。
+2026-10-10用户确认今晚为内部预发布验收；材料见 `docs/acceptance/PRE_RELEASE_REVIEW_2026-10-10.md`。独立只读复核及链接核对完成，整体仍NOT_ACCEPTED；不表示生产上线、真实质量或旧题迁移通过。PR13旧head a0df788 CI全绿；资料提交后的最新head需重新核验，合并请求连接重置尚未核实成功。
+
+2026-10-10 14:04 定期核验：内部预发布资料提交23c7db281262ecc8eb4b56cb83142280908f4912已在origin/agent-lab核验。此前全绿仅对应a0df788；本轮精确23c7db2的check-runs及PR13读取均连接重置，最新CI与合并结果未知，因此未尝试合并。无业务代码/数据变更、无模型调用、不重复既有通过测试；整体NOT_ACCEPTED。此网络状态暂存本地，恢复后先核验精确head。
+
+2026-10-10 16:07 阶段合并核验：网络恢复，PR13精确head23c7db281262ecc8eb4b56cb83142280908f4912的ci-summary/docker-build-test/lint-type-test均completed/success；REST按该SHA合并成功，远端main核验1d811487053d8600061e103c890a27a7d9e2292d，本地agent-lab快进同步。远端agent-lab仍23c7db2（后续合格批次再推送）。阶段仅SDK桥接与内部验收材料，不表示真实题库复制、模型质量、全UI或生产验收通过。未重跑未变更测试、未写业务数据、模型费用0；整体NOT_ACCEPTED。
+
+2026-10-10 18:07：独立测试Agent复核真实隔离迁移下一阶段方案，见QUESTION_TRANSFER_PREVIEW.md；共享锁/持久收据/schema及短隔离SDK写入验收仍待实施，无业务写入或模型调用，整体NOT_ACCEPTED。
+
+2026-10-10 20:08：新增短私有Milvus/etcd迁移存储harness，首轮及两次诊断flush限流失败如实保留；按0.1/s预先限速不重试后基础/独立增强版均退出0。真实SDK并集/幂等/源B不变、授权及冲突零insert、丢弃真实ack为UNKNOWN并新任务Strong核对恢复通过。仅单进程hook/内存收据，不证明共享锁、持久收据、API/浏览器或业务16题迁移；外部模型0，整体NOT_ACCEPTED。CI接入，精确新head通过后才合并。证据QUESTION_TRANSFER_STORAGE_EVIDENCE.md。

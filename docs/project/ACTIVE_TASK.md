@@ -35,3 +35,11 @@ Phase 0 验收清单完成，产品整体 NOT_ACCEPTED。计划见 `docs/accepta
 2026-10-10 SDK桥接阶段：Strong=0/1001读取上限/拒绝超量与假空/插入全量ack+PK校验/flush确认/源写禁用；独立审计新增稀疏、重复及超int64主键3红测，修复后累计43/43、lint/diff通过。实际SDK只读Strong旧16条通过，未复制业务题或写入SDK验收，不证明真实锁/审批/model provenance/真实迁移完成。PR12 head ff02020最新CI38013238845全绿；GraphQL连接重置后REST核实开放并成功合并，核验远端main 32d9c8ab580760d8ce6a4f189398b65fa204087b，agent-lab快进同步；后续SDK批次新head需重验CI。新模型费用0，整体NOT_ACCEPTED。
 
 今晚内部预发布验收材料已整理并经独立复核，入口 `docs/acceptance/PRE_RELEASE_REVIEW_2026-10-10.md`；只核验限定阶段证据，不把签字变为整体交付批准。
+
+当前远端agent-lab head23c7db2；最新CI/PR13因连接重置未核实，不合并。下次先精确核验，再继续隔离迁移及逐项双证据；旧题归属和真实模型费用前置保持。
+
+2026-10-10 16:07 阶段合并核验：网络恢复，PR13精确head23c7db281262ecc8eb4b56cb83142280908f4912的ci-summary/docker-build-test/lint-type-test均completed/success；REST按该SHA合并成功，远端main核验1d811487053d8600061e103c890a27a7d9e2292d，本地agent-lab快进同步。远端agent-lab仍23c7db2（后续合格批次再推送）。阶段仅SDK桥接与内部验收材料，不表示真实题库复制、模型质量、全UI或生产验收通过。未重跑未变更测试、未写业务数据、模型费用0；整体NOT_ACCEPTED。
+
+2026-10-10 18:07：独立测试Agent复核真实隔离迁移下一阶段方案，见QUESTION_TRANSFER_PREVIEW.md；共享锁/持久收据/schema及短隔离SDK写入验收仍待实施，无业务写入或模型调用，整体NOT_ACCEPTED。
+
+2026-10-10 20:08：新增短私有Milvus/etcd迁移存储harness，首轮及两次诊断flush限流失败如实保留；按0.1/s预先限速不重试后基础/独立增强版均退出0。真实SDK并集/幂等/源B不变、授权及冲突零insert、丢弃真实ack为UNKNOWN并新任务Strong核对恢复通过。仅单进程hook/内存收据，不证明共享锁、持久收据、API/浏览器或业务16题迁移；外部模型0，整体NOT_ACCEPTED。CI接入，精确新head通过后才合并。证据QUESTION_TRANSFER_STORAGE_EVIDENCE.md。
