@@ -143,3 +143,7 @@ DELIVERY-CLOSEOUT-1 已完成。PR #4 于 2026-10-08 合入 `main`，merge commi
 2026-10-11 14:24：PR19精确900699c8ef65e3bb5ea845f314c1ca393a755440六项CI成功，已合并并核验远端main09413b85c852e35025911341dba3565046e6736c，agent-lab快进。当前单主题L07写入完整性：独立10项8红/2绿确认PK及rollback缺口，追加5项发现partial ack误报并修复；现15+原input/boundaries=34/34，lint/typecheck通过。最终API镜像sha256:0ee7eec3d49142eb5332bb89a513d6a9331af68371edc69b39e0709f54cf3a6c含completeAcknowledgement，真实隔离链运行中。未提交/未计验收通过，无业务旧题迁移和付费模型；整体NOT_ACCEPTED。证据LAB_QUESTION_WRITE_INTEGRITY_EVIDENCE.md。
 
 2026-10-11 14:31：写入完整性最终镜像首次隔离链exit0，API82/82、完整浏览器和严格PG/Milvus/Qdrant恢复通过；实际插入后伪delete ack残留Strong读回正确保持UNKNOWN，再显式删除核验，原题保留。独立15项+相关34/34、lint/type/build/diff通过。仅L07写入补偿限定阶段，真实模型质量/未知写入HTTP界面/全部产品仍NOT_ACCEPTED，无业务题迁移/外部费用。准备提交精确新head，新CI全绿后方合并。
+
+写入完整性批次6ec7bde689e74e949fe51f6fb912fdb0da6a35d3已推送并核验origin/agent-lab，PR20创建并附到聊天；精确head四项push/PR jobs为in_progress，无成功结论，未合并。下轮优先精确最新CI全部绿后按SHA合并并核验远端，不重复已通过链路。主键/Strong/partial-ack风险已有限定修复，L07输入拒绝及未知写入HTTP界面仍待验；外部费用0/整体NOT_ACCEPTED。
+
+2026-10-11 16:28：PR20精确head6ec7bde689e74e949fe51f6fb912fdb0da6a35d3六项CI成功，已合并并核验远端mainbff3476676ba6dec2a1481a85459627bbe41f3e3，agent-lab快进。L07输入拒绝独立helper首次完整隔离链exit0（API82/82、全部浏览器/严格PG与向量恢复）；native空值零POST，两类真实400零Provider/fixture-user LLM_CALL增量且保留六字段/会话，修正后真实创建读回成功。snapshot限制固定私有容器/数据库且仅聚合计数；只测试/台账，无API/DB/权限变化，无外部费用/旧题迁移。34模板PARTIAL，最终980/整体NOT_ACCEPTED，新批次CI绿后才合并。证据LAB_QUESTION_INPUT_EVIDENCE.md。

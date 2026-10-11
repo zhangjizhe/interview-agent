@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { verifyQuestionRaceEvidence } from './lab-question-race-evidence.mjs';
+import { verifyQuestionInputEvidence } from './lab-question-input-evidence.mjs';
+import { questionInputSnapshot } from './lab-question-input-snapshot.mjs';
 
 export async function verifyQuestionEvidence(page, context, origin) {
   assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
@@ -16,8 +18,12 @@ export async function verifyQuestionEvidence(page, context, origin) {
   await page.getByText('暂无题目', { exact: true }).waitFor({ timeout: 20000 });
   await page.getByRole('button', { name: '新增题目', exact: true }).click();
   const form = page.locator('form.question-bank-create');
+  await verifyQuestionInputEvidence(page, context, origin, questionInputSnapshot);
+  console.log('PASS question input: native required zero POST, real whitespace/combined-byte400 retain draft with zero provider and ledger increments');
   const input = { position: 'Browser Fixture', level: 'P6', category: '幂等', question: 'Browser synthetic queue constraint', answer: 'Use an immutable request key.', tags: ['queue', 'fixture'] };
-  for (const [label, value] of [['岗位', input.position], ['职级', input.level], ['分类', input.category], ['题目', input.question], ['参考答案', input.answer], ['标签', input.tags.join(',')]]) await form.getByLabel(label, { exact: true }).fill(value);
+  const createFields = form.locator('input, textarea');
+  assert.equal(await createFields.count(), 6);
+  for (const [index, value] of [input.position, input.level, input.category, input.question, input.answer, input.tags.join(',')].entries()) await createFields.nth(index).fill(value);
   const create = responseFor(questionPath, 'POST');
   const refreshed = responseFor(`${questionPath}/list`);
   // Observe rejections immediately; cleanup must not mask the first assertion failure.

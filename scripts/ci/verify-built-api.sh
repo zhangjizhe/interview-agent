@@ -94,7 +94,7 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
   done
   test "$fixture_lab_ready" = true
   if [[ "${FIXTURE_BROWSER_TEST:-}" == "1" ]]; then
-    LAB_FIXTURE_SYNTHETIC=1 pnpm --filter @interview-agent/web exec node e2e/lab-isolated-acceptance.mjs
+    LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/lab-isolated-acceptance.mjs
   else
     echo 'BROWSER FIXTURE READY at http://localhost:5176; waiting for local gate file'
     fixture_browser_ready=false
