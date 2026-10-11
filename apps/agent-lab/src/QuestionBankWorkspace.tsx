@@ -24,6 +24,9 @@ export function QuestionBankWorkspace({
   message,
   loading = false,
   searching = false,
+  listError = false,
+  retrying = false,
+  onRetryList,
   onQuery,
   onPosition,
   onSearch,
@@ -36,6 +39,9 @@ export function QuestionBankWorkspace({
   message: string;
   loading?: boolean;
   searching?: boolean;
+  listError?: boolean;
+  retrying?: boolean;
+  onRetryList?: () => void;
   onQuery: (value: string) => void;
   onPosition: (value: string) => void;
   onSearch: () => void;
@@ -76,6 +82,7 @@ export function QuestionBankWorkspace({
         <button className="agent-command" type="button" onClick={onSearch} disabled={!query.trim() || searching}><Search size={16}/>{searching ? '搜索中' : '搜索'}</button>
         {searchResults && <button className="agent-command quiet-command" type="button" onClick={onClearSearch}>清除</button>}
         <button className="agent-command" type="button" disabled={createQuestion.isPending} onClick={() => setShowCreate((value) => !value)}><Plus size={16}/>{showCreate ? '关闭新增' : '新增题目'}</button>
+        {(listError || retrying) && onRetryList && <button className="agent-command" type="button" disabled={retrying} onClick={onRetryList}>{retrying ? '读取中' : '重试读取题库'}</button>}
       </div>
     </section>
     {message && <p className="agent-error">{message}</p>}

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { verifyQuestionDeleteFailure } from './lab-question-delete-failure-evidence.mjs';
+import { verifyQuestionListRetry } from './lab-question-list-retry-evidence.mjs';
 
 /** Proxy-discarded successful receipt, not a natural API 503 or storage failure. */
 export async function verifyQuestionUnknownEvidence(page, context, origin, snapshot) {
@@ -79,6 +80,7 @@ export async function verifyQuestionUnknownEvidence(page, context, origin, snaps
     assert.equal(await page.locator('form.question-bank-create').count(), 0);
     assert.equal(await page.evaluate(() => localStorage.getItem('ia_access_token')), token);
     assert.equal(posts.length, 1);
+    await verifyQuestionListRetry(page, context, origin, saved, snapshot);
     await verifyQuestionDeleteFailure(page, context, origin, saved, snapshot);
     page.once('dialog', dialog => dialog.accept());
     const deleted = waitResponse(`${path}/${encodeURIComponent(saved.questionId)}`, 'DELETE');

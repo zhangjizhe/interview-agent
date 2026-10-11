@@ -4,6 +4,25 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuestionBankWorkspace } from '../../../agent-lab/src/QuestionBankWorkspace';
 
+describe('question list explicit recovery', () => {
+  it('offers same-condition retry and freezes repeated clicks while refetching', () => {
+    const retry = vi.fn();
+    const client = new QueryClient();
+    const props: any = { questions: [], query: 'keep query', position: 'keep position', searchResults: null, message: '题库暂不可用', listError: true, retrying: false, onRetryList: retry, onQuery: vi.fn(), onPosition: vi.fn(), onSearch: vi.fn(), onClearSearch: vi.fn() };
+    const tree = () => <QueryClientProvider client={client}><QuestionBankWorkspace {...props}/></QueryClientProvider>;
+    const view = render(tree());
+    expect(screen.queryByText('暂无题目')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重试读取题库' }));
+    expect(retry).toHaveBeenCalledTimes(1);
+    props.retrying = true; props.listError = false; view.rerender(tree());
+    const pending = screen.getByRole('button', { name: '读取中' });
+    expect(pending).toBeDisabled(); fireEvent.click(pending);
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('搜索题目')).toHaveValue('keep query');
+    expect(screen.getByLabelText('岗位')).toHaveValue('keep position');
+  });
+});
+
 describe('Lab question bank governance', () => {
   let transport: any, clear: any;
   beforeEach(() => { clear = vi.fn(); transport = vi.fn(); vi.stubGlobal('fetch', transport); vi.spyOn(window, 'confirm').mockReturnValue(true); });
