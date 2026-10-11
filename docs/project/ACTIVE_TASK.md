@@ -99,3 +99,12 @@ Phase 0 验收清单完成，产品整体 NOT_ACCEPTED。计划见 `docs/accepta
 
 
 2026-10-11 22:24: PR21 exact a13226a2acadcd2762a96bf29d2914c146bd74ed six latest checks completed/success. Merged and remote main verified 5f0103dd20ed6718f44e2e447f1c9e6a29d59dba; agent-lab fast-forwarded. Unknown-receipt evidence locally passed and independently reviewed; preparing separate commit and new CI. Overall NOT_ACCEPTED, external cost0.
+
+
+Unknown-receipt batch 4024b3a9bd4745c7ae89953189b6dc47ad04abdb committed, pushed and origin/agent-lab verified. PR22 created and attached; exact-head push/PR docker-build-test and lint-type-test currently in_progress. Not merged. Next run check all latest checks success before SHA-pinned merge and remote main verification; do not repeat passed local chain. Deletion-failure evidence remains planned, not implemented. Overall NOT_ACCEPTED, external cost0.
+
+
+PR22 exact 4024b3a9bd4745c7ae89953189b6dc47ad04abdb six latest checks success, merged and remote main verified bcf2c859f3c67007749b0af1198850f697607b8c; agent-lab fast-forwarded. Next single theme: DELETE refusal browser/persistence evidence. Added injected non-forwarded503 on existing synthetic question, actual same-ID field readback, unchanged provider/ledger, then explicit real deletion/empty check. Syntax/lint/diff and independent review passed. Full isolated chain running: API82/82 passed, browser/strict restore pending. Not committed or accepted yet. No app changes, external cost0, overall NOT_ACCEPTED.
+
+
+DELETE refusal evidence first full isolated chain exit0: API82/82, all browser assertions, strict PostgreSQL and actual Milvus/Qdrant restoration PASS. Non-forwarded503 retained real same-ID fields and session, observed one DELETE, no provider/ledger increment; explicit second confirmation real DELETE/Strong empty/UI empty and cleared error. Report LAB_QUESTION_DELETE_FAILURE_EVIDENCE.md. Independent review and lint/diff pass. Limited proxy-fault evidence, no natural storage-failure or overall acceptance claim. Ready separate commit/new CI. External cost0.

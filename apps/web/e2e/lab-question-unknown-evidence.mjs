@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { verifyQuestionDeleteFailure } from './lab-question-delete-failure-evidence.mjs';
 
 /** Proxy-discarded successful receipt, not a natural API 503 or storage failure. */
 export async function verifyQuestionUnknownEvidence(page, context, origin, snapshot) {
@@ -78,11 +79,13 @@ export async function verifyQuestionUnknownEvidence(page, context, origin, snaps
     assert.equal(await page.locator('form.question-bank-create').count(), 0);
     assert.equal(await page.evaluate(() => localStorage.getItem('ia_access_token')), token);
     assert.equal(posts.length, 1);
+    await verifyQuestionDeleteFailure(page, context, origin, saved, snapshot);
     page.once('dialog', dialog => dialog.accept());
     const deleted = waitResponse(`${path}/${encodeURIComponent(saved.questionId)}`, 'DELETE');
     await article.getByTitle('删除题目').click();
     const removal = await deleted; assert.equal(removal.status(), 200); assert.equal((await removal.json()).deleted, true);
     await page.getByText('暂无题目', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('alert').filter({ hasText: '题目删除失败，请刷新核验后重试。' }).count(), 0);
     assert.deepEqual((await read()).results, []);
     assert.equal(posts.length, 1);
     assert.deepEqual(await snapshot(), after);
