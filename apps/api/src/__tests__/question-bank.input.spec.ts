@@ -25,7 +25,7 @@ describe('question input and bounded writes', () => {
   beforeEach(() => {
     service = new QuestionBankService(new ConfigService(), {} as any);
     client = { insert: jest.fn().mockResolvedValue({ ...ok, insert_cnt: '1', IDs: { int_id: { data: ['9007199254740993'] } } }),
-      flush: jest.fn().mockResolvedValue({ ...ok, coll_segIDs: {} }), getFlushState: jest.fn().mockResolvedValue({ ...ok, flushed: true }), delete: jest.fn().mockResolvedValue(ok) };
+      flush: jest.fn().mockResolvedValue({ ...ok, coll_segIDs: {} }), getFlushState: jest.fn().mockResolvedValue({ ...ok, flushed: true }), delete: jest.fn().mockResolvedValue(ok), query: jest.fn().mockResolvedValue({ ...ok, data: [] }) };
     service.client = client; service.ensureCollection = jest.fn().mockResolvedValue(undefined);
     service.embedText = jest.fn().mockResolvedValue([1]);
   });

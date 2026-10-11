@@ -143,3 +143,13 @@ PR #4 已于 2026-10-08 合入 `main`，merge commit `8b2e94c5b8c831fc027024d43f
 2026-10-11 10:18：独立测试Agent新增L06迟到搜索回执helper，经首次完整隔离链路exit0：真实API80/80、浏览器迟到成功/注入失败均不覆盖新输入和岗位列表，当前条件真实新搜索字段一致，严格PG和Milvus/Qdrant恢复通过。独立最终审计无范围阻断/秘密。仅本地测试与证据改动，不改产品API/DB/权限；额外两次离线合成搜索有Gateway/账本，外部付费0。33模板PARTIAL/最终980及整体NOT_ACCEPTED。PR18新lint成功，docker仍in_progress；一次查询连接重置后恢复，尚未全绿，不合并，也不改变PR18精确head。
 
 2026-10-11 10:22：PR18精确head59480869d0e13a18bad140f5aa9685e7162f9395的push/PR六项检查均completed/success，按冻结SHA合并并核验远端main 87a4fa6cf62e10490c735f3c00f8e4bd9810306d，agent-lab快进同步。搜索等待/恢复阶段已合并；竞态补充链已通过，随后独立提交/新CI，不能沿用PR18旧CI作为新批次结论。外部费用0/整体NOT_ACCEPTED，业务旧16题未复制。
+
+竞态补充批次900699c8ef65e3bb5ea845f314c1ca393a755440已提交推送并核验origin/agent-lab。两次只读开放PR查询连接重置，未发起新PR创建，新CI结论未知，未合并。下一轮先查开放PR（若无则使用已准备题库竞态描述创建并附到聊天），核验精确新head所有push/PR checks成功后按SHA合并并核验远端。不重复已通过链路、外部付费0，整体NOT_ACCEPTED。
+
+2026-10-11 12:19：网络恢复确认无开放PR，竞态提交900699c8ef65e3bb5ea845f314c1ca393a755440的push三项CI均success；创建PR19并附到聊天。新PR docker/lint jobs当前in_progress，未合并，不沿用旧push代新PR。等待时独立Agent只读规划L07新增输入/失败双证据，不改产品/业务数据或调用外部模型。整体NOT_ACCEPTED。
+
+2026-10-11 12:21：PR19精确最新checks两次连接重置，最终新PRCI未知、未合并；下轮先核验900699c8ef65e3bb5ea845f314c1ca393a755440及PR19，绿后合并/核远端。独立只读审查发现L07完整性风险待红测确认：QuestionBankService.addQuestions主键回执校验可能接受稀疏/重复/超int64字符串；rollback仅delete ack+flush，无Strong读回，现有QUESTION_WRITE_ROLLED_BACK标签不作为完整恢复证据。后续优先最小主键/回滚真实性单主题，输入拒绝UI另组；当前未改产品、未复制旧题、外部付费0，整体NOT_ACCEPTED。
+
+2026-10-11 14:24：PR19精确900699c8ef65e3bb5ea845f314c1ca393a755440六项CI成功，已合并并核验远端main09413b85c852e35025911341dba3565046e6736c，agent-lab快进。当前单主题L07写入完整性：独立10项8红/2绿确认PK及rollback缺口，追加5项发现partial ack误报并修复；现15+原input/boundaries=34/34，lint/typecheck通过。最终API镜像sha256:0ee7eec3d49142eb5332bb89a513d6a9331af68371edc69b39e0709f54cf3a6c含completeAcknowledgement，真实隔离链运行中。未提交/未计验收通过，无业务旧题迁移和付费模型；整体NOT_ACCEPTED。证据LAB_QUESTION_WRITE_INTEGRITY_EVIDENCE.md。
+
+2026-10-11 14:31：写入完整性最终镜像首次隔离链exit0，API82/82、完整浏览器和严格PG/Milvus/Qdrant恢复通过；实际插入后伪delete ack残留Strong读回正确保持UNKNOWN，再显式删除核验，原题保留。独立15项+相关34/34、lint/type/build/diff通过。仅L07写入补偿限定阶段，真实模型质量/未知写入HTTP界面/全部产品仍NOT_ACCEPTED，无业务题迁移/外部费用。准备提交精确新head，新CI全绿后方合并。
