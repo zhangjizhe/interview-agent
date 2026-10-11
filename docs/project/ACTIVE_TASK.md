@@ -89,3 +89,13 @@ Phase 0 验收清单完成，产品整体 NOT_ACCEPTED。计划见 `docs/accepta
 写入完整性批次6ec7bde689e74e949fe51f6fb912fdb0da6a35d3已推送并核验origin/agent-lab，PR20创建并附到聊天；精确head四项push/PR jobs为in_progress，无成功结论，未合并。下轮优先精确最新CI全部绿后按SHA合并并核验远端，不重复已通过链路。主键/Strong/partial-ack风险已有限定修复，L07输入拒绝及未知写入HTTP界面仍待验；外部费用0/整体NOT_ACCEPTED。
 
 2026-10-11 16:28：PR20精确head6ec7bde689e74e949fe51f6fb912fdb0da6a35d3六项CI成功，已合并并核验远端mainbff3476676ba6dec2a1481a85459627bbe41f3e3，agent-lab快进。L07输入拒绝独立helper首次完整隔离链exit0（API82/82、全部浏览器/严格PG与向量恢复）；native空值零POST，两类真实400零Provider/fixture-user LLM_CALL增量且保留六字段/会话，修正后真实创建读回成功。snapshot限制固定私有容器/数据库且仅聚合计数；只测试/台账，无API/DB/权限变化，无外部费用/旧题迁移。34模板PARTIAL，最终980/整体NOT_ACCEPTED，新批次CI绿后才合并。证据LAB_QUESTION_INPUT_EVIDENCE.md。
+
+输入拒绝批次a13226a2acadcd2762a96bf29d2914c146bd74ed已提交推送并核验origin/agent-lab。REST创建PR连接重置，随后只读开放PR确认亦重置；是否创建未知、最新CI未知、未合并。下轮先查询开放agent-lab PR并附到聊天（确认无PR才创建），核验精确新head所有checks成功后按SHA合并并核验远端；不盲目重建或重复已通过链路。整体NOT_ACCEPTED，外部费用0，旧题归属/真实质量/历史未知费用前置保持。
+
+2026-10-11 18:23: Unknown receipt evidence first isolated chain exit0: API82/82, browser and strict PG/Milvus/Qdrant restore PASS. Actual201 proxied503 retains draft; exactly one synthetic embedding and fixture LLM_CALL, real list/reload same ID fields, explicit delete confirmed. Proxy receipt failure only, not natural API503/unknown storage. External cost0, overall NOT_ACCEPTED. Local changes only; report LAB_QUESTION_UNKNOWN_EVIDENCE.md. Network recovered: no open PR, a13226a push3 success, PR21 created/attached; precise a13226a2acadcd2762a96bf29d2914c146bd74ed new PR lint/docker in_progress. Do not alter frozen head or merge before all checks success.
+
+
+2026-10-11 20:21：PR21 精确 a13226a2acadcd2762a96bf29d2914c146bd74ed 的 GitHub REST checks/PR 状态多次连接重置，最终 CI 未知，未合并且未改变冻结 head。未知回执本地批次独立复核无新增阻断，相关 diff 检查通过；保留既有 API82/82、浏览器及严格存储恢复证据，不重复已通过检查。下一最小验收主题 L07 删除失败保留/显式重试：复用已存合成题，代理一次不转发 DELETE503，真实 GET 核同 ID/字段，零自动重试及零 Provider/账本增量，再确认真实删除与 Strong 空/UI 空。此下一主题仅规划未执行；新批次必须独立提交与新 CI，排除历史费用报告及旧截图。整体 NOT_ACCEPTED，外部费用0，旧业务题未复制。
+
+
+2026-10-11 22:24: PR21 exact a13226a2acadcd2762a96bf29d2914c146bd74ed six latest checks completed/success. Merged and remote main verified 5f0103dd20ed6718f44e2e447f1c9e6a29d59dba; agent-lab fast-forwarded. Unknown-receipt evidence locally passed and independently reviewed; preparing separate commit and new CI. Overall NOT_ACCEPTED, external cost0.

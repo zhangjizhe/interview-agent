@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { verifyQuestionRaceEvidence } from './lab-question-race-evidence.mjs';
 import { verifyQuestionInputEvidence } from './lab-question-input-evidence.mjs';
 import { questionInputSnapshot } from './lab-question-input-snapshot.mjs';
+import { verifyQuestionUnknownEvidence } from './lab-question-unknown-evidence.mjs';
 
 export async function verifyQuestionEvidence(page, context, origin) {
   assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
@@ -137,5 +138,7 @@ export async function verifyQuestionEvidence(page, context, origin) {
       const after = await read(); assert.equal(after.results.some(item => item.questionId === saved.questionId), false); assert.equal(after.count, 0);
     } finally { release(); await page.unroute(pattern); }
   } finally { page.off('request', observe); }
+  await verifyQuestionUnknownEvidence(page, context, origin, questionInputSnapshot);
+  console.log('PASS unknown question receipt: actual201 proxied503, retained draft, one embedding/ledger, real reload and explicit deletion');
   console.log('PASS question evidence: real POST/list/search fields, injected search503 session preservation and held real search pending, native answer disclosure, clear/filter, cancel zero DELETE, held real delete disabled and absent after Strong read');
 }

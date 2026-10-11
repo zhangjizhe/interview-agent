@@ -11502,7 +11502,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md; docs/acceptance/LAB_QUESTION_UNKNOWN_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11566,7 +11566,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md; docs/acceptance/LAB_QUESTION_UNKNOWN_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11598,7 +11598,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md; docs/acceptance/LAB_QUESTION_UNKNOWN_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11630,7 +11630,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md; docs/acceptance/LAB_QUESTION_UNKNOWN_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11662,7 +11662,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md; docs/acceptance/LAB_QUESTION_UNKNOWN_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11694,7 +11694,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md; docs/acceptance/LAB_QUESTION_UNKNOWN_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11726,7 +11726,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md; docs/acceptance/LAB_QUESTION_UNKNOWN_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11742,7 +11742,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md; docs/acceptance/LAB_QUESTION_UNKNOWN_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
