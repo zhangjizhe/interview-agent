@@ -18,5 +18,14 @@ module.exports = async ({ check }) => {
     await assert.rejects(scope(() => service.addQuestions([{ ...fixture, questionId: 'store-rollback-fixture' }])), /QUESTION_WRITE_ROLLED_BACK/);
     const remaining = await scope(() => service.list('Fixture'));
     check('actual vector rollback deletes only newly inserted primary IDs', remaining.some(item => item.questionId === fixture.questionId) && !remaining.some(item => item.questionId === 'store-rollback-fixture'));
+    const realDelete = service.client.delete.bind(service.client);
+    service.client.delete = async () => ({ status: { error_code: 'Success', code: 0 } });
+    interrupt = true;
+    try {
+      await assert.rejects(scope(() => service.addQuestions([{ ...fixture, questionId: 'store-retained-fixture' }])), /QUESTION_WRITE_UNCONFIRMED/);
+      const retained = await scope(() => service.list('Fixture'));
+      check('delete acknowledgement without actual removal stays unknown after Strong readback', retained.some(item => item.questionId === 'store-retained-fixture') && retained.some(item => item.questionId === fixture.questionId));
+    } finally { service.client.delete = realDelete; }
+    check('retained synthetic write can be explicitly removed and Strong verified', (await scope(() => service.deleteQuestion('store-retained-fixture'))).deleted === true);
   } finally { await service.client.closeConnection(); }
 };

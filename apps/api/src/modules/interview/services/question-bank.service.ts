@@ -234,6 +234,7 @@ export class QuestionBankService {
     }
     const now = new Date().toISOString();
     let insertedIds: string[] = [];
+    let completeAcknowledgement = false;
     try {
       const result = await this.client.insert({
         collection_name: this.COLLECTION,
@@ -241,9 +242,15 @@ export class QuestionBankService {
         data: items.map((item, i) => ({ ...item, vector: vectors[i], text: texts[i], createdAt: now })),
       });
       const rawIds = (result.IDs as any)?.int_id?.data;
-      if (Array.isArray(rawIds) && rawIds.every(id => /^\d+$/.test(String(id)) && (typeof id !== 'number' || Number.isSafeInteger(id)))) insertedIds = rawIds.map(String);
+      if (Array.isArray(rawIds) && Array.from(rawIds).every(id =>
+        (typeof id === 'string' || (typeof id === 'number' && Number.isSafeInteger(id)))
+        && /^\d+$/.test(String(id)) && BigInt(id) <= 9223372036854775807n)) {
+        const canonicalIds = Array.from(rawIds, id => BigInt(id).toString());
+        if (new Set(canonicalIds).size === canonicalIds.length) insertedIds = canonicalIds;
+      }
       this.assertWrite(result);
-      if (insertedIds.length !== items.length || Number(result.insert_cnt) !== items.length) throw new Error('QUESTION_INSERT_INCOMPLETE');
+      completeAcknowledgement = insertedIds.length === items.length && Number(result.insert_cnt) === items.length;
+      if (!completeAcknowledgement) throw new Error('QUESTION_INSERT_INCOMPLETE');
       await this.flushConfirmed();
       return { count: items.length };
     } catch {
@@ -252,7 +259,11 @@ export class QuestionBankService {
         try {
           this.assertWrite(await this.client.delete({ collection_name: this.COLLECTION, filter: `id in [${insertedIds.join(',')}]`, timeout: 5000 }));
           await this.flushConfirmed();
-          rollbackConfirmed = true;
+          const remaining = await this.client.query({ collection_name: this.COLLECTION,
+            consistency_level: ConsistencyLevelEnum.Strong, filter: `id in [${insertedIds.join(',')}]`,
+            output_fields: ['id'], limit: 1, timeout: 5000 });
+          this.assertWrite(remaining);
+          rollbackConfirmed = completeAcknowledgement && Array.isArray(remaining.data) && remaining.data.length === 0;
         } catch { /* Unknown persistence must never be reported as success. */ }
       }
       this.logger.warn({ event: 'question_batch_write_failed', rollbackConfirmed });
