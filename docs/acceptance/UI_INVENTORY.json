@@ -11499,10 +11499,10 @@
       "tag": "p",
       "labelOrExpression": "<p className=\"agent-error\">{createQuestion.error instanceof Error ? createQuestion.error.message : '题目保存失败'}。若结果未知，请先刷新核验，避免重复调用模型。</p>",
       "attributes": "className=\"agent-error\"",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11566,7 +11566,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11598,7 +11598,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11630,7 +11630,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11662,7 +11662,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11694,7 +11694,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11726,7 +11726,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11742,7 +11742,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_INPUT_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
