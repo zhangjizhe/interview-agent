@@ -58,9 +58,36 @@ export async function verifyQuestionEvidence(page, context, origin) {
   assert.equal(await answer.innerText(), saved.answer); assert.equal(await answer.isVisible(), true);
   await details.locator('summary').click(); assert.equal(await details.evaluate(node => node.open), false); assert.equal(await answer.isVisible(), false);
   await page.getByLabel('搜索题目', { exact: true }).fill('queue');
-  const searched = responseFor(`${questionPath}/search`);
+  const searchPattern = `${origin}${questionPath}/search?*`;
+  await page.route(searchPattern, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Synthetic search unavailable' }) }), { times: 1 });
+  const failedSearch = responseFor(`${questionPath}/search`); void failedSearch.catch(() => {});
   await page.getByRole('button', { name: '搜索', exact: true }).click();
-  const searchResponse = await searched; assert.equal(searchResponse.ok(), true);
+  assert.equal((await failedSearch).status(), 503);
+  await page.getByText('Synthetic search unavailable', { exact: true }).waitFor();
+  assert.equal(await page.getByLabel('搜索题目', { exact: true }).inputValue(), 'queue');
+  assert.equal(await page.evaluate(() => localStorage.getItem('ia_access_token')), token);
+  await assertDisplay();
+  assert.ok((await read()).results.some(item => item.questionId === saved.questionId));
+  await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent === '搜索' && !button.disabled));
+  let releaseSearch; const searchGate = new Promise(resolve => { releaseSearch = resolve; });
+  let realSearches = 0;
+  await page.route(searchPattern, async route => { realSearches++; const actual = await route.fetch({ timeout: 75000 }); await searchGate; await route.fulfill({ response: actual }); });
+  const searched = responseFor(`${questionPath}/search`); void searched.catch(() => {});
+  let searchResponse;
+  try {
+    await page.getByRole('button', { name: '搜索', exact: true }).click();
+    try {
+      await page.getByRole('button', { name: '搜索中', exact: true }).waitFor();
+      assert.equal(await page.getByRole('button', { name: '搜索中', exact: true }).isDisabled(), true);
+      await assertDisplay();
+      assert.equal(await page.getByLabel('搜索题目', { exact: true }).inputValue(), 'queue');
+    } finally { releaseSearch(); }
+    searchResponse = await searched;
+    assert.equal(realSearches, 1);
+  } finally { releaseSearch(); await page.unroute(searchPattern); }
+  assert.equal(searchResponse.ok(), true);
+  await page.waitForFunction(() => !document.body.textContent.includes('Synthetic search unavailable'));
+  assert.equal(await page.evaluate(() => localStorage.getItem('ia_access_token')), token);
   const search = await searchResponse.json(); assert.equal(search.query, 'queue');
   const match = search.results.find(item => item.questionId === saved.questionId); assert.ok(match);
   for (const field of ['position', 'level', 'category', 'question', 'answer', 'tags']) assert.deepEqual(match[field], saved[field]);
@@ -102,5 +129,5 @@ export async function verifyQuestionEvidence(page, context, origin) {
       const after = await read(); assert.equal(after.results.some(item => item.questionId === saved.questionId), false); assert.equal(after.count, 0);
     } finally { release(); await page.unroute(pattern); }
   } finally { page.off('request', observe); }
-  console.log('PASS question evidence: real POST/list/search fields, native answer disclosure, clear/filter, cancel zero DELETE, held real delete disabled and absent after Strong read');
+  console.log('PASS question evidence: real POST/list/search fields, injected search503 session preservation and held real search pending, native answer disclosure, clear/filter, cancel zero DELETE, held real delete disabled and absent after Strong read');
 }

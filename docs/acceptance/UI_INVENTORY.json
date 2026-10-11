@@ -11406,7 +11406,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_SEARCH_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11438,7 +11438,7 @@
       "productReview": "PARTIAL",
       "apiPersistenceCheck": "PARTIAL",
       "browserSecondCheck": "PARTIAL",
-      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md",
+      "evidence": "docs/acceptance/LAB_QUESTION_EVIDENCE.md; docs/acceptance/LAB_QUESTION_SEARCH_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {
@@ -11483,10 +11483,10 @@
       "tag": "p",
       "labelOrExpression": "<p className=\"agent-error\">{message}</p>",
       "attributes": "className=\"agent-error\"",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_QUESTION_SEARCH_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {

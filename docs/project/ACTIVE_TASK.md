@@ -61,3 +61,9 @@ Phase 0 验收清单完成，产品整体 NOT_ACCEPTED。计划见 `docs/accepta
 2026-10-11 04:11：网络恢复确认无开放PR后创建题库双证据PR16并附到聊天，head75e59c6054df50336886cb3ee3155812a3716bf5。此前push三项CI成功，新PR两项job in_progress；后续精确checks读取连接重置，最新结论未知、未合并。下一轮核验新PR对应全部checks成功后按SHA合并并核验远端，不重复已通过测试。
 
 2026-10-11 06:30：PR16精确head75e59c6对应六项CI成功，按SHA合并并核验远端main a7ad13f099e766d6b37d375e1a8c4bab5431083c；agent-lab快进同步。新增题目在途冻结六字段/保存/关闭，独立组件旧2红修复11/11、lint/type/build通过。三轮浏览器失败如实保留：实际POST201约2.6s排除后端超时猜测，原因为已填textarea包装label精确定位失败且未处理response拒绝掩盖首错；修正测试定位/错误记录后第四轮API80/80、完整浏览器及严格PG/Milvus/Qdrant恢复退出0。32模板限定PARTIAL，最终980/整体NOT_ACCEPTED。旧16题未复制，外部费用0；新批次待提交及最新CI，绿后才合并。证据LAB_QUESTION_PENDING_EVIDENCE.md。
+
+题库等待保护批次1e7dd144c09274f60760f09164c9d82327e4ee33已推送并核验origin/agent-lab；PR17创建并附到聊天，精确head四项push/PR jobs当前in_progress，无成功结论。未合并；继续核验对应最新CI全绿后按SHA合并并核验远端。此状态暂存本地。
+
+2026-10-11 06:40：PR17精确head1e7dd144c09274f60760f09164c9d82327e4ee33的push/PR六项checks均completed/success，按冻结SHA合并并核验远端main 3ad7c515cbb8af867ceb04df0f542032431aa636，agent-lab快进同步。等待编辑保护阶段已合并；不是全产品交付。整体NOT_ACCEPTED，外部付费0，旧业务16题未迁移。下一组为题库搜索等待/错误与剩余条件逐项双证据；旧题归属、embedding来源与历史未知账单保持前置。独立审计无阻断，旧题库证据补充链接暂存本地供下一批提交。
+
+2026-10-11 08:16：L06搜索补充证据首次完整隔离链路退出0（API80/80、完整浏览器、严格PG与Milvus/Qdrant恢复）。一次浏览器注入503不转发后台，query/token/真实题保留；held实际search响应期间按钮禁用，成功错误清除且逐字段与真实结果一致。独立审计无阻断。仅测试/台账，不改API/DB/权限/产品或模型路径；UI0715限定PARTIAL，累计33，最终980/整体NOT_ACCEPTED。自然故障/取消/关键词改变竞态/真实质量仍未验；外部费用0，旧题未迁移。证据LAB_QUESTION_SEARCH_EVIDENCE.md，新批次待CI全绿再合并。
