@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { verifyQuestionRaceEvidence } from './lab-question-race-evidence.mjs';
 
 export async function verifyQuestionEvidence(page, context, origin) {
   assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
@@ -107,6 +108,7 @@ export async function verifyQuestionEvidence(page, context, origin) {
   const missingResponse = await missing; assert.equal(missingResponse.ok(), true); assert.deepEqual((await missingResponse.json()).results, []);
   await page.getByText('暂无题目', { exact: true }).waitFor();
   await filter.fill(''); await article.waitFor(); await assertDisplay();
+  await verifyQuestionRaceEvidence(page, context, origin, saved);
   let deletes = 0;
   const deletePath = `${questionPath}/${encodeURIComponent(saved.questionId)}`;
   const observe = request => { if (new URL(request.url()).pathname === deletePath && request.method() === 'DELETE') deletes++; };
