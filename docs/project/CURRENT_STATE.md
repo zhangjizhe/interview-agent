@@ -135,3 +135,11 @@ PR #4 已于 2026-10-08 合入 `main`，merge commit `8b2e94c5b8c831fc027024d43f
 2026-10-11 06:40：PR17精确head1e7dd144c09274f60760f09164c9d82327e4ee33的push/PR六项checks均completed/success，按冻结SHA合并并核验远端main 3ad7c515cbb8af867ceb04df0f542032431aa636，agent-lab快进同步。等待编辑保护阶段已合并；不是全产品交付。整体NOT_ACCEPTED，外部付费0，旧业务16题未迁移。下一组为题库搜索等待/错误与剩余条件逐项双证据；旧题归属、embedding来源与历史未知账单保持前置。独立审计无阻断，旧题库证据补充链接暂存本地供下一批提交。
 
 2026-10-11 08:16：L06搜索补充证据首次完整隔离链路退出0（API80/80、完整浏览器、严格PG与Milvus/Qdrant恢复）。一次浏览器注入503不转发后台，query/token/真实题保留；held实际search响应期间按钮禁用，成功错误清除且逐字段与真实结果一致。独立审计无阻断。仅测试/台账，不改API/DB/权限/产品或模型路径；UI0715限定PARTIAL，累计33，最终980/整体NOT_ACCEPTED。自然故障/取消/关键词改变竞态/真实质量仍未验；外部费用0，旧题未迁移。证据LAB_QUESTION_SEARCH_EVIDENCE.md，新批次待CI全绿再合并。
+
+搜索补充证据提交59480869d0e13a18bad140f5aa9685e7162f9395已推送并核验origin/agent-lab。REST创建PR时连接重置，随后的只读开放PR确认亦重置；是否创建未知，最新对应CI未知，未合并。下一轮先查询开放agent-lab PR并附到聊天（确认无PR才创建），核验精确新head全部CI成功后按SHA合并并核对远端。不重复本轮已通过链路或盲目重复创建。整体NOT_ACCEPTED，业务旧题与费用前置不变。
+
+2026-10-11 10:14：网络恢复确认无开放PR，上轮head59480869d0e13a18bad140f5aa9685e7162f9395的push三项CI成功；创建并附PR18，新PR两项job in_progress，未合并。等待期间独立审查下一组L06迟到成功/失败合同：query或position变化清旧状态并递增版本，旧回执不得覆盖新状态；在途请求不取消且可能已计费用，按钮完成后才恢复。无确定缺陷，准备隔离真实held-success与注入held503浏览器回归，不修改PR18提交。
+
+2026-10-11 10:18：独立测试Agent新增L06迟到搜索回执helper，经首次完整隔离链路exit0：真实API80/80、浏览器迟到成功/注入失败均不覆盖新输入和岗位列表，当前条件真实新搜索字段一致，严格PG和Milvus/Qdrant恢复通过。独立最终审计无范围阻断/秘密。仅本地测试与证据改动，不改产品API/DB/权限；额外两次离线合成搜索有Gateway/账本，外部付费0。33模板PARTIAL/最终980及整体NOT_ACCEPTED。PR18新lint成功，docker仍in_progress；一次查询连接重置后恢复，尚未全绿，不合并，也不改变PR18精确head。
+
+2026-10-11 10:22：PR18精确head59480869d0e13a18bad140f5aa9685e7162f9395的push/PR六项检查均completed/success，按冻结SHA合并并核验远端main 87a4fa6cf62e10490c735f3c00f8e4bd9810306d，agent-lab快进同步。搜索等待/恢复阶段已合并；竞态补充链已通过，随后独立提交/新CI，不能沿用PR18旧CI作为新批次结论。外部费用0/整体NOT_ACCEPTED，业务旧16题未复制。
