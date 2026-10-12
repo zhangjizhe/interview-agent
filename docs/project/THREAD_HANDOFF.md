@@ -193,3 +193,12 @@ List retry batch e6fe133c3c4051c0be6bf5e8b497a30ee2280bd8 committed/pushed and o
 
 
 2026-10-12 12:34: Network recovered: PR24 confirmed open exacte6fe133, latest six checks success, merged and remote main verified9e277bb4ee9d234eb3a33dc307ae30c2e9997da6. Create-receipt plus local inventory batch final independent review no blockers, 981 preserved ID/review/evidence/verdict and AST/hash checked; historical cost-report/old screenshots excluded. Prior full isolated acceptance retained. Prepare separate commit/new CI, overall NOT_ACCEPTED, external cost0.
+
+
+Create-receipt batch39fc36cd9b81f590c86ff7b9213e307f09a70603 pushed/origin verified; PR25 created/attached. New exact-head CI pending, not merged. Next verify all latest checks success before SHA-pinned merge and remote main. Do not repeat passed unchanged local checks. Overall NOT_ACCEPTED, external cost0.
+
+
+2026-10-12 14:30: PR25 exact39fc36cd9b81f590c86ff7b9213e307f09a70603 latest six checks success, confirmed open/main, merged and remote main verifiedcf0e3f2afe21b7d91a7931194d89d995ab813ea7. Agent-lab fast-forwarded. Creation receipt and inventory981 accepted-stage changes now merged, not overall acceptance. One read-only CI permission review timed out, single permitted retry succeeded; no remaining approval blocker. Next independent audit selects real server-side session revocation: actual auth/logout via separate synthetic context revokes browser token, reload real401 clears3keys/UI/cache, oldtoken real profile/admin-write401 with zero provider/ledger, real fixture relogin/navigation recovery. Existing LabSessionGate clears QueryClient on expired; source finding only, new scenario not implemented/verified yet. No paid model or business copy, overall NOT_ACCEPTED.
+
+
+2026-10-12 16:31: Real session revocation helper first full isolated chain exit0: API82/82, live new-key list401 after actual Redis logout, three session keys/UI removed, oldtoken real profile/adminwrite401, new login/profile200 with old token still401, zero provider/ledger increments, strict PG/Milvus/Qdrant recovery PASS. No HTTP fault injection or app changes; syntax/eslint/diff/independent review pass. Report LAB_SESSION_REVOCATION_EVIDENCE.md. Cached nonempty content/all cache items/TTL expiry/role change not covered. Preparing test-only accepted-stage commit/new CI, overall NOT_ACCEPTED, external cost0.
