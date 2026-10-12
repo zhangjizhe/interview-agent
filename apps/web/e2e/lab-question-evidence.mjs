@@ -139,6 +139,8 @@ export async function verifyQuestionEvidence(page, context, origin) {
     } finally { release(); await page.unroute(pattern); }
   } finally { page.off('request', observe); }
   await verifyQuestionUnknownEvidence(page, context, origin, questionInputSnapshot);
+  await verifyQuestionUnknownEvidence(page, context, origin, questionInputSnapshot, 'malformed200');
+  console.log('PASS malformed success receipt: actual201 proxied200 empty body retains draft, one embedding/ledger, actual persisted ID reload and deletion');
   console.log('PASS unknown question receipt: actual201 proxied503, retained draft, one embedding/ledger, real reload and explicit deletion');
   console.log('PASS question evidence: real POST/list/search fields, injected search503 session preservation and held real search pending, native answer disclosure, clear/filter, cancel zero DELETE, held real delete disabled and absent after Strong read');
 }

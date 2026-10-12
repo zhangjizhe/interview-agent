@@ -51,11 +51,17 @@ export function QuestionBankWorkspace({
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ position: 'AI Agent 工程师', level: 'P5', category: '通用', question: '', answer: '', tags: '' });
   const createQuestion = useMutation({
-    mutationFn: () => api('/interview/question-bank', {
+    mutationFn: async () => {
+      const result = await api('/interview/question-bank', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...form, tags: form.tags.split(/[,，、\s]+/).filter(Boolean) }),
-    }),
+      });
+      if (result?.success !== true || typeof result.questionId !== 'string' || !result.questionId.trim()) {
+        throw new Error('题目保存未确认，请先刷新核验。');
+      }
+      return result;
+    },
     onSuccess: () => {
       setShowCreate(false);
       setForm({ position: 'AI Agent 工程师', level: 'P5', category: '通用', question: '', answer: '', tags: '' });

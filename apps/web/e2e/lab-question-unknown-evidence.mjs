@@ -3,7 +3,8 @@ import { verifyQuestionDeleteFailure } from './lab-question-delete-failure-evide
 import { verifyQuestionListRetry } from './lab-question-list-retry-evidence.mjs';
 
 /** Proxy-discarded successful receipt, not a natural API 503 or storage failure. */
-export async function verifyQuestionUnknownEvidence(page, context, origin, snapshot) {
+export async function verifyQuestionUnknownEvidence(page, context, origin, snapshot, receipt = '503') {
+  assert.ok(['503', 'malformed200'].includes(receipt));
   assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
   assert.equal(origin, 'http://localhost:5176');
   assert.equal(typeof snapshot, 'function');
@@ -33,7 +34,7 @@ export async function verifyQuestionUnknownEvidence(page, context, origin, snaps
     assert.equal(actual.status(), 201);
     actualCreated = await actual.json();
     assert.equal(actualCreated.success, true); assert.ok(actualCreated.questionId);
-    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'QUESTION_WRITE_UNCONFIRMED: inspect storage before retry' }) });
+    await route.fulfill({ status: receipt === '503' ? 503 : 200, contentType: 'application/json', body: receipt === '503' ? JSON.stringify({ message: 'QUESTION_WRITE_UNCONFIRMED: inspect storage before retry' }) : '{}' });
   };
   page.on('request', record);
   await page.route(pattern, handler, { times: 1 });
@@ -46,9 +47,9 @@ export async function verifyQuestionUnknownEvidence(page, context, origin, snaps
     const before = await snapshot();
     const rejected = waitResponse(path, 'POST');
     await form.getByRole('button', { name: '保存题目', exact: true }).click();
-    assert.equal((await rejected).status(), 503);
+    assert.equal((await rejected).status(), receipt === '503' ? 503 : 200);
     await page.waitForFunction(() => { const button = document.querySelector('form.question-bank-create button[type="submit"]'); return button && !button.disabled; });
-    await page.getByText(/QUESTION_WRITE_UNCONFIRMED.*若结果未知，请先刷新核验/).waitFor();
+    await page.getByText(receipt === '503' ? /QUESTION_WRITE_UNCONFIRMED.*若结果未知，请先刷新核验/ : /题目保存未确认.*若结果未知，请先刷新核验/).waitFor();
     assert.deepEqual(await Promise.all((await fields.all()).map(field => field.inputValue())), input);
     for (const field of await fields.all()) assert.equal(await field.isEnabled(), true);
     assert.equal(await page.getByRole('button', { name: '关闭新增', exact: true }).isEnabled(), true);
@@ -80,8 +81,10 @@ export async function verifyQuestionUnknownEvidence(page, context, origin, snaps
     assert.equal(await page.locator('form.question-bank-create').count(), 0);
     assert.equal(await page.evaluate(() => localStorage.getItem('ia_access_token')), token);
     assert.equal(posts.length, 1);
-    await verifyQuestionListRetry(page, context, origin, saved, snapshot);
-    await verifyQuestionDeleteFailure(page, context, origin, saved, snapshot);
+    if (receipt === '503') {
+      await verifyQuestionListRetry(page, context, origin, saved, snapshot);
+      await verifyQuestionDeleteFailure(page, context, origin, saved, snapshot);
+    }
     page.once('dialog', dialog => dialog.accept());
     const deleted = waitResponse(`${path}/${encodeURIComponent(saved.questionId)}`, 'DELETE');
     await article.getByTitle('删除题目').click();

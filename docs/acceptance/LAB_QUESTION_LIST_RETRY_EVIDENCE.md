@@ -6,4 +6,4 @@
 
 浏览器使用未缓存的合成岗位持续代理 GET503，涵盖默认重试直到最终错误；无“暂无题目”误报，Provider/fixture用户账本无增量。撤注入后持有真实同岗位 GET200，逐项核相同ID、岗位、级别、类别、题干、答案与标签；等待期间按钮禁用、岗位与会话保留。释放后真实题目恢复，清岗位等待无岗位真实GET及显示，再交接既有删除验收。
 
-实际 Lab 镜像 sha256:cd4729ae4618edc7ef4e257f0edeb33402870a7939d8add63ed45450c1c1de09。隔离API82/82及完整浏览器通过，首次完整隔离链exit0，严格PostgreSQL schema/行多集/sequence及实际Milvus/Qdrant恢复全部通过。本批尚未提交，需新精确head CI全绿后合并。无外部费用或旧业务题复制；代理读取故障不代表自然Milvus故障，真实质量及全产品仍NOT_ACCEPTED。新增按钮需在下一次源码清单协调时补入，原980模板统计不冒充新源码覆盖。
+实际 Lab 镜像 sha256:cd4729ae4618edc7ef4e257f0edeb33402870a7939d8add63ed45450c1c1de09。隔离API82/82及完整浏览器通过，首次完整隔离链exit0，严格PostgreSQL schema/行多集/sequence及实际Milvus/Qdrant恢复全部通过。修复批次e6fe133c3c4051c0be6bf5e8b497a30ee2280bd8已推送并创建PR24，精确head六项CI已成功；已重新只读确认开放状态及六项最新CI成功后合并，远端main核验9e277bb4ee9d234eb3a33dc307ae30c2e9997da6。无外部费用或旧业务题复制；代理读取故障不代表自然Milvus故障，真实质量及全产品仍NOT_ACCEPTED。本地源码清单已显式协调：原980项ID/审查/证据/verdict全部保留，题库原45节点tag/属性/顺序一致，刷新位置及表达式；新增UI-0981按钮，三项限定PARTIAL、最终NOT_ACCEPTED。共981模板/35限定PARTIAL，动态/条件/响应式及其余模板仍待完整验收。独立复核与来源hash核验通过，此清单批次仍未提交。
