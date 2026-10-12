@@ -176,3 +176,15 @@ PR22 exact 4024b3a9bd4745c7ae89953189b6dc47ad04abdb six latest checks success, m
 
 
 DELETE refusal evidence first full isolated chain exit0: API82/82, all browser assertions, strict PostgreSQL and actual Milvus/Qdrant restoration PASS. Non-forwarded503 retained real same-ID fields and session, observed one DELETE, no provider/ledger increment; explicit second confirmation real DELETE/Strong empty/UI empty and cleared error. Report LAB_QUESTION_DELETE_FAILURE_EVIDENCE.md. Independent review and lint/diff pass. Limited proxy-fault evidence, no natural storage-failure or overall acceptance claim. Ready separate commit/new CI. External cost0.
+
+
+Delete-refusal batch 963c7ce0aa5ca249b5173d64db3e1dac01ca13cc pushed and origin/agent-lab verified; PR23 created/attached. New exact-head CI pending, not merged. Next verify all latest checks then SHA-pinned merge/remote main. No repeat of passed local chain; overall NOT_ACCEPTED, external cost0.
+
+
+2026-10-12 00:25: GitHub REST exact PR23 checks/status repeatedly reset, final CI unknown, no merge or frozen-head change. Passed local DELETE chain retained without repetition. Independent read-only audit selected next minimal L06 list-failure recovery: main.tsx187 query has default retries, 339 error asks retry, no dedicated list retry control and general refresh192 does not invalidate question bank. Source finding only, not reproduced or fixed. Plan continuous injected list503 on uncached position, verify honest error/session/input/zero counters, then explicit same-condition retry actual200 and same-ID fields. Proxy-fault scope only; no model/business copy. Overall NOT_ACCEPTED, external cost0.
+
+
+2026-10-12 02:27: L06 list retry product fix in progress locally. Old UI explicit-retry test red1/pass11, initial fix12/12; independent review found real TanStack uncached refetch clears isError during pending, so updated test transitions listError=false and reproduced second red. Fixed visibility to listError OR isFetching; latest12/12, ESLint/typecheck/build/diff passed. main wires same-query questions.refetch, preserves inputs, fetching disables retry control. No API/DB/permission/cost changes. New image plus continuous503 -> held realGET200 browser and strict storage recovery NOT YET run; do not commit/claim acceptance before that. PR23 exact latestCI remains unknown after repeated GitHub resets, no merge/frozen-head change. Overall NOT_ACCEPTED, external cost0.
+
+
+2026-10-12 04:25: PR23 exact963c7ce six latest checks success, merged and remote main verified37bd61cc3f04b12f38798830a3582d7c236bc67b, agent-lab fast-forwarded. List retry new image cd4729ae4618edc7ef4e257f0edeb33402870a7939d8add63ed45450c1c1de09 first full chain exit0: API82/82, browser, strict PG/Milvus/Qdrant restoration PASS. Independent review reliability corrections included before browser run; components12/12/lint/type/build/diff pass. Report LAB_QUESTION_LIST_RETRY_EVIDENCE.md. New retry button inventory reconciliation outstanding; do not reinterpret existing980 as new coverage. Preparing separate accepted-stage commit/new CI; overall NOT_ACCEPTED, external cost0.

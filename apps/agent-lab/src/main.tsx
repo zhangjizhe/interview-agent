@@ -338,6 +338,9 @@ function ControlCenter() {
           searchResults={questionSearch ? JSON.parse(questionSearch) as QuestionBankItem[] : null}
           message={questionMessage || (questions.isError ? '题库暂不可用，请重试；未将读取失败显示为空数据。' : '')}
           loading={questions.isLoading}
+          listError={questions.isError}
+          retrying={questions.isFetching}
+          onRetryList={() => { void questions.refetch(); }}
           searching={questionSearching}
           onQuery={(value) => { clearQuestionSearch(); setQuestionQuery(value); }}
           onPosition={(value) => { clearQuestionSearch(); setQuestionPosition(value); }}
