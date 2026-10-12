@@ -4,6 +4,36 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuestionBankWorkspace } from '../../../agent-lab/src/QuestionBankWorkspace';
 
+describe('question creation requires a complete success receipt', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it.each([
+    [200, '{"success":false,"questionId":"synthetic"}'],
+    [201, '{"questionId":"synthetic"}'],
+    [201, '{"success":true}'],
+    [201, '{"success":true,"questionId":"   "}'],
+    [201, '{"success":true,"questionId":17}'],
+    [201, 'invalid-json'],
+  ])('retains draft for malformed HTTP %s receipt %s', async (status, body) => {
+    const transport = vi.fn().mockResolvedValue(new Response(body as string, { status: status as number }));
+    vi.stubGlobal('fetch', transport);
+    const clear = vi.fn();
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
+    render(<QueryClientProvider client={client}><QuestionBankWorkspace questions={[]} searchResults={null} query="preserve search" position="" message="" onQuery={vi.fn()} onPosition={vi.fn()} onSearch={vi.fn()} onClearSearch={clear}/></QueryClientProvider>);
+    fireEvent.click(screen.getByRole('button', { name: '新增题目', exact: true }));
+    const form = document.querySelector('form.question-bank-create')!;
+    const inputs = Array.from(form.querySelectorAll('input,textarea'));
+    const values = ['Synthetic', 'P6', 'Receipt', 'Synthetic question', 'Synthetic answer', 'receipt,fixture'];
+    inputs.forEach((input, index) => fireEvent.change(input, { target: { value: values[index] } }));
+    fireEvent.click(screen.getByRole('button', { name: '保存题目', exact: true }));
+    await screen.findByText(/题目保存未确认/);
+    await waitFor(() => expect(screen.getByRole('button', { name: '保存题目', exact: true })).toBeEnabled());
+    inputs.forEach((input, index) => { expect(input).toHaveValue(values[index]); expect(input).toBeEnabled(); });
+    expect(clear).not.toHaveBeenCalled(); expect(invalidate).not.toHaveBeenCalled();
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('question list explicit recovery', () => {
   it('offers same-condition retry and freezes repeated clicks while refetching', () => {
     const retry = vi.fn();
