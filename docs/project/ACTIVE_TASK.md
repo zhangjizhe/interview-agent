@@ -144,3 +144,15 @@ Create-receipt batch39fc36cd9b81f590c86ff7b9213e307f09a70603 pushed/origin verif
 
 
 2026-10-12 16:31: Real session revocation helper first full isolated chain exit0: API82/82, live new-key list401 after actual Redis logout, three session keys/UI removed, oldtoken real profile/adminwrite401, new login/profile200 with old token still401, zero provider/ledger increments, strict PG/Milvus/Qdrant recovery PASS. No HTTP fault injection or app changes; syntax/eslint/diff/independent review pass. Report LAB_SESSION_REVOCATION_EVIDENCE.md. Cached nonempty content/all cache items/TTL expiry/role change not covered. Preparing test-only accepted-stage commit/new CI, overall NOT_ACCEPTED, external cost0.
+
+
+Session revocation batch3d8ccba359ef501a5af97dd761cee896849878ca pushed/origin verified. GitHub PR list/create reset; PR creation outcome and latest CI unknown, not merged. Next read open agent-lab PR first, attach if present; create only after absence confirmed, then latest exact checks all success before merge/remote verification. Retain passed local chain without repetition; overall NOT_ACCEPTED, external cost0.
+
+
+2026-10-12 18:31: Prior session batch3d8ccba openPR/CI queries repeatedly reset, creation outcome unknown, frozen head unchanged/not merged. New minimal USER permission browser helper first full isolated chain exit0: real login200 USER/UI deny/no local keys, real dashboard+MCP POST403, forged localADMIN actual403/no control UI, unchanged globalprovider/fixtureadmin ledger, API82/82/all browser/strictPG+Milvus/Qdrant restore PASS. Independent review/lint/diff pass. Report LAB_USER_PERMISSION_EVIDENCE.md. Local candidate only; no app changes/paid models/business data. Do not claim allMCP configs/USER ledgers unchanged or no server session. Resolve prior PR then separate newcommit/newCI; overall NOT_ACCEPTED.
+
+
+2026-10-13 00:31: Network recovered; confirmed no open agent-lab PR, exact3d8ccba push3 CI success. Created/attached PR26 for real session revocation, new PR CI pending/not merged. USER permission candidate remains locally accepted but uncommitted, do not change frozenhead before PR26 final checks/merge. No repeat of passed unchanged verification, external cost0, overall NOT_ACCEPTED.
+
+
+2026-10-13 02:37: PR26 exact3d8ccba359ef501a5af97dd761cee896849878ca latest six checks success, merged and remote main verified2013605f76074b78dd78d7831a3bad98ba1975dd; agent-lab fast-forwarded. USER permission local candidate retains first isolated fullchain PASS/API82/browser/strictrestore and independent review/lint/diff; no app changes, no repeated type/build needed. Preparing separate accepted-stage commit/new CI excluding historical unrelated dirt. Overall NOT_ACCEPTED, external cost0.
