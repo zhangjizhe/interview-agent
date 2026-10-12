@@ -1,0 +1,9 @@
+# 普通用户与本地角色篡改边界
+
+隔离fixture-ci-owner普通用户通过真实登录HTTP200/roleUSER，Lab显示尚未管理员授权，不写三个本地会话键且不显示管理导航。独立context直接使用真实USER token读dashboard及POST MCP重载，均真实403。
+
+仅在该独立浏览器context伪造localStorage角色为ADMIN并保留USER token，刷新触发真实dashboard403，显示无法读取控制面且无导航或MCP重载按钮。服务器使用数据库当前角色及全局RolesGuard，拒绝发生在管理员controller操作前。本地角色不构成后台授权。403不清token是当前合同，最终关闭隔离context，不影响管理员浏览器。
+
+Provider全局计数与fixture-admin LLM_CALL账本计数前后不变；没有额外模型调用或外部费用。普通用户真实登录已创建服务器会话，不能声称未创建会话；未比较全部MCP配置或USER全账本，不宣称这些全部零变化。鉴权读取/限流计数不属于被拒绝的管理员操作。本轮不改产品/API/权限/数据库实现，不使用业务账号。
+
+语法/eslint/diff与独立审查通过，API82/82、完整浏览器和严格PostgreSQL恢复核对通过，实际Milvus/Qdrant恢复也通过，首次完整隔离链exit0。仅普通用户及本地角色伪造场景，不涵盖真实降权/跨组织切换或全产品。当前本地候选，尚未提交；前一会话撤销批次PR创建/CI状态受网络重置影响，须先确认，再为本批新提交运行最新CI。整体NOT_ACCEPTED。
