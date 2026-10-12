@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { verifyControlRecovery } from './lab-control-recovery.mjs';
 import { verifyQuestionEvidence } from './lab-question-evidence.mjs';
+import { verifySessionRevocation } from './lab-session-revocation-evidence.mjs';
 
 // This entry point is restricted to the synthetic Docker fixture, never a business account.
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic fixture authorization required');
@@ -119,6 +120,7 @@ try {
   await page.getByRole('button', { name: '登录控制台', exact: true }).click();
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
   console.log('PASS browser first-release denial, eleven navigation headings, logout/reload/new login');
+  await verifySessionRevocation(page, context, url);
   assert.deepEqual(errors, []);
   console.log('PASS isolated browser: login/create/draft/run/trace/dedupe/reload/workflow/question create/search/delete/answer');
 } catch (error) {
