@@ -4,6 +4,7 @@ import { verifyControlRecovery } from './lab-control-recovery.mjs';
 import { verifyQuestionEvidence } from './lab-question-evidence.mjs';
 import { verifySessionRevocation } from './lab-session-revocation-evidence.mjs';
 import { verifyUserPermission } from './lab-user-permission-evidence.mjs';
+import { verifyBuilderSavePending } from './lab-builder-save-pending-evidence.mjs';
 
 // This entry point is restricted to the synthetic Docker fixture, never a business account.
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic fixture authorization required');
@@ -48,7 +49,7 @@ try {
   await page.getByLabel('名称', { exact: true }).fill('browser-ci-agent');
   await page.getByLabel('唯一 key', { exact: true }).fill('browser-ci-agent');
   await page.getByLabel('系统提示', { exact: true }).fill('fixture-final');
-  await page.getByRole('button', { name: '创建并保存初始草稿', exact: true }).click();
+  await verifyBuilderSavePending(page, context, url);
   await textContains('草稿已保存');
   await page.getByLabel('测试输入', { exact: true }).fill('browser-ci-check');
   await page.getByLabel('确认按已保存版本启动模型调用及预算').check();

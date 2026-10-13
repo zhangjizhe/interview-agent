@@ -11,3 +11,5 @@
 .builder-confirm input { width:auto; }
 .builder-workspace pre { white-space:pre-wrap; overflow-wrap:anywhere; }
 @media(max-width:768px) { .builder-fields { grid-template-columns:1fr; } .builder-heading { flex-direction:column; } }
+
+.builder-workspace .builder-save-fields { display: grid; gap: 16px; border: 0; margin: 0; padding: 0; min-width: 0; }

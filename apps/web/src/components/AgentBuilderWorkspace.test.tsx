@@ -41,6 +41,30 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it('freezes save target and draft until a failed request restores editing', async () => {
+    let reject!: (error: Error) => void;
+    post.mockReturnValue(new Promise((_, fail) => { reject = fail; }));
+    mount(); await screen.findByRole('option', { name: 'Synthetic Agent · synthetic-agent' });
+    fireEvent.click(screen.getByRole('button', { name: '新增 Agent / 工作流' }));
+    fireEvent.change(screen.getByLabelText('名称'), { target: { value: 'Pending synthetic' } });
+    fireEvent.change(screen.getByLabelText('唯一 key'), { target: { value: 'pending-synthetic' } });
+    fireEvent.change(screen.getByLabelText('系统提示'), { target: { value: 'Preserve pending instruction' } });
+    fireEvent.click(screen.getByRole('button', { name: '创建并保存初始草稿' }));
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    await screen.findByRole('button', { name: '保存中' });
+    expect(screen.getByRole('button', { name: '新增 Agent / 工作流' })).toBeDisabled();
+    expect(screen.getByLabelText('选择 Agent')).toBeDisabled();
+    const form = document.querySelector('.builder-workspace form')!;
+    form.querySelectorAll('input,textarea,select,button').forEach(control => expect(control).toBeDisabled());
+    reject(new Error('Synthetic pending save failed'));
+    await screen.findByText('Synthetic pending save failed');
+    expect(screen.getByLabelText('名称')).toHaveValue('Pending synthetic');
+    expect(screen.getByLabelText('系统提示')).toHaveValue('Preserve pending instruction');
+    expect(screen.getByLabelText('选择 Agent')).toBeEnabled();
+    expect(screen.getByRole('button', { name: '新增 Agent / 工作流' })).toBeEnabled();
+    form.querySelectorAll('input,textarea,select').forEach(control => expect(control).toBeEnabled());
+    expect(post).toHaveBeenCalledTimes(1);
+  });
   it.each([{ rows: [] }, { rows: [{ id: 'delayed-run', status: 'COMPLETED' }] }])('shows loading instead of a false empty history until the response arrives (%j)', async ({ rows }) => {
     let complete!: (rows: any[]) => void;
     const deferred = new Promise<any[]>(resolve => { complete = resolve; });
