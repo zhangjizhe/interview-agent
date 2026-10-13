@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentBuilderWorkspace } from '../../../agent-lab/src/AgentBuilderWorkspace';
 const { transport } = vi.hoisted(() => ({ transport: vi.fn() }));
 vi.mock('../../../agent-lab/src/api', () => ({ api: transport }));
-const version = { id: 'saved-one', version: '1.0.0', status: 'DRAFT', systemPrompt: 'Saved instruction',
+const version = { id: 'saved-one', agentId: 'agent-one', version: '1.0.0', status: 'DRAFT', systemPrompt: 'Saved instruction',
   modelConfig: { provider: 'qwen', maxTokens: 32, temperature: 0 }, runtimeConfig: { adapter: 'single-agent-v1', maxEstimatedCostCny: 0.05, maxDurationMs: 10000 } };
 const agent = { id: 'agent-one', name: 'Synthetic Agent', key: 'synthetic-agent', type: 'CUSTOM', versions: [version] };
 let post: ReturnType<typeof vi.fn>;
@@ -41,6 +41,40 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it.each([
+    ['create', {}],
+    ['create', { id: '   ', versions: [{ ...version }] }],
+    ['create', { id: agent.id, versions: [] }],
+    ['create', { id: agent.id, versions: { 0: { ...version } } }],
+    ['create', { id: agent.id, versions: [{ ...version, id: '' }] }],
+    ['create', { id: agent.id, versions: [{ ...version, agentId: 'other-agent' }] }],
+    ['create', { id: agent.id, versions: [{ ...version, version: '9.9.9' }] }],
+    ['create', { id: agent.id, versions: [{ ...version, status: 'PUBLISHED' }] }],
+    ['version', {}],
+    ['version', { ...version, id: ' ' }],
+    ['version', { ...version, agentId: 'other-agent', version: '1.0.1' }],
+    ['version', { ...version, id: 'new-version', version: '9.9.9' }],
+    ['version', { ...version, version: '1.0.1', status: 'PUBLISHED' }],
+  ])('retains %s editor for incomplete save receipt %j', async (mode, receipt) => {
+    post.mockResolvedValue(receipt); mount();
+    if (mode === 'create') {
+      fireEvent.click(screen.getByRole('button', { name: '新增 Agent / 工作流' }));
+      fireEvent.change(screen.getByLabelText('名称'), { target: { value: 'Receipt synthetic' } });
+      fireEvent.change(screen.getByLabelText('唯一 key'), { target: { value: 'receipt-synthetic' } });
+    } else {
+      await selectSaved();
+      fireEvent.change(screen.getByLabelText('保存为版本'), { target: { value: '1.0.1' } });
+    }
+    fireEvent.change(screen.getByLabelText('系统提示'), { target: { value: 'Preserve receipt draft' } });
+    fireEvent.click(screen.getByRole('button', { name: mode === 'create' ? '创建并保存初始草稿' : '保存新版本草稿' }));
+    await screen.findByText(/草稿保存未确认/);
+    await waitFor(() => expect(screen.getByLabelText('系统提示')).toBeEnabled());
+    expect(screen.getByLabelText('系统提示')).toHaveValue('Preserve receipt draft');
+    expect(screen.queryByText(/草稿已保存/)).not.toBeInTheDocument();
+    if (mode === 'create') expect(screen.getByLabelText('名称')).toHaveValue('Receipt synthetic');
+    else expect(screen.getByLabelText('读取版本')).toHaveValue(version.id);
+    expect(post).toHaveBeenCalledTimes(1);
+  });
   it('freezes save target and draft until a failed request restores editing', async () => {
     let reject!: (error: Error) => void;
     post.mockReturnValue(new Promise((_, fail) => { reject = fail; }));
