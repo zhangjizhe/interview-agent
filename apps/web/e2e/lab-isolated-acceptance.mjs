@@ -5,6 +5,7 @@ import { verifyQuestionEvidence } from './lab-question-evidence.mjs';
 import { verifySessionRevocation } from './lab-session-revocation-evidence.mjs';
 import { verifyUserPermission } from './lab-user-permission-evidence.mjs';
 import { verifyBuilderSavePending } from './lab-builder-save-pending-evidence.mjs';
+import { verifyBuilderSaveReceipt } from './lab-builder-save-receipt-evidence.mjs';
 
 // This entry point is restricted to the synthetic Docker fixture, never a business account.
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic fixture authorization required');
@@ -45,6 +46,7 @@ try {
   await page.getByRole('heading', { name: 'Agent 与工作流编排', level: 1, exact: true }).waitFor();
   console.log('PASS overview: actual API fields, static boundary and two shortcut targets');
   await page.getByRole('button', { name: '运行编排', exact: true }).click();
+  await verifyBuilderSaveReceipt(page, context, url);
   await page.getByRole('button', { name: '新增 Agent / 工作流', exact: true }).click();
   await page.getByLabel('名称', { exact: true }).fill('browser-ci-agent');
   await page.getByLabel('唯一 key', { exact: true }).fill('browser-ci-agent');

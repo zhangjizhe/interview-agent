@@ -40,8 +40,19 @@ export function AgentBuilderWorkspace() {
     modelConfig: adapter === 'single-agent-v1' ? { provider, maxTokens, temperature } : {},
     runtimeConfig: { adapter, maxEstimatedCostCny: budget, maxDurationMs: duration, ...(adapter === 'finite-workflow-v1' ? { nodes } : {}) }, inputSchema, outputSchema });
   const save = useMutation({ mutationFn: async () => {
-    if (creating) return api('/agent-lab/configured-agents', { method: 'POST', body: JSON.stringify({ key, name, description, type: adapter === 'finite-workflow-v1' ? 'WORKFLOW' : 'CUSTOM', initialVersion: definition() }) });
-    return api(`/agent-lab/agents/${agentId}/versions`, { method: 'POST', body: JSON.stringify(definition()) });
+    const create = creating;
+    const targetAgentId = agentId;
+    const submitted = definition();
+    const result = create
+      ? await api('/agent-lab/configured-agents', { method: 'POST', body: JSON.stringify({ key, name, description, type: adapter === 'finite-workflow-v1' ? 'WORKFLOW' : 'CUSTOM', initialVersion: submitted }) })
+      : await api(`/agent-lab/agents/${targetAgentId}/versions`, { method: 'POST', body: JSON.stringify(submitted) });
+    const saved = create ? result?.versions?.[0] : result;
+    const validId = (value: unknown) => typeof value === 'string' && !!value.trim();
+    if ((create && !Array.isArray(result?.versions)) || !validId(result?.id) || !validId(saved?.id) || saved?.agentId !== (create ? result.id : targetAgentId)
+      || saved?.version !== submitted.version || saved?.status !== 'DRAFT') {
+      throw new Error('草稿保存未确认，请重新读取 Agent 和版本后核验，避免重复创建。');
+    }
+    return result;
   }, onSuccess: async result => {
     setConfirmed(false); pending.current = undefined;
     setFeedback('草稿已保存。正式版本未改变；请在下方选择保存的版本核验。');
