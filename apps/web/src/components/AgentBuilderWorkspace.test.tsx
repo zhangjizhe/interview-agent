@@ -41,6 +41,61 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it('freezes run target and input while start receipt is pending, restores after refusal', async () => {
+    let reject!: (error: Error) => void;
+    post.mockReturnValue(new Promise((_, fail) => { reject = fail; }));
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: '新增 Agent / 工作流' })).toBeDisabled();
+    expect(screen.getByLabelText('选择 Agent')).toBeDisabled();
+    expect(screen.getByLabelText('读取版本')).toBeDisabled();
+    expect(screen.getByLabelText('测试输入')).toBeDisabled();
+    expect(screen.getByLabelText('确认按已保存版本启动模型调用及预算')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '保存新版本草稿' })).toBeDisabled();
+    fireEvent.submit(document.querySelector('.builder-workspace form')!);
+    expect(post).toHaveBeenCalledTimes(1);
+    reject(new Error('Synthetic start receipt refused'));
+    await screen.findByText('Synthetic start receipt refused');
+    await waitFor(() => expect(screen.getByLabelText('选择 Agent')).toBeEnabled());
+    expect(screen.getByLabelText('读取版本')).toHaveValue(version.id);
+    expect(screen.getByLabelText('测试输入')).toHaveValue('Synthetic test input');
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+  it('freezes context during cancellation and restores its run after refusal', async () => {
+    runState = { ...runState, status: 'RUNNING' };
+    const original = transport.getMockImplementation()!;
+    transport.mockImplementation((path: string, options?: any) => path.startsWith('/agent-lab/runs?') ? Promise.resolve([{ id: 'run-one', status: 'RUNNING' }]) : original(path, options));
+    post.mockResolvedValueOnce({ id: 'run-one', reused: false });
+    let reject!: (error: Error) => void;
+    post.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }));
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '取消运行' }));
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
+    expect(screen.getByLabelText('选择 Agent')).toBeDisabled();
+    expect(screen.getByLabelText('读取版本')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '新增 Agent / 工作流' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'run-one · RUNNING' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '保存新版本草稿' })).toBeDisabled();
+    reject(new Error('Synthetic cancel receipt refused'));
+    await screen.findByText('Synthetic cancel receipt refused');
+    await waitFor(() => expect(screen.getByLabelText('选择 Agent')).toBeEnabled());
+    expect(screen.getByText('运行 run-one')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: version.id } });
+    expect(screen.queryByText('运行 run-one')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'run-one · RUNNING' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled());
+  });
+  it('removes the previous selected run when loading another saved version', async () => {
+    const other = { ...version, id: 'other-version', version: '1.0.1' }; agent.versions.push(other);
+    post.mockResolvedValue({ id: 'run-one', reused: false }); mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText('运行 run-one');
+    fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: other.id } });
+    expect(screen.queryByText('运行 run-one')).not.toBeInTheDocument();
+  });
   it.each(['new', 'agent', 'version', 'failed-next-save'])('does not reuse saved feedback for a changed context (%s)', async action => {
     const saved = { ...version, id: 'feedback-version', version: '1.0.1' };
     post.mockImplementationOnce(async () => { agent.versions.push(saved); return saved; });
