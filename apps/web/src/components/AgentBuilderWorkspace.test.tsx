@@ -41,6 +41,25 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it.each(['new', 'agent', 'version', 'failed-next-save'])('does not reuse saved feedback for a changed context (%s)', async action => {
+    const saved = { ...version, id: 'feedback-version', version: '1.0.1' };
+    post.mockImplementationOnce(async () => { agent.versions.push(saved); return saved; });
+    mount(); await selectSaved();
+    fireEvent.change(screen.getByLabelText('保存为版本'), { target: { value: '1.0.1' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本草稿' }));
+    await screen.findByText(/草稿已保存/);
+    await waitFor(() => expect(screen.getByLabelText('读取版本')).toBeEnabled());
+    if (action === 'new') fireEvent.click(screen.getByRole('button', { name: '新增 Agent / 工作流' }));
+    else if (action === 'agent') fireEvent.change(screen.getByLabelText('选择 Agent'), { target: { value: '' } });
+    else if (action === 'version') fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: version.id } });
+    else {
+      post.mockRejectedValueOnce(new Error('Synthetic next save refused'));
+      fireEvent.change(screen.getByLabelText('保存为版本'), { target: { value: '1.0.2' } });
+      fireEvent.click(screen.getByRole('button', { name: '保存新版本草稿' }));
+      await screen.findByText('Synthetic next save refused');
+    }
+    expect(screen.queryByText(/草稿已保存/)).not.toBeInTheDocument();
+  });
   it.each([
     ['create', {}],
     ['create', { id: '   ', versions: [{ ...version }] }],

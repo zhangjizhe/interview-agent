@@ -39,7 +39,7 @@ export function AgentBuilderWorkspace() {
   const definition = () => ({ version, systemPrompt: adapter === 'single-agent-v1' ? prompt : '',
     modelConfig: adapter === 'single-agent-v1' ? { provider, maxTokens, temperature } : {},
     runtimeConfig: { adapter, maxEstimatedCostCny: budget, maxDurationMs: duration, ...(adapter === 'finite-workflow-v1' ? { nodes } : {}) }, inputSchema, outputSchema });
-  const save = useMutation({ mutationFn: async () => {
+  const save = useMutation({ onMutate: () => { setFeedback(''); }, mutationFn: async () => {
     const create = creating;
     const targetAgentId = agentId;
     const submitted = definition();
@@ -66,6 +66,7 @@ export function AgentBuilderWorkspace() {
   }, onSuccess: result => { setRunId(result.id); setFeedback(result.reused ? '已读取原运行，不重复调用模型。' : '草稿测试已排队，可查询状态或取消。'); } });
   const cancel = useMutation({ mutationFn: () => api(`/agent-lab/runs/${runId}/cancel`, { method: 'POST' }), onSuccess: () => { setFeedback('取消已请求；在途调用仍需结算，后续节点停止。'); cache.invalidateQueries({ queryKey: ['builder-run'] }); } });
   function load(item: Version) {
+    setFeedback('');
     pending.current = undefined; setVersionId(item.id); setAdapter(item.runtimeConfig?.adapter ?? 'single-agent-v1'); setPrompt(item.systemPrompt);
     setProvider(item.modelConfig?.provider ?? 'qwen'); setMaxTokens(item.modelConfig?.maxTokens ?? 512); setTemperature(item.modelConfig?.temperature ?? 0.3);
     setBudget(item.runtimeConfig?.maxEstimatedCostCny ?? 0.05); setDuration(item.runtimeConfig?.maxDurationMs ?? 120000); setNodes(item.runtimeConfig?.nodes ?? []);
@@ -75,10 +76,10 @@ export function AgentBuilderWorkspace() {
   const errors = [agents.error, selected.error, models.error, versions.error, run.error, trace.error, history.error, save.error, start.error, cancel.error].filter(Boolean);
   return <section className="builder-workspace">
     <div className="builder-heading"><div><h2>Agent 与工作流</h2><p>配置保存为草稿；测试不会发布。工作流引用固定版本，按真实运行记录展示。</p></div>
-      <button disabled={save.isPending} onClick={() => { setConfirmed(false); pending.current = undefined; setRunId(''); setCreating(true); setAgentId(''); setVersionId(''); setName(''); setKey(''); setDescription(''); setVersion('1.0.0'); setPrompt(''); setAdapter('single-agent-v1'); setNodes([]); }}>新增 Agent / 工作流</button></div>
+      <button disabled={save.isPending} onClick={() => { setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setCreating(true); setAgentId(''); setVersionId(''); setName(''); setKey(''); setDescription(''); setVersion('1.0.0'); setPrompt(''); setAdapter('single-agent-v1'); setNodes([]); }}>新增 Agent / 工作流</button></div>
     {errors.map((error, index) => <p role="alert" className="agent-error" key={index}>{String((error as Error).message)}</p>)}
     {feedback && <p role="status">{feedback}</p>}
-    <label>选择 Agent<select disabled={save.isPending} value={agentId} onChange={event => { setConfirmed(false); pending.current = undefined; setRunId(''); setAgentId(event.target.value); setVersionId(''); setCreating(false); }}><option value="">请选择</option>{agents.data?.map(agent => <option value={agent.id} key={agent.id}>{agent.name} · {agent.key}</option>)}</select></label>
+    <label>选择 Agent<select disabled={save.isPending} value={agentId} onChange={event => { setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setAgentId(event.target.value); setVersionId(''); setCreating(false); }}><option value="">请选择</option>{agents.data?.map(agent => <option value={agent.id} key={agent.id}>{agent.name} · {agent.key}</option>)}</select></label>
     {!agents.isLoading && !agents.error && !agents.data?.length && <p>尚无自定义 Agent，点击新增并保存初始草稿。</p>}
     {agentId && <div><p>正式版本：{selected.data?.currentVersion?.version ?? '未发布'}</p><label>读取版本<select disabled={save.isPending} value={versionId} onChange={event => { const item = selected.data?.versions?.find(v => v.id === event.target.value); if (item) load(item); }}><option value="">选择版本</option>{selected.data?.versions?.map(item => <option key={item.id} value={item.id}>{item.version} · {item.status} · {item.runtimeConfig?.adapter}</option>)}</select></label></div>}
     {(creating || agentId) && <form onSubmit={event => { event.preventDefault(); if (!save.isPending) save.mutate(); }}><fieldset className="builder-save-fields" disabled={save.isPending}>

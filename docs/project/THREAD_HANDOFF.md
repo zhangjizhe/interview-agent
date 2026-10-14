@@ -241,3 +241,18 @@ Builder save-pending batchc307ff5fbe37f136cde853ec23336fd8e31c1940 pushed/origin
 
 
 2026-10-13 20:41: BUILDER-SAVE-RECEIPT new Lab8de82655fa99dcb6ea6492f0d055433ed0bb35251e856a70d639a86398f90e3d third fullchain exit0: API82/82/allbrowser/strictPG+Milvus/Qdrant restore PASS. First failure filledprompt wraplabel; second nativeoptionvisible instead ofattached, both retained/testissues not backend failures. Third realconfigured/newversion201 proxied200{} retainsdraft/selection, actualGET/reloadpersistedIDs/prompts/DRAFT/currentnull, two metadataPOST/noextra model. Components23/lint/type/build/diff and independent review pass; inventory982 preserves all IDs/reviews/evidence/verdict and101Builder mappings/hashaf0a8c60922bbeb4df1e155136913076e0453099db1a107e407a787c6c365702. Prepare separate acceptedstagecommit/newCI. Follow-up oldsuccessfeedback ownership on target change recorded, not fixed by thisfresh-editor test. Overall NOT_ACCEPTED/externalcost0/no businesscopy.
+
+
+Builder receipt batch64464b79d4a1455fff67461f07ba432eeb059ab0 pushed/origin verified. OpenPR lookup reset; no PR creation attempted in this run, latest CI unknown, not merged. Next first confirm open agent-lab PR; attach if present or create only after absence confirmed using prepared body, then exact-head all latestchecks success before merge/remote verification. Keep passed local evidence/no repeated checks. Overall NOT_ACCEPTED/externalcost0.
+
+
+2026-10-13 22:39: Network recovered, confirmed no open agent-lab PR, exact64464b7 push3 checks success. PR29 created/attached for save receipt identity; new PR CI pending/not merged. Next latest exact checks allsuccess then SHA-pinned merge/remote main, no repeated unchanged local verification. Overall NOT_ACCEPTED/externalcost0.
+
+
+2026-10-14 04:41: PR29 exact64464b79d4a1455fff67461f07ba432eeb059ab0 latest six checks success, confirmed open/main, merged and remote main verified33d3e0cee8ec7a956127a3640cfae4e4d89f530f. Agent-lab fast-forwarded; Builder save receipt identity limited-stage evidence merged. Overall/realquality/deployment NOT_ACCEPTED. Follow-up oldfeedback ownership on target/new-editor change remains next candidate; preserve historic unknown billing and oldquestion ownership prerequisites. No repeated checks or external model cost.
+
+
+2026-10-14 06:44: Single theme BUILDER-FEEDBACK-OWNERSHIP: old saved feedback remained on new/agent/version change and next failed save. Added4 red cases(old23pass); clearfeedback at new editor/agent/loadVersion and save.onMutate, final27/27 plus lint/type/build/diff pass. No API/DB/permissions/cost changes, requestkey behavior unchanged. New image/browser actual saved feedback thencontextchange/refusednextsave and strictstore NOT YET tested, local uncommitted/notaccepted. Inventory sourceattrs/line/hash coordination pending. Async start/cancel latefeedback is distinct follow-up audit, not covered by save tests. Overall NOT_ACCEPTED/externalcost0.
+
+
+2026-10-14 08:43: BUILDER-FEEDBACK-OWNERSHIP first full isolated chain exit0: API82/82/allbrowser/strictPG+Milvus/Qdrantrestore PASS. Four actual metadata versions201/GETDRAFT/currentnull, oldfeedback cleared on version/selectioncancel/new/nextproxy503 with failedversionretained/countunchanged, noextra model. Components27/lint/type/build/diff/independentreview PASS. Inventory982 oldIDs/allreviews/evidence/verdict preserved,101Builder AST/hash50a3e1b31c1433699753b5af365421a2ab1113483d79341748af428fbc28656c correct. Report LAB_BUILDER_FEEDBACK_EVIDENCE.md; asyncstartcancel/runcontext distinctpending. Prepare acceptedstagecommit/newCI, no API/DB/permission/costchange, externalcost0/overallNOT_ACCEPTED.
