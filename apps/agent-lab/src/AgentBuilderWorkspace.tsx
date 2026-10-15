@@ -115,6 +115,7 @@ export function AgentBuilderWorkspace() {
       <button disabled={busy || contextLocked} onClick={() => { pending.current = undefined; setFeedback('已准备新运行请求；下一次启动会重新调用模型。'); }}>准备新运行</button>
     </section>}
     {run.data && <section><h3>运行 {run.data.id}</h3><p>状态：{run.data.status} · {run.data.application}</p>
+      <p>运行 Agent：{run.data.agent?.name || '未记录'} · 固定版本：{run.data.agentVersion?.version || '未记录'}</p>
       <p>估算费用：{run.data.estimatedCost === null || run.data.estimatedCost === undefined ? '未知' : `${run.data.estimatedCost} CNY`} · 调用次数：{run.data.tokenUsage?.calls ?? '未知'}</p>
       {run.data.error && <p role="alert">{run.data.error}</p>}<button disabled={!busy || cancel.isPending} onClick={() => cancel.mutate()}>取消运行</button>
       {run.data.output?.response && <pre>{run.data.output.response}</pre>}

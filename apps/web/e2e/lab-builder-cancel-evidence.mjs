@@ -49,6 +49,35 @@ export async function verifyBuilderCancellation(page, context, origin, previous)
     await page.waitForFunction(() => Array.from(document.querySelectorAll('.builder-workspace button')).some(button => button.textContent === '取消运行' && !button.disabled));
     const active = await questionInputSnapshot();
     assert.equal(active.provider.chat, before.provider.chat + 1);
+    const createdVersion = await context.request.post(`${origin}/api/agent-lab/agents/${agentId}/versions`, {
+      headers,
+      data: { version: '1.0.1', systemPrompt: definition.systemPrompt, modelConfig: definition.modelConfig,
+        runtimeConfig: definition.runtimeConfig, inputSchema: definition.inputSchema, outputSchema: definition.outputSchema },
+    });
+    assert.equal(createdVersion.status(), 201);
+    const otherVersion = await createdVersion.json();
+    assert.equal(otherVersion.agentId, agentId); assert.equal(otherVersion.version, '1.0.1');
+    const agentSelect = page.locator('.builder-workspace > label select');
+    await agentSelect.selectOption('');
+    assert.equal(await page.getByRole('heading', { name: `运行 ${run.id}`, exact: true }).count(), 0);
+    assert.equal((await read()).status, 'RUNNING');
+    const reloadAgent = page.waitForResponse(response => new URL(response.url()).pathname === `/api/agent-lab/agents/${agentId}` && response.request().method() === 'GET');
+    void reloadAgent.catch(() => {});
+    await agentSelect.selectOption(agentId);
+    assert.equal((await reloadAgent).status(), 200);
+    await versions.locator(`option[value="${otherVersion.id}"]`).waitFor({ state: 'attached' });
+    await versions.selectOption(otherVersion.id);
+    await page.getByRole('heading', { name: '受控测试 · 1.0.1 · DRAFT', exact: true }).waitFor();
+    assert.equal(await page.getByRole('heading', { name: `运行 ${run.id}`, exact: true }).count(), 0);
+    const pinned = await read();
+    assert.equal(pinned.status, 'RUNNING'); assert.equal(pinned.agentVersionId, definition.id);
+    assert.equal(pinned.agentVersion.version, '1.0.0'); assert.equal(pinned.cancelRequestedAt, null);
+    await page.getByRole('button', { name: `${run.id} · RUNNING`, exact: true }).click();
+    await page.getByRole('heading', { name: `运行 ${run.id}`, exact: true }).waitFor();
+    await page.getByText('运行 Agent：browser-ci-agent · 固定版本：1.0.0', { exact: true }).waitFor();
+    assert.equal(await versions.inputValue(), otherVersion.id);
+    assert.deepEqual(await questionInputSnapshot(), active);
+    console.log('PASS RUNNING history provenance: actual draft1.0.1 editor, original run stays1.0.0, history restores its controls without new model work');
     const path = `${origin}/api/agent-lab/runs/${run.id}/cancel`;
     await page.route(path, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Synthetic cancel refused' }) }), { times: 1 });
     await page.getByRole('button', { name: '取消运行', exact: true }).click();
@@ -91,6 +120,7 @@ export async function verifyBuilderCancellation(page, context, origin, previous)
     for (const key of ['embedding', 'rerank', 'externalRequests']) assert.equal(after.provider[key], before.provider[key]);
     assert.equal(after.provider.externalRequests, 0);
     assert.equal(terminal.cancelRequestedAt != null, true);
+    assert.equal(terminal.agentVersionId, definition.id); assert.equal(terminal.agentVersion.version, '1.0.0');
     assert.equal((await fixtureModelHold('state')).waiting, false);
     console.log('PASS actual cancellation: RUNNING model held, refusal preserves state, held real cancel freezes context, release settles CANCELLED with one billed synthetic call; version clears old run and history restores it');
   } catch (error) { failed = true; throw error; } finally {
