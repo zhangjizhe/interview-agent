@@ -65,7 +65,9 @@ export function AgentBuilderWorkspace() {
     return api(`/agent-lab/agents/${agentId}/test-runs`, { method: 'POST', body: JSON.stringify({ input: { message }, agentVersionId: versionId, requestKey: pending.current.key }) });
   }, onSuccess: result => { setRunId(result.id); setFeedback(result.reused ? '已读取原运行，不重复调用模型。' : '草稿测试已排队，可查询状态或取消。'); } });
   const cancel = useMutation({ mutationFn: () => api(`/agent-lab/runs/${runId}/cancel`, { method: 'POST' }), onSuccess: () => { setFeedback('取消已请求；在途调用仍需结算，后续节点停止。'); cache.invalidateQueries({ queryKey: ['builder-run'] }); } });
+  const contextLocked = save.isPending || start.isPending || cancel.isPending;
   function load(item: Version) {
+    setRunId('');
     setFeedback('');
     pending.current = undefined; setVersionId(item.id); setAdapter(item.runtimeConfig?.adapter ?? 'single-agent-v1'); setPrompt(item.systemPrompt);
     setProvider(item.modelConfig?.provider ?? 'qwen'); setMaxTokens(item.modelConfig?.maxTokens ?? 512); setTemperature(item.modelConfig?.temperature ?? 0.3);
@@ -76,13 +78,13 @@ export function AgentBuilderWorkspace() {
   const errors = [agents.error, selected.error, models.error, versions.error, run.error, trace.error, history.error, save.error, start.error, cancel.error].filter(Boolean);
   return <section className="builder-workspace">
     <div className="builder-heading"><div><h2>Agent 与工作流</h2><p>配置保存为草稿；测试不会发布。工作流引用固定版本，按真实运行记录展示。</p></div>
-      <button disabled={save.isPending} onClick={() => { setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setCreating(true); setAgentId(''); setVersionId(''); setName(''); setKey(''); setDescription(''); setVersion('1.0.0'); setPrompt(''); setAdapter('single-agent-v1'); setNodes([]); }}>新增 Agent / 工作流</button></div>
+      <button disabled={contextLocked} onClick={() => { setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setCreating(true); setAgentId(''); setVersionId(''); setName(''); setKey(''); setDescription(''); setVersion('1.0.0'); setPrompt(''); setAdapter('single-agent-v1'); setNodes([]); }}>新增 Agent / 工作流</button></div>
     {errors.map((error, index) => <p role="alert" className="agent-error" key={index}>{String((error as Error).message)}</p>)}
     {feedback && <p role="status">{feedback}</p>}
-    <label>选择 Agent<select disabled={save.isPending} value={agentId} onChange={event => { setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setAgentId(event.target.value); setVersionId(''); setCreating(false); }}><option value="">请选择</option>{agents.data?.map(agent => <option value={agent.id} key={agent.id}>{agent.name} · {agent.key}</option>)}</select></label>
+    <label>选择 Agent<select disabled={contextLocked} value={agentId} onChange={event => { setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setAgentId(event.target.value); setVersionId(''); setCreating(false); }}><option value="">请选择</option>{agents.data?.map(agent => <option value={agent.id} key={agent.id}>{agent.name} · {agent.key}</option>)}</select></label>
     {!agents.isLoading && !agents.error && !agents.data?.length && <p>尚无自定义 Agent，点击新增并保存初始草稿。</p>}
-    {agentId && <div><p>正式版本：{selected.data?.currentVersion?.version ?? '未发布'}</p><label>读取版本<select disabled={save.isPending} value={versionId} onChange={event => { const item = selected.data?.versions?.find(v => v.id === event.target.value); if (item) load(item); }}><option value="">选择版本</option>{selected.data?.versions?.map(item => <option key={item.id} value={item.id}>{item.version} · {item.status} · {item.runtimeConfig?.adapter}</option>)}</select></label></div>}
-    {(creating || agentId) && <form onSubmit={event => { event.preventDefault(); if (!save.isPending) save.mutate(); }}><fieldset className="builder-save-fields" disabled={save.isPending}>
+    {agentId && <div><p>正式版本：{selected.data?.currentVersion?.version ?? '未发布'}</p><label>读取版本<select disabled={contextLocked} value={versionId} onChange={event => { const item = selected.data?.versions?.find(v => v.id === event.target.value); if (item) load(item); }}><option value="">选择版本</option>{selected.data?.versions?.map(item => <option key={item.id} value={item.id}>{item.version} · {item.status} · {item.runtimeConfig?.adapter}</option>)}</select></label></div>}
+    {(creating || agentId) && <form onSubmit={event => { event.preventDefault(); if (!contextLocked) save.mutate(); }}><fieldset className="builder-save-fields" disabled={save.isPending}>
       {creating && <div className="builder-fields"><label>名称<input required maxLength={120} value={name} onChange={e => setName(e.target.value)}/></label><label>唯一 key<input required pattern="[a-z][a-z0-9-]{1,63}" value={key} onChange={e => setKey(e.target.value)}/></label><label>用途<textarea maxLength={4000} value={description} onChange={e => setDescription(e.target.value)}/></label></div>}
       <div className="builder-fields"><label>保存为版本<input required pattern="[0-9]+\.[0-9]+\.[0-9]+" value={version} onChange={e => setVersion(e.target.value)}/></label>
       <label>执行方式<select value={adapter} onChange={e => setAdapter(e.target.value)}><option value="single-agent-v1">单 Agent</option><option value="finite-workflow-v1">有限工作流</option></select></label>
@@ -103,14 +105,14 @@ export function AgentBuilderWorkspace() {
           <button type="button" disabled={nodes.length >= 10} onClick={() => setNodes([...nodes, { id: `node-${nodes.length + 1}`, agentVersionId: '', inputFrom: nodes.length ? 'previous' : 'input' }])}>新增节点</button>
         </>}
       <p>输入：message 字符串；输出：response 字符串。每节点最多一次模型请求，禁用自动 fallback，工具/记忆绑定尚未开放。</p>
-      <button type="submit" disabled={save.isPending}>{save.isPending ? '保存中' : creating ? '创建并保存初始草稿' : '保存新版本草稿'}</button>
+      <button type="submit" disabled={contextLocked}>{save.isPending ? '保存中' : creating ? '创建并保存初始草稿' : '保存新版本草稿'}</button>
     </fieldset></form>}
     {savedVersion && ['single-agent-v1', 'finite-workflow-v1'].includes(savedVersion.runtimeConfig?.adapter) && <section><h3>受控测试 · {savedVersion.version} · {savedVersion.status}</h3>
       <p>运行使用已保存配置，与上方未保存编辑独立。估算总上限 {savedVersion.runtimeConfig.maxEstimatedCostCny} CNY；取消不能撤回在途请求，未知费用不计零。</p>
-      <label>测试输入<textarea maxLength={10000} value={message} onChange={e => { setMessage(e.target.value); setConfirmed(false); }}/></label>
-      <label className="builder-confirm"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)}/>确认按已保存版本启动模型调用及预算</label>
-      <button disabled={!confirmed || !message.trim() || start.isPending || busy} onClick={() => start.mutate()}>启动草稿测试</button>
-      <button disabled={busy || start.isPending} onClick={() => { pending.current = undefined; setFeedback('已准备新运行请求；下一次启动会重新调用模型。'); }}>准备新运行</button>
+      <label>测试输入<textarea disabled={start.isPending || cancel.isPending} maxLength={10000} value={message} onChange={e => { setMessage(e.target.value); setConfirmed(false); }}/></label>
+      <label className="builder-confirm"><input disabled={start.isPending || cancel.isPending} type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)}/>确认按已保存版本启动模型调用及预算</label>
+      <button disabled={!confirmed || !message.trim() || contextLocked || busy} onClick={() => start.mutate()}>启动草稿测试</button>
+      <button disabled={busy || contextLocked} onClick={() => { pending.current = undefined; setFeedback('已准备新运行请求；下一次启动会重新调用模型。'); }}>准备新运行</button>
     </section>}
     {run.data && <section><h3>运行 {run.data.id}</h3><p>状态：{run.data.status} · {run.data.application}</p>
       <p>估算费用：{run.data.estimatedCost === null || run.data.estimatedCost === undefined ? '未知' : `${run.data.estimatedCost} CNY`} · 调用次数：{run.data.tokenUsage?.calls ?? '未知'}</p>
@@ -118,6 +120,6 @@ export function AgentBuilderWorkspace() {
       {run.data.output?.response && <pre>{run.data.output.response}</pre>}
       <h4>节点与 Trace</h4><ol>{trace.data?.map(event => <li key={event.id}>{event.seq} · {event.type} · {event.step} {event.error && `· ${event.error}`}</li>)}</ol>
     </section>}
-    {agentId && <section><h3>运行记录</h3>{history.isLoading && <p role="status">正在读取运行记录…</p>}{history.isSuccess && Array.isArray(history.data) && history.data.length === 0 && <p>暂无运行</p>}{history.data?.map(item => <button key={item.id} onClick={() => setRunId(item.id)}>{item.id} · {item.status}</button>)}</section>}
+    {agentId && <section><h3>运行记录</h3>{history.isLoading && <p role="status">正在读取运行记录…</p>}{history.isSuccess && Array.isArray(history.data) && history.data.length === 0 && <p>暂无运行</p>}{history.data?.map(item => <button key={item.id} disabled={contextLocked} onClick={() => setRunId(item.id)}>{item.id} · {item.status}</button>)}</section>}
   </section>;
 }

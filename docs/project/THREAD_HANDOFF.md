@@ -256,3 +256,18 @@ Builder receipt batch64464b79d4a1455fff67461f07ba432eeb059ab0 pushed/origin veri
 
 
 2026-10-14 08:43: BUILDER-FEEDBACK-OWNERSHIP first full isolated chain exit0: API82/82/allbrowser/strictPG+Milvus/Qdrantrestore PASS. Four actual metadata versions201/GETDRAFT/currentnull, oldfeedback cleared on version/selectioncancel/new/nextproxy503 with failedversionretained/countunchanged, noextra model. Components27/lint/type/build/diff/independentreview PASS. Inventory982 oldIDs/allreviews/evidence/verdict preserved,101Builder AST/hash50a3e1b31c1433699753b5af365421a2ab1113483d79341748af428fbc28656c correct. Report LAB_BUILDER_FEEDBACK_EVIDENCE.md; asyncstartcancel/runcontext distinctpending. Prepare acceptedstagecommit/newCI, no API/DB/permission/costchange, externalcost0/overallNOT_ACCEPTED.
+
+
+Feedback batch8b78571ae9701d9594a7fa4bc97679d711c08f53 committed/pushed/originverified. OpenPR lookup reset, no PRcreate attempted thisrun, latestCI unknown/notmerged. Next confirm openagentlabPR, attachifpresent/createonlyafterconfirmedabsence from preparedbody; all latestexactCI green before SHAmerge/remotemain. Preserve passedunchanged verification; overallNOT_ACCEPTED/externalcost0.
+
+
+2026-10-14 14:43: Readonly CI permission review timed out; one allowed retry succeeded. Network recovered: no openagentlabPR, exact8b78571 push3 CI success. PR30 created/attached for feedback ownership, newPR CI pending/notmerged. Next all latest exactchecks success before SHA-pinned merge/remotemain, no repeated local checks. OverallNOT_ACCEPTED/externalcost0.
+
+
+2026-10-14 20:45: PR30 exact8b78571ae9701d9594a7fa4bc97679d711c08f53 latest six checks success, confirmed open/main, merged and remote main verifiedb9ac15bd51e496e595ee8d5853fa1cec29e64bb4; agent-lab fast-forwarded. Completed-save feedback ownership limited-stage evidence merged. Asyncstartcancel/oldruncontext remains next single candidate, not covered. Overall/realquality/deployment NOT_ACCEPTED, historicalbilling/oldquestionownership prerequisites retained; externalcost0/no repeated unchanged checks.
+
+
+2026-10-14 22:47: Single theme BUILDER-RUN-CONTEXT: deferredstart/cancel targetfreeze and loadVersion oldrun tests reproduced3red(old27pass). Local contextLocked(save/start/cancelpending) now protects new/Agent/version/history selection and save submit+guard; start/cancelpending freezes testinput/confirm, versionload clearsselectedrunId, failedrequest preservesdurablekey. Components30/30 incl save-submitzeroextraPOST and runninghistoryrecovery/cancelaccess; lint/type/build/diff pass. No backend/permission/cost changes, backgroundrun not cancelled by selection. New image/browser heldactualstart/cancel receipts/providerledger/persistence/strictrestore and inventory attrs/lines/hash NOT YET accepted; localuncommitted. LateAPI/malformedrun receipts/errorownership remaining follow-ups, not solved by freeze. OverallNOT_ACCEPTED/externalcost0.
+
+
+2026-10-15 00:51: BUILDER-RUN-CONTEXT newLabc4fa8a3065567a499161b9f2052eb7d337b74b053d938eb19bd5250d7d7ae34b second fullchain exit0: API82/82/allbrowser/strictPG+Milvus/Qdrant restore PASS. First incorrect201 assertion actualcontroller202 and routeuncaught preserved; fixed202/routeerror propagation. Real samekey reused202/GETcompletedcalls1 freezes target/input/save/completedhistory, zeroextra providerledger. Components30/lint/type/build/diff/independentreview PASS; inventory982/101Builder oldIDs/5review retained/hash8b1674fdfeb7083a021deb746c84440945c81a85db758524e0cc1070421ec453. Cancelpending/runninghistory/versionhide onlycomponent; realcancelUI pending follow-up, not fullacceptance. Prepareacceptedstagecommit/newCI, externalcost0/overallNOT_ACCEPTED.

@@ -1,0 +1,11 @@
+# 运行回执等待期间的上下文保护
+
+启动/取消HTTP在途时原界面仍可切换目标，保存也可能清在途请求键。局部contextLocked覆盖新增、Agent/版本选择、历史运行选择、保存提交和submit guard；测试输入/确认冻结，版本load清当前runId。失败恢复编辑并保留请求键；选择其它目标不取消后台运行，费用结算合同不变。
+
+组件三个旧红测（原27绿），修复30/30，包括启动/取消失败恢复、保存零额外POST、清版本旧运行、历史运行恢复取消入口；lint/type/build/diff通过。
+
+新增浏览器替代既有重复启动：不转发503保留同requestKey，再持有真实reused202回执，实际GET原COMPLETED运行/calls1，目标/输入/保存及COMPLETED历史按钮禁用，释放后恢复；Provider及fixture-admin账本无增量，不增加模型调用。拒绝是明确代理场景，不能冒充自然网络故障。
+
+第一链API82/82通过，但route断言误把实际controller HttpCode202当201，未经传递的断言中断浏览器；错误与诊断保留。已按实际合同修为202并传递route错误，第二完整链exit0，API82/82、全部浏览器、严格PG schema/行多集/sequence及实际Milvus/Qdrant恢复通过。Lab镜像sha256:c4fa8a3065567a499161b9f2052eb7d337b74b053d938eb19bd5250d7d7ae34b。限定阶段通过，尚未提交，需新精确CI后合并。
+
+实际取消在途、RUNNING历史恢复和版本切换清运行目前仅组件证据，本次浏览器不冒充这些全部通过。运行回执缺失/错误归属仍为后续主题。源码清单982原ID/审查/证据/verdict保留，101Builder节点guard属性和行/hash已独立复核，hash8b1674fdfeb7083a021deb746c84440945c81a85db758524e0cc1070421ec453。整体NOT_ACCEPTED，外部费用0，业务账号与旧题未动。

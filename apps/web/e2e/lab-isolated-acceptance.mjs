@@ -7,6 +7,7 @@ import { verifyUserPermission } from './lab-user-permission-evidence.mjs';
 import { verifyBuilderSavePending } from './lab-builder-save-pending-evidence.mjs';
 import { verifyBuilderSaveReceipt } from './lab-builder-save-receipt-evidence.mjs';
 import { verifyBuilderFeedback } from './lab-builder-feedback-evidence.mjs';
+import { verifyBuilderStartContext } from './lab-builder-run-context-evidence.mjs';
 
 // This entry point is restricted to the synthetic Docker fixture, never a business account.
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic fixture authorization required');
@@ -62,9 +63,7 @@ try {
   await textContains('model.end');
   assert.match(await page.locator('body').innerText(), /COMPLETED/);
   assert.doesNotMatch(await page.locator('body').innerText(), /估算费用：\s*未知/);
-  const reusedResponse = page.waitForResponse(response => /\/test-runs$/.test(response.url()) && response.request().method() === 'POST');
-  await page.getByRole('button', { name: '启动草稿测试', exact: true }).click();
-  const reused = await (await reusedResponse).json();
+  const reused = await verifyBuilderStartContext(page, context, url);
   assert.equal(reused.reused, true);
   await textContains('已读取原运行，不重复调用模型。');
   await page.reload();
