@@ -271,3 +271,15 @@ Feedback batch8b78571ae9701d9594a7fa4bc97679d711c08f53 committed/pushed/originve
 
 
 2026-10-15 00:51: BUILDER-RUN-CONTEXT newLabc4fa8a3065567a499161b9f2052eb7d337b74b053d938eb19bd5250d7d7ae34b second fullchain exit0: API82/82/allbrowser/strictPG+Milvus/Qdrant restore PASS. First incorrect201 assertion actualcontroller202 and routeuncaught preserved; fixed202/routeerror propagation. Real samekey reused202/GETcompletedcalls1 freezes target/input/save/completedhistory, zeroextra providerledger. Components30/lint/type/build/diff/independentreview PASS; inventory982/101Builder oldIDs/5review retained/hash8b1674fdfeb7083a021deb746c84440945c81a85db758524e0cc1070421ec453. Cancelpending/runninghistory/versionhide onlycomponent; realcancelUI pending follow-up, not fullacceptance. Prepareacceptedstagecommit/newCI, externalcost0/overallNOT_ACCEPTED.
+
+
+Runcontext batchdd41974deee405f4b2d86be1855b1d419ec67913 pushed/originverified. OpenPR lookupreset, noPRcreationattempted thisrun/latestCIunknown/notmerged. Next confirmopenagentlabPR, createonlyafterabsence orattachifpresent frompreparedbody; all latestexactCI green beforeSHAmerge/remotemain. Keep passedlocalchecks no repetition. OverallNOT_ACCEPTED/externalcost0.
+
+
+2026-10-15 08:57: Network recovered, noopenagentlabPR confirmed, exactdd41974 push3 CI success. PR31 created/attached for runcontext protection; newPRCI pending/notmerged. Next all latestexactchecks success beforeSHAmerge/remotemain. No repeatunchanged localchecks; actualcancelUI followup and overall/realquality/deployment NOT_ACCEPTED, externalcost0.
+
+
+2026-10-15 10:55: PR31 exactdd41974deee405f4b2d86be1855b1d419ec67913 latest six checks success, confirmedopen/main, merged and remote main verifiedf2917f46b4ebc09bbec74a6fdb48c19361797a4f; agent-lab fast-forwarded. Runcontext limitedstage merged; actualcancel UI/runninghistory/versionhide browser remain nextsingleacceptance theme, not retroactively accepted by startreuse evidence. Overall/realquality/deployment NOT_ACCEPTED; externalcost0/no repeated checks.
+
+
+2026-10-15 12:54: Real cancel UI second isolated fullchain exit0: API82/allbrowser/strictPG+Milvus/Qdrantrestore PASS. Firstcancelassertions passed but downstream filledinputexactlabel failed, preserved; fixedexplicittextarea, second also includes60s fixturehold fallback/cleanup preservingfirsterror. ActualRUNNING/chatbegun→cancelproxy503/no flag→heldrealcancel201/persistedflag/frozencontrols→releaseHTTP thenmodel→CANCELLED/chat+1/adminLLMledger+1/external0. Serialsinglemodel fixtureonly, no productionchange/immediateinterrupt/multinode/concurrentclaim. Completedhistory restored/loadsameversion hidesoldrun only; runninghistory/crossversion variantspending. UI0971 limitedPARTIAL/finalNOT_ACCEPTED inventory982. Independent review/lint/diff pass, existingappimage no repeatedtypebuild. Prepareteststagecommit/newCI, overallNOT_ACCEPTED/externalcost0.

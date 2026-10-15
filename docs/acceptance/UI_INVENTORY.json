@@ -15579,10 +15579,10 @@
       "tag": "button",
       "labelOrExpression": "<button disabled={!busy || cancel.isPending} onClick={() => cancel.mutate()}>取消运行</button>",
       "attributes": "disabled={!busy || cancel.isPending} onClick={() => cancel.mutate()}",
-      "productReview": "PENDING",
-      "apiPersistenceCheck": "PENDING",
-      "browserSecondCheck": "PENDING",
-      "evidence": null,
+      "productReview": "PARTIAL",
+      "apiPersistenceCheck": "PARTIAL",
+      "browserSecondCheck": "PARTIAL",
+      "evidence": "docs/acceptance/LAB_BUILDER_CANCELLATION_EVIDENCE.md",
       "verdict": "NOT_ACCEPTED"
     },
     {

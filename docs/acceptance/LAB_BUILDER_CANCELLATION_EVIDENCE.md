@@ -1,0 +1,11 @@
+# 已开始模型调用后的真实取消 UI
+
+仅私有离线模型夹具新增精确marker等待点、loopback状态/释放接口及60秒自动释放兜底；固定Docker容器名/数据库/mode guard的execFile调用，接口不代理到浏览器或生产网络。生产运行、Gateway、权限与计费代码不变。全局单槽仅用于串行单运行，不是并发取消验收。
+
+浏览器使用已有合成Agent显式准备新运行，真实test-runs202后确认模型等待点和RUNNING状态。先代理不转发cancel503，提示失败、取消按钮恢复，实际cancelRequestedAt仍null且模型/账本无额外变化；再实际cancel201写入cancelRequestedAt，持有回执核Agent/版本/新增/保存/取消/历史按钮禁用，实际GET确认标记持久化。释放HTTP回执显示在途仍结算提示，再释放模型，轮询真实CANCELLED并核UI终态，chat和fixture-admin LLM_CALL各增1，其余Provider计数不变且externalRequests0。取消不意味着撤回在途模型或退款，不以未结算快照计零。
+
+额外一次离线模型调用有合成账本，外部费用0。开始前加载版本清除原COMPLETED运行UI、历史按钮恢复原运行；再次加载同版本触发load清UI。这不是RUNNING历史恢复或跨不同版本全部条件验收，也不证明多节点停止或立即中断模型。
+
+首次新增取消断言通过/API82/82，但原下游工作流步骤精确测试输入label因新填充值超时，诊断保留，未记整链通过。改明确textarea定位后第二完整链exit0，同时覆盖带60秒兜底的夹具：API82/82、全部浏览器、严格PG schema/行多集/sequence与实际Milvus/Qdrant恢复通过。清理改为始终尝试释放且不覆盖首错。语法/eslint/diff及独立只读审查通过，无应用代码变化，不重复未变type/build。
+
+UI-0971取消按钮记为限定三字段PARTIAL，最终NOT_ACCEPTED，总982模板不变。当前阶段通过未提交，新精确提交CI成功后才合并。整体NOT_ACCEPTED，真实模型质量/部署/其余产品条件仍待验收，无业务账号/旧题复制。
