@@ -41,6 +41,30 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it('restores a running history item with its actual pinned version while editing another version', async () => {
+    const other = { ...version, id: 'another-version', version: '1.0.1' }; agent.versions.push(other);
+    runState = { ...runState, status: 'RUNNING', agentId: agent.id, agentVersionId: version.id, agent: { name: agent.name }, agentVersion: { id: version.id, version: version.version } };
+    const original = transport.getMockImplementation()!;
+    transport.mockImplementation((path: string, options?: any) => path.startsWith('/agent-lab/runs?') ? Promise.resolve([runState]) : original(path, options));
+    post.mockResolvedValue({ id: 'run-one', reused: false }); mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText('运行 run-one');
+    fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: other.id } });
+    expect(screen.queryByText('运行 run-one')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'run-one · RUNNING' }));
+    await screen.findByText(/固定版本：1.0.0/);
+    expect(screen.getByLabelText('读取版本')).toHaveValue(other.id);
+    expect(screen.getByText(/受控测试 · 1.0.1/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled();
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+  it('does not substitute the editor version for missing run provenance', async () => {
+    runState = { ...runState, agentVersion: null, agent: null };
+    post.mockResolvedValue({ id: 'run-one', reused: false }); mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText('运行 run-one');
+    await screen.findByText(/固定版本：未记录/);
+  });
   it('freezes run target and input while start receipt is pending, restores after refusal', async () => {
     let reject!: (error: Error) => void;
     post.mockReturnValue(new Promise((_, fail) => { reject = fail; }));

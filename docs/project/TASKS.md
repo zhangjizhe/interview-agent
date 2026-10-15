@@ -220,3 +220,21 @@ Runcontext batchdd41974deee405f4b2d86be1855b1d419ec67913 pushed/originverified. 
 
 
 2026-10-15 12:54: Real cancel UI second isolated fullchain exit0: API82/allbrowser/strictPG+Milvus/Qdrantrestore PASS. Firstcancelassertions passed but downstream filledinputexactlabel failed, preserved; fixedexplicittextarea, second also includes60s fixturehold fallback/cleanup preservingfirsterror. ActualRUNNING/chatbegun→cancelproxy503/no flag→heldrealcancel201/persistedflag/frozencontrols→releaseHTTP thenmodel→CANCELLED/chat+1/adminLLMledger+1/external0. Serialsinglemodel fixtureonly, no productionchange/immediateinterrupt/multinode/concurrentclaim. Completedhistory restored/loadsameversion hidesoldrun only; runninghistory/crossversion variantspending. UI0971 limitedPARTIAL/finalNOT_ACCEPTED inventory982. Independent review/lint/diff pass, existingappimage no repeatedtypebuild. Prepareteststagecommit/newCI, overallNOT_ACCEPTED/externalcost0.
+
+
+Realcancel batcha98b875d7fd445e8f4891d12d09f3c7557bcf51a committed/pushed/originverified; PR32 created/attached. NewexactheadCI pending/notmerged. Next all latestchecks success beforeSHAmerge/remotemain, no repeat unchangedlocalchecks. Preserve serialmodel/COMPLETEDhistory only evidence boundary, overallNOT_ACCEPTED/externalcost0.
+
+
+2026-10-15 14:56: PR32 exacta98b875 latest six checks allsuccess, confirmedopen/main. MergePUT connectionreset, remote main stillf2917f46b4ebc09bbec74a6fdb48c19361797a4f atcheck. Outcomeunconfirmed; first readonlyPRstate next before anyretry, verifyremotemain. Passed local realcancel evidence retained/no repeatedtests; overallNOT_ACCEPTED/externalcost0.
+
+
+2026-10-15 18:57: Readonly PR32 state/CI query automatic permission review timed out before execution; one allowed retry also timed out. Lower-privilege readonly gh alternative could not connect GitHub. No new remote evidence or merge action; PR32 outcome remains unknown from lastnetworkreset. No tests/model calls repeated, externalcost0. Next restore approval/network connectivity then readonlystate first; do not infer rejection as unsafe action or assume CI failure/merge. OverallNOT_ACCEPTED.
+
+
+2026-10-15 20:58: Readonly PR32 query permission review succeeded thisrun, but GitHub connection reset. Approval timeout no longer current blocker; remote state/merge outcome still unconfirmed. No mutation/tests/paid calls repeated; overallNOT_ACCEPTED/externalcost0.
+
+
+2026-10-15 23:04: Network recovered; PR32 confirmedopen exacta98b875/latest sixchecks success. Merged and remote main verified18cd82803706ac3a84352d594d98a1d97e6a138e; agent-lab fast-forwarded. Realcancel serialsinglemodel limitedstage nowmerged, not overallacceptance. Next RUNNINGhistory/crossversion recovery or runreceipt integrity single theme selection; preserve remainingboundaries incl realquality/deployment/oldquestionownership/historicunknownbilling. No repeated unchangedchecks/externalcost0/overallNOT_ACCEPTED.
+
+
+2026-10-16 01:01: RUN-PROVENANCE first fullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS. NewLabb90d0dbff7ba497fbaed8ea4ed49e206b0f6bdd7c514e3f89b406e867e57e936. ActualRUNNING1.0.0 stayspinned during metadata1.0.1/editorchange; historyrestoresoldrun with actualAgent/currentname/fixedversion1.0.0 whileeditor1.0.1; cancelsoldrun/terminalversionunchanged, stilloneofflinechat+ledger/external0. Components2red→32pass/linttypebuilddiff/independentreview PASS. Inventory983 oldIDs/5review preserved, newUI0983 limitedPARTIAL/finalNOT_ACCEPTED,102Builder AST/hashcf3e311276c99c127a5e70aed6fdfbf75752cbf24668b727c04dc06711870f42 checked. Report LAB_RUN_PROVENANCE_EVIDENCE.md. Prepare acceptedstagecommit/newCI, no API/DB/permissions/modelpathchange, overallNOT_ACCEPTED.
