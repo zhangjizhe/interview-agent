@@ -1,14 +1,23 @@
 import http from 'node:http';
 const stats = { chat: 0, embedding: 0, rerank: 0, externalRequests: 0 };
+let releaseHeldCall;
 http.createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url === '/fixture/stats') return res.end(JSON.stringify(stats));
+  if (req.url === '/fixture/hold-state') return res.end(JSON.stringify({ waiting: Boolean(releaseHeldCall) }));
+  if (req.url === '/fixture/release' && req.method === 'POST') {
+    releaseHeldCall?.(); return res.end(JSON.stringify({ released: true }));
+  }
   const chunks = []; for await (const chunk of req) chunks.push(chunk);
   const body = JSON.parse(Buffer.concat(chunks).toString() || '{}');
   if (req.url === '/v1/chat/completions') {
     stats.chat++;
     const prompt = body.messages?.[0]?.content ?? '';
     const message = body.messages?.at(-1)?.content ?? '';
+    if (message === 'fixture-hold-cancel') await new Promise(resolve => {
+      const timer = setTimeout(() => releaseHeldCall?.(), 60000);
+      releaseHeldCall = () => { clearTimeout(timer); releaseHeldCall = undefined; resolve(); };
+    });
     if (message.includes('fixture-delay')) await new Promise(resolve => setTimeout(resolve, 3000));
     const content = prompt.includes('fixture-route') ? 'route-yes' : `fixture-response:${message}`;
     return res.end(JSON.stringify({ id: 'synthetic', object: 'chat.completion', created: 1, model: body.model,

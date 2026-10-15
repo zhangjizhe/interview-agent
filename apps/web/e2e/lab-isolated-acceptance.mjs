@@ -8,6 +8,7 @@ import { verifyBuilderSavePending } from './lab-builder-save-pending-evidence.mj
 import { verifyBuilderSaveReceipt } from './lab-builder-save-receipt-evidence.mjs';
 import { verifyBuilderFeedback } from './lab-builder-feedback-evidence.mjs';
 import { verifyBuilderStartContext } from './lab-builder-run-context-evidence.mjs';
+import { verifyBuilderCancellation } from './lab-builder-cancel-evidence.mjs';
 
 // This entry point is restricted to the synthetic Docker fixture, never a business account.
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic fixture authorization required');
@@ -56,7 +57,7 @@ try {
   await page.getByLabel('系统提示', { exact: true }).fill('fixture-final');
   await verifyBuilderSavePending(page, context, url);
   await textContains('草稿已保存');
-  await page.getByLabel('测试输入', { exact: true }).fill('browser-ci-check');
+  await page.locator('.builder-workspace textarea[maxlength="10000"]').fill('browser-ci-check');
   await page.getByLabel('确认按已保存版本启动模型调用及预算').check();
   await page.getByRole('button', { name: '启动草稿测试', exact: true }).click();
   await textContains('fixture-response:browser-ci-check');
@@ -84,13 +85,14 @@ try {
   await textContains('fixture-response:browser-ci-check');
   await page.getByRole('button', { name: `${reused.id} · COMPLETED`, exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: / · COMPLETED$/ }).count(), 1, 'repeated submit must share one run');
+  await verifyBuilderCancellation(page, context, url, reused);
   await page.getByRole('combobox', { name: '选择 Agent', exact: true }).selectOption({ label: 'synthetic-workflow · synthetic-workflow' });
   await page.getByRole('combobox', { name: '读取版本', exact: true }).selectOption({ label: '1.0.0 · DRAFT · finite-workflow-v1' });
   assert.equal(await page.getByLabel('节点 ID', { exact: true }).count(), 3);
   await page.getByLabel('保存为版本', { exact: true }).fill('1.0.1');
   await page.getByRole('button', { name: '保存新版本草稿', exact: true }).click();
   await page.getByRole('heading', { name: '受控测试 · 1.0.1 · DRAFT', exact: true }).waitFor();
-  await page.getByLabel('测试输入', { exact: true }).fill('browser-workflow-check');
+  await page.locator('.builder-workspace textarea[maxlength="10000"]').fill('browser-workflow-check');
   await page.getByLabel('确认按已保存版本启动模型调用及预算').check();
   const workflowResponse = page.waitForResponse(response => /\/test-runs$/.test(response.url()) && response.request().method() === 'POST');
   await page.getByRole('button', { name: '启动草稿测试', exact: true }).click();
