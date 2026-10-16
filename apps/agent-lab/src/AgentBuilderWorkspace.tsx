@@ -59,10 +59,15 @@ export function AgentBuilderWorkspace() {
     if (creating) { setAgentId(result.id); setVersionId(result.versions[0].id); setCreating(false); } else setVersionId(result.id);
     await refresh();
   } });
-  const start = useMutation({ mutationFn: async () => {
+  const start = useMutation({ onMutate: () => { setFeedback(''); }, mutationFn: async () => {
     const signature = JSON.stringify({ agentId, versionId, message });
     if (pending.current?.signature !== signature) pending.current = { signature, key: crypto.randomUUID() };
-    return api(`/agent-lab/agents/${agentId}/test-runs`, { method: 'POST', body: JSON.stringify({ input: { message }, agentVersionId: versionId, requestKey: pending.current.key }) });
+    const result = await api(`/agent-lab/agents/${agentId}/test-runs`, { method: 'POST', body: JSON.stringify({ input: { message }, agentVersionId: versionId, requestKey: pending.current.key }) });
+    if (typeof result?.id !== 'string' || !result.id.trim() || typeof result.reused !== 'boolean'
+      || !['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'].includes(result.status)) {
+      throw new Error('运行启动未确认，请先核验运行记录；再次提交将复用同一请求键。');
+    }
+    return result;
   }, onSuccess: result => { setRunId(result.id); setFeedback(result.reused ? '已读取原运行，不重复调用模型。' : '草稿测试已排队，可查询状态或取消。'); } });
   const cancel = useMutation({ mutationFn: () => api(`/agent-lab/runs/${runId}/cancel`, { method: 'POST' }), onSuccess: () => { setFeedback('取消已请求；在途调用仍需结算，后续节点停止。'); cache.invalidateQueries({ queryKey: ['builder-run'] }); } });
   const contextLocked = save.isPending || start.isPending || cancel.isPending;
