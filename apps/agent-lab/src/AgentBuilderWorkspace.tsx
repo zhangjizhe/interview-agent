@@ -60,11 +60,18 @@ export function AgentBuilderWorkspace() {
     await refresh();
   } });
   const start = useMutation({ onMutate: () => { setFeedback(''); }, mutationFn: async () => {
-    const signature = JSON.stringify({ agentId, versionId, message });
+    const targetAgentId = agentId; const targetVersionId = versionId;
+    const signature = JSON.stringify({ agentId: targetAgentId, versionId: targetVersionId, message });
     if (pending.current?.signature !== signature) pending.current = { signature, key: crypto.randomUUID() };
-    const result = await api(`/agent-lab/agents/${agentId}/test-runs`, { method: 'POST', body: JSON.stringify({ input: { message }, agentVersionId: versionId, requestKey: pending.current.key }) });
+    const result = await api(`/agent-lab/agents/${targetAgentId}/test-runs`, { method: 'POST', body: JSON.stringify({ input: { message }, agentVersionId: targetVersionId, requestKey: pending.current.key }) });
     if (typeof result?.id !== 'string' || !result.id.trim() || typeof result.reused !== 'boolean'
       || !['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'].includes(result.status)) {
+      throw new Error('运行启动未确认，请先核验运行记录；再次提交将复用同一请求键。');
+    }
+    try {
+      const persisted = await api(`/agent-lab/runs/${result.id}`);
+      if (persisted?.id !== result.id || persisted?.agentId !== targetAgentId || persisted?.agentVersionId !== targetVersionId) throw new Error('Run binding mismatch');
+    } catch {
       throw new Error('运行启动未确认，请先核验运行记录；再次提交将复用同一请求键。');
     }
     return result;

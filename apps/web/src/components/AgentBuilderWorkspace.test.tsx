@@ -25,7 +25,7 @@ function confirmInput() {
   fireEvent.click(screen.getByLabelText('确认按已保存版本启动模型调用及预算'));
 }
 beforeEach(() => {
-  post = vi.fn(); runState = { id: 'run-one', status: 'COMPLETED', application: 'lab-draft-test', estimatedCost: null };
+  post = vi.fn(); runState = { id: 'run-one', agentId: 'agent-one', agentVersionId: 'saved-one', status: 'COMPLETED', application: 'lab-draft-test', estimatedCost: null };
   transport.mockReset().mockImplementation(async (path: string, options?: any) => {
     if (options?.method === 'POST') return post(path, JSON.parse(options.body ?? '{}'));
     if (path === '/agent-lab/agents') return [agent];
@@ -41,6 +41,41 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it.each(['403', '404', '503'])('retains the request key after start readback %s failure', async status => {
+    const original = transport.getMockImplementation()!;
+    let rejectRead = true;
+    transport.mockImplementation(async (path: string, options?: any) => {
+      if (path === '/agent-lab/runs/run-one' && rejectRead) throw new Error(`Synthetic read ${status}`);
+      return original(path, options);
+    });
+    post.mockResolvedValue({ id: 'run-one', status: 'COMPLETED', reused: true });
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText(/运行启动未确认/);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('heading', { name: '运行 run-one' })).not.toBeInTheDocument();
+    rejectRead = false;
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText('已读取原运行，不重复调用模型。');
+    expect(post.mock.calls[0][1].requestKey).toBe(post.mock.calls[1][1].requestKey);
+  });
+
+  it.each([
+    ['missing agent', { agentId: undefined }], ['wrong agent', { agentId: 'other-agent' }],
+    ['missing version', { agentVersionId: undefined }], ['wrong version', { agentVersionId: 'other-version' }],
+    ['wrong run', { id: 'other-run' }],
+  ])('rejects start readback with %s binding', async (_name, patch) => {
+    runState = { ...runState, ...patch };
+    post.mockResolvedValue({ id: 'run-one', status: 'COMPLETED', reused: true });
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText(/运行启动未确认/);
+    expect(screen.queryByText('已读取原运行，不重复调用模型。')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '运行 run-one' })).not.toBeInTheDocument();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('确认按已保存版本启动模型调用及预算')).toBeChecked();
+  });
+
   it.each(['version', 'agent', 'new'].flatMap(context => ['start', 'cancel'].map(operation => ({ context, operation }))))('clears completed $operation failure after $context context change', async ({ context, operation }) => {
     if (operation === 'cancel') {
       runState = { ...runState, status: 'RUNNING' };

@@ -49,6 +49,35 @@ export async function verifyBuilderStartContext(page, context, origin) {
     assert.equal(await page.getByText('草稿测试已排队，可查询状态或取消。', { exact: true }).count(), 0);
     assert.deepEqual(await questionInputSnapshot(), before);
   } finally { await page.unroute(path, broken); }
+  const runPath = `${origin}/api/agent-lab/runs/${brokenReceipt.id}`;
+  let rejectBinding;
+  const bindingFailure = new Promise((_, reject) => { rejectBinding = reject; });
+  void bindingFailure.catch(() => {});
+  const mismatch = async route => {
+    try {
+      const actual = await route.fetch({ timeout: 75000 }); assert.equal(actual.status(), 200);
+      const persisted = await actual.json();
+      assert.equal(persisted.id, brokenReceipt.id); assert.equal(persisted.agentId, id); assert.equal(persisted.agentVersionId, versionId);
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...persisted, agentVersionId: 'synthetic-wrong-version' }) });
+    } catch (error) { rejectBinding(error); await route.abort(); }
+  };
+  await page.route(runPath, mismatch, { times: 1 });
+  try {
+    const response = page.waitForResponse(item => item.url() === path && item.request().method() === 'POST');
+    void response.catch(() => {});
+    await page.getByRole('button', { name: '启动草稿测试', exact: true }).click();
+    const receiptResponse = await Promise.race([response, bindingFailure]);
+    assert.equal(receiptResponse.request().postDataJSON().requestKey, failedKey);
+    assert.equal((await receiptResponse.json()).reused, true);
+    await Promise.race([bindingFailure, page.getByRole('alert').filter({ hasText: '运行启动未确认' }).waitFor()]);
+    await page.waitForFunction(() => !document.querySelector('.builder-workspace > label select').disabled);
+    assert.equal(await page.getByText('已读取原运行，不重复调用模型。', { exact: true }).count(), 0);
+    assert.equal(await page.getByRole('heading', { name: `运行 ${brokenReceipt.id}`, exact: true }).count(), 1);
+    assert.equal(await page.locator('.builder-confirm input').isChecked(), true);
+    assert.equal(await page.locator('.builder-workspace textarea[maxlength="10000"]').inputValue(), message);
+    assert.deepEqual(await questionInputSnapshot(), before);
+    console.log('PASS start target binding: real reused202 then real GET200 proxied wrong version reports unknown, retains original run/input/key, zero model/ledger increments');
+  } finally { await page.unroute(runPath, mismatch); }
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   let arrived;

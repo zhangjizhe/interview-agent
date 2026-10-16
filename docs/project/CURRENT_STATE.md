@@ -338,3 +338,15 @@ CANCEL-RECEIPT batch840702b9651046b4066674c53acef559e06b3ca0 committed/pushed/or
 
 
 2026-10-16 19:20: ERROR-CONTEXT stage: threeoldsavecontextred→65pass incl sixpostfixstart/cancelcontextcases. Reset mutationerrors only explicitversion/Agent/new transition, pendinglocks retained; hidingerror notrollback/unknownresolution. Firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS, newsave503browserthreecontextchanges no persistedversion/provider/ledgerincrement. Lab14ba55c20f04ceddb64a3f4fceb852f41e9a0d9e3172040f9f32d22ec1cf3148; linttypebuilddiff/independent review/inventory983+102oldreviews PASS. Report LAB_ERROR_CONTEXT_EVIDENCE.md, browserstartcancelerrors notcovered. Preparestagecommit/CI/PR; externalcost0/overallNOT_ACCEPTED/realqualitydeploymentoldownershiphistoricbilling boundaries retained.
+
+
+ERROR-CONTEXT batch65e388c3c0d04d70299deb5438d6fbe217a739fe committed/pushed/originverified; PR36 created/attached. LatestexactheadCI in_progress, notmerged. Next allsixlatestchecks success before SHA-bound merge/remotemain verification. No repeatunchangedchecks; externalcost0/overallNOT_ACCEPTED.
+
+
+2026-10-16 21:16: PR36 readonlystate/exact65e388cCI queries both failed GitHub TCP connection reset. LatestCI outcome remains unknown; no merge attempted. No unchangedtests/modelcalls repeated, externalcost0. Next restore GitHub connectivity, read PR/head/latestchecks before any mutation; overallNOT_ACCEPTED.
+
+
+2026-10-16 23:20: PR36 exact65e388c3c0d04d70299deb5438d6fbe217a739fe latestsixchecks success, confirmedopen/main; SHA-bound merged and remote main verified9da9fb8686aa5755896d31aac3b3bc0a4d613514, agent-lab fast-forwarded. ERROR-CONTEXT limitedstage merged; overall/realquality/deployment NOT_ACCEPTED. No unchangedtests/modelcalls repeated/externalcost0. Next remainingstarttargetbinding or productacceptancegap selection; oldquestionownership/historicunknownbilling retained.
+
+
+2026-10-17 01:21: START-TARGET-BINDING stage:5oldred→73pass incl simulatedGET403404503/samekeyretry; captureAgent/version thenactualGET validateid/agentId/version before success, no automaticPOST, oldrun/key preserved onunknown. Firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS; actualreused202+GET200proxywrongversion unknownretainsoldrun/input/confirm, nextactualsamekeyrecovers/no providerledgerincrement. Labccefc4221d09acccce4294dee24d8a9bccbf9a0da0ae43a41a8ddfbc1e1c499f. linttypebuilddiff/independentreview/inventory983+102oldreview PASS. Report LAB_START_TARGET_BINDING_EVIDENCE.md; not fullrequestKey/inputcorrelation. Preparestagecommit/CI/PR; externalcost0/overallrealqualitydeploymentNOT_ACCEPTED/oldownershiphistoricunknownbilling retained.
