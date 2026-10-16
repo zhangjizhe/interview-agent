@@ -86,7 +86,9 @@ export function AgentBuilderWorkspace() {
     cache.invalidateQueries({ queryKey: ['builder-run'] });
   } });
   const contextLocked = save.isPending || start.isPending || cancel.isPending;
+  function clearOperationErrors() { save.reset(); start.reset(); cancel.reset(); }
   function load(item: Version) {
+    clearOperationErrors();
     setRunId('');
     setFeedback('');
     pending.current = undefined; setVersionId(item.id); setAdapter(item.runtimeConfig?.adapter ?? 'single-agent-v1'); setPrompt(item.systemPrompt);
@@ -98,10 +100,10 @@ export function AgentBuilderWorkspace() {
   const errors = [agents.error, selected.error, models.error, versions.error, run.error, trace.error, history.error, save.error, start.error, cancel.error].filter(Boolean);
   return <section className="builder-workspace">
     <div className="builder-heading"><div><h2>Agent 与工作流</h2><p>配置保存为草稿；测试不会发布。工作流引用固定版本，按真实运行记录展示。</p></div>
-      <button disabled={contextLocked} onClick={() => { setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setCreating(true); setAgentId(''); setVersionId(''); setName(''); setKey(''); setDescription(''); setVersion('1.0.0'); setPrompt(''); setAdapter('single-agent-v1'); setNodes([]); }}>新增 Agent / 工作流</button></div>
+      <button disabled={contextLocked} onClick={() => { clearOperationErrors(); setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setCreating(true); setAgentId(''); setVersionId(''); setName(''); setKey(''); setDescription(''); setVersion('1.0.0'); setPrompt(''); setAdapter('single-agent-v1'); setNodes([]); }}>新增 Agent / 工作流</button></div>
     {errors.map((error, index) => <p role="alert" className="agent-error" key={index}>{String((error as Error).message)}</p>)}
     {feedback && <p role="status">{feedback}</p>}
-    <label>选择 Agent<select disabled={contextLocked} value={agentId} onChange={event => { setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setAgentId(event.target.value); setVersionId(''); setCreating(false); }}><option value="">请选择</option>{agents.data?.map(agent => <option value={agent.id} key={agent.id}>{agent.name} · {agent.key}</option>)}</select></label>
+    <label>选择 Agent<select disabled={contextLocked} value={agentId} onChange={event => { clearOperationErrors(); setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setAgentId(event.target.value); setVersionId(''); setCreating(false); }}><option value="">请选择</option>{agents.data?.map(agent => <option value={agent.id} key={agent.id}>{agent.name} · {agent.key}</option>)}</select></label>
     {!agents.isLoading && !agents.error && !agents.data?.length && <p>尚无自定义 Agent，点击新增并保存初始草稿。</p>}
     {agentId && <div><p>正式版本：{selected.data?.currentVersion?.version ?? '未发布'}</p><label>读取版本<select disabled={contextLocked} value={versionId} onChange={event => { const item = selected.data?.versions?.find(v => v.id === event.target.value); if (item) load(item); }}><option value="">选择版本</option>{selected.data?.versions?.map(item => <option key={item.id} value={item.id}>{item.version} · {item.status} · {item.runtimeConfig?.adapter}</option>)}</select></label></div>}
     {(creating || agentId) && <form onSubmit={event => { event.preventDefault(); if (!contextLocked) save.mutate(); }}><fieldset className="builder-save-fields" disabled={save.isPending}>

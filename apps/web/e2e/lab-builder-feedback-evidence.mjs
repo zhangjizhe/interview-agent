@@ -50,5 +50,25 @@ export async function verifyBuilderFeedback(page, context, origin) {
     assert.equal(await success.count(), 0);
     assert.deepEqual(await questionInputSnapshot(), before);
   }
+  const failure = page.getByRole('alert').filter({ hasText: 'Synthetic next save refused' });
+  for (const action of ['version', 'agent', 'new']) {
+    if (action !== 'version') {
+      await page.route(`${origin}/api/agent-lab/agents/${id}/versions`, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Synthetic next save refused' }) }), { times: 1 });
+      await page.getByRole('button', { name: '保存新版本草稿', exact: true }).click();
+      await failure.waitFor();
+    }
+    await page.waitForFunction(() => !document.querySelector('.builder-workspace > label select').disabled);
+    const selectedVersion = await page.locator('.builder-workspace select').nth(1).inputValue();
+    const count = (await read()).versions.length;
+    if (action === 'version') await page.locator('.builder-workspace select').nth(1).selectOption(selectedVersion);
+    if (action === 'agent') await agentSelect.selectOption('');
+    if (action === 'new') await page.getByRole('button', { name: '新增 Agent / 工作流', exact: true }).click();
+    assert.equal(await failure.count(), 0);
+    assert.equal((await read()).versions.length, count);
+    assert.deepEqual(await questionInputSnapshot(), before);
+    await select(selectedVersion);
+    await page.getByLabel('保存为版本', { exact: true }).fill('1.0.6');
+  }
+  console.log('PASS completed save failure ownership: version/agent/new context transitions clear old error, no persisted version or provider/ledger increments');
   console.log('PASS saved feedback ownership: actual persisted drafts, version/agent/new switches and injected next-save503 clear prior success, zero model increment');
 }

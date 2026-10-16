@@ -256,3 +256,12 @@ Startreceipt batchbb1da671ae63c97b56c02fb914641b2d7b6bcef7 pushed/originverified
 
 
 2026-10-16 15:23: CANCEL-RECEIPT stage: old13red/43pass→56pass; matchingrun/fivestatus/canonicalISOflag, terminalexplicitnull no-op, malformedreceipt retainsrun/noautosubmit. Relevantlint/Labtypebuild/diff and independentreview PASS. Firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS; realcancel201→proxy201{} unknownresult, explicitretry samepersistedflag; sameoneofflinecall+ledger/externalcost0. Inventory983/102Builder oldIDs/reviews/verdict preserved/hash reconciled. Evidence LAB_CANCEL_RECEIPT_EVIDENCE.md; terminalnull onlycomponent, no fullquality/deployment acceptance. Preparestagecommit/newCI/PR; overallNOT_ACCEPTED, historicunknownbilling/oldquestionownership retained.
+
+
+CANCEL-RECEIPT batch840702b9651046b4066674c53acef559e06b3ca0 committed/pushed/originverified; PR35 created/attached. Exacthead CI query failed with GitHub TCP connection reset; no merge attempted, CI outcome unknown. Next read latest exacthead checks, allsixsuccess before SHA-bound merge/remotemain verification. Passed unchangedchecks not repeated; externalcost0/overallNOT_ACCEPTED.
+
+
+2026-10-16 17:10: PR35 exact840702b9651046b4066674c53acef559e06b3ca0 latestsixchecks success, confirmedopen/main; SHA-bound merged and remote main verified385e3e2bad2d2e61abbc10f0c4a20199e39548ce, agent-lab fast-forwarded. CANCEL-RECEIPT limitedstage merged. No unchangedtests repeated/externalcost0; overall/realquality/deployment NOT_ACCEPTED. Next select single remaining Builder errorownership or starttargetbinding theme; historicalunknownbilling/oldquestionownership prerequisites retained.
+
+
+2026-10-16 19:20: ERROR-CONTEXT stage: threeoldsavecontextred→65pass incl sixpostfixstart/cancelcontextcases. Reset mutationerrors only explicitversion/Agent/new transition, pendinglocks retained; hidingerror notrollback/unknownresolution. Firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS, newsave503browserthreecontextchanges no persistedversion/provider/ledgerincrement. Lab14ba55c20f04ceddb64a3f4fceb852f41e9a0d9e3172040f9f32d22ec1cf3148; linttypebuilddiff/independent review/inventory983+102oldreviews PASS. Report LAB_ERROR_CONTEXT_EVIDENCE.md, browserstartcancelerrors notcovered. Preparestagecommit/CI/PR; externalcost0/overallNOT_ACCEPTED/realqualitydeploymentoldownershiphistoricbilling boundaries retained.

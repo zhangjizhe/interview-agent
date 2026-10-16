@@ -41,6 +41,38 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it.each(['version', 'agent', 'new'].flatMap(context => ['start', 'cancel'].map(operation => ({ context, operation }))))('clears completed $operation failure after $context context change', async ({ context, operation }) => {
+    if (operation === 'cancel') {
+      runState = { ...runState, status: 'RUNNING' };
+      post.mockResolvedValueOnce({ id: 'run-one', status: 'PENDING', reused: false }).mockRejectedValueOnce(new Error('Synthetic old operation failed'));
+    } else post.mockRejectedValueOnce(new Error('Synthetic old operation failed'));
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    if (operation === 'cancel') {
+      await waitFor(() => expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled());
+      fireEvent.click(screen.getByRole('button', { name: '取消运行' }));
+    }
+    await screen.findByText('Synthetic old operation failed');
+    await waitFor(() => expect(screen.getByRole('button', { name: '新增 Agent / 工作流' })).toBeEnabled());
+    if (context === 'new') fireEvent.click(screen.getByRole('button', { name: '新增 Agent / 工作流' }));
+    else if (context === 'agent') fireEvent.change(screen.getByLabelText('选择 Agent'), { target: { value: '' } });
+    else fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: version.id } });
+    await waitFor(() => expect(screen.queryByText('Synthetic old operation failed')).not.toBeInTheDocument());
+    expect(post).toHaveBeenCalledTimes(operation === 'cancel' ? 2 : 1);
+  });
+  it.each(['version', 'agent', 'new'])('clears a completed save failure after changing %s context', async context => {
+    post.mockRejectedValue(new Error('Synthetic previous draft failed'));
+    mount(); await selectSaved();
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本草稿' }));
+    await screen.findByText('Synthetic previous draft failed');
+    await waitFor(() => expect(screen.getByRole('button', { name: '新增 Agent / 工作流' })).toBeEnabled());
+    if (context === 'new') fireEvent.click(screen.getByRole('button', { name: '新增 Agent / 工作流' }));
+    else if (context === 'agent') fireEvent.change(screen.getByLabelText('选择 Agent'), { target: { value: '' } });
+    else fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: version.id } });
+    await waitFor(() => expect(screen.queryByText('Synthetic previous draft failed')).not.toBeInTheDocument());
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ['null', null], ['empty', {}],
     ['wrong-id', { id: 'other-run', status: 'RUNNING', cancelRequestedAt: '2026-10-16T00:00:00.000Z' }],
