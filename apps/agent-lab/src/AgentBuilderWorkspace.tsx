@@ -69,7 +69,22 @@ export function AgentBuilderWorkspace() {
     }
     return result;
   }, onSuccess: result => { setRunId(result.id); setFeedback(result.reused ? '已读取原运行，不重复调用模型。' : '草稿测试已排队，可查询状态或取消。'); } });
-  const cancel = useMutation({ mutationFn: () => api(`/agent-lab/runs/${runId}/cancel`, { method: 'POST' }), onSuccess: () => { setFeedback('取消已请求；在途调用仍需结算，后续节点停止。'); cache.invalidateQueries({ queryKey: ['builder-run'] }); } });
+  const cancel = useMutation({ onMutate: () => setFeedback(''), mutationFn: async () => {
+    const targetRunId = runId;
+    const result = await api(`/agent-lab/runs/${targetRunId}/cancel`, { method: 'POST' });
+    const status = result?.status;
+    const flag = result?.cancelRequestedAt;
+    const recorded = typeof flag === 'string' && Number.isFinite(Date.parse(flag)) && new Date(flag).toISOString() === flag;
+    const terminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(status);
+    if (!targetRunId.trim() || result?.id !== targetRunId || !['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'].includes(status)
+      || (!recorded && !(terminal && flag === null))) {
+      throw new Error('取消结果未确认，请刷新运行状态后核验。');
+    }
+    return { status, recorded };
+  }, onSuccess: result => {
+    setFeedback(result.recorded ? '取消已请求；在途调用仍需结算，后续节点停止。' : `运行已结束（${result.status}），请核验最终状态；本次未确认取消请求。`);
+    cache.invalidateQueries({ queryKey: ['builder-run'] });
+  } });
   const contextLocked = save.isPending || start.isPending || cancel.isPending;
   function load(item: Version) {
     setRunId('');

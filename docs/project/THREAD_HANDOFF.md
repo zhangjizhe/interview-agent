@@ -310,3 +310,12 @@ Runprovenance batchc6a8521bc472f38ead4b23491b7208c28a0f4f2c committed/pushed/ori
 
 
 2026-10-16 09:03: START-RECEIPT first fullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS, newLab1f1e4a9fc73b371451ada4f8c80b639c0acba0a839dbcbe030e0b25c4351d568. Eight oldred→43components/linttypebuilddiff/independentreview PASS. Actualreused202→proxy202{} retainsoldrun/input/confirm/Agent/version/noqueueclaim, samekey explicitretry actualsamereusedID, zero model/ledger increments. Threefieldshape only, not targetIDbinding; browser{} and otherbadtypes/terminalreusecomponent. Inventory983 oldIDs/5reviews retained/102Builderhash125d9a7e75a9efb58bc331accb7652afbc2feb92ddc4e53ab43f2ab9358cccbf checked. Report LAB_START_RECEIPT_EVIDENCE.md. Prepare acceptedstagecommit/newCI; no API/DB/permission/billingpathchanges/externalcost0/overallNOT_ACCEPTED.
+
+
+Startreceipt batchbb1da671ae63c97b56c02fb914641b2d7b6bcef7 pushed/originverified; PR34 created/attached. NewexactheadCI pending/notmerged. Next all latestchecks success beforeSHAmerge/remotemain, preserve passedunchanged localchecks. OverallNOT_ACCEPTED/externalcost0.
+
+
+2026-10-16 13:08: PR34 exactbb1da671ae63c97b56c02fb914641b2d7b6bcef7 latest sixchecks success, confirmedopen/main, merged and remote main verified55ecae4365cf9da949b8449eead76c9f0c0efa56; agent-lab fast-forwarded. Startreceipt shape limitedstage merged, targetIDbinding/cancelreceipt/errorownership remain candidates. Overall/realquality/deployment NOT_ACCEPTED; externalcost0/no repeated unchangedchecks, historicunknownbilling/oldquestionownership prerequisites retained.
+
+
+2026-10-16 15:23: CANCEL-RECEIPT stage: old13red/43pass→56pass; matchingrun/fivestatus/canonicalISOflag, terminalexplicitnull no-op, malformedreceipt retainsrun/noautosubmit. Relevantlint/Labtypebuild/diff and independentreview PASS. Firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS; realcancel201→proxy201{} unknownresult, explicitretry samepersistedflag; sameoneofflinecall+ledger/externalcost0. Inventory983/102Builder oldIDs/reviews/verdict preserved/hash reconciled. Evidence LAB_CANCEL_RECEIPT_EVIDENCE.md; terminalnull onlycomponent, no fullquality/deployment acceptance. Preparestagecommit/newCI/PR; overallNOT_ACCEPTED, historicunknownbilling/oldquestionownership retained.

@@ -41,6 +41,43 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it.each([
+    ['null', null], ['empty', {}],
+    ['wrong-id', { id: 'other-run', status: 'RUNNING', cancelRequestedAt: '2026-10-16T00:00:00.000Z' }],
+    ['unknown-status', { id: 'run-one', status: 'UNKNOWN', cancelRequestedAt: '2026-10-16T00:00:00.000Z' }],
+    ['missing-flag', { id: 'run-one', status: 'RUNNING' }],
+    ['null-running-flag', { id: 'run-one', status: 'RUNNING', cancelRequestedAt: null }],
+    ['null-pending-flag', { id: 'run-one', status: 'PENDING', cancelRequestedAt: null }],
+    ['invalid-date', { id: 'run-one', status: 'RUNNING', cancelRequestedAt: 'not-a-date' }],
+    ['normalized-date', { id: 'run-one', status: 'RUNNING', cancelRequestedAt: '123' }],
+    ['missing-terminal-flag', { id: 'run-one', status: 'COMPLETED' }],
+  ])('does not claim cancellation for an incomplete receipt (%s)', async (_name, receipt) => {
+    runState = { ...runState, status: 'RUNNING' };
+    post.mockResolvedValueOnce({ id: 'run-one', status: 'PENDING', reused: false }).mockResolvedValueOnce(receipt);
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '取消运行' }));
+    await screen.findByText(/取消结果未确认/);
+    await waitFor(() => expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled());
+    expect(screen.getByText('运行 run-one')).toBeInTheDocument();
+    expect(screen.queryByText(/取消已请求/)).not.toBeInTheDocument();
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+  it.each(['COMPLETED', 'FAILED', 'CANCELLED'])('reports an already terminal %s run without claiming a new cancellation', async status => {
+    runState = { ...runState, status: 'RUNNING' };
+    post.mockResolvedValueOnce({ id: 'run-one', status: 'PENDING', reused: false }).mockImplementationOnce(async () => {
+      runState = { ...runState, status }; return { id: 'run-one', status, cancelRequestedAt: null };
+    });
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '取消运行' }));
+    await screen.findByText(`运行已结束（${status}），请核验最终状态；本次未确认取消请求。`);
+    await screen.findByText(`状态：${status} · lab-draft-test`);
+    expect(screen.queryByText(/取消已请求/)).not.toBeInTheDocument();
+    expect(post).toHaveBeenCalledTimes(2);
+  });
   it.each(['FAILED', 'CANCELLED'])('accepts a reused terminal %s receipt without preparing a new request', async status => {
     runState = { ...runState, status };
     post.mockResolvedValue({ id: 'run-one', status, reused: true });
@@ -93,7 +130,7 @@ describe('Agent builder independent product contracts', () => {
     runState = { ...runState, status: 'RUNNING', agentId: agent.id, agentVersionId: version.id, agent: { name: agent.name }, agentVersion: { id: version.id, version: version.version } };
     const original = transport.getMockImplementation()!;
     transport.mockImplementation((path: string, options?: any) => path.startsWith('/agent-lab/runs?') ? Promise.resolve([runState]) : original(path, options));
-    post.mockResolvedValue({ id: 'run-one', status: 'PENDING', reused: false }); mount(); await selectSaved(); confirmInput();
+    post.mockResolvedValueOnce({ id: 'run-one', status: 'PENDING', reused: false }).mockResolvedValue({ id: 'run-one', status: 'RUNNING', cancelRequestedAt: '2026-10-16T00:00:00.000Z' }); mount(); await selectSaved(); confirmInput();
     fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
     await screen.findByText('运行 run-one');
     fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: other.id } });
@@ -107,7 +144,7 @@ describe('Agent builder independent product contracts', () => {
   });
   it('does not substitute the editor version for missing run provenance', async () => {
     runState = { ...runState, agentVersion: null, agent: null };
-    post.mockResolvedValue({ id: 'run-one', status: 'PENDING', reused: false }); mount(); await selectSaved(); confirmInput();
+    post.mockResolvedValueOnce({ id: 'run-one', status: 'PENDING', reused: false }).mockResolvedValue({ id: 'run-one', status: 'RUNNING', cancelRequestedAt: '2026-10-16T00:00:00.000Z' }); mount(); await selectSaved(); confirmInput();
     fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
     await screen.findByText('运行 run-one');
     await screen.findByText(/固定版本：未记录/);
@@ -161,7 +198,7 @@ describe('Agent builder independent product contracts', () => {
   });
   it('removes the previous selected run when loading another saved version', async () => {
     const other = { ...version, id: 'other-version', version: '1.0.1' }; agent.versions.push(other);
-    post.mockResolvedValue({ id: 'run-one', status: 'PENDING', reused: false }); mount(); await selectSaved(); confirmInput();
+    post.mockResolvedValueOnce({ id: 'run-one', status: 'PENDING', reused: false }).mockResolvedValue({ id: 'run-one', status: 'RUNNING', cancelRequestedAt: '2026-10-16T00:00:00.000Z' }); mount(); await selectSaved(); confirmInput();
     fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
     await screen.findByText('运行 run-one');
     fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: other.id } });
@@ -337,7 +374,7 @@ describe('Agent builder independent product contracts', () => {
   });
   it('requests cancellation of a running job and describes in-flight billing', async () => {
     runState = { ...runState, status: 'RUNNING' };
-    post.mockResolvedValue({ id: 'run-one', status: 'PENDING', reused: false }); mount(); await selectSaved(); confirmInput();
+    post.mockResolvedValueOnce({ id: 'run-one', status: 'PENDING', reused: false }).mockResolvedValue({ id: 'run-one', status: 'RUNNING', cancelRequestedAt: '2026-10-16T00:00:00.000Z' }); mount(); await selectSaved(); confirmInput();
     fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled());
     expect(screen.getByRole('button', { name: '启动草稿测试' })).toBeDisabled();
