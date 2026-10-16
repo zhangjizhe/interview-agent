@@ -41,12 +41,59 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it.each(['FAILED', 'CANCELLED'])('accepts a reused terminal %s receipt without preparing a new request', async status => {
+    runState = { ...runState, status };
+    post.mockResolvedValue({ id: 'run-one', status, reused: true });
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText('已读取原运行，不重复调用模型。');
+    await screen.findByText(`状态：${status} · lab-draft-test`);
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+  it('retains an existing run when a later start receipt is incomplete and removes stale success', async () => {
+    post.mockResolvedValueOnce({ id: 'run-one', status: 'COMPLETED', reused: true }).mockResolvedValueOnce({});
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText('运行 run-one');
+    await waitFor(() => expect(screen.getByRole('button', { name: '启动草稿测试' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText(/运行启动未确认/);
+    expect(screen.getByText('运行 run-one')).toBeInTheDocument();
+    expect(screen.queryByText('已读取原运行，不重复调用模型。')).not.toBeInTheDocument();
+    expect(transport.mock.calls.some(call => call[0] === '/agent-lab/runs/undefined')).toBe(false);
+    expect(post.mock.calls[0][1].requestKey).toBe(post.mock.calls[1][1].requestKey);
+  });
+  it.each([
+    ['null', null], ['empty', {}],
+    ['blank-id', { id: ' ', status: 'PENDING', reused: false }],
+    ['numeric-id', { id: 1, status: 'PENDING', reused: false }],
+    ['missing-reused', { id: 'run-one', status: 'PENDING' }],
+    ['string-reused', { id: 'run-one', status: 'PENDING', reused: 'false' }],
+    ['missing-status', { id: 'run-one', reused: false }],
+    ['unknown-status', { id: 'run-one', status: 'UNKNOWN', reused: false }],
+  ])('keeps confirmation and request key for an incomplete start receipt (%s)', async (_name, receipt) => {
+    post.mockResolvedValueOnce(receipt).mockResolvedValue({ id: 'run-one', status: 'COMPLETED', reused: true });
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText(/运行启动未确认/);
+    await waitFor(() => expect(screen.getByRole('button', { name: '启动草稿测试' })).toBeEnabled());
+    expect(screen.queryByText(/草稿测试已排队/)).not.toBeInTheDocument();
+    expect(screen.queryByText('运行 run-one')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('测试输入')).toHaveValue('Synthetic test input');
+    expect(screen.getByLabelText('确认按已保存版本启动模型调用及预算')).toBeChecked();
+    expect(post).toHaveBeenCalledTimes(1);
+    const requestKey = post.mock.calls[0][1].requestKey; expect(requestKey).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText('已读取原运行，不重复调用模型。');
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(post.mock.calls[1][1].requestKey).toBe(requestKey);
+  });
   it('restores a running history item with its actual pinned version while editing another version', async () => {
     const other = { ...version, id: 'another-version', version: '1.0.1' }; agent.versions.push(other);
     runState = { ...runState, status: 'RUNNING', agentId: agent.id, agentVersionId: version.id, agent: { name: agent.name }, agentVersion: { id: version.id, version: version.version } };
     const original = transport.getMockImplementation()!;
     transport.mockImplementation((path: string, options?: any) => path.startsWith('/agent-lab/runs?') ? Promise.resolve([runState]) : original(path, options));
-    post.mockResolvedValue({ id: 'run-one', reused: false }); mount(); await selectSaved(); confirmInput();
+    post.mockResolvedValue({ id: 'run-one', status: 'PENDING', reused: false }); mount(); await selectSaved(); confirmInput();
     fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
     await screen.findByText('运行 run-one');
     fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: other.id } });
@@ -60,7 +107,7 @@ describe('Agent builder independent product contracts', () => {
   });
   it('does not substitute the editor version for missing run provenance', async () => {
     runState = { ...runState, agentVersion: null, agent: null };
-    post.mockResolvedValue({ id: 'run-one', reused: false }); mount(); await selectSaved(); confirmInput();
+    post.mockResolvedValue({ id: 'run-one', status: 'PENDING', reused: false }); mount(); await selectSaved(); confirmInput();
     fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
     await screen.findByText('运行 run-one');
     await screen.findByText(/固定版本：未记录/);
@@ -90,7 +137,7 @@ describe('Agent builder independent product contracts', () => {
     runState = { ...runState, status: 'RUNNING' };
     const original = transport.getMockImplementation()!;
     transport.mockImplementation((path: string, options?: any) => path.startsWith('/agent-lab/runs?') ? Promise.resolve([{ id: 'run-one', status: 'RUNNING' }]) : original(path, options));
-    post.mockResolvedValueOnce({ id: 'run-one', reused: false });
+    post.mockResolvedValueOnce({ id: 'run-one', status: 'PENDING', reused: false });
     let reject!: (error: Error) => void;
     post.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }));
     mount(); await selectSaved(); confirmInput();
@@ -114,7 +161,7 @@ describe('Agent builder independent product contracts', () => {
   });
   it('removes the previous selected run when loading another saved version', async () => {
     const other = { ...version, id: 'other-version', version: '1.0.1' }; agent.versions.push(other);
-    post.mockResolvedValue({ id: 'run-one', reused: false }); mount(); await selectSaved(); confirmInput();
+    post.mockResolvedValue({ id: 'run-one', status: 'PENDING', reused: false }); mount(); await selectSaved(); confirmInput();
     fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
     await screen.findByText('运行 run-one');
     fireEvent.change(screen.getByLabelText('读取版本'), { target: { value: other.id } });
@@ -224,7 +271,7 @@ describe('Agent builder independent product contracts', () => {
     expect(screen.getByLabelText('系统提示')).toHaveValue('Synthetic instruction');
   });
   it('uses the selected saved version despite unsaved edits and displays unknown cost honestly', async () => {
-    post.mockResolvedValue({ id: 'run-one', reused: false }); mount(); await selectSaved();
+    post.mockResolvedValue({ id: 'run-one', status: 'PENDING', reused: false }); mount(); await selectSaved();
     fireEvent.change(screen.getByLabelText('系统提示'), { target: { value: 'Unsaved instruction' } });
     fireEvent.change(screen.getByLabelText('总预算上限（估算 CNY）'), { target: { value: '0.99' } });
     expect(screen.getByText(/估算总上限 0.05 CNY/)).toBeInTheDocument();
@@ -235,7 +282,7 @@ describe('Agent builder independent product contracts', () => {
     expect(post.mock.calls[0][1]).not.toHaveProperty('runtimeConfig');
   });
   it('requires explicit confirmation and reuses the request key after an ambiguous start failure', async () => {
-    post.mockRejectedValueOnce(new Error('Synthetic response lost')).mockResolvedValue({ id: 'run-one', reused: true });
+    post.mockRejectedValueOnce(new Error('Synthetic response lost')).mockResolvedValue({ id: 'run-one', status: 'COMPLETED', reused: true });
     mount(); await selectSaved();
     expect(screen.getByRole('button', { name: '启动草稿测试' })).toBeDisabled();
     confirmInput(); fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
@@ -290,7 +337,7 @@ describe('Agent builder independent product contracts', () => {
   });
   it('requests cancellation of a running job and describes in-flight billing', async () => {
     runState = { ...runState, status: 'RUNNING' };
-    post.mockResolvedValue({ id: 'run-one', reused: false }); mount(); await selectSaved(); confirmInput();
+    post.mockResolvedValue({ id: 'run-one', status: 'PENDING', reused: false }); mount(); await selectSaved(); confirmInput();
     fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '取消运行' })).toBeEnabled());
     expect(screen.getByRole('button', { name: '启动草稿测试' })).toBeDisabled();

@@ -6,6 +6,8 @@ export async function verifyBuilderStartContext(page, context, origin) {
   assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
   assert.equal(origin, 'http://localhost:5176');
   const id = await page.locator('.builder-workspace > label select').inputValue();
+  const versionId = await page.locator('.builder-workspace select').nth(1).inputValue();
+  const message = await page.getByLabel('测试输入', { exact: false }).inputValue();
   const path = `${origin}/api/agent-lab/agents/${id}/test-runs`;
   const before = await questionInputSnapshot();
   let failedKey;
@@ -19,6 +21,34 @@ export async function verifyBuilderStartContext(page, context, origin) {
   await page.getByRole('alert').filter({ hasText: 'Synthetic start receipt unavailable' }).waitFor();
   await page.waitForFunction(() => { const input = document.querySelector('.builder-workspace .builder-confirm input'); return input && !input.disabled; });
   assert.deepEqual(await questionInputSnapshot(), before);
+  let brokenReceipt;
+  let rejectBroken;
+  const brokenFailure = new Promise((_, reject) => { rejectBroken = reject; });
+  void brokenFailure.catch(() => {});
+  const broken = async route => {
+    try {
+      assert.equal(route.request().postDataJSON().requestKey, failedKey);
+      const actual = await route.fetch({ timeout: 75000 }); assert.equal(actual.status(), 202);
+      brokenReceipt = await actual.json(); assert.equal(brokenReceipt.reused, true); assert.ok(brokenReceipt.id);
+      await route.fulfill({ status: 202, contentType: 'application/json', body: '{}' });
+    } catch (error) { rejectBroken(error); await route.abort(); }
+  };
+  await page.route(path, broken, { times: 1 });
+  try {
+    const response = page.waitForResponse(item => item.url() === path && item.request().method() === 'POST');
+    void response.catch(() => {});
+    await page.getByRole('button', { name: '启动草稿测试', exact: true }).click();
+    assert.equal((await Promise.race([response, brokenFailure])).status(), 202);
+    await page.getByRole('alert').filter({ hasText: '运行启动未确认' }).waitFor();
+    await page.waitForFunction(() => { const input = document.querySelector('.builder-workspace .builder-confirm input'); return input && !input.disabled; });
+    assert.equal(await page.getByRole('heading', { name: `运行 ${brokenReceipt.id}`, exact: true }).count(), 1);
+    assert.equal(await page.locator('.builder-confirm input').isChecked(), true);
+    assert.equal(await page.getByLabel('测试输入', { exact: false }).inputValue(), message);
+    assert.equal(await page.locator('.builder-workspace > label select').inputValue(), id);
+    assert.equal(await page.locator('.builder-workspace select').nth(1).inputValue(), versionId);
+    assert.equal(await page.getByText('草稿测试已排队，可查询状态或取消。', { exact: true }).count(), 0);
+    assert.deepEqual(await questionInputSnapshot(), before);
+  } finally { await page.unroute(path, broken); }
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   let arrived;
@@ -59,6 +89,7 @@ export async function verifyBuilderStartContext(page, context, origin) {
     release();
     await page.waitForFunction(() => { const select = document.querySelector('.builder-workspace > label select'); return select && !select.disabled; });
     assert.equal(calls, 1);
+    assert.equal(receipt.id, brokenReceipt.id);
     assert.deepEqual(await questionInputSnapshot(), before);
     console.log('PASS start context: injected receipt refusal retains key, held actual reused202 freezes target/input/save/history, persisted run and zero model/ledger increment');
     return receipt;

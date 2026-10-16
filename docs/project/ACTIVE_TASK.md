@@ -243,3 +243,12 @@ Realcancel batcha98b875d7fd445e8f4891d12d09f3c7557bcf51a committed/pushed/origin
 
 
 2026-10-16 01:01: RUN-PROVENANCE first fullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS. NewLabb90d0dbff7ba497fbaed8ea4ed49e206b0f6bdd7c514e3f89b406e867e57e936. ActualRUNNING1.0.0 stayspinned during metadata1.0.1/editorchange; historyrestoresoldrun with actualAgent/currentname/fixedversion1.0.0 whileeditor1.0.1; cancelsoldrun/terminalversionunchanged, stilloneofflinechat+ledger/external0. Components2red→32pass/linttypebuilddiff/independentreview PASS. Inventory983 oldIDs/5review preserved, newUI0983 limitedPARTIAL/finalNOT_ACCEPTED,102Builder AST/hashcf3e311276c99c127a5e70aed6fdfbf75752cbf24668b727c04dc06711870f42 checked. Report LAB_RUN_PROVENANCE_EVIDENCE.md. Prepare acceptedstagecommit/newCI, no API/DB/permissions/modelpathchange, overallNOT_ACCEPTED.
+
+
+Runprovenance batchc6a8521bc472f38ead4b23491b7208c28a0f4f2c committed/pushed/originverified; PR33 created/attached. NewexactheadCI pending/notmerged. Next all latestchecks success beforeSHAmerge/remotemain; keep passedunchanged localchecks. OverallNOT_ACCEPTED/externalcost0.
+
+
+2026-10-16 07:01: PR33 exactc6a8521bc472f38ead4b23491b7208c28a0f4f2c latest sixchecks success, confirmedopen/main, merged and remote main verified3e3da95bc617d0d3cb8fd2cbe4a8db1af7f97ade; agent-lab fast-forwarded. RUNNINGhistory/crossversion1.0.0→editor1.0.1/actualrunprovenance and oldruncancel limitedstage nowmerged. Overall/realquality/deployment NOT_ACCEPTED; runreceipt integrity/errorownership remain candidates. No repeated unchangedchecks/externalcost0.
+
+
+2026-10-16 09:03: START-RECEIPT first fullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS, newLab1f1e4a9fc73b371451ada4f8c80b639c0acba0a839dbcbe030e0b25c4351d568. Eight oldred→43components/linttypebuilddiff/independentreview PASS. Actualreused202→proxy202{} retainsoldrun/input/confirm/Agent/version/noqueueclaim, samekey explicitretry actualsamereusedID, zero model/ledger increments. Threefieldshape only, not targetIDbinding; browser{} and otherbadtypes/terminalreusecomponent. Inventory983 oldIDs/5reviews retained/102Builderhash125d9a7e75a9efb58bc331accb7652afbc2feb92ddc4e53ab43f2ab9358cccbf checked. Report LAB_START_RECEIPT_EVIDENCE.md. Prepare acceptedstagecommit/newCI; no API/DB/permission/billingpathchanges/externalcost0/overallNOT_ACCEPTED.
