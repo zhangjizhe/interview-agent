@@ -85,6 +85,27 @@ export async function verifyBuilderCancellation(page, context, origin, previous)
     await page.waitForFunction(() => Array.from(document.querySelectorAll('.builder-workspace button')).some(button => button.textContent === '取消运行' && !button.disabled));
     assert.equal((await read()).cancelRequestedAt, null);
     assert.deepEqual(await questionInputSnapshot(), active);
+    let brokenReceipt;
+    let rejectBroken;
+    const brokenFailure = new Promise((_, reject) => { rejectBroken = reject; });
+    void brokenFailure.catch(() => {});
+    await page.route(path, async route => {
+      try {
+        const actual = await route.fetch({ timeout: 75000 });
+        brokenReceipt = { status: actual.status(), body: await actual.json() };
+        await route.fulfill({ status: actual.status(), contentType: 'application/json', body: '{}' });
+      } catch (error) { rejectBroken(error); await route.abort(); }
+    }, { times: 1 });
+    await page.getByRole('button', { name: '取消运行', exact: true }).click();
+    await Promise.race([brokenFailure, page.getByRole('alert').filter({ hasText: '取消结果未确认，请刷新运行状态后核验。' }).waitFor()]);
+    assert.equal(brokenReceipt.status, 201);
+    assert.equal(brokenReceipt.body.id, run.id);
+    assert.ok(brokenReceipt.body.cancelRequestedAt);
+    assert.equal((await read()).cancelRequestedAt, brokenReceipt.body.cancelRequestedAt);
+    assert.equal(await page.getByText('取消已请求；在途调用仍需结算，后续节点停止。', { exact: true }).count(), 0);
+    await page.waitForFunction(() => Array.from(document.querySelectorAll('.builder-workspace button')).some(button => button.textContent === '取消运行' && !button.disabled));
+    assert.deepEqual(await questionInputSnapshot(), active);
+    console.log('PASS cancel receipt integrity: actual201 records flag, proxy201{} shows unknown result and retains explicit retry without model or ledger increments');
     let arrived;
     let rejected;
     const ready = new Promise((resolve, reject) => { arrived = resolve; rejected = reject; });
@@ -101,7 +122,7 @@ export async function verifyBuilderCancellation(page, context, origin, previous)
     await page.getByRole('button', { name: '取消运行', exact: true }).click();
     await Promise.race([ready, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Actual cancel receipt missing')), 75000); })]);
     clearTimeout(timeout);
-    assert.ok((await read()).cancelRequestedAt);
+    assert.equal((await read()).cancelRequestedAt, brokenReceipt.body.cancelRequestedAt);
     assert.equal(await page.locator('.builder-workspace > label select').isEnabled(), false);
     assert.equal(await versions.isEnabled(), false);
     for (const name of ['新增 Agent / 工作流', '保存新版本草稿', '取消运行']) assert.equal(await page.getByRole('button', { name, exact: true }).isEnabled(), false);
