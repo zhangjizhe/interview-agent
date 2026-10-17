@@ -298,3 +298,18 @@ START-TARGET-BINDING batch4b6cd647db944529000271d2580be3f0fc102fd5 committed/pus
 
 
 2026-10-17 13:27: START-REQUEST-BINDING stage:5oldred→78pass, POSTsnapshotkey/message+actualGETcheckkey/input.message/draftapplication; unknownpreservesoldrun/key/noautoPOST, noadditionalGET. Firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS, actualGETproxywrongrequestkey→unknown→samekeycorrectrecovery/providerledgerunchanged. Lab6bf77aee0c19aadd44c22f23e3021f155cb53993fba6229b122ca9fa8191acf0; linttypebuilddiff/independentfinalreview/inventory983+102oldreviews PASS. Report LAB_START_REQUEST_BINDING_EVIDENCE.md. Preparestagecommit/latestCI/PR; requestassociation not modelquality, externalcost0/overallrealqualitydeploymentNOT_ACCEPTED/legacyownershiphistoricunknownbilling retained.
+
+
+START-REQUEST-BINDING batch94546ec0dda9143ae96088d7d819c7bf17e411af committed/pushed/originverified; PR38 created/attached. LatestexactheadCI inprogress/notmerged. Next allsixlatestchecks success before SHAmerge/remotemain; no unchangedtests repeat/externalcost0/overallNOT_ACCEPTED.
+
+
+2026-10-17 15:19: PR38 readonlystate/exactheadCI both GitHub TCPreset; latestCIunknown/no merge attempted. Preservepassedunchangedchecks/no modelreplay/externalcost0/overallNOT_ACCEPTED. Next lateststate/checks after connectivity before any SHAmerge.
+
+
+2026-10-17 17:21: PR38 readonlystate/exactheadCI still GitHub TCPreset; unchangednetworkblocker, latestCIunknown/no merge. No unchangedtests or modelcalls repeated/externalcost0/overallNOT_ACCEPTED; next restoredconnectivity latestchecks before mutation.
+
+
+2026-10-17 19:22: PR38 exact94546ec0dda9143ae96088d7d819c7bf17e411af latestsixchecks success, confirmedopen/main; SHA-bound merged and remote main verifiedb43bf6098d1af07509c34f89276391512b3448a4, agent-lab fast-forwarded. START-REQUEST-BINDING limitedstage merged. No unchangedtests/modelcalls repeated/externalcost0; overall/realquality/deployment NOT_ACCEPTED. Next select remaining productacceptance gap; legacyquestionownership/historicunknownbilling remain unresolved.
+
+
+2026-10-17 21:29: L05 MCP-TOGGLE evidenceonly stage firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS. Newbuiltin actualtoggle201 heldpending/APIlistenabledfalse+count-1/disabledhealth200false+UIreason/reenablecountrestore; injected503noforward retainsstate, no providerledgerincrement. Existingimagesunchanged; syntax/diff/independentfinalreview PASS, no product/API/schema/permission changes/no new UI verdict. Report LAB_MCP_TOGGLE_EVIDENCE.md. Runtimeoverride onlyinmemory: restartdurability/multiprocesscoordination/externalprotocol/tool-execution/wholeL05 notaccepted; record asremaininggap, no businessswitch changed. Preparestagecommit/latestCI/PR; externalcost0/overallNOT_ACCEPTED, realqualitydeploymentlegacyownershiphistoricbilling remainopen.
