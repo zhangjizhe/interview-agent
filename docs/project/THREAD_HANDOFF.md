@@ -340,3 +340,24 @@ ERROR-CONTEXT batch65e388c3c0d04d70299deb5438d6fbe217a739fe committed/pushed/ori
 
 
 2026-10-17 01:21: START-TARGET-BINDING stage:5oldred→73pass incl simulatedGET403404503/samekeyretry; captureAgent/version thenactualGET validateid/agentId/version before success, no automaticPOST, oldrun/key preserved onunknown. Firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS; actualreused202+GET200proxywrongversion unknownretainsoldrun/input/confirm, nextactualsamekeyrecovers/no providerledgerincrement. Labccefc4221d09acccce4294dee24d8a9bccbf9a0da0ae43a41a8ddfbc1e1c499f. linttypebuilddiff/independentreview/inventory983+102oldreview PASS. Report LAB_START_TARGET_BINDING_EVIDENCE.md; not fullrequestKey/inputcorrelation. Preparestagecommit/CI/PR; externalcost0/overallrealqualitydeploymentNOT_ACCEPTED/oldownershiphistoricunknownbilling retained.
+
+
+START-TARGET-BINDING batch4b6cd647db944529000271d2580be3f0fc102fd5 committed/pushed/originverified. OpenPR readonlyquery failed GitHub TCPreset; PR notcreated thisrun, CI unknown/notmerged. Next queryexistingPR first, create/attach if none, all latestexactheadCI success before SHAmerge/remotemain. No unchangedchecks repeated/externalcost0/overallNOT_ACCEPTED.
+
+
+2026-10-17 03:19: START-TARGET-BINDING PR37 created/attached exact4b6cd647db944529000271d2580be3f0fc102fd5. PushCIthreechecks success; newlytriggeredPR lintqueued/dockerinprogress, latestallchecks notgreen/notmerged. Next latestall6success before SHA-bound merge/remotemain. No unchangedlocaltests/modelcalls repeated/externalcost0/overallNOT_ACCEPTED.
+
+
+2026-10-17 05:22: PR37 readonlystate and exactheadchecks requests both GitHub TCPreset. LatestCI/PRstate unconfirmed, no merge mutation attempted. No unchangedtests/paidcalls repeated; externalcost0/overallNOT_ACCEPTED. Next readonlylateststatechecks after connectivity restores before any SHAmerge.
+
+
+2026-10-17 07:17: PR37 readonlystate/exactheadCI still GitHub TCPreset, unchanged external blocker; no merge attempted or tests/modelcalls repeated. Externalcost0/overallNOT_ACCEPTED; next restore connectivity then latestchecks before mutation.
+
+
+2026-10-17 09:21: PR37 readonlystate/latestexactheadchecks still GitHub TCPreset. Unchangednetworkblocker, no merge/test/model replay. Externalcost0, overallNOT_ACCEPTED; latestchecks must be observed before any merge.
+
+
+2026-10-17 11:18: PR37 exact4b6cd647db944529000271d2580be3f0fc102fd5 latestsixchecks success, confirmedopen/main, SHA-bound merged; remote main verifiedbd6b7fb74063006f22184b2538e05cda24198136 and agent-lab fast-forwarded. START-TARGET-BINDING limitedstage merged. No unchangedtests/modelcalls repeated/externalcost0; overall/realquality/deployment NOT_ACCEPTED, requestKey/inputcorrelation notcovered. Next select single remaining productacceptance gap; legacyownership/historicunknownbilling retained.
+
+
+2026-10-17 13:27: START-REQUEST-BINDING stage:5oldred→78pass, POSTsnapshotkey/message+actualGETcheckkey/input.message/draftapplication; unknownpreservesoldrun/key/noautoPOST, noadditionalGET. Firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS, actualGETproxywrongrequestkey→unknown→samekeycorrectrecovery/providerledgerunchanged. Lab6bf77aee0c19aadd44c22f23e3021f155cb53993fba6229b122ca9fa8191acf0; linttypebuilddiff/independentfinalreview/inventory983+102oldreviews PASS. Report LAB_START_REQUEST_BINDING_EVIDENCE.md. Preparestagecommit/latestCI/PR; requestassociation not modelquality, externalcost0/overallrealqualitydeploymentNOT_ACCEPTED/legacyownershiphistoricunknownbilling retained.

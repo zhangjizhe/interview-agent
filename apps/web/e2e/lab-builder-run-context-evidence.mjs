@@ -49,6 +49,7 @@ export async function verifyBuilderStartContext(page, context, origin) {
     assert.equal(await page.getByText('草稿测试已排队，可查询状态或取消。', { exact: true }).count(), 0);
     assert.deepEqual(await questionInputSnapshot(), before);
   } finally { await page.unroute(path, broken); }
+  for (const corruption of ['version', 'request']) {
   const runPath = `${origin}/api/agent-lab/runs/${brokenReceipt.id}`;
   let rejectBinding;
   const bindingFailure = new Promise((_, reject) => { rejectBinding = reject; });
@@ -58,7 +59,9 @@ export async function verifyBuilderStartContext(page, context, origin) {
       const actual = await route.fetch({ timeout: 75000 }); assert.equal(actual.status(), 200);
       const persisted = await actual.json();
       assert.equal(persisted.id, brokenReceipt.id); assert.equal(persisted.agentId, id); assert.equal(persisted.agentVersionId, versionId);
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...persisted, agentVersionId: 'synthetic-wrong-version' }) });
+      assert.equal(persisted.requestKey, failedKey); assert.equal(persisted.input.message, message); assert.equal(persisted.application, 'lab-draft-test');
+      const patch = corruption === 'version' ? { agentVersionId: 'synthetic-wrong-version' } : { requestKey: 'synthetic-other-request' };
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...persisted, ...patch }) });
     } catch (error) { rejectBinding(error); await route.abort(); }
   };
   await page.route(runPath, mismatch, { times: 1 });
@@ -76,8 +79,9 @@ export async function verifyBuilderStartContext(page, context, origin) {
     assert.equal(await page.locator('.builder-confirm input').isChecked(), true);
     assert.equal(await page.locator('.builder-workspace textarea[maxlength="10000"]').inputValue(), message);
     assert.deepEqual(await questionInputSnapshot(), before);
-    console.log('PASS start target binding: real reused202 then real GET200 proxied wrong version reports unknown, retains original run/input/key, zero model/ledger increments');
+    console.log(`PASS start binding ${corruption}: real reused202 and GET200 proxied mismatched field, unknown result retains original run/input/key, zero model/ledger increments`);
   } finally { await page.unroute(runPath, mismatch); }
+  }
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   let arrived;

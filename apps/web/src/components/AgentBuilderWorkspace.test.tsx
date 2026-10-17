@@ -34,13 +34,35 @@ beforeEach(() => {
     if (path === `/agent-lab/agents/${agent.id}/versions`) return [version];
     if (path.startsWith('/agent-lab/runs?')) return [];
     if (path.endsWith('/trace')) return [];
-    if (path === '/agent-lab/runs/run-one') return runState;
+    if (path === '/agent-lab/runs/run-one') {
+      const submitted = post.mock.calls.slice().reverse().find(call => call[0].endsWith('/test-runs'))?.[1];
+      return { requestKey: submitted?.requestKey, input: submitted?.input, ...runState };
+    }
     throw new Error(`Unexpected synthetic path: ${path}`);
   });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); agent.versions.splice(1); });
 
 describe('Agent builder independent product contracts', () => {
+  it.each([
+    ['missing key', { requestKey: undefined }], ['wrong key', { requestKey: 'other-request' }],
+    ['missing input', { input: undefined }], ['wrong input', { input: { message: 'Other request input' } }],
+    ['wrong application', { application: 'lab-configured-run' }],
+  ])('does not acknowledge a start readback with %s', async (_name, patch) => {
+    runState = { ...runState, ...patch };
+    post.mockResolvedValue({ id: 'run-one', status: 'COMPLETED', reused: true });
+    mount(); await selectSaved(); confirmInput();
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText(/运行启动未确认/);
+    expect(screen.queryByText('已读取原运行，不重复调用模型。')).not.toBeInTheDocument();
+    expect(post).toHaveBeenCalledTimes(1);
+    const key = post.mock.calls[0][1].requestKey;
+    delete runState.requestKey; delete runState.input; runState.application = 'lab-draft-test';
+    fireEvent.click(screen.getByRole('button', { name: '启动草稿测试' }));
+    await screen.findByText('已读取原运行，不重复调用模型。');
+    expect(post.mock.calls[1][1].requestKey).toBe(key);
+  });
+
   it.each(['403', '404', '503'])('retains the request key after start readback %s failure', async status => {
     const original = transport.getMockImplementation()!;
     let rejectRead = true;
