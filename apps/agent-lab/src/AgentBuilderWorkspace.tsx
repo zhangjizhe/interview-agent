@@ -60,17 +60,20 @@ export function AgentBuilderWorkspace() {
     await refresh();
   } });
   const start = useMutation({ onMutate: () => { setFeedback(''); }, mutationFn: async () => {
-    const targetAgentId = agentId; const targetVersionId = versionId;
-    const signature = JSON.stringify({ agentId: targetAgentId, versionId: targetVersionId, message });
+    const targetAgentId = agentId; const targetVersionId = versionId; const submittedMessage = message;
+    const signature = JSON.stringify({ agentId: targetAgentId, versionId: targetVersionId, message: submittedMessage });
     if (pending.current?.signature !== signature) pending.current = { signature, key: crypto.randomUUID() };
-    const result = await api(`/agent-lab/agents/${targetAgentId}/test-runs`, { method: 'POST', body: JSON.stringify({ input: { message }, agentVersionId: targetVersionId, requestKey: pending.current.key }) });
+    const requestKey = pending.current.key;
+    const result = await api(`/agent-lab/agents/${targetAgentId}/test-runs`, { method: 'POST', body: JSON.stringify({ input: { message: submittedMessage }, agentVersionId: targetVersionId, requestKey }) });
     if (typeof result?.id !== 'string' || !result.id.trim() || typeof result.reused !== 'boolean'
       || !['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED'].includes(result.status)) {
       throw new Error('运行启动未确认，请先核验运行记录；再次提交将复用同一请求键。');
     }
     try {
       const persisted = await api(`/agent-lab/runs/${result.id}`);
-      if (persisted?.id !== result.id || persisted?.agentId !== targetAgentId || persisted?.agentVersionId !== targetVersionId) throw new Error('Run binding mismatch');
+      if (persisted?.id !== result.id || persisted?.agentId !== targetAgentId || persisted?.agentVersionId !== targetVersionId
+        || persisted?.requestKey !== requestKey || persisted?.application !== 'lab-draft-test'
+        || !persisted?.input || typeof persisted.input !== 'object' || Array.isArray(persisted.input) || persisted.input.message !== submittedMessage) throw new Error('Run binding mismatch');
     } catch {
       throw new Error('运行启动未确认，请先核验运行记录；再次提交将复用同一请求键。');
     }
