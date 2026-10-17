@@ -318,3 +318,18 @@ START-REQUEST-BINDING batch94546ec0dda9143ae96088d7d819c7bf17e411af committed/pu
 
 
 2026-10-17 21:29: L05 MCP-TOGGLE evidenceonly stage firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS. Newbuiltin actualtoggle201 heldpending/APIlistenabledfalse+count-1/disabledhealth200false+UIreason/reenablecountrestore; injected503noforward retainsstate, no providerledgerincrement. Existingimagesunchanged; syntax/diff/independentfinalreview PASS, no product/API/schema/permission changes/no new UI verdict. Report LAB_MCP_TOGGLE_EVIDENCE.md. Runtimeoverride onlyinmemory: restartdurability/multiprocesscoordination/externalprotocol/tool-execution/wholeL05 notaccepted; record asremaininggap, no businessswitch changed. Preparestagecommit/latestCI/PR; externalcost0/overallNOT_ACCEPTED, realqualitydeploymentlegacyownershiphistoricbilling remainopen.
+
+
+MCP-TOGGLE batch89f7974f27c2107db339876adcb3f1e1367fcf3b committed/pushed/originverified; PR39 created/attached. LatestexactheadCI inprogress/notmerged. Next allsixlatestchecks success before SHAmerge/remotemain; no unchangedchecks repeat/externalcost0/overallNOT_ACCEPTED.
+
+
+2026-10-17 23:23: PR39 readonlystate/exactheadCI both GitHub TCPreset. LatestCIunknown/no merge attempted. No unchangedtests/modelcalls repeated, externalcost0/overallNOT_ACCEPTED. Next readonlylateststatechecks after connectivity before SHAmerge.
+
+
+2026-10-18 01:28: PR39 readonlystate/exactheadCI still GitHub TCPreset; unchangednetworkblocker, no merge attempted/no tests or modelreplay. Externalcost0/overallNOT_ACCEPTED. Next lateststate/checks when connectivityrestored before mutation.
+
+
+2026-10-18 03:28: PR39 exact89f7974f27c2107db339876adcb3f1e1367fcf3b latestsixchecks success, confirmedopen/main; SHA-bound merged and remote main verified01148a804e596aca50536098baeb264c96502650, agent-lab fast-forwarded. MCP-TOGGLE limitedevidencestage merged. Runtimeoverrideinmemory/restartdurability/externalprotocol/tool-execution remainunaccepted; overall/realquality/deployment NOT_ACCEPTED. No unchangedtests/modelcalls repeated/externalcost0. Next singleproductgap selection; legacyownership/historicunknownbilling retained.
+
+
+2026-10-18 05:31: MCP-TOGGLE-RECEIPT stage: correctedtestsetupthen6oldred3pass→9pass; helperinputsnapshot/exactok/name/boolack/mainfeedbackreset, malformedunknown notrollback/noautoPOST. Firstfullchain exit0/API82/allbrowser/strictPG+MilvusQdrantrestore PASS. Actualdisable201→proxy201{} unknown/realstatefalse/nofalseupdated/no providerledgerincrement, explicitsamefalse+reenable restore. Lab73da2faf1b42369aa928af58b7142279aa482588982c601dcb93cf2efb2993dc; linttypebuildsyntaxdiff/independentfinalreview/inventory983oldreview PASS. Report LAB_MCP_RECEIPT_EVIDENCE.md. Preparestagecommit/newCI/PR; onlyprocessruntimeack/no restartdurability or externalprotocol acceptance, externalcost0/overallrealqualitydeploymentNOT_ACCEPTED/oldownershiphistoricbilling retained.

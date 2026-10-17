@@ -1,3 +1,4 @@
+import { toggleMcpServer } from './mcp-controls';
 import { AgentBuilderWorkspace } from './AgentBuilderWorkspace';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -197,12 +198,8 @@ function ControlCenter() {
     queryClient.invalidateQueries({ queryKey: ['agent-lab-operation-logs'] });
   };
   const toggle = useMutation({
-    mutationFn: ({ toolName, enabled }: { toolName: string; enabled: boolean }) =>
-      api('/admin/mcp-servers/toggle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toolName, enabled }),
-      }),
+    onMutate: () => setFeedback(''),
+    mutationFn: toggleMcpServer,
     onSuccess: (_result, variables) => {
       setFeedback(`${variables.toolName} 已更新。`);
       refresh();
