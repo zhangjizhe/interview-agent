@@ -23,6 +23,31 @@ export async function verifyMcpToggle(page, context, origin) {
   await failure.waitFor();
   assert.equal((await read()).servers.find(item => item.name === server.name).enabled, true);
   assert.deepEqual(await questionInputSnapshot(), before);
+  let rejectBroken;
+  const brokenFailure = new Promise((_, reject) => { rejectBroken = reject; });
+  void brokenFailure.catch(() => {});
+  const broken = async route => {
+    try {
+      const actual = await route.fetch({ timeout: 75000 }); assert.equal(actual.status(), 201);
+      assert.deepEqual(await actual.json(), { ok: true, toolName: server.name, enabled: false });
+      await route.fulfill({ status: 201, contentType: 'application/json', body: '{}' });
+    } catch (error) { rejectBroken(error); await route.abort(); }
+  };
+  await page.route(path, broken, { times: 1 });
+  try {
+    await row.getByRole('button', { name: '系统关闭', exact: true }).click();
+    await Promise.race([brokenFailure, page.getByText('MCP 开关结果未确认，请重新读取服务状态后核验。', { exact: false }).waitFor()]);
+    assert.equal((await read()).servers.find(item => item.name === server.name).enabled, false);
+    assert.equal(await page.getByText(`${server.name} 已更新。`, { exact: true }).count(), 0);
+    assert.deepEqual(await questionInputSnapshot(), before);
+    console.log('PASS MCP receipt: real disable201 proxied201{} reports unknown despite persisted runtime state, no false success or provider/ledger increment');
+  } catch (error) {
+    try {
+      const restored = await context.request.post(path, { headers, data: { toolName: server.name, enabled: true } });
+      if (restored.status() !== 201) console.error('MCP broken-receipt cleanup could not restore state');
+    } catch { console.error('MCP broken-receipt cleanup failed after original error'); }
+    throw error;
+  } finally { await page.unroute(path, broken); }
   let release;
   const gate = new Promise(resolve => { release = resolve; });
   let arrived; let rejected;
