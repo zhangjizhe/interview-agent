@@ -1,3 +1,4 @@
+import { verifyOperationLogs } from './lab-operation-log-evidence.mjs';
 import { verifyMcpToggle } from './lab-mcp-toggle-evidence.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
@@ -46,6 +47,7 @@ try {
   await page.getByRole('button', { name: '治理 MCP', exact: true }).click();
   await page.getByRole('heading', { name: 'MCP 与工具治理', level: 1, exact: true }).waitFor();
   await verifyMcpToggle(page, context, url);
+  await verifyOperationLogs(page, context, url);
   await page.getByRole('button', { name: '控制中心', exact: true }).click();
   await page.getByRole('button', { name: '查看编排', exact: true }).click();
   await page.getByRole('heading', { name: 'Agent 与工作流编排', level: 1, exact: true }).waitFor();
