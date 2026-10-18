@@ -14,7 +14,7 @@
 
 ## 按主题路由
 
-当前交付事实优先看 `docs/DELIVERY-REPORT-2026-10-08.md`。安全迁移从报告的公告/补丁与 `TASKS.md` 选定单一主题后，只检查对应依赖链与回归；六份旧上下文保留在 `archive/release-readiness-2026-10-08/`，不默认加载。
+当前重新验收事实优先看 `CURRENT_STATE.md` 与 `docs/acceptance/INTERNAL_PRE_RELEASE_STATUS.md`；`docs/DELIVERY-REPORT-2026-10-08.md` 是旧交付快照。安全迁移从报告的公告/补丁与 `TASKS.md` 选定单一主题后，只检查对应依赖链与回归；六份旧上下文保留在 `archive/release-readiness-2026-10-08/`，不默认加载。
 
 | 需求 | 优先阅读 | 再检查 |
 | --- | --- | --- |
