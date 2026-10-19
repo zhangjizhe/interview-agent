@@ -12,6 +12,6 @@
 8. 当前预览不能推定最新部署，生产/真实质量/全UI验收仍NOT_ACCEPTED。当前仪表仅内部预发布复核。
 9. 排除历史费用报告、旧截图及TASK-034本地未跟踪文件，不重置或提交。
 
-下一步：B0-EXTERNAL-INIT最小修复与fixture已完成，旧3红1绿/新相关15绿，首次新API/Lab完整链exit0/API85/浏览器/严格恢复及最终独立审查通过。待提交/推送/新PR及最新精确CI，绿后SHA合并/核main。API fde14c0e…、Lab29778e0b…完整digest见EXTERNAL_RUN_INITIALIZATION_EVIDENCE.md；数据库清理失败仍可留RUNNING，禁止称所有孤儿解决。早期误用test脚本/EPERM/ESMsetup错误已记录，无外部费用。
+下一步：B1a注册/分发限定阶段通过：27相关测试/lint/type/build、首新API实链89/全browser/严格PG向量恢复及独立终审。待提交推送/新PR及精确CI，绿后SHA合并核main。API fe3f6b14…、Lab29778e0b…完整digest见RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md；synthetic替代实现不是生产插件，统一事件/完整信封仍未做，整体NOT_ACCEPTED/外部费0。
 
 [旧交接完整快照](archive/reacceptance-2026-10-18/THREAD_HANDOFF.md) · [当前验收仪表](../acceptance/INTERNAL_PRE_RELEASE_STATUS.md)

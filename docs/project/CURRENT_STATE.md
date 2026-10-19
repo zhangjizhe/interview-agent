@@ -8,9 +8,13 @@
 
 2026-10-19 23:40远端同步核验：PR43最终head76e4274六项CI成功并合并1aeeec3；PR44精确a8fcb7d4dc3ae4e22e6080cd4c0e4945fa48a3e3六项CI成功并合并，远端main与agent-lab均为ce1813159c6e96ea9d0dab8bbebf07703a70b1cb，本地agent-lab已快进。此轮仅核对远端和同步，未本地重跑、未部署、未付费模型调用；采用新交接的B0及全自建规划剩余范围，整体NOT_ACCEPTED。
 
+## B1a适配器注册与实际分发
+
+RuntimeAdapterRegistry/Nest factory包装legacy/single/finite，实际runAgent经resolve→prepare→execute；状态/权限/版本/CAS/Trace/费用仍领域服务拥有。未知引擎/所需能力显式拒绝，不动态加载代码。相关27/27及lint/type/build、独立审核通过；首新API镜像实链API89/完整浏览器/严格PG向量恢复exit0，双构造期合成实现持久输出/版本/Trace并UI读回，实际Nest未知引擎400且不建Run。待新提交CI/PR，非完整B1/统一事件/完整信封/生产插件。证据RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md，外部费用0。
+
 ## B0外部Run初始化清理
 
-startExternalRun创建后必需user.message写入失败，条件FAILED收尾并保留原错；数据库清理失败仅脱敏事件、不保证完全消除孤儿。旧3红1绿→4/4、相关15/15/lint/type/build通过；新真实PG+API85/85/浏览器FAILED历史与未知费用/严格恢复首轮exit0，最终独立审核通过。待新提交CI/PR；不是自然DB故障/真实并发/全候选人链/完整B0验收。详见EXTERNAL_RUN_INITIALIZATION_EVIDENCE.md，外部费用0。
+startExternalRun创建后必需user.message写入失败，条件FAILED收尾并保留原错；数据库清理失败仅脱敏事件、不保证完全消除孤儿。旧3红1绿→4/4、相关15/15/lint/type/build通过；新真实PG+API85/85/浏览器FAILED历史与未知费用/严格恢复首轮exit0，最终独立审核通过。PR45精确66e735d六项CI成功，2026-10-20 05:39已合并并核远端main0698d168da5701f14de361e3906a896030818d41，agent-lab快进；不是自然DB故障/真实并发/全候选人链/完整B0验收。详见EXTERNAL_RUN_INITIALIZATION_EVIDENCE.md，外部费用0。
 
 ## 本轮完整规划与链路一致性
 

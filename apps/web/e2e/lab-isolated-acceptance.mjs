@@ -1,3 +1,4 @@
+import { verifyRuntimeAdapterHistory } from './lab-runtime-adapter-evidence.mjs';
 import { verifyExternalInitialization } from './lab-external-init-evidence.mjs';
 import { verifyOperationLogs } from './lab-operation-log-evidence.mjs';
 import { verifyMcpToggle } from './lab-mcp-toggle-evidence.mjs';
@@ -55,6 +56,7 @@ try {
   console.log('PASS overview: actual API fields, static boundary and two shortcut targets');
   await page.getByRole('button', { name: '运行编排', exact: true }).click();
   await verifyExternalInitialization(page, context, url);
+  await verifyRuntimeAdapterHistory(page, context, url);
   await verifyBuilderSaveReceipt(page, context, url);
   await verifyBuilderFeedback(page, context, url);
   await page.getByRole('button', { name: '新增 Agent / 工作流', exact: true }).click();
