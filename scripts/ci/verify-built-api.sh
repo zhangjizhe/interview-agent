@@ -78,6 +78,7 @@ docker cp scripts/ci/fixture-mcp-server.cjs "$fixture_api:/tmp/fixture-mcp-serve
 docker cp scripts/ci/verify-mcp-protocol.cjs "$fixture_api:/tmp/verify-mcp-protocol.cjs"
 docker exec -d "$fixture_api" node /tmp/fixture-mcp-server.cjs
 docker exec "$fixture_api" node /tmp/verify-mcp-protocol.cjs
+docker cp scripts/ci/verify-external-run-init.cjs "$fixture_api:/tmp/verify-external-run-init.cjs"
 docker cp scripts/ci/verify-training-loop.cjs "$fixture_api:/tmp/verify-training-loop.cjs"
 docker cp scripts/ci/verify-question-store.cjs "$fixture_api:/tmp/verify-question-store.cjs"
 docker cp scripts/ci/verify-vector-recovery.cjs "$fixture_api:/tmp/verify-vector-recovery.cjs"
