@@ -701,3 +701,14 @@ Lab原有Registry/Version/Run/Trace与发布门可复用，但执行器仅Interv
 关键词只检查最终response；工作流中间节点与费用元数据不参与最终输出评分。有界JSON Schema复用运行时校验器，空断言不通过。发布门升级v5并要求final-output/v1证据，旧评测不能默认为新规则合格，未知账单不零计且不自动重放。
 
 工作流自动候选仅改父提示词没有实际行为差异，当前明确拒绝；管理员需修改实际固定节点版本并重新验证依赖。单Agent自动候选复用有界版本合同，超长拒绝，不截断。无新增数据库结构；API增加门禁expectedCurrentVersionId及并发冲突，生产发布权限/证据要求保持，合成评测不替代真实模型质量。
+
+
+## ADR 24：自建领域核心与可替换 Agent 端口（2026-10-19）
+
+用户选择“全自建可替换架构”。继续使用React/NestJS/Prisma/LangGraph模块化单体，领域状态、版本、评测证据、发布门与账本由项目掌握；运行时、工具、检索/记忆、评测器和观测出口逐步通过适配器替换。具体合同与迁移见architecture/REPLACEABLE_AGENT_CONTRACTS.md；接口为目标设计，不能将文档或空Registry记为交付。
+
+基于官方LangSmith/Langfuse/Braintrust及Interview产品资料更新产品流程，来源与日期保存在product/SELF_BUILT_AGENT_PLATFORM_PLAN.md。不购买服务、不自动导出候选人数据、不假定招聘平台开放API。不将供应商营销、合成结果或关键词规则等同技术正确性/学习效果。
+
+首批落实两个真实链路错误：简历确认必须核验HTTP和success回执；Interview桥在异步前固定已发布版本快照，Run使用同一显式agentVersionId并校验回读，关联失败尽力记为失败。每回合快照不等于全会话锁定，控制器catch-and-continue仍是可选桥而非强制策略加载；后续独立拆分必需策略与可选遥测。付费预算、未知账单、旧题归属和全产品NOT_ACCEPTED边界保持。
+
+取舍：先复用现有持久Run/Job/Trace/发布门；不提前建设微服务、通用无限Agent循环或新队列。每新增真实能力先做权限/能力/预算校验及合同测试，再做API/持久化与浏览器双证据。未来多实例MCP与沙箱另行设计，禁用只阻断后续调用。

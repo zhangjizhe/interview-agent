@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { ApplicationService } from './application.service';
 import { AgentRuntimeService } from './agent-runtime.service';
 import { PrismaService } from '../../infra/prisma/prisma.service';
@@ -15,7 +15,19 @@ export class InterviewLabBridgeService {
 
   async startTurn(userId: string, interview: { id: string; position: string; level: string }, message: string) {
     const application = await this.applications.bootstrapInterviewApplication(userId);
+    const currentVersion = application.agent.currentVersion;
+    if (!currentVersion || currentVersion.status !== 'PUBLISHED') {
+      throw new ConflictException('Interview Lab 需要已发布的 Agent 版本快照');
+    }
+    // Capture primitives before the next await: concurrent publication must not
+    // change which policy is attributed to this turn's external Run.
+    const snapshot = {
+      id: currentVersion.id,
+      version: currentVersion.version,
+      approvedPolicy: currentVersion.systemPrompt.slice(0, 12_000),
+    };
     const run = await this.runtime.startExternalRun(userId, application.agentId, {
+      agentVersionId: snapshot.id,
       application: 'interview',
       externalRunId: interview.id,
       input: {
@@ -25,22 +37,27 @@ export class InterviewLabBridgeService {
         sessionId: interview.id,
       },
     });
-    await this.prisma.applicationRun.create({
-      data: {
-        applicationId: application.id,
-        runId: run.id,
-        externalSessionId: interview.id,
-      },
-    });
-    const currentVersion = application.agent.currentVersion;
+    try {
+      if (run.agentVersionId !== snapshot.id) {
+        throw new ConflictException('Interview Lab Run 版本与已发布策略快照不一致');
+      }
+      await this.prisma.applicationRun.create({
+        data: {
+          applicationId: application.id,
+          runId: run.id,
+          externalSessionId: interview.id,
+        },
+      });
+    } catch (error) {
+      // The external Run exists already. Do not leave it RUNNING if the bridge
+      // rejects its identity or cannot persist the application association.
+      await this.failTurn(run.id, error);
+      throw error;
+    }
     return {
       ...run,
-      approvedPolicy: currentVersion?.status === 'PUBLISHED'
-        ? currentVersion.systemPrompt.slice(0, 12_000)
-        : '',
-      agentVersion: currentVersion?.status === 'PUBLISHED'
-        ? { id: currentVersion.id, version: currentVersion.version }
-        : null,
+      approvedPolicy: snapshot.approvedPolicy,
+      agentVersion: { id: snapshot.id, version: snapshot.version },
     };
   }
 

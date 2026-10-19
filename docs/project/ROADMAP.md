@@ -1,5 +1,7 @@
 # 项目路线图
 
+当前战略更新（2026-10-19）：[全自建可替换AgentLab+Interview完整规划](../product/SELF_BUILT_AGENT_PLATFORM_PLAN.md)，按B0可靠性→B1替换合同→B2工具治理→B3面试黄金链→B4可信评测→B5受控改进→B6按需扩展推进。下文保留历史优先级，不以历史阶段替代当前验收。
+
 最后更新：2026-10-08
 战略来源：`docs/product/PRODUCT_ROADMAP.md`。本文件仅保留优先级层次。
 
