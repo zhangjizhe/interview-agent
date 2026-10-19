@@ -560,7 +560,7 @@ function OperationLogList({ data, onPage }: { data?: LabOperationLogResponse; on
     {data.items.map((item) => <article className="lab-row" key={item.id}>
       <div><p className="agent-eyebrow">{item.action} / {item.outcome}</p><h2>{item.objectType} <span>{item.objectId}</span></h2><p>管理员 {item.actorId} · {new Date(item.createdAt).toLocaleString()}</p></div>
     </article>)}
-    <div className="lab-pagination"><span>{data.total} 条</span><button className="icon-command" title="上一页" disabled={data.page <= 1} onClick={() => onPage(data.page - 1)}>‹</button><button className="icon-command" title="下一页" disabled={!data.hasMore} onClick={() => onPage(data.page + 1)}>›</button></div>
+    <div className="lab-pagination"><span>{data.total} 条</span><button className="icon-command" title="上一页" aria-label="上一页" disabled={data.page <= 1} onClick={() => onPage(data.page - 1)}>‹</button><button className="icon-command" title="下一页" aria-label="下一页" disabled={!data.hasMore} onClick={() => onPage(data.page + 1)}>›</button></div>
   </section>;
 }
 
