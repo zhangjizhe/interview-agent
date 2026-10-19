@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { safeJson } from '../utils/safeJson';
 import {
@@ -70,6 +70,25 @@ export function InterviewPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const confirmPending = useRef(false);
+  const confirmationMounted = useRef(true);
+  const confirmationAttempt = useRef(0);
+  const currentInterviewId = useRef(interviewId);
+  currentInterviewId.current = interviewId;
+  const [confirmationError, setConfirmationError] = useState('');
+  useEffect(() => {
+    confirmationMounted.current = true;
+    confirmationAttempt.current += 1;
+    confirmPending.current = false;
+    setConfirming(false);
+    setConfirmationError('');
+    return () => {
+      confirmationMounted.current = false;
+      confirmationAttempt.current += 1;
+      confirmPending.current = false;
+      setConfirming(false);
+    };
+  }, [interviewId, setConfirming]);
 
   const resetComposerHeight = () => {
     if (composerRef.current) composerRef.current.style.height = '';
@@ -254,15 +273,27 @@ export function InterviewPage() {
 
   // 确认简历 → 后端打标 → 解锁聊天
   const confirmResumeStart = async () => {
-    if (!interviewId) return;
+    if (!interviewId || confirming || confirmPending.current) return;
+    const submittedInterviewId = interviewId;
+    const attempt = ++confirmationAttempt.current;
+    confirmPending.current = true;
+    setConfirmationError('');
     setConfirming(true);
     try {
-      await fetch(`/api/interview/${interviewId}/confirm-resume`, { method: 'POST' });
-      setResumeConfirmed(true);
+      const response = await fetch(`/api/interview/${submittedInterviewId}/confirm-resume`, { method: 'POST' });
+      const receipt = await safeJson(response);
+      if (!response.ok) throw new Error(receipt?.message || `确认简历失败 (HTTP ${response.status})`);
+      if (receipt?.success !== true) throw new Error('简历确认结果未确认，请刷新面试状态后核验。');
+      if (confirmationMounted.current && confirmationAttempt.current === attempt && currentInterviewId.current === submittedInterviewId) setResumeConfirmed(true);
     } catch (err) {
-      console.error('确认失败:', err);
+      if (confirmationMounted.current && confirmationAttempt.current === attempt && currentInterviewId.current === submittedInterviewId) {
+        setConfirmationError(err instanceof Error ? err.message : '确认简历失败，请重试。');
+      }
     } finally {
-      setConfirming(false);
+      if (confirmationMounted.current && confirmationAttempt.current === attempt) {
+        confirmPending.current = false;
+        setConfirming(false);
+      }
     }
   };
 
@@ -377,14 +408,16 @@ export function InterviewPage() {
               </button>
             </div>
 
+            {confirmationError && <p role="alert" className="text-sm text-red-700">{confirmationError}</p>}
             <div className="flex gap-3 pt-2">
               <button
                 onClick={confirmResumeStart}
+                aria-busy={confirming}
                 disabled={confirming}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {confirming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                确认无误，开始面试
+                {confirming ? '正在确认简历' : '确认无误，开始面试'}
               </button>
             </div>
           </div>

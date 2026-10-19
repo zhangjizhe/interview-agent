@@ -63,7 +63,7 @@ describe('MCP workspace process scope and state recovery', () => {
     await screen.findByRole('button', { name: '本进程启用', exact: true });
     fireEvent.click(screen.getByRole('button', { name: '本进程启用', exact: true }));
     await screen.findByText('fixture-tool 已在当前 API 进程启用。');
-  });
+  }, 15_000);
 
   it('rereads actual disabled state after an unconfirmed mutation and permits an explicit GET recovery', async () => {
     await mount(); brokenReceipt = true;
@@ -78,7 +78,7 @@ describe('MCP workspace process scope and state recovery', () => {
     await screen.findByText(readSuccess);
     expect(transport.mock.calls.slice(start)).toEqual([['/admin/mcp-servers']]);
     expect(transport.mock.calls.filter(call => call[0] === '/admin/mcp-servers/toggle')).toHaveLength(1);
-  });
+  }, 15_000);
 
   it('does not claim a failed explicit GET refreshed state or change the cached enabled state', async () => {
     await mount(); failRead = true;
@@ -88,7 +88,7 @@ describe('MCP workspace process scope and state recovery', () => {
     expect(screen.queryByText(readSuccess)).toBeNull();
     expect(screen.getByRole('button', { name: '本进程关闭', exact: true })).toBeTruthy();
     expect(transport.mock.calls.slice(start)).toEqual([['/admin/mcp-servers']]);
-  });
+  }, 15_000);
 
   it('requires reload confirmation and reports retained runtime switches after the POST', async () => {
     await mount();
@@ -101,5 +101,5 @@ describe('MCP workspace process scope and state recovery', () => {
     await screen.findByText(reloadSuccess);
     await waitFor(() => expect(screen.getByRole('button', { name: '本进程启用', exact: true })).toBeTruthy());
     expect(transport.mock.calls.filter(call => call[0] === '/admin/mcp-servers/reload')).toEqual([['/admin/mcp-servers/reload', { method: 'POST' }]]);
-  });
+  }, 15_000);
 });

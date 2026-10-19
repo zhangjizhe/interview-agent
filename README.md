@@ -1,5 +1,7 @@
 # Interview Agent / Agent Lab
 
+[完整功能规划与商业能力对标](docs/product/SELF_BUILT_AGENT_PLATFORM_PLAN.md) · [可替换Agent架构合同](docs/architecture/REPLACEABLE_AGENT_CONTRACTS.md) · [当前功能矩阵](docs/product/FEATURE_MATRIX.md)
+
 **面试训练工作台 · 可追溯的 Agent 运行与受控评测**
 
 [![Product verification](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml/badge.svg)](https://github.com/zhangjizhe/interview-agent/actions/workflows/ci-api.yml)

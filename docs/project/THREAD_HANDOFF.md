@@ -12,6 +12,6 @@
 8. 当前预览不能推定最新部署，生产/真实质量/全UI验收仍NOT_ACCEPTED。当前仪表仅内部预发布复核。
 9. 排除历史费用报告、旧截图及TASK-034本地未跟踪文件，不重置或提交。
 
-下一步：本轮L05调用前禁用检查和进程范围/恢复修复，已完成本地测试、lint、三端type/build及独立清单复核，详见LAB_MCP_PROCESS_POLICY_EVIDENCE。需提交推送agent-lab，复用现有PR43并核对精确head新CI；本地无Docker，不得把历史隔离链写成本轮通过。新清单985，原983审查字段保留，新增0984/0985未验收。真实模型费用/生产部署仍阻塞，禁止付费探针。
+下一步：用户追加完整规划/官方商业对标并选择全自建可替换架构，交付文件SELF_BUILT_AGENT_PLATFORM_PLAN与REPLACEABLE_AGENT_CONTRACTS，更新矩阵/路线图/ADR24。B0新增确认回执/路由竞态与回合版本一致性，相关11+6测试、独立交叉评审通过；API767通过/Redis21跳过。全Web初次一项MCP异步场景5秒超时（其余217通过），保留断言改为有界15秒，全量复验22文件/218测试全部通过。新清单986/180/806，UI0986确认错误提示，前985ID审查字段保留。MCP76e4274六项CI通过、PR43已合并核main1aeeec3；本轮需推送agent-lab并新建PR，核精确新CI。无Docker本地不冒充实链，候选人完整浏览器/真实模型/部署仍NOT_ACCEPTED。
 
 [旧交接完整快照](archive/reacceptance-2026-10-18/THREAD_HANDOFF.md) · [当前验收仪表](../acceptance/INTERNAL_PRE_RELEASE_STATUS.md)

@@ -1,27 +1,25 @@
-# Feature Matrix
+# 功能矩阵（当前事实与自建目标）
 
-状态基于当前默认 NestJS + React 路径的仓库审计，不把 `apps/py-api` 视为默认产品能力。
+更新：2026-10-19。已实现代码不等于完成验收；整体NOT_ACCEPTED。当前事实由源码/数据库/API合同与独立证据判定。完整范围、商业对标、链路与批次见[自建完整规划](SELF_BUILT_AGENT_PLATFORM_PLAN.md)。
 
-| Feature | User | Problem | Value | Current Status | UI | API | Database | Agent | Test | Security | Cost | Priority | Phase |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 登录、注册、JWT、RBAC | 用户/管理员 | 身份和管理边界 | 基础信任 | KEEP | 已有登录门禁/管理路由 | 已有 auth API | User、role、passwordHash | 无 | API/Web/浏览器验收 | JWT、RBAC、ownership | 低 | P0 | 已有 |
-| 简历上传与解析 | 候选人 | 缺少候选人上下文 | 个性化面试入口 | KEEP | 已有上传/确认 | upload/parse/list | Resume 通过向量上下文，未版本化 | 个性化出题 | 真实内容验收 | 格式/大小限制 | 解析与 embedding | P0 | V0.2 |
-| 面试 SSE 与报告 | 候选人 | 无真实模拟面试 | 核心 MVP | IMPROVE | InterviewPage/Report | start/message/end | Interview、Message、Report | LangGraph/任务队列 | Jest/E2E | ownership、输入限制 | 会话成本已有 | P0 | V0.2 |
-| 结构化 Evaluation | 候选人 | 不知道答得哪里好/差 | 改进依据 | IMPROVE | 报告页已有 | evaluate/generate-report | AnswerHistory、Report | Scoring/Reviewer | Golden Dataset 基础 | 数据隔离 | 模型成本可记录 | P0 | V0.2 |
-| Skill Profile 与 Gap | 候选人 | 无法看到长期能力变化 | 训练闭环 | FUTURE | 未有专页 | 未有专用 API | 未有 Skill 模型 | 未来 | 未有 | 需用户隔离 | 低/中 | P1 | V0.3 |
-| Adaptive Training | 候选人 | 评估后不知道如何练 | 复面与留存 | FUTURE | 未有 | 未有 | 未有 Training 模型 | 未来 Training Agent | 未有 | 需配额 | 中 | P1 | V0.3 |
-| Knowledge Base 与 Question Bank | 管理员/候选人 | 题目与知识缺少治理 | 面试质量 | IMPROVE | QuestionBankPage | 文件/URL/搜索/知识库 API | 向量索引为主 | RAG 检索/题目生成 | 真实导入验收 | SSRF 基础防护、管理员写权限 | embedding/LLM | P0 | V0.4 |
-| Knowledge Curator | 管理员 | 来源质量与岗位覆盖不稳定 | 知识智能 | FUTURE | 未有 | 未有 | 未有 Source 生命周期 | 未来受控 Agent | RAG benchmark 可复用 | 注入/版权/SSRF | 抓取与模型成本 | P1 | V0.5 |
-| Agent Harness 与 Experiment | 研发团队 | 无法证明 Agent 优化 | 防回归与持续改进 | IMPROVE | 无管理视图 | Golden Dataset/benchmark CLI 已有 | ReflectionLog 已有 | Eval/Reflection/Langfuse 基础 | Golden Dataset、成本基准 | 不自动改生产 Prompt | 必须比较实际 Token | P0 | V0.5 |
-| Usage、Quota、Entitlement | SaaS 用户 | AI 成本与滥用风险 | 商业基础 | FUTURE | 未有 | Session cost API 仅基础 | SessionCost 已有 | Gateway 已有 | 成本基准 | 限流已有，Quota 未有 | 高优先级控制项 | P1 | V0.6 |
-| Billing 与 Payment | 付费用户 | 订阅和支付 | 商业化 | FUTURE | 未有 | 未有 | 未有 | 无 | 未有 | Webhook/幂等要求 | 高 | P2 | V0.6 |
-| Mini Program | 日常训练用户 | 移动碎片化练习 | 扩展触点 | FUTURE | 未有 | 应共享 API | 未有 | 应复用 | 未有 | 统一身份 | 中 | P2 | V0.7 |
+| 功能 | 当前代码事实 | 尚未完成/验收 | 优先级/批次 |
+| --- | --- | --- | --- |
+| 身份/组织/会话 | JWT、RBAC、归属、组织隔离与吊销 | 完整管理员生命周期/持久授权审计 | P0/B0与持续验收 |
+| 岗位/JD | 岗位版本、激活、文本JD/准备度 | 全状态浏览器、更多导入类型 | P0/B3 |
+| 简历/确认 | PDF/MD/TXT解析与确认；本轮修复错误回执 | 真正版本化简历、完整候选人浏览器链 | P0/B0+B3 |
+| 模拟/单技能 | 已有模式、SSE与正式证据 | 完整状态/断流恢复与黄金链 | P0/B3 |
+| 报告/技能 | FINAL评价、Evidence、Report与技能聚合 | 可比成长及真实质量/校准 | P0/B3+B4 |
+| 定向训练/复测 | 推荐、Attempt、关联复测基础 | 完整浏览器/长期提升证据 | P0/B3 |
+| Registry/运行 | 版本、Run、Trace、single/finite配置、持久任务 | 通用RuntimeAdapter替换合同 | P0/B1 |
+| 工具/知识/记忆绑定 | ToolRunner等基础资产；配置运行非空绑定拒绝 | 真实运行贯穿治理、能力逐项启用 | P0/B2 |
+| MCP管理 | 进程内开关/检查/重载；调用前禁用 | 持久化、多实例、逐外部服务可用性 | P0/B0；扩展另批 |
+| 题库/检索 | Milvus/Qdrant、文件/URL、Gateway计量 | 旧16题归属/迁入、检索质量、完整来源治理 | P0/B2+B4 |
+| 评测/发布 | 冻结/审查/重复、规则评测、发布证据门与CAS | 语义Judge校准、人工标注、线上回流 | P0/B4+B5 |
+| 应用版本接入 | legacy-sse-bridge；本轮固定回合快照 | 全会话快照、策略加载与可选遥测分离 | P0/B0+B3 |
+| 自动改进 | 有界候选/实验/决定基础 | 多类失败诊断、可验证改进、完整回滚 | P1/B5 |
+| 用量/额度 | UsageLedger、原子额度、费用状态基础 | 未知历史费用/账单核对，完整权益 | P0费用门；权益后续 |
+| 商业平台连接器 | 现有可选Langfuse；新集成均未启用 | 官方API授权后按可替换合同接入 | P2/B6，按需 |
+| Worker/编码沙箱 | 当前PG任务/API进程执行 | 独立隔离执行、工程编码题 | P2/B6 |
+| 语音/小程序/支付 | 目标设计，不作为当前已交付 | 分别独立合同与验收 | P2/B6 |
 
-## 分类定义
-
-- **KEEP**：已具备并应稳定维护。
-- **IMPROVE**：已有基础，应补足闭环、质量或治理。
-- **REFACTOR**：当前不安排；须单独设计、收益和回滚。
-- **REPLACE**：当前无批准替换项。
-- **REMOVE**：当前无批准删除项。
-- **FUTURE**：未实现，不得作为已交付能力宣传。
+状态不用KEEP/FUTURE代替具体事实。禁止把旧的“无技能表/无额度/无Lab”描述当现状，禁止把目标设计当已接通。外部平台功能是对标依据，不能继承其品牌或效果声明。

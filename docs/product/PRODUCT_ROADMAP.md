@@ -1,16 +1,15 @@
-# Product Roadmap
+# 产品路线图
 
-| Version | Goal | Features | Dependencies | Success Metrics | Risks |
-| --- | --- | --- | --- | --- | --- |
-| V0.1 | Independent Agent Lab Foundation | 独立控制台、MCP 治理、LangGraph、RAG、追踪、Golden Dataset | 当前 NestJS 主路径与稳定的管理 API | 可独立构建、可复跑评测与真实验收 | 控制面与业务域耦合、文档口径不一致 |
-| V0.2 | AI Interview MVP | Resume、目标岗位、面试、报告产品化闭环 | Auth、RAG、SSE | 首次面试完成率 | 面试状态与产品导航不足 |
-| V0.3 | Personal Skill System | Skill Profile、Skill Gap、趋势 | 结构化 Evaluation、历史数据 | 用户可解释能力差距 | 评分一致性不足 |
-| V0.4 | Knowledge + Question Intelligence | 来源生命周期、题目质量、岗位覆盖 | RAG、Question Bank、导入安全 | 召回与题目质量达标 | 注入、版权、来源质量 |
-| V0.5 | Agent Harness | 实验记录、失败分析、版本比较、人工批准优化 | Golden Dataset、Reflection、Langfuse、成本数据 | 无 Agent 回归发布 | 误把命中率当收益 |
-| V0.6 | SaaS Foundation | Usage Ledger、Quota、Entitlement | 统一身份和成本模型 | 无额度绕过 | 过早引入 Billing 复杂度 |
-| V0.7 | Web + Mini Program | 深度训练与日常练习双端 | API First、统一 Domain | 复面与留存 | 复制业务逻辑 |
-| V1.0 | Training Platform | 完整提升闭环与运营指标 | 前置阶段验证完成 | Skill Improvement、Retention、Conversion | 指标无法证明真实提升 |
+更新：2026-10-19。用户选择全自建可替换架构。完整功能与官方对标见[总体规划](SELF_BUILT_AGENT_PLATFORM_PLAN.md)，当前能力见[功能矩阵](FEATURE_MATRIX.md)。阶段是依赖顺序，不是已发布版本号。
 
-## 当前建议顺序
+| 批次 | 成果 | 退出门 |
+| --- | --- | --- |
+| B0 | MCP执行边界、确认回执、回合版本一致性 | 本轮测试、独立复核、精确SHA新镜像CI |
+| B1 | Runtime/Application适配器能力与兼容合同 | 现有实现可替换、同合同测试、旧链兼容 |
+| B2 | 首个知识工具贯穿ToolRunner，然后扩展绑定 | 权限/审批/预算/真实Trace与读回 |
+| B3 | Interview蓝图/会话快照、黄金链与恢复 | API/持久化+候选人浏览器；正式报告→训练→复测 |
+| B4 | 评测器适配器、人工标注/Judge校准、轨迹/会话/切片实验 | 冻结集/保留集、真实有界质量与费用证据 |
+| B5 | 失败回流→候选→实验→人工发布→回滚 | 不自动改生产或改分；CAS/回滚/线上观测 |
+| B6 | Worker/沙箱、语音/编码、平台连接、权益/支付/小程序 | 按实际需要独立评审，不阻塞2026开源与作品展示 |
 
-先完成 V0.2 的产品闭环设计与 V0.5 的受控 Harness 设计，再引入 Skill Profile 和 Training。Billing、Payment、小程序和复杂多租户不属于当前第一开发 Epic。
+当前整体NOT_ACCEPTED。真实模型仍受历史未知费用/额度核对约束；单次≤0.5CNY、发布前累计≤3CNY，不自动付费重放。外部账号、生产部署与支付接入各有授权/环境前置。
