@@ -33,7 +33,7 @@ export async function verifyControlRecovery(page, context, origin) {
   page.once('dialog', dialog => dialog.dismiss());
   await page.getByRole('button', { name: '重新加载 MCP', exact: true }).click();
   assert.equal(reloadCalls, 0);
-  assert.equal(await page.getByText('MCP 配置已重新加载。', { exact: true }).count(), 0);
+  assert.equal(await page.getByText('当前 API 进程的 MCP 配置已重新加载；运行时开关保持不变。', { exact: true }).count(), 0);
   const headers = { Authorization: `Bearer ${originalSession.token}` };
   const before = await (await context.request.get(`${origin}/api/admin/mcp-servers`, { headers })).json();
   let releaseResponse;
@@ -53,7 +53,7 @@ export async function verifyControlRecovery(page, context, origin) {
   } finally { releaseResponse(); }
   const receipt = await (await completed).json();
   assert.equal(receipt.ok, true);
-  await page.getByText('MCP 配置已重新加载。', { exact: true }).waitFor();
+  await page.getByText('当前 API 进程的 MCP 配置已重新加载；运行时开关保持不变。', { exact: true }).waitFor();
   assert.equal(reloadCalls, 1);
   const after = await (await context.request.get(`${origin}/api/admin/mcp-servers`, { headers })).json();
   const binding = data => data.servers.map(server => ({ name: server.name, enabled: server.enabled, executable: server.executable })).sort((a, b) => a.name.localeCompare(b.name));

@@ -229,8 +229,18 @@ class McpRegistryClass {
   get(name: string): McpTool | undefined {
     const e = this.entries.get(name);
     if (!e) return undefined;
-    // 返回真实 execute（若已 bindExecute 注入，则有真实函数，否则为 undefined）
-    return { ...e.meta, execute: e.execute };
+    // Check policy at invocation time too: plans may retain a tool before an
+    // administrator disables it, reloads metadata, or unregisters its binding.
+    return {
+      ...e.meta,
+      enabled: this.isSystemEnabled(name),
+      execute: e.execute ? async (args: any) => {
+        const current = this.entries.get(name);
+        if (!current || !this.isSystemEnabled(name)) throw new Error('MCP工具或父服务已禁用');
+        if (!current.execute) throw new Error('MCP工具尚未绑定执行器');
+        return current.execute(args);
+      } : undefined,
+    };
   }
 
   count(): number {

@@ -1,0 +1,13 @@
+# Operation log pagination and button names
+
+Scope: L13-PAGINATION, internal prerelease, overall NOT_ACCEPTED.
+
+The existing arrow buttons used title text but exposed arrow characters as their accessible names. Add explicit `aria-label` values for previous/next page. No API/schema/authorization changes; source template IDs and existing review verdicts remain unchanged.
+
+Product contract: the first page shows20 records, next page shows the remaining record, previous/next availability matches actual page and hasMore, and changing filters from page2 resets the query to page1. The two named buttons must work using focus and Enter.
+
+The synthetic-only browser helper first requires an existing successful MCP reload log and an initial count1..21. It performs at most20 real administrative MCP reloads to reach21 actual persisted log records. This is metadata writing inside the private fixture, not a read-only test or fabricated log insertion. It compares actual browser page responses with separate authenticated API reads, waits for displayed fields, verifies20+1 records and21 unique API IDs, keyboard next/previous/next, boundary disabling, empty AND filters from page2 and restoration to page1. Provider/ledger aggregate counts must remain unchanged.
+
+Verification: first full new-image chain exits0: API82/82, actual page1/page2 keyboard traversal and filter reset, complete browser, strict PostgreSQL schema/row-multiset/sequence equality and actual Milvus question/Qdrant vector-payload recovery pass. Provider/ledger aggregates unchanged during added metadata scenario. Lab image `sha256:f4489259b862fe5bb9a9940e8f48829dd8f28a4e0f9f6e65994f2dc4c9f96ce1`. Relevant ESLint/Lab TypeScript/build, helper syntax and diff checks pass. Final independent review discovered inherited source-line drift: explicit AST component/tag/attribute sequence reconciliation of268 main nodes corrected242 rows while preserving all IDs/reviews; independent final verification confirms all268 source nodes match and the inventory blocker is resolved. Limited stage passed; new exact-head CI and PR merge remain pending. No runtime test repeated for this data-only correction.
+
+Limits: serial stable fixture only; service ordering is createdAt descending without an ID tiebreaker, so concurrent pagination consistency is not established. API ID uniqueness is not a claim that the UI displays IDs. Only these buttons' accessible names/focus/Enter are verified; no screen-reader, complete keyboard, mobile or whole L13 acceptance. Real model quality, deployment, old question ownership and historical unknown bills remain open. Offline model fixture, external cost0; whole-chain model/ledger work is not absent.
