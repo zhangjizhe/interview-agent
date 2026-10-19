@@ -1,8 +1,14 @@
 # 当前状态
 
-更新：2026-10-18 · 唯一活动任务 PRODUCT-REACCEPTANCE-1
+更新：2026-10-19 · 唯一活动任务 PRODUCT-REACCEPTANCE-1
 
 整体 **NOT_ACCEPTED**。内部预发布审查可以复核限定工程证据，不能据此批准完整交付、真实模型版本发布或生产部署。
+
+## 本轮 L05 修复与验证
+
+- 在远端 agent-lab `cf1d101` 基础实施专家团审查：修复内置 MCP 缓存执行函数绕过禁用；页面明确进程/所有组织/重载/重启边界，加入只读刷新及未确认回执自动读回。
+- 本地 API 93 suites / 762 passed，4 suites / 21 Redis integration skipped；Web 21 files / 207 passed；lint、三端 typecheck/build、独立复核通过。没有本地Docker；阶段验收必须读取本次提交对应远端 Product verification，不继承旧镜像结果。
+- 清单新增 UI-0984/0985，985模板（180交互/805展示），所有原审查字段和最终NOT_ACCEPTED保留。详见 [L05证据](../acceptance/LAB_MCP_PROCESS_POLICY_EVIDENCE.md)。
 
 ## 版本与验证
 
@@ -14,7 +20,7 @@ L13阶段PR42已按精确3f35deb六项CI成功合并，2026-10-19 07:30核远端
 - 最新代码阶段：MCP 开关回执严格校验确认标记、工具名、布尔目标；损坏回执显示未确认，不宣称回滚。合同测试9/9；相关 lint/type/build、独立复核和首轮完整隔离链通过。
 - 最近完整隔离链：实际 API82/82、真实浏览器、PostgreSQL schema/行多集/sequence 相等、Milvus 题目与 Qdrant 向量/payload 恢复读回，退出0。API镜像 `sha256:0ee7eec3d49142eb5332bb89a513d6a9331af68371edc69b39e0709f54cf3a6c`；Lab镜像 `sha256:73da2faf1b42369aa928af58b7142279aa482588982c601dcb93cf2efb2993dc`。这是隔离合成环境证据，不是当前业务部署快照。
 - CI `.github/workflows/ci-api.yml` 已执行隔离浏览器、题目迁移存储合同及数据恢复。不能继续沿用早期“CI无浏览器门”的描述。
-- UI清单983源码模板：179交互、804展示，最终983项均NOT_ACCEPTED。有限PARTIAL证据不等于整项通过；动态、条件、响应式状态仍未完整展开。旧ID及审查字段保留。
+- UI清单985源码模板：180交互、805展示，最终985项均NOT_ACCEPTED。有限PARTIAL证据不等于整项通过；动态、条件、响应式状态仍未完整展开。旧ID及审查字段保留。
 
 ## 已有限定工程证据
 

@@ -1,10 +1,10 @@
 # 当前任务
 
-更新：2026-10-18 · PRODUCT-REACCEPTANCE-1 · 整体NOT_ACCEPTED
+更新：2026-10-19 · PRODUCT-REACCEPTANCE-1 · 整体NOT_ACCEPTED
 
 用户要求全产品严谨重新验收：每个交互/展示先明确产品合同，API/持久化与浏览器独立二次确认，授权独立测试Agent；自主持续推进，合格阶段才经PR合并main，覆盖旧逐Phase等待规则。所有改动在agent-lab，不提交无关历史修改或秘密。
 
-当前子主题：L13实际分页/可访问名称。OperationLogList两按钮增加aria-label，隔离fixture最多20次真实MCP重载补足21条持久日志，验证API20+1/唯一ID、浏览器键盘翻页往返/末页禁用与page2换筛选reset1。此轮有合成metadata写入，不是只读；无业务数据/付费模型。相关lint/type/build/语法/diff通过，首轮新镜像完整链exit0/API82/全浏览器/严格PG与向量恢复通过。独立审核发现旧清单main行漂移；按268节点AST严格身份序列修242行，保留983原ID/审查/证据，最终独立复核已通过，待提交/新精确CI/PR合并。
+当前子主题：L05 MCP进程范围与执行时禁用检查。架构专家确认内置工具缓存执行引用可绕过禁用，已在Registry调用边界实时检查当前工具/父服务；页面说明进程/所有组织/重载/重启范围，加入只读刷新及未确认回执自动读回。后端相关31测试、前端相关13测试，全API762/Web207测试、lint、三端type/build及独立源码/清单复核通过；21个Redis集成测试因未配置本地服务跳过。当前环境无Docker，提交后必须核对精确head远端隔离浏览器/恢复链；整体仍NOT_ACCEPTED。
 
 最近已完成阶段PR40：MCP开关回执，main `ade07bf2139f628b49a87d7f0fbf4c892a15649a` 已核验。完整隔离API82/浏览器/恢复通过；整体不因此通过。详细当前事实见CURRENT_STATE。
 

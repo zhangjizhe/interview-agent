@@ -1,6 +1,6 @@
 # 交接
 
-更新：2026-10-18 · PRODUCT-REACCEPTANCE-1
+更新：2026-10-19 · PRODUCT-REACCEPTANCE-1
 
 1. 按AGENTS→宪法→PROJECT_CONTEXT→CURRENT_STATE→ACTIVE_TASK→CONTEXT_INDEX加载；本任务持续推进，不默认批量读历史。
 2. 分支agent-lab。最近核实main为 `ade07bf2139f628b49a87d7f0fbf4c892a15649a`（PR40，精确head8b943a0六项CI成功）；agent-lab已快进。文档校准PR41精确ce5fdba全部三项可见CI成功，已合并核远端main a510d2c6eccfc54935406b98b680ea8015e5db8c，agent-lab快进；后续先查远端，不假定状态。
@@ -12,6 +12,6 @@
 8. 当前预览不能推定最新部署，生产/真实质量/全UI验收仍NOT_ACCEPTED。当前仪表仅内部预发布复核。
 9. 排除历史费用报告、旧截图及TASK-034本地未跟踪文件，不重置或提交。
 
-下一步：L13分页实链通过，完成清单独立终审后提交/新CI/PR；再按ACTIVE_TASK选下一个产品闭环，不能停在计划或重复等待。
+下一步：本轮L05调用前禁用检查和进程范围/恢复修复，已完成本地测试、lint、三端type/build及独立清单复核，详见LAB_MCP_PROCESS_POLICY_EVIDENCE。需提交推送agent-lab，复用现有PR43并核对精确head新CI；本地无Docker，不得把历史隔离链写成本轮通过。新清单985，原983审查字段保留，新增0984/0985未验收。真实模型费用/生产部署仍阻塞，禁止付费探针。
 
 [旧交接完整快照](archive/reacceptance-2026-10-18/THREAD_HANDOFF.md) · [当前验收仪表](../acceptance/INTERNAL_PRE_RELEASE_STATUS.md)

@@ -118,7 +118,7 @@ const CONTROL_NAV: Array<{ id: View; label: string; icon: typeof Gauge; enabled:
   { id: 'operations', label: '操作日志', icon: ScrollText, enabled: true },
 ];
 
-function ControlCenter() {
+export function ControlCenter() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>('overview');
   const [feedback, setFeedback] = useState('');
@@ -201,8 +201,18 @@ function ControlCenter() {
     onMutate: () => setFeedback(''),
     mutationFn: toggleMcpServer,
     onSuccess: (_result, variables) => {
-      setFeedback(`${variables.toolName} 已更新。`);
+      setFeedback(`${variables.toolName} 已在当前 API 进程${variables.enabled ? '启用' : '关闭'}。`);
       refresh();
+    },
+    // A missing receipt does not establish rollback: the server may have applied it.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['agent-lab-mcp'] }),
+  });
+  const readMcpState = useMutation({
+    mutationFn: () => api('/admin/mcp-servers'),
+    onMutate: () => setFeedback(''),
+    onSuccess: (result) => {
+      queryClient.setQueryData(['agent-lab-mcp'], result);
+      setFeedback('已重新读取当前 API 进程状态；请核对各工具开关。');
     },
   });
   const health = useMutation({
@@ -217,9 +227,10 @@ function ControlCenter() {
   const reload = useMutation({
     mutationFn: () => api('/admin/mcp-servers/reload', { method: 'POST' }),
     onSuccess: () => {
-      setFeedback('MCP 配置已重新加载。');
+      setFeedback('当前 API 进程的 MCP 配置已重新加载；运行时开关保持不变。');
       refresh();
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['agent-lab-mcp'] }),
   });
   const executeImport = useMutation({
     mutationFn: (importId: string) => api(`/agent-lab/recorded-imports/${importId}/execute`, { method: 'POST' }),
@@ -266,7 +277,7 @@ function ControlCenter() {
   const labData = lab.data as LabDashboard;
   const imports = (recordedImports.data as { imports: LabRecordedImport[] }).imports;
   const questionItems = ((questions.data as { results?: QuestionBankItem[] })?.results || []);
-  const currentMutationError = toggle.error || health.error || reload.error || executeImport.error || createExperiment.error || recordDecision.error;
+  const currentMutationError = readMcpState.error || toggle.error || health.error || reload.error || executeImport.error || createExperiment.error || recordDecision.error;
   const searchQuestions = async () => {
     if (!questionQuery.trim() || questionSearchPending.current) return;
     questionSearchPending.current = true;
@@ -315,8 +326,9 @@ function ControlCenter() {
       <main className="agent-workspace">
         <header className="agent-topbar">
           <div><p className="agent-eyebrow">AGENT OPERATIONS</p><h1>{titleFor(view)}</h1></div>
+          {view === 'mcp' && <button className="agent-command" onClick={() => readMcpState.mutate()} disabled={readMcpState.isPending || toggle.isPending || reload.isPending}>刷新本进程状态</button>}
           <button className="agent-command" onClick={() => {
-            if (window.confirm('重新加载 MCP 配置不会发布或修改运行结果。继续吗？')) reload.mutate();
+            if (window.confirm('仅重新加载当前 API 进程的 MCP 配置；保留运行时开关，不同步其他实例。继续吗？')) reload.mutate();
           }} disabled={reload.isPending}>
             <RefreshCw size={16} className={reload.isPending ? 'spin' : ''}/>{reload.isPending ? '重载中' : '重新加载 MCP'}
           </button>
@@ -589,6 +601,7 @@ function McpWorkspace({ data, health, toggle }: {
   toggle: { isPending: boolean; variables?: { toolName: string; enabled: boolean }; mutate: (input: { toolName: string; enabled: boolean }) => void };
 }) {
   return <section className="mcp-workspace">
+    <p>开关仅作用于当前 API 进程，会影响该进程服务的所有组织；不会同步其他实例。重新加载配置保留当前开关，API 重启后恢复配置文件默认值。关闭会阻止后续工具调用，不会取消已经开始的调用。</p>
     <div className="mcp-summary"><Activity size={17}/><strong>{data.runningCount} / {data.count}</strong><span>已启用且执行绑定就绪</span></div>
     <div className="mcp-list">
       {data.servers.map((server) => {
@@ -596,7 +609,7 @@ function McpWorkspace({ data, health, toggle }: {
         const toggleBusy = toggle.isPending && toggle.variables?.toolName === server.name;
         return <article className="mcp-row" key={server.name}>
           <div className="mcp-identity"><span className={`agent-status-dot ${server.status}`}/><div><h2>{server.displayName || server.name}</h2><p>{server.description || `${server.transport || 'internal'} · ${server.status}`}</p></div></div>
-          <div className="mcp-actions"><button className="icon-command" title="健康检查" onClick={() => health.mutate(server.name)} disabled={healthBusy}><Activity size={16} className={healthBusy ? 'spin' : ''}/></button><button onClick={() => toggle.mutate({ toolName: server.name, enabled: !server.enabled })} disabled={toggleBusy}><ToggleLeft size={16}/>{toggleBusy ? '处理中' : server.enabled ? '系统关闭' : '系统启用'}</button></div>
+          <div className="mcp-actions"><button className="icon-command" title="健康检查" onClick={() => health.mutate(server.name)} disabled={healthBusy}><Activity size={16} className={healthBusy ? 'spin' : ''}/></button><button onClick={() => toggle.mutate({ toolName: server.name, enabled: !server.enabled })} disabled={toggleBusy}><ToggleLeft size={16}/>{toggleBusy ? '处理中' : server.enabled ? '本进程关闭' : '本进程启用'}</button></div>
         </article>;
       })}
     </div>
