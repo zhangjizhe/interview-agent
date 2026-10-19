@@ -4,6 +4,14 @@
 
 整体 **NOT_ACCEPTED**。内部预发布审查可以复核限定工程证据，不能据此批准完整交付、真实模型版本发布或生产部署。
 
+## 最新远端核验
+
+2026-10-19 23:40远端同步核验：PR43最终head76e4274六项CI成功并合并1aeeec3；PR44精确a8fcb7d4dc3ae4e22e6080cd4c0e4945fa48a3e3六项CI成功并合并，远端main与agent-lab均为ce1813159c6e96ea9d0dab8bbebf07703a70b1cb，本地agent-lab已快进。此轮仅核对远端和同步，未本地重跑、未部署、未付费模型调用；采用新交接的B0及全自建规划剩余范围，整体NOT_ACCEPTED。
+
+## B0外部Run初始化清理
+
+startExternalRun创建后必需user.message写入失败，条件FAILED收尾并保留原错；数据库清理失败仅脱敏事件、不保证完全消除孤儿。旧3红1绿→4/4、相关15/15/lint/type/build通过；新真实PG+API85/85/浏览器FAILED历史与未知费用/严格恢复首轮exit0，最终独立审核通过。待新提交CI/PR；不是自然DB故障/真实并发/全候选人链/完整B0验收。详见EXTERNAL_RUN_INITIALIZATION_EVIDENCE.md，外部费用0。
+
 ## 本轮完整规划与链路一致性
 
 用户选择全自建可替换架构；[完整规划](../product/SELF_BUILT_AGENT_PLATFORM_PLAN.md)、[目标端口](../architecture/REPLACEABLE_AGENT_CONTRACTS.md)、功能矩阵/路线图和ADR24已更新。官方产品对标不等于第三方已接入。当前配置Agent非空工具/知识/记忆绑定仍拒绝、ToolRunner未贯穿全部旧路径、语义Judge/人工校准尚未交付。

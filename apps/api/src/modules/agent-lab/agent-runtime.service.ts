@@ -230,12 +230,24 @@ export class AgentRuntimeService {
       },
     });
     // 用户消息属于模型可见历史，不能降级为尽力而为遥测。
-    await this.trace.append(run.id, {
-      type: 'user.message',
-      name: 'Application User Message',
-      step: 'application-bridge',
-      payload: { content: message },
-    });
+    try {
+      await this.trace.append(run.id, {
+        type: 'user.message',
+        name: 'Application User Message',
+        step: 'application-bridge',
+        payload: { content: message },
+      });
+    } catch (error) {
+      try {
+        await this.prisma.run.updateMany({
+          where: { id: run.id, status: 'RUNNING' },
+          data: { status: 'FAILED', completedAt: new Date(), error: 'Application 初始化失败：必需消息持久化未确认' },
+        });
+      } catch {
+        this.logger.warn({ event: 'external_run_initialization_cleanup_unconfirmed', runId: run.id });
+      }
+      throw error;
+    }
     await this.writeTrace(run.id, {
       type: 'turn.start',
       name: 'Application Run Started',
