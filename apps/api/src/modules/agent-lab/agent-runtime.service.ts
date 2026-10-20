@@ -1,3 +1,5 @@
+import { RuntimeAdapterRegistry } from './runtime-adapter.registry';
+import { createBuiltinRuntimeAdapters } from './builtin-runtime.adapters';
 import { assertSchema } from './configured-runtime.contract';
 import type { ConfiguredRuntimeService } from './configured-runtime.service';
 import { RuntimeCancelledError } from './configured-runtime.contract';
@@ -18,6 +20,7 @@ import { TraceBundleService } from './trace-bundle.service';
 
 @Injectable()
 export class AgentRuntimeService {
+  private readonly adapters: RuntimeAdapterRegistry;
   private readonly logger = new Logger(AgentRuntimeService.name);
 
   constructor(
@@ -26,7 +29,8 @@ export class AgentRuntimeService {
     private readonly trace: TraceEventService,
     private readonly traceBundles: TraceBundleService,
     @Optional() @Inject('CONFIGURED_RUNTIME') private readonly configured?: ConfiguredRuntimeService,
-  ) {}
+    @Optional() adapters?: RuntimeAdapterRegistry,
+  ) { this.adapters = adapters ?? createBuiltinRuntimeAdapters(multiAgent, configured); }
 
   async prepareConfiguredRun(userId: string, agentId: string, dto: RunAgentDto, allowDraft: boolean) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
@@ -71,17 +75,14 @@ export class AgentRuntimeService {
     }
 
     const runtimeConfig = (version.runtimeConfig || {}) as Record<string, unknown>;
-    const isConfigured = ['single-agent-v1', 'finite-workflow-v1'].includes(String(runtimeConfig.adapter));
+    const adapter = this.adapters.resolve(runtimeConfig.adapter);
+    const isConfigured = adapter.manifest.mode === 'configured';
     if (isConfigured && !options.queuedRun && !options.allowDraftVersion) {
       throw new ConflictException('配置运行必须通过带 requestKey 的 runs 队列入口启动');
     }
-    const prepared = isConfigured && this.configured
-      ? await this.configured.prepare(version, workspace.id, options.allowDraftVersion === true) : undefined;
-    if (runtimeConfig.adapter !== 'interview-multi-agent' && !prepared) {
-      throw new BadRequestException(
-        `当前仅支持 interview-multi-agent 适配器，版本 ${version.version} 未配置该适配器`,
-      );
-    }
+    const adapterContext = { userId, workspaceId: workspace.id, version, input: dto.input, allowDraft: options.allowDraftVersion === true,
+      bypassSemanticCache: options.bypassSemanticCache === true, externalRunId: dto.externalRunId };
+    const prepared = await adapter.prepare(adapterContext);
 
     const startedAt = new Date();
     const run = options.queuedRun || await this.prisma.run.create({
@@ -114,19 +115,7 @@ export class AgentRuntimeService {
     });
 
     try {
-      if (!prepared && !this.multiAgent.isEnabled()) {
-        throw new ConflictException('interview-multi-agent 运行时当前未启用');
-      }
-
-      const graphResult: any = prepared
-        ? await this.configured!.execute(userId, run, version, dto.input, prepared)
-        : await this.multiAgent.run(
-        message,
-        dto.externalRunId || run.id,
-        [],
-        version.systemPrompt,
-        { bypassSemanticCache: options.bypassSemanticCache === true },
-      );
+      const graphResult: any = await adapter.execute({ ...adapterContext, run, prepared });
       const completedAt = new Date();
       const latencyMs = completedAt.getTime() - startedAt.getTime();
       const output = graphResult.output || {

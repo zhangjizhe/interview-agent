@@ -4,7 +4,7 @@
 
 ## 当前与目标
 
-当前：React双应用→NestJS模块化单体→Interview/Lab服务→LangGraph或配置型模型工作流→Gateway/数据。AgentRuntimeService以字符串分支直接依赖实现；ToolRunner与配置运行尚未连通；Interview仍用legacy-sse-bridge。现有Single/Finite运行契约明确拒绝工具/知识/记忆非空绑定。
+当前：React双应用→NestJS模块化单体→Interview/Lab服务→LangGraph或配置型模型工作流→Gateway/数据。B1a改动中AgentRuntimeService通过构造期Registry包装既有实现（尚待本批精确CI验收）；ToolRunner与配置运行尚未连通；Interview仍用legacy-sse-bridge。现有Single/Finite运行契约明确拒绝工具/知识/记忆非空绑定。
 
 目标：领域状态与权限、版本和发布证据稳定，具体引擎/模型/检索/评测/观测可以替换。保留Prisma/PostgreSQL事实来源；Redis和向量索引不是身份/发布事实来源。
 
@@ -61,3 +61,9 @@
 ## 迁移与回滚
 
 B1只包装现有运行路径并做双实现合同回归；B2逐个工具切换到ToolRunner，不一次迁移全部工具；B3加会话快照和稳定事件；B4增加EvaluatorAdapter与人工校准；B5才开放受控候选生成。旧HTTP接口保留兼容，schema加字段先可空/回填验证再约束；不清账本或改组织归属。回滚切回前一已发布应用版本，保留新历史和迁移字段；需要副作用补偿时提供明确收据，不能伪称事务回滚外部调用。
+
+## B1a实现边界（2026-10-20，限定实链已过/待远端CI）
+
+RuntimeAdapterRegistry/Nest工厂已接入runAgent的准备与执行，包装legacy与single/finite，并以message能力拒绝未知或不支持的适配器。构造期注册对象/manifest为可信服务端配置，不是动态插件或沙箱。领域仍负责workspace、版本和Run终态/CAS/Trace/费用；队列准入与外部桥保留旧路径。
+
+当前内部context及返回值仍是既有执行输入/graph-result形状，不等于上文完整运行信封或统一事件合同；其他Ports仍PROPOSED。替代实现目前只有受限合成合同证据，不能声称真实生产引擎切换或完整B1完成。证据入口：docs/acceptance/RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md。

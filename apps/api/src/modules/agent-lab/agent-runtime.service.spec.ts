@@ -1,3 +1,4 @@
+import { RuntimeAdapterRegistry } from './runtime-adapter.registry';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { AgentRuntimeService } from './agent-runtime.service';
 
@@ -56,6 +57,30 @@ const publishedInterviewVersion = {
 };
 
 describe('AgentRuntimeService', () => {
+  it.each(['synthetic-one', 'synthetic-two'])('dispatches %s through the injected registry while retaining Run lifecycle ownership', async id => {
+    const prisma: any = createPrismaMock();
+    prisma.agent.findFirst.mockResolvedValue({ id: 'agent-1', currentVersion: { ...publishedInterviewVersion, runtimeConfig: { adapter: id } } });
+    prisma.run.create.mockResolvedValue({ id: 'run-1' });
+    prisma.run.update.mockImplementation(async ({ data }: any) => ({ id: 'run-1', ...data }));
+    const execute = jest.fn().mockResolvedValue({ response: 'Synthetic registered response' });
+    const registry = new RuntimeAdapterRegistry([{ manifest: { id, mode: 'legacy', capabilities: ['message'] }, prepare: async () => ({ ready: true }), execute }]);
+    const legacy = { isEnabled: jest.fn(), run: jest.fn() };
+    const service = new AgentRuntimeService(prisma, legacy as any, createTraceMock() as any, createTraceBundleMock() as any, undefined, registry);
+    const result = await service.runAgent('user-1', 'agent-1', { input: { message: 'Synthetic input' } });
+    expect(result.status).toBe('COMPLETED');
+    expect(result.output.response).toBe('Synthetic registered response');
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-1', workspaceId: 'workspace-1', run: { id: 'run-1' }, prepared: { ready: true } }));
+    expect(legacy.run).not.toHaveBeenCalled();
+  });
+  it('rejects unknown adapters before creating a Run or invoking the engine', async () => {
+    const prisma: any = createPrismaMock();
+    prisma.agent.findFirst.mockResolvedValue({ id: 'agent-1', currentVersion: { ...publishedInterviewVersion, runtimeConfig: { adapter: 'unknown-engine' } } });
+    const legacy = { isEnabled: jest.fn(), run: jest.fn() };
+    const service = new AgentRuntimeService(prisma, legacy as any, createTraceMock() as any, createTraceBundleMock() as any);
+    await expect(service.runAgent('user-1', 'agent-1', { input: { message: 'Synthetic input' } })).rejects.toThrow('未知运行适配器');
+    expect(prisma.run.create).not.toHaveBeenCalled(); expect(legacy.run).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
   });

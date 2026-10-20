@@ -40,3 +40,5 @@ AgentLab扩展ConfiguredRuntimeService与ConfiguredRunJobsService；AgentVersion
 目标端口与兼容迁移见[REPLACEABLE_AGENT_CONTRACTS](../architecture/REPLACEABLE_AGENT_CONTRACTS.md)。当前AgentRuntimeService仍直接依赖MultiAgentService并按适配器字符串分支；ToolRunner未贯穿所有旧工具路径，配置Agent拒绝非空tool/knowledge/memory绑定。规则评测与发布治理存在，语义Judge/人工校准未交付。不能称为已完成可替换通用Agent平台。
 
 本轮Bridge回合固定一个PUBLISHED快照，并将id传入startExternalRun/核验返回Run，避免并发发布造成记录与policy错配；关联失败尽力终结Run。Interview控制器仍允许Bridge失败后继续原流程，这不是强制已发布策略合同；会话快照与策略/遥测拆分为B3。前端简历确认只有真实成功回执才解锁，并隔离页面/请求生命周期。无新增表、API形状、模型或付费调用。
+
+B1a限定检查通过/待远端CI实现：agent-lab/runtime-adapter.registry.ts + builtin-runtime.adapters.ts经Nest factory接入AgentRuntimeService.runAgent，既有legacy/single/finite包装；Run/权限/CAS/Trace/费用仍领域服务拥有，非动态插件/完整统一事件。见RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md。
