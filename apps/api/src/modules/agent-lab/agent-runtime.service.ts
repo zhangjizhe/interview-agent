@@ -1,3 +1,4 @@
+import { normalizeRuntimeOutput, RuntimeOutputContractError, runtimeFailureEvidence } from './runtime-result.contract';
 import { RuntimeAdapterRegistry } from './runtime-adapter.registry';
 import { createBuiltinRuntimeAdapters } from './builtin-runtime.adapters';
 import { assertSchema } from './configured-runtime.contract';
@@ -114,18 +115,12 @@ export class AgentRuntimeService {
       },
     });
 
+    let executionResult: unknown;
     try {
-      const graphResult: any = await adapter.execute({ ...adapterContext, run, prepared });
+      const graphResult: any = executionResult = await adapter.execute({ ...adapterContext, run, prepared });
       const completedAt = new Date();
       const latencyMs = completedAt.getTime() - startedAt.getTime();
-      const output = graphResult.output || {
-        response: graphResult.response,
-        intent: graphResult.intent,
-        plan: graphResult.plan,
-        pastSteps: graphResult.pastSteps,
-        steps: graphResult.steps,
-        threadId: graphResult.threadId,
-      };
+      const output = normalizeRuntimeOutput(graphResult);
 
       const completion = {
         data: {
@@ -159,18 +154,21 @@ export class AgentRuntimeService {
       });
       return completed;
     } catch (error: any) {
+      const failureEvidence = error instanceof RuntimeOutputContractError ? runtimeFailureEvidence(executionResult) : {};
       const completedAt = new Date();
       const latencyMs = completedAt.getTime() - startedAt.getTime();
       const message = error?.message || '运行时执行失败';
       await (options.queuedRun ? this.prisma.run.updateMany({
         where: { id: run.id, status: 'RUNNING', ...(options.queuedRun ? { leaseOwner: run.leaseOwner } : {}) },
         data: {
+          ...failureEvidence,
           status: error instanceof RuntimeCancelledError ? 'CANCELLED' : 'FAILED',
           error: message,
           latencyMs,
           completedAt,
         },
       }) : this.prisma.run.update({ where: { id: run.id }, data: {
+        ...failureEvidence,
         status: error instanceof RuntimeCancelledError ? 'CANCELLED' : 'FAILED', error: message, latencyMs, completedAt,
       } }));
       await this.writeTrace(run.id, {
@@ -180,6 +178,8 @@ export class AgentRuntimeService {
         payload: { status: error instanceof RuntimeCancelledError ? 'CANCELLED' : 'FAILED', error: message },
         latencyMs,
         error: message,
+        tokenUsage: failureEvidence.tokenUsage,
+        estimatedCost: failureEvidence.estimatedCost,
       });
       if (error && typeof error === 'object') {
         error.agentLabRunId = run.id;

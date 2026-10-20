@@ -57,6 +57,29 @@ const publishedInterviewVersion = {
 };
 
 describe('AgentRuntimeService', () => {
+  it('retains returned usage and estimated cost when invalid output makes the Run fail', async () => {
+    const prisma: any = createPrismaMock(); prisma.agent.findFirst.mockResolvedValue({ id: 'agent-1', currentVersion: publishedInterviewVersion });
+    prisma.run.create.mockResolvedValue({ id: 'run-1' }); prisma.run.update.mockResolvedValue({ id: 'run-1', status: 'FAILED' });
+    const tokenUsage = { promptTokens: 4, completionTokens: 2, totalTokens: 6, calls: 1, models: ['synthetic'] };
+    const multi = { isEnabled: () => true, run: jest.fn().mockResolvedValue({ output: [], tokenUsage, estimatedCostCny: 0.012 }) };
+    const service = new AgentRuntimeService(prisma, multi as any, createTraceMock() as any, createTraceBundleMock() as any);
+    await expect(service.runAgent('user-1', 'agent-1', { input: { message: 'Synthetic input' } })).rejects.toThrow('运行适配器最终输出无效');
+    expect(prisma.run.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED', tokenUsage, estimatedCost: 0.012 }) }));
+    expect(multi.run).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([{}, { response: 42 }, { output: [] }, { output: { response: false } }])('does not complete a malformed adapter result %j', async result => {
+    const prisma: any = createPrismaMock();
+    prisma.agent.findFirst.mockResolvedValue({ id: 'agent-1', currentVersion: publishedInterviewVersion });
+    prisma.run.create.mockResolvedValue({ id: 'run-1' }); prisma.run.update.mockResolvedValue({ id: 'run-1', status: 'FAILED' });
+    const multi = { isEnabled: () => true, run: jest.fn().mockResolvedValue(result) }; const trace = createTraceMock();
+    const service = new AgentRuntimeService(prisma, multi as any, trace as any, createTraceBundleMock() as any);
+    await expect(service.runAgent('user-1', 'agent-1', { input: { message: 'Synthetic input' } })).rejects.toThrow('运行适配器最终输出无效');
+    expect(prisma.run.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED' }) }));
+    expect(prisma.run.update.mock.calls.some((call: any) => call[0].data.status === 'COMPLETED')).toBe(false);
+    expect(multi.run).toHaveBeenCalledTimes(1);
+  });
+
   it.each(['synthetic-one', 'synthetic-two'])('dispatches %s through the injected registry while retaining Run lifecycle ownership', async id => {
     const prisma: any = createPrismaMock();
     prisma.agent.findFirst.mockResolvedValue({ id: 'agent-1', currentVersion: { ...publishedInterviewVersion, runtimeConfig: { adapter: id } } });

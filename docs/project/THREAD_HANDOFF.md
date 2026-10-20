@@ -1,4 +1,8 @@
 # 交接
+## B1b运行结果边界（本地限定验收通过）
+
+48项相关测试、API构建与定向lint通过；已修复无效输出误记成功及失败丢失合规用量/估算，独立源码终审无阻断。首最新镜像完整链exit0，实际API91/91、浏览器失败历史/费用及严格PG/向量恢复通过。待提交推送和本次精确CI/PR合并，不继承PR46 CI。详见../acceptance/RUNTIME_RESULT_BOUNDARY_EVIDENCE.md；外部模型费用0，整体NOT_ACCEPTED。
+
 
 更新：2026-10-19 · PRODUCT-REACCEPTANCE-1
 
@@ -12,6 +16,6 @@
 8. 当前预览不能推定最新部署，生产/真实质量/全UI验收仍NOT_ACCEPTED。当前仪表仅内部预发布复核。
 9. 排除历史费用报告、旧截图及TASK-034本地未跟踪文件，不重置或提交。
 
-下一步：B1a注册/分发限定阶段通过：27相关测试/lint/type/build、首新API实链89/全browser/严格PG向量恢复及独立终审。待提交推送/新PR及精确CI，绿后SHA合并核main。API fe3f6b14…、Lab29778e0b…完整digest见RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md；synthetic替代实现不是生产插件，统一事件/完整信封仍未做，整体NOT_ACCEPTED/外部费0。
+下一步：B1a注册/分发限定阶段通过：27相关测试/lint/type/build、首新API实链89/全browser/严格PG向量恢复及独立终审。c79b11a已推送核远端，PR46精确head六项CI成功，已合并核远端main5fba68332751081818f0506dcb64c3632fd5dc37，agent-lab快进。PR46远端核验完成；下一主题补B1未完成合同，不继承旧CI。API fe3f6b14…、Lab29778e0b…完整digest见RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md；synthetic替代实现不是生产插件，统一事件/完整信封仍未做，整体NOT_ACCEPTED/外部费0。
 
 [旧交接完整快照](archive/reacceptance-2026-10-18/THREAD_HANDOFF.md) · [当前验收仪表](../acceptance/INTERNAL_PRE_RELEASE_STATUS.md)
