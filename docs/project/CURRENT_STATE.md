@@ -1,6 +1,9 @@
 # 当前状态
 
-当前单主题B0-POLICY-ADMISSION：本地限定阶段验收通过，相关14测试/lint/type/build，最终新候选镜像完整exit0：API93、Lab及候选真实浏览器（拒绝提示/可重试/跨会话清旧错）、严格PG及实际向量恢复，独立终审无阻断。保留早期夹具bootstrap/旧Lab门禁超时与键盘/解码脚本失败；原始根因边界见INTERVIEW_POLICY_ADMISSION_EVIDENCE.md。UI清单987（180交互/807展示）全部最终NOT_ACCEPTED，旧986审查字段保留。待提交推送/精确CI/PR，不继承PR47绿灯；外部费用0，整体NOT_ACCEPTED。
+当前单主题CI安全前置：1b3e0f3精确push run39488684415镜像产品检查成功，lint-type-test在security-audit前置失败（尚未执行lint/test），不得合并。三条新增Hono/follow-redirects公告已核官方并最小更新hono4.13.11/follow1.16.1，冻结install/原audit通过；安全回归12+离线消费者27、lint/type/build通过。新三端镜像首完整实链exit0（实际MCP协议/API93/双浏览器/严格PG与向量恢复），独立终审无阻断，待提交该补丁及新精确CI/PR，见SECURITY_DEPENDENCY_GATE_2026_10_21.md。未知费用和整体NOT_ACCEPTED保留。
+
+
+当前单主题B0-POLICY-ADMISSION：本地限定阶段验收通过，相关14测试/lint/type/build，最终新候选镜像完整exit0：API93、Lab及候选真实浏览器（拒绝提示/可重试/跨会话清旧错）、严格PG及实际向量恢复，独立终审无阻断。保留早期夹具bootstrap/旧Lab门禁超时与键盘/解码脚本失败；原始根因边界见INTERVIEW_POLICY_ADMISSION_EVIDENCE.md。UI清单987（180交互/807展示）全部最终NOT_ACCEPTED，旧986审查字段保留。1b3e0f31e409ade529746ff4b70353ce26e3ca1e已提交推送并核origin/agent-lab；PR读取及精确CI查询连续TCPreset，尚未创建本批PR/未合并。恢复后先查现有PR再创建并attach，全部精确CI成功才冻结head合并核main；不继承PR47绿灯；外部费用0，整体NOT_ACCEPTED。
 
 ## B1b运行结果边界（本地限定验收通过）
 

@@ -4,7 +4,7 @@
 
 用户要求全产品严谨重新验收：每个交互/展示先明确产品合同，API/持久化与浏览器独立二次确认，授权独立测试Agent；自主持续推进，合格阶段才经PR合并main，覆盖旧逐Phase等待规则。所有改动在agent-lab，不提交无关历史修改或秘密。
 
-当前子主题：B0-POLICY-ADMISSION。B1消费者审查发现Interview吞startTurn错误后空策略继续模型，优先修该准入缺口。修复与14相关测试/lint/type/build通过；最终新镜像API93、Lab+候选浏览器及严格PG/向量恢复exit0、独立终审无阻断。待本次精确CI/PR合并，整体未通过。详见../acceptance/INTERVIEW_POLICY_ADMISSION_EVIDENCE.md。B1b已由PR47精确六项CI验收合并并核远端a5e32ed；B1其余合同仍待完成。
+当前子主题：CI-SECURITY-PREREQUISITE。策略修复1b3e0f3已推送，但精确CI在新生产安全公告审计处失败，先最小升级两传递依赖并验收新镜像，禁止放白名单/跳门。原audit/安全回归12+消费者27/lint/type/build及新三端首完整实链exit0，独立复核无阻断；待提交并核新精确CI/PR；策略交付尚未PR/合并，完整产品NOT_ACCEPTED。详见../acceptance/SECURITY_DEPENDENCY_GATE_2026_10_21.md。
 
 2026-10-19 23:40远端同步核验：PR43最终head76e4274六项CI成功并合并1aeeec3；PR44精确a8fcb7d4dc3ae4e22e6080cd4c0e4945fa48a3e3六项CI成功并合并，远端main与agent-lab均为ce1813159c6e96ea9d0dab8bbebf07703a70b1cb，本地agent-lab已快进。此轮仅核对远端和同步，未本地重跑、未部署、未付费模型调用；采用新交接的B0及全自建规划剩余范围，整体NOT_ACCEPTED。
 
