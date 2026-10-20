@@ -1,4 +1,8 @@
 # 当前状态
+## B1b运行结果边界（本地限定验收通过）
+
+48项相关测试、API构建与定向lint通过；已修复无效输出误记成功及失败丢失合规用量/估算，独立源码终审无阻断。首最新镜像完整链exit0，实际API91/91、浏览器失败历史/费用及严格PG/向量恢复通过。待提交推送和本次精确CI/PR合并，不继承PR46 CI。详见../acceptance/RUNTIME_RESULT_BOUNDARY_EVIDENCE.md；外部模型费用0，整体NOT_ACCEPTED。
+
 
 更新：2026-10-19 · 唯一活动任务 PRODUCT-REACCEPTANCE-1
 
@@ -10,7 +14,7 @@
 
 ## B1a适配器注册与实际分发
 
-RuntimeAdapterRegistry/Nest factory包装legacy/single/finite，实际runAgent经resolve→prepare→execute；状态/权限/版本/CAS/Trace/费用仍领域服务拥有。未知引擎/所需能力显式拒绝，不动态加载代码。相关27/27及lint/type/build、独立审核通过；首新API镜像实链API89/完整浏览器/严格PG向量恢复exit0，双构造期合成实现持久输出/版本/Trace并UI读回，实际Nest未知引擎400且不建Run。待新提交CI/PR，非完整B1/统一事件/完整信封/生产插件。证据RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md，外部费用0。
+RuntimeAdapterRegistry/Nest factory包装legacy/single/finite，实际runAgent经resolve→prepare→execute；状态/权限/版本/CAS/Trace/费用仍领域服务拥有。未知引擎/所需能力显式拒绝，不动态加载代码。相关27/27及lint/type/build、独立审核通过；首新API镜像实链API89/完整浏览器/严格PG向量恢复exit0，双构造期合成实现持久输出/版本/Trace并UI读回，实际Nest未知引擎400且不建Run。c79b11a已推送核远端，PR46精确head六项CI成功，已合并核远端main5fba68332751081818f0506dcb64c3632fd5dc37，agent-lab快进，非完整B1/统一事件/完整信封/生产插件。证据RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md，外部费用0。
 
 ## B0外部Run初始化清理
 

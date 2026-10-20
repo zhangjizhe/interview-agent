@@ -41,4 +41,6 @@ AgentLab扩展ConfiguredRuntimeService与ConfiguredRunJobsService；AgentVersion
 
 本轮Bridge回合固定一个PUBLISHED快照，并将id传入startExternalRun/核验返回Run，避免并发发布造成记录与policy错配；关联失败尽力终结Run。Interview控制器仍允许Bridge失败后继续原流程，这不是强制已发布策略合同；会话快照与策略/遥测拆分为B3。前端简历确认只有真实成功回执才解锁，并隔离页面/请求生命周期。无新增表、API形状、模型或付费调用。
 
-B1a限定检查通过/待远端CI实现：agent-lab/runtime-adapter.registry.ts + builtin-runtime.adapters.ts经Nest factory接入AgentRuntimeService.runAgent，既有legacy/single/finite包装；Run/权限/CAS/Trace/费用仍领域服务拥有，非动态插件/完整统一事件。见RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md。
+B1a已由PR46精确CI验收并合并：agent-lab/runtime-adapter.registry.ts + builtin-runtime.adapters.ts经Nest factory接入AgentRuntimeService.runAgent，既有legacy/single/finite包装；Run/权限/CAS/Trace/费用仍领域服务拥有，非动态插件/完整统一事件。见RUNTIME_ADAPTER_REGISTRY_EVIDENCE.md。
+
+B1b增量（本地限定实链验收通过）：runAgent完成前经runtime-result.contract校验显式output/旧response对象；无效输出走既有失败状态/CAS/Trace，保留格式有效的适配器报告用量与估算，未知不补零。无API/schema/权限变更，非语义质量/完整信封/统一事件或真实账单。详见RUNTIME_RESULT_BOUNDARY_EVIDENCE.md；首新镜像API91/浏览器/严格恢复通过，精确CI待核。
