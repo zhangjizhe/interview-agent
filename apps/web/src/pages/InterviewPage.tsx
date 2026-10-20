@@ -50,6 +50,8 @@ export function InterviewPage() {
   const input = useInterviewStore((s) => s.input);
   const streaming = useInterviewStore((s) => s.streaming);
   const reconnecting = useInterviewStore((s) => s.reconnecting);
+  const streamError = useInterviewStore((s) => s.error);
+  useEffect(() => { useInterviewStore.getState().setError(null); }, [interviewId]);
   const hitlPending = useInterviewStore((s) => s.hitlPending);
   const setHitlPending = useInterviewStore((s) => s.setHitlPending);
 
@@ -764,6 +766,8 @@ export function InterviewPage() {
                 )}
               </div>
             </div>
+
+            {streamError && <p role="alert" className="mx-auto max-w-3xl px-3 py-2 text-sm text-red-700">{streamError}</p>}
 
             {/* 输入区 */}
             <div

@@ -83,7 +83,7 @@ check('logged out access token rejected', (await request('/auth/profile', { toke
 check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: sibling.data.refreshToken } })).status === 401);
 check('other device remains authenticated', (await request('/auth/profile', { token: owner })).status === 200);
 const require = createRequire(`${process.cwd()}/package.json`);
-await require('/tmp/verify-external-run-init.cjs')({ request, admin, check });
+await require('/tmp/verify-external-run-init.cjs')({ request, admin, owner, check });
 await require('/tmp/verify-runtime-adapters.cjs')({ request, admin, check });
 await require('/tmp/verify-training-loop.cjs')({ request, owner, targetJobId: created.data.id, check });
 await require('/tmp/verify-question-store.cjs')({ check });

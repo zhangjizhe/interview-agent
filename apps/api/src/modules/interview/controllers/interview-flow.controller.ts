@@ -275,39 +275,36 @@ export class InterviewFlowController {
     }
     const candidateMessage = claim.message;
     let labRunId: string | null = null;
-    let approvedAgentPolicy = '';
-    try {
-      const labRun = await this.interviewLab.startTurn(req.user.userId, interview, dto.content);
-      labRunId = labRun.id;
-      approvedAgentPolicy = labRun.approvedPolicy;
-    } catch {
-      // Lab observability must not block candidate delivery.
-    }
-
-    const ctx: AgentContext = {
-      userId: interview.userId,
-      sessionId: interviewId,
-      position: interview.position,
-      level: interview.level,
-      // P0-3 修复：传 provider，让 maxTokens 走对应 provider 配置
-      provider: (dto as any).provider || 'qwen',
-      answerMessageId: candidateMessage.id,
-      interviewMode: interview.mode,
-      practiceSkillId: interview.practiceSkill?.id,
-      practiceSkillName: interview.practiceSkill?.name,
-      targetJobId: interview.targetJobId || undefined,
-      targetJobProfileVersion: interview.targetJobProfileVersion || undefined,
-      approvedAgentPolicy,
-    };
-
     let fullResponse = '';
     let assistantPersisted = false;
 
-    // 默认走 multi 模式（LangGraph Supervisor 拓扑），SSE 流式逐 token 推送
-    // 路径：processMessage → MultiAgentService.stream → graph.stream(streamMode='messages')
-    // LlmGatewayChatModel adapter 确保 multi 模式也经过 LlmGateway（P0 缓存层）
-    // llm-direct 模式走 LlmGatewayService.streamChat（纯 LLM，无 Agent 拓扑）
     try {
+      const labRun = await this.interviewLab.startTurn(req.user.userId, interview, dto.content);
+      labRunId = labRun.id;
+      // Published policy and application association are required admission facts.
+      // A failed initialization must never fall back to an empty policy.
+      const approvedAgentPolicy = labRun.approvedPolicy;
+
+      const ctx: AgentContext = {
+        userId: interview.userId,
+        sessionId: interviewId,
+        position: interview.position,
+        level: interview.level,
+        // P0-3 修复：传 provider，让 maxTokens 走对应 provider 配置
+        provider: (dto as any).provider || 'qwen',
+        answerMessageId: candidateMessage.id,
+        interviewMode: interview.mode,
+        practiceSkillId: interview.practiceSkill?.id,
+        practiceSkillName: interview.practiceSkill?.name,
+        targetJobId: interview.targetJobId || undefined,
+        targetJobProfileVersion: interview.targetJobProfileVersion || undefined,
+        approvedAgentPolicy,
+      };
+
+      // 默认走 multi 模式（LangGraph Supervisor 拓扑），SSE 流式逐 token 推送
+      // 路径：processMessage → MultiAgentService.stream → graph.stream(streamMode='messages')
+      // LlmGatewayChatModel adapter 确保 multi 模式也经过 LlmGateway（P0 缓存层）
+      // llm-direct 模式走 LlmGatewayService.streamChat（纯 LLM，无 Agent 拓扑）
       for await (const event of this.agent.processMessage(ctx, dto.content)) {
         const quotaFailure = tenantContext.getStore()?.quotaFailure;
         if (quotaFailure) throw new HttpException(quotaFailure, quotaFailure.status);

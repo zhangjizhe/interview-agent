@@ -102,7 +102,7 @@ describe('InterviewFlowController stream replay', () => {
     } };
     const controller = new InterviewFlowController(agent as any, {} as any, {} as any, {} as any,
       { interview: { findFirst: async () => ({ id: 'i', userId: 'u', status: 'IN_PROGRESS' }) } } as any,
-      delivery as any, { startTurn: async () => { throw new Error('disabled'); } } as any);
+      delivery as any, { startTurn: async () => ({ id: 'fixture-run', approvedPolicy: 'Synthetic approved policy' }), failTurn: async () => undefined } as any);
     await tenantContext.run({ organizationId: 'o', userId: 'u' }, () => controller.streamMessage('i', { userId: 'u', content: 'test' }, { user: { userId: 'u' } }, response as any));
     expect(writes.join('')).toContain('"code":"QUOTA_EXCEEDED"');
     expect(writes.join('')).not.toContain('[DONE]');
