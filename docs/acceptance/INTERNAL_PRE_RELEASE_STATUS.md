@@ -11,7 +11,7 @@
 | main | PR40已合并，`ade07bf2139f628b49a87d7f0fbf4c892a15649a`；对应head8b943a0六项CI成功 | 后续资料提交或其他SHA自动通过 |
 | 隔离镜像 | API `sha256:0ee7eec3d49142eb5332bb89a513d6a9331af68371edc69b39e0709f54cf3a6c`；Lab `sha256:73da2faf1b42369aa928af58b7142279aa482588982c601dcb93cf2efb2993dc` | 当前业务预览已部署这些镜像 |
 | 最近完整链 | API82/82、完整隔离浏览器、PG schema/行多集/sequence一致、实际Milvus题目/Qdrant向量payload恢复，exit0 | 真实模型质量、生产RPO/RTO或所有UI状态通过 |
-| UI清单 | 986模板：180交互/806展示；986最终NOT_ACCEPTED | 模板数或PARTIAL项等于运行时覆盖率 |
+| UI清单 | 987模板：180交互/807展示；987最终NOT_ACCEPTED | 模板数或PARTIAL项等于运行时覆盖率 |
 | CI | ci-api已执行隔离浏览器、题目迁移存储合同和恢复链 | 离线fixture证明真实外部协议或模型效果 |
 | 费用 | 近期验收外部0；历史已知评测小计0.069285CNY，另有未知费用 | 未知账单为零，或剩余额度已确认 |
 

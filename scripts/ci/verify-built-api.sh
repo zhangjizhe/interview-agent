@@ -11,6 +11,7 @@ fixture_milvus="$fixture_network-milvus"
 fixture_qdrant="$fixture_network-qdrant"
 fixture_api="$fixture_network-api"
 fixture_lab="$fixture_network-lab"
+fixture_web="$fixture_network-web"
 fixture_backup="$(mktemp -d "${TMPDIR:-/tmp}/interview-recovery.XXXXXX")"
 chmod 700 "$fixture_backup"
 qdrant_image='qdrant/qdrant@sha256:75eab8c4ba42096724fdcfde8b4de0b5713d529dde32f285a1f86fdcb2c9e50c'
@@ -21,7 +22,7 @@ cleanup() {
     docker logs --tail 120 "$fixture_etcd" >&2 2>/dev/null || true
     docker logs --tail 120 "$fixture_qdrant" >&2 2>/dev/null || true
   fi
-  docker rm -fv "$fixture_lab" "$fixture_api" "$fixture_pg" "$fixture_redis" "$fixture_milvus" "$fixture_etcd" "$fixture_qdrant" >/dev/null 2>&1 || true
+  docker rm -fv "$fixture_web" "$fixture_lab" "$fixture_api" "$fixture_pg" "$fixture_redis" "$fixture_milvus" "$fixture_etcd" "$fixture_qdrant" >/dev/null 2>&1 || true
   docker network rm "$fixture_network" >/dev/null 2>&1 || true
   if [[ "$status" -ne 0 && "${FIXTURE_KEEP_FAILURE:-}" == "1" ]]; then
     echo "Synthetic recovery diagnostics retained: $fixture_backup" >&2
@@ -107,6 +108,11 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
     test "$fixture_browser_ready" = true
   fi
   docker rm -fv "$fixture_lab" >/dev/null
+  docker run -d --name "$fixture_web" --network "$fixture_network" -p 127.0.0.1:5177:80 "${FIXTURE_WEB_IMAGE:-interview-web:verification}" >/dev/null
+  docker network connect bridge "$fixture_web"
+  docker cp scripts/ci/fixture-policy-browser.cjs "$fixture_api:/tmp/fixture-policy-browser.cjs"
+  LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/interview-policy-admission.mjs
+  docker rm -fv "$fixture_web" >/dev/null
 fi
 docker exec "$fixture_api" node /tmp/verify-vector-recovery.cjs seed
 

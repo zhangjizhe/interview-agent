@@ -19,7 +19,7 @@ describe('Interview SSE current delivery contract', () => {
   const agent = { processMessage: jest.fn() };
   const prisma = { interview: { findFirst: jest.fn() } };
   const delivery = { claimCandidateMessage: jest.fn(), persistAssistantResponse: jest.fn(), releaseUnansweredMessage: jest.fn().mockResolvedValue(undefined) };
-  const lab = { startTurn: jest.fn().mockRejectedValue(new Error('fixture disabled')) };
+  const lab = { startTurn: jest.fn(), completeTurn: jest.fn(), failTurn: jest.fn() };
   beforeAll(async () => {
     const module = await Test.createTestingModule({ controllers: [InterviewFlowController], providers: [
       { provide: InterviewAgentService, useValue: agent }, { provide: PrismaService, useValue: prisma },
@@ -30,7 +30,7 @@ describe('Interview SSE current delivery contract', () => {
     await app.listen(0, '127.0.0.1'); base = await app.getUrl();
   });
   beforeEach(() => {
-    jest.clearAllMocks(); prisma.interview.findFirst.mockResolvedValue({ id: 'fixture', userId: 'fixture-user', status: 'ACTIVE', position: 'Engineer', level: 'P5' });
+    jest.clearAllMocks(); lab.startTurn.mockResolvedValue({ id: 'fixture-run', approvedPolicy: 'Synthetic approved policy' }); lab.completeTurn.mockResolvedValue(undefined); lab.failTurn.mockResolvedValue(undefined); prisma.interview.findFirst.mockResolvedValue({ id: 'fixture', userId: 'fixture-user', status: 'ACTIVE', position: 'Engineer', level: 'P5' });
     delivery.claimCandidateMessage.mockResolvedValue({ state: 'new', message: { id: 'fixture-message' } });
     agent.processMessage.mockImplementation(async function* () { yield { type: 'thinking', content: 'private detail' }; yield { type: 'token', content: 'hello\nworld' }; });
   });
@@ -45,8 +45,20 @@ describe('Interview SSE current delivery contract', () => {
     const tokens = text.split('\n\n').filter(line => line.startsWith('data: {')).map(line => JSON.parse(line.slice(6)));
     expect(tokens.map(event => event.type)).toEqual(['heartbeat', 'token']);
     expect(tokens[1].content).toBe('hello\nworld'); expect(text).toContain('data: [DONE]\n\n');
+    expect(agent.processMessage).toHaveBeenCalledWith(expect.objectContaining({ approvedAgentPolicy: 'Synthetic approved policy' }), 'synthetic input');
     expect(text).not.toContain('private detail'); expect(delivery.persistAssistantResponse).toHaveBeenCalledTimes(1);
   });
+  it('does not call the agent when required published policy initialization fails', async () => {
+    lab.startTurn.mockRejectedValue(new Error('synthetic-private-policy-error'));
+    const { text } = await post();
+    expect(text).toContain('"type":"error"'); expect(text).not.toContain('[DONE]');
+    expect(text).not.toContain('synthetic-private-policy-error');
+    expect(agent.processMessage).not.toHaveBeenCalled();
+    expect(delivery.persistAssistantResponse).not.toHaveBeenCalled();
+    expect(delivery.releaseUnansweredMessage).toHaveBeenCalledWith('fixture-message');
+    expect(delivery.releaseUnansweredMessage).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects empty input before claiming or invoking a model', async () => {
     expect((await post('')).text).toContain('"type":"error"');
     expect(delivery.claimCandidateMessage).not.toHaveBeenCalled(); expect(agent.processMessage).not.toHaveBeenCalled();

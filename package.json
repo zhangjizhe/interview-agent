@@ -46,11 +46,12 @@
       "@modelcontextprotocol/sdk": "1.32.1",
       "qs": "6.16.0",
       "protobufjs@7": "7.6.5",
-      "hono": "4.13.7",
+      "hono": "4.13.11",
       "@hono/node-server": "1.19.15",
       "body-parser@1": "1.20.6",
       "mongoose@9": "9.7.2",
-      "mem0ai>uuid": "11.1.1"
+      "mem0ai>uuid": "11.1.1",
+      "follow-redirects": "1.16.1"
     },
     "patchedDependencies": {
       "braces@3.0.3": "patches/braces@3.0.3.patch"
