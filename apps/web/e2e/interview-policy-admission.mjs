@@ -1,3 +1,4 @@
+import { verifyHistorySessionBoundary } from './interview-history-session-evidence.mjs';
 import { verifyStreamSessionBoundary } from './interview-stream-session-evidence.mjs';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
@@ -30,6 +31,7 @@ try {
     assert.ok(!(await page.locator('body').innerText()).includes('synthetic-private-policy'));
   }
   await verifyStreamSessionBoundary(page, data, composer);
+  await verifyHistorySessionBoundary(page, data, composer);
   assert.deepEqual(errors, []);
   console.log('PASS candidate policy browser: real SSE refusal, visible generic error, composer restored and explicit retry, no model/ledger/message persistence');
 } catch (error) { firstError = error; throw error; }
