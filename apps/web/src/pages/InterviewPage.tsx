@@ -102,25 +102,26 @@ export function InterviewPage() {
   };
 
   // Each route lifetime has its own identity, including A → B → A.
-  const historyLifetime = useRef<object>({});
+  const pageLifetime = useRef<object>({});
   const historyRequest = useRef(0);
   useEffect(() => {
     const lifetime = {};
-    historyLifetime.current = lifetime;
-    return () => { historyLifetime.current = {}; };
-  }, [interviewId]);
+    pageLifetime.current = lifetime;
+    setEnding(false);
+    return () => { pageLifetime.current = {}; setEnding(false); };
+  }, [interviewId, setEnding]);
 
   const { pullDistance, refreshing, pullRef } = usePullToRefresh({
     onRefresh: async () => {
       if (!interviewId) return;
-      const lifetime = historyLifetime.current;
+      const lifetime = pageLifetime.current;
       const request = ++historyRequest.current;
       const snapshot = useInterviewStore.getState().messages;
       if (useInterviewStore.getState().streaming || confirmPending.current) return;
       try {
         const res = await fetch(`/api/interview/${interviewId}`);
         const data = await safeJson(res);
-        if (historyLifetime.current !== lifetime || historyRequest.current !== request
+        if (pageLifetime.current !== lifetime || historyRequest.current !== request
           || useInterviewStore.getState().streaming
           || useInterviewStore.getState().messages !== snapshot) return;
         if (data?.messages) {
@@ -148,14 +149,14 @@ export function InterviewPage() {
   // 进入页面 / interviewId 变化时加载历史消息
   useEffect(() => {
     if (!interviewId) return;
-    const lifetime = historyLifetime.current;
+    const lifetime = pageLifetime.current;
     const request = ++historyRequest.current;
     const snapshot = useInterviewStore.getState().messages;
     (async () => {
       try {
         const res = await fetch(`/api/interview/${interviewId}`);
         const data = await safeJson(res);
-        if (historyLifetime.current !== lifetime || historyRequest.current !== request
+        if (pageLifetime.current !== lifetime || historyRequest.current !== request
           || useInterviewStore.getState().streaming
           || useInterviewStore.getState().messages !== snapshot) return;
         if (data?.messages) {
@@ -231,6 +232,8 @@ export function InterviewPage() {
 
   const handleEnd = async () => {
     if (!interviewId || ending) return;
+    const lifetime = pageLifetime.current;
+    const isCurrentEnd = () => pageLifetime.current === lifetime;
     setEnding(true);
     setDrawerOpen(false);
 
@@ -248,6 +251,7 @@ export function InterviewPage() {
       });
       clearTimeout(timeoutId);
       const data = await safeJson(res);
+      if (!isCurrentEnd()) return;
       if (!res.ok) throw new Error(`结束面试失败 (HTTP ${res.status})`);
       if (data?.deleted === true && data.reason !== 'no_messages') {
         throw new Error('结束结果未确认，请刷新面试状态后核验。');
@@ -265,13 +269,14 @@ export function InterviewPage() {
       navigate(`/reports/${interviewId}`, { replace: true });
     } catch (err: any) {
       clearTimeout(timeoutId);
+      if (!isCurrentEnd()) return;
       if (err?.name === 'AbortError') {
         alert('生成报告超时（60 秒）。请检查后端 LLM 状态或重试。');
       } else {
         alert('生成报告失败：' + err);
       }
     } finally {
-      setEnding(false); // finally 必执行，确保按钮 loading 切回
+      if (isCurrentEnd()) setEnding(false);
     }
   };
 
