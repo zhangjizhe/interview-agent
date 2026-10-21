@@ -116,7 +116,7 @@ export function InterviewPage() {
       const lifetime = historyLifetime.current;
       const request = ++historyRequest.current;
       const snapshot = useInterviewStore.getState().messages;
-      if (useInterviewStore.getState().streaming) return;
+      if (useInterviewStore.getState().streaming || confirmPending.current) return;
       try {
         const res = await fetch(`/api/interview/${interviewId}`);
         const data = await safeJson(res);
@@ -301,6 +301,8 @@ export function InterviewPage() {
     const submittedInterviewId = interviewId;
     const attempt = ++confirmationAttempt.current;
     confirmPending.current = true;
+    // Older history snapshots predate this explicit mutation.
+    historyRequest.current += 1;
     setConfirmationError('');
     setConfirming(true);
     try {
