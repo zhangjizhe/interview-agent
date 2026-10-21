@@ -104,11 +104,17 @@ export function InterviewPage() {
   // Each route lifetime has its own identity, including A → B → A.
   const pageLifetime = useRef<object>({});
   const historyRequest = useRef(0);
+  const endRequests = useRef(new Map<AbortController, ReturnType<typeof setTimeout>>());
   useEffect(() => {
     const lifetime = {};
     pageLifetime.current = lifetime;
     setEnding(false);
-    return () => { pageLifetime.current = {}; setEnding(false); };
+    return () => {
+      pageLifetime.current = {};
+      for (const [controller, timer] of endRequests.current) { clearTimeout(timer); controller.abort(); }
+      endRequests.current.clear();
+      setEnding(false);
+    };
   }, [interviewId, setEnding]);
 
   const { pullDistance, refreshing, pullRef } = usePullToRefresh({
@@ -243,13 +249,13 @@ export function InterviewPage() {
     const controller = new AbortController();
     const END_TIMEOUT_MS = 60_000;
     const timeoutId = setTimeout(() => controller.abort(), END_TIMEOUT_MS);
+    endRequests.current.set(controller, timeoutId);
 
     try {
       const res = await fetch(`/api/interview/${interviewId}/end`, {
         method: 'POST',
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
       const data = await safeJson(res);
       if (!isCurrentEnd()) return;
       if (!res.ok) throw new Error(`结束面试失败 (HTTP ${res.status})`);
@@ -268,14 +274,15 @@ export function InterviewPage() {
       setInterviewStatus('COMPLETED'); // 标记已结束，二次进入会禁用输入
       navigate(`/reports/${interviewId}`, { replace: true });
     } catch (err: any) {
-      clearTimeout(timeoutId);
       if (!isCurrentEnd()) return;
       if (err?.name === 'AbortError') {
-        alert('生成报告超时（60 秒）。请检查后端 LLM 状态或重试。');
+        alert('结束请求超时（60 秒），结果尚未确认。请刷新面试状态后核验。');
       } else {
         alert('生成报告失败：' + err);
       }
     } finally {
+      clearTimeout(timeoutId);
+      endRequests.current.delete(controller);
       if (isCurrentEnd()) setEnding(false);
     }
   };
