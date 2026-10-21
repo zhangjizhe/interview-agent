@@ -67,7 +67,7 @@ export function InterviewPage() {
   const setUploadedName = useInterviewStore((s) => s.setUploadedName);
   const setConfirming = useInterviewStore((s) => s.setConfirming);
 
-  const { send } = useInterviewStream();
+  const { send } = useInterviewStream(interviewId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

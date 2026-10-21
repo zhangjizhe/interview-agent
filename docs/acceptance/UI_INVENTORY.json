@@ -15932,6 +15932,11 @@
       "source": "apps/web/src/pages/InterviewPage.tsx",
       "sha256": "1b9f3453dda43443a4be42c82431584cb31067ee24f157e7726bd98fdde5c868",
       "reason": "2026-10-21 policy admission error display: AST identifies one added streamError alert; reconcile remaining component/tag sequence preserving all IDs/reviews/evidence/verdict, update lines/expressions; append UI-0987 NOT_ACCEPTED."
+    },
+    {
+      "source": "apps/web/src/pages/InterviewPage.tsx",
+      "sha256": "d0eebc6dfe2c19c0f67f104d1022a5b300244593aa5dd92e7641a5d722f9116c",
+      "reason": "2026-10-21 session lifecycle: pass interviewId to stream hook; pre-JSX only. AST/native identity reconciliation confirms all entries/reviews/evidence/verdict and lines unchanged; preserve prior hash history."
     }
   ]
 }
