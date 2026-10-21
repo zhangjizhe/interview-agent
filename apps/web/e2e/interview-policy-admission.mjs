@@ -1,3 +1,4 @@
+import { verifyEndReceipt } from './interview-end-receipt-evidence.mjs';
 import { verifyConfirmationHistory } from './interview-confirmation-history-evidence.mjs';
 import { verifyHistorySessionBoundary } from './interview-history-session-evidence.mjs';
 import { verifyStreamSessionBoundary } from './interview-stream-session-evidence.mjs';
@@ -35,6 +36,7 @@ try {
   await verifyHistorySessionBoundary(page, data, composer);
   await verifyHistorySessionBoundary(page, data, composer, true);
   await verifyConfirmationHistory(page, data, control);
+  await verifyEndReceipt(page, data, control);
   assert.deepEqual(errors, []);
   console.log('PASS candidate policy browser: real SSE refusal, visible generic error, composer restored and explicit retry, no model/ledger/message persistence');
 } catch (error) { firstError = error; throw error; }

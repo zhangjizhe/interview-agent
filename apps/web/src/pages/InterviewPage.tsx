@@ -248,10 +248,18 @@ export function InterviewPage() {
       });
       clearTimeout(timeoutId);
       const data = await safeJson(res);
-      if (data?.deleted) {
+      if (!res.ok) throw new Error(`结束面试失败 (HTTP ${res.status})`);
+      if (data?.deleted === true && data.reason !== 'no_messages') {
+        throw new Error('结束结果未确认，请刷新面试状态后核验。');
+      }
+      if (data?.deleted === true && data.reason === 'no_messages') {
         alert(data.reason === 'no_messages' ? '空面试已退出，不保存' : '已退出');
         navigate('/');
         return;
+      }
+      if (typeof data?.report?.id !== 'string' || !data.report.id.trim()
+        || data.report.interviewId !== interviewId) {
+        throw new Error('结束结果未确认，请刷新面试状态后核验。');
       }
       setInterviewStatus('COMPLETED'); // 标记已结束，二次进入会禁用输入
       navigate(`/reports/${interviewId}`, { replace: true });

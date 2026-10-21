@@ -132,3 +132,37 @@ it('skips refresh while confirming and allows a fresh read after confirmation fa
   expect(useInterviewStore.getState().resumeConfirmed).toBe(true);
   view.unmount();
 });
+
+it.each(['http failure', 'empty receipt', 'wrong interview', 'blank id', 'conflicting deletion'])('does not complete an interview on an invalid end receipt: %s', async kind => {
+  vi.stubGlobal('alert', vi.fn());
+  vi.mocked(fetch).mockImplementation(async input => {
+    const ending = String(input).endsWith('/end');
+    return { ok: !ending || kind !== 'http failure', status: ending && kind === 'http failure' ? 503 : 200,
+      text: async () => JSON.stringify(ending ? kind === 'wrong interview' ? { report: { id: 'report', interviewId: 'other' } } : kind === 'blank id' ? { report: { id: '   ', interviewId: 'a' } } : kind === 'conflicting deletion' ? { deleted: true, reason: 'unknown', report: { id: 'report', interviewId: 'a' } } : {} : {}) } as Response;
+  });
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  act(() => { useInterviewStore.getState().setMessages([{ role: 'user', content: 'Synthetic answer' }]); });
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: '结束并生成报告' })); });
+  expect(useInterviewStore.getState().interviewStatus).not.toBe('COMPLETED');
+  expect(routing.navigate).not.toHaveBeenCalled();
+  expect(alert).toHaveBeenCalled();
+  expect(useInterviewStore.getState().ending).toBe(false);
+  view.unmount();
+});
+
+
+it.each(['report', 'deleted'])('accepts the valid end receipt: %s', async kind => {
+  vi.stubGlobal('alert', vi.fn());
+  vi.mocked(fetch).mockImplementation(async input => ({ ok: true, text: async () => JSON.stringify(String(input).endsWith('/end') ? kind === 'report' ? { report: { id: 'report', interviewId: 'a' } } : { deleted: true, reason: 'no_messages' } : {}) } as Response));
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  act(() => { useInterviewStore.getState().setMessages([{ role: 'user', content: 'Synthetic answer' }]); });
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: '结束并生成报告' })); });
+  if (kind === 'report') {
+    expect(useInterviewStore.getState().interviewStatus).toBe('COMPLETED');
+    expect(routing.navigate).toHaveBeenCalledWith('/reports/a', { replace: true });
+  } else expect(routing.navigate).toHaveBeenCalledWith('/');
+  expect(useInterviewStore.getState().ending).toBe(false);
+  view.unmount();
+});
