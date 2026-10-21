@@ -1,5 +1,5 @@
 import { isCandidateVisibleAgentEvent } from '../utils/candidateEvents';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useInterviewStore } from '../store/interview-store';
 import type { AgentEvent } from '@interview-agent/shared-types';
 
@@ -23,10 +23,26 @@ interface UseInterviewStreamReturn {
  * - 自动重连：最多 3 次，指数退避
  * - 使用 forceRender 机制确保每次 token 更新都触发 React 重渲染
  */
-export function useInterviewStream(): UseInterviewStreamReturn {
+export function useInterviewStream(sessionId?: string): UseInterviewStreamReturn {
   const abortRef = useRef<AbortController | null>(null);
   const reconnectingRef = useRef(false);
   const requestIdRef = useRef(0);
+
+  useEffect(() => () => {
+    const controller = abortRef.current;
+    // Invalidate before abort: an already queued reader/fetch completion must
+    // not finalize a later session's global placeholder or error state.
+    requestIdRef.current += 1;
+    abortRef.current = null;
+    reconnectingRef.current = false;
+    controller?.abort();
+    if (controller) {
+      const store = useInterviewStore.getState();
+      store.finalizeLastMessage();
+      store.setStreaming(false);
+      store.setReconnecting(false);
+    }
+  }, [sessionId]);
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

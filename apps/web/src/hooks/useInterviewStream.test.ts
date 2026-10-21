@@ -43,6 +43,49 @@ describe('useInterviewStream', () => {
     vi.useRealTimers();
   });
 
+  it.each(['switch', 'unmount'])('invalidates a held request on session lifecycle %s even if transport ignores abort', async action => {
+    let resolveResponse!: (response: Response) => void;
+    let signal!: AbortSignal;
+    vi.mocked(global.fetch).mockImplementation((_input, init) => {
+      signal = init!.signal as AbortSignal;
+      return new Promise<Response>(resolve => { resolveResponse = resolve; });
+    });
+    const { result, rerender, unmount } = renderHook(({ sessionId }) => useInterviewStream(sessionId), { initialProps: { sessionId: 'session-a' } });
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.send('session-a', 'synthetic-user', 'held answer'); });
+    await act(flushAsyncWork);
+    if (action === 'switch') rerender({ sessionId: 'session-b' }); else unmount();
+    const abortedAtBoundary = signal.aborted;
+    act(() => {
+      useInterviewStore.getState().setMessages([{ role: 'assistant', content: 'new session answer', streaming: true }]);
+      useInterviewStore.getState().setStreaming(true);
+    });
+    const body = new ReadableStream<Uint8Array>({ start(controller) {
+      controller.enqueue(new TextEncoder().encode('data: {"type":"token","content":"late old token"}\n\ndata: {"type":"error","error":"late old error"}\n\n'));
+      controller.close();
+    } });
+    await act(async () => { resolveResponse({ ok: true, status: 200, body } as Response); await pending; });
+    expect(abortedAtBoundary).toBe(true);
+    expect(useInterviewStore.getState().messages).toEqual([{ role: 'assistant', content: 'new session answer', streaming: true }]);
+    expect(useInterviewStore.getState().streaming).toBe(true);
+    expect(useInterviewStore.getState().error).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('delivers the active session response normally before its lifecycle ends', async () => {
+    const body = new ReadableStream<Uint8Array>({ start(controller) {
+      controller.enqueue(new TextEncoder().encode('data: {"type":"token","content":"current session answer"}\n\ndata: [DONE]\n\n'));
+      controller.close();
+    } });
+    vi.mocked(global.fetch).mockResolvedValue({ ok: true, status: 200, body } as Response);
+    const { result } = renderHook(() => useInterviewStream('session-current'));
+    await act(async () => { await result.current.send('session-current', 'synthetic-user', 'answer'); });
+    expect(useInterviewStore.getState().messages.at(-1)).toMatchObject({ role: 'assistant', content: 'current session answer', streaming: false });
+    expect(useInterviewStore.getState().streaming).toBe(false);
+    expect(useInterviewStore.getState().error).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   describe('SSE Event Types', () => {
     it('should define valid SSE event types', () => {
       const validEventTypes = [

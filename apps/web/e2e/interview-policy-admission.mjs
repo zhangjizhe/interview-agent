@@ -1,3 +1,4 @@
+import { verifyStreamSessionBoundary } from './interview-stream-session-evidence.mjs';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -28,10 +29,7 @@ try {
     await composer.fill('Ready for explicit retry'); assert.equal(await composer.isEnabled(), true);
     assert.ok(!(await page.locator('body').innerText()).includes('synthetic-private-policy'));
   }
-  const alternateRead = page.waitForResponse(r => r.url().endsWith(`/api/interview/${data.alternateId}`) && r.ok()); alternateRead.catch(() => undefined);
-  await page.evaluate(path => { history.pushState(null, '', path); dispatchEvent(new PopStateEvent('popstate')); }, `/interview/${data.alternateId}`);
-  await alternateRead; await composer.waitFor();
-  assert.equal(await page.getByRole('alert').filter({ hasText: '当前回答暂时无法处理' }).count(), 0);
+  await verifyStreamSessionBoundary(page, data, composer);
   assert.deepEqual(errors, []);
   console.log('PASS candidate policy browser: real SSE refusal, visible generic error, composer restored and explicit retry, no model/ledger/message persistence');
 } catch (error) { firstError = error; throw error; }
