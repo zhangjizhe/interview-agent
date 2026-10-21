@@ -40,11 +40,15 @@ async function stats() {
     assert.equal(draft.status, 'DRAFT');
     const interview = await prisma.interview.findFirstOrThrow({ where: { userId: user.id, position: 'Synthetic admission fixture' } });
     const alternate = await prisma.interview.create({ data: { organizationId: user.organizationId, userId: user.id, position: 'Synthetic error scope', resumeConfirmed: true } });
-    const saved = { alternateId: alternate.id, agentId: agent.id, originalVersionId: agent.currentVersionId, interviewId: interview.id, originalConfirmed: interview.resumeConfirmed, runs: await prisma.run.count(), ledger: await prisma.usageLedger.count(), stats: await stats() };
+    const lifecycle = await prisma.interview.create({ data: { organizationId: user.organizationId, userId: user.id, position: 'Synthetic end lifecycle', resumeConfirmed: true } });
+    const saved = { lifecycleId: lifecycle.id, alternateId: alternate.id, agentId: agent.id, originalVersionId: agent.currentVersionId, interviewId: interview.id, originalConfirmed: interview.resumeConfirmed, runs: await prisma.run.count(), ledger: await prisma.usageLedger.count(), stats: await stats() };
     fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
     await prisma.interview.update({ where: { id: interview.id }, data: { resumeConfirmed: true } });
     await prisma.agent.update({ where: { id: agent.id }, data: { currentVersionId: draft.id } });
-    console.log(JSON.stringify({ interviewId: interview.id, alternateId: alternate.id }));
+    console.log(JSON.stringify({ interviewId: interview.id, alternateId: alternate.id, lifecycleId: lifecycle.id }));
+  } else if (process.argv[2] === 'verify-lifecycle-deleted') {
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(await prisma.interview.findUnique({ where: { id: saved.lifecycleId } }), null);
   } else if (['verify-end-present', 'verify-end-deleted'].includes(process.argv[2])) {
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     const interview = await prisma.interview.findUnique({ where: { id: saved.alternateId } });
@@ -77,7 +81,7 @@ async function stats() {
       assert.deepEqual(await stats(), saved.stats);
     } catch (error) { primary = error; } finally {
       const restored = await Promise.allSettled([prisma.agent.update({ where: { id: saved.agentId }, data: { currentVersionId: saved.originalVersionId } }),
-      prisma.interview.update({ where: { id: saved.interviewId }, data: { resumeConfirmed: saved.originalConfirmed } }), prisma.interview.deleteMany({ where: { id: saved.alternateId, userId: 'fixture-ci-owner' } })]);
+      prisma.interview.update({ where: { id: saved.interviewId }, data: { resumeConfirmed: saved.originalConfirmed } }), prisma.interview.deleteMany({ where: { id: { in: [saved.alternateId, saved.lifecycleId] }, userId: 'fixture-ci-owner' } })]);
       if (saved.confirmationResume) {
         try { await removeResume(); } catch (error) { restored.push({ status: 'rejected', reason: error }); }
       }

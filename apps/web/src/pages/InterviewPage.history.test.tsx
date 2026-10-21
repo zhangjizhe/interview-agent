@@ -166,3 +166,30 @@ it.each(['report', 'deleted'])('accepts the valid end receipt: %s', async kind =
   expect(useInterviewStore.getState().ending).toBe(false);
   view.unmount();
 });
+
+it.each(['switch', 'return', 'unmount', 'late failure', 'body'])('ignores the old end request after lifecycle change: %s', async mode => {
+  vi.stubGlobal('alert', vi.fn());
+  let release!: (response: Response) => void;
+  const pending = new Promise<Response>(resolve => { release = resolve; });
+  vi.mocked(fetch).mockImplementation(async input => String(input).endsWith('/end') ? mode === 'body' ? { ok: true, text: async () => (await pending).text() } as Response : pending : { ok: true, text: async () => '{}' } as Response);
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  act(() => { useInterviewStore.getState().setMessages([{ role: 'user', content: 'Synthetic answer' }]); });
+  act(() => { fireEvent.click(view.getByRole('button', { name: '结束并生成报告' })); });
+  expect(useInterviewStore.getState().ending).toBe(true);
+  if (mode === 'unmount') view.unmount();
+  else {
+    routing.id = 'b'; view.rerender(<InterviewPage />);
+    if (mode === 'return') { routing.id = 'a'; view.rerender(<InterviewPage />); }
+  }
+  await act(async () => { await Promise.resolve(); });
+  const endingAtBoundary = useInterviewStore.getState().ending;
+  act(() => { useInterviewStore.getState().setEnding(true); });
+  await act(async () => { release({ ok: mode !== 'late failure', status: mode === 'late failure' ? 503 : 200, text: async () => JSON.stringify({ report: { id: 'report-a', interviewId: 'a' } }) } as Response); });
+  expect(endingAtBoundary).toBe(false);
+  expect(useInterviewStore.getState().ending).toBe(true);
+  expect(useInterviewStore.getState().interviewStatus).not.toBe('COMPLETED');
+  expect(routing.navigate).not.toHaveBeenCalled();
+  expect(alert).not.toHaveBeenCalled();
+  if (mode !== 'unmount') view.unmount();
+});
