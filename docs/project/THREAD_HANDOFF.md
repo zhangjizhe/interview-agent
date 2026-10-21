@@ -1,6 +1,8 @@
 # 交接
 
-当前单主题INTERVIEW-STREAM-SESSION：生命周期2红9绿复现→含当前成功正测12绿，lint/type/build及新候选镜像首完整链exit0（API93/Lab+候选held-SSE/严格PG向量恢复）、独立终审无阻断；待提交及本次精确CI/PR，见INTERVIEW_STREAM_SESSION_EVIDENCE.md。不承诺abort停止服务端计费。另记P0：HistoryGET迟到更新；P1：多hook实例同时操作globalstore。未将两者算本批已修。
+2026-10-21 INTERVIEW-HISTORY-OWNERSHIP本地限定验收通过：实际Page五项旧GET迟到红测已复现，修复后连正向控制及SSE合计18通过；lint/type/build及独立终审通过。新候选镜像首完整隔离链exit0：API93/Lab+候选真实GET扣留SPA浏览器/严格PG和实际向量恢复通过。精确提交CI及PR合并待核，GitHub只读查询TCPreset不当作成功。见../acceptance/INTERVIEW_HISTORY_OWNERSHIP_EVIDENCE.md。单主题边界：同生命周期刷新/SSE时序另列待办；外部费用0，整体NOT_ACCEPTED。
+
+当前收尾（2026-10-21）：INTERVIEW-STREAM-SESSION相关12测试/lint/type/build与新候选镜像首完整链API93/Lab+候选held-SSE/严格PG向量恢复通过、独立终审无阻断；PR49精确7cc227a71b5f7365bc190f2a63e0ddb7b4949f7c全部六项CI成功，已冻结SHA合并42d1f997dfa6c1b81c9eead8cad5eff6799e39cc，核远端main与agent-lab均该SHA，本地快进同步。未部署/整体NOT_ACCEPTED。下一单主题P0：HistoryGET迟到更新，先定位加载/刷新调用并重现，另保留P1多hook实例globalstore；不将abort等同服务端停止计费。见INTERVIEW_STREAM_SESSION_EVIDENCE.md。
 
 
 当前收尾核验（2026-10-21）：PR48精确head692c32e0a749fdd2dfa81b062f87e3a185e7ea05全部六项push/PR CI成功，已冻结SHA合并为9032c913e9728ab0eaa8c648da72a231cd43e2d2；已核远端main与agent-lab均该SHA，本地快进同步。涵盖策略准入/候选错误展示及独立安全前置补丁；原1b3e0f3安全审计失败留存，未重放或忽略。限定阶段完成，未部署；真实质量/未知账单/完整B1及全产品仍NOT_ACCEPTED。下一步核对候选在途请求跨会话归属，先固定重现场景，不重跑已通过不变检查。

@@ -101,12 +101,22 @@ export function InterviewPage() {
     target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
   };
 
+  // Each route lifetime has its own identity, including A → B → A.
+  const historyLifetime = useRef<object>({});
+  useEffect(() => {
+    const lifetime = {};
+    historyLifetime.current = lifetime;
+    return () => { historyLifetime.current = {}; };
+  }, [interviewId]);
+
   const { pullDistance, refreshing, pullRef } = usePullToRefresh({
     onRefresh: async () => {
       if (!interviewId) return;
+      const lifetime = historyLifetime.current;
       try {
         const res = await fetch(`/api/interview/${interviewId}`);
         const data = await safeJson(res);
+        if (historyLifetime.current !== lifetime) return;
         if (data?.messages) {
           setMessages(
             data.messages.map((m: any) => ({
@@ -132,10 +142,12 @@ export function InterviewPage() {
   // 进入页面 / interviewId 变化时加载历史消息
   useEffect(() => {
     if (!interviewId) return;
+    const lifetime = historyLifetime.current;
     (async () => {
       try {
         const res = await fetch(`/api/interview/${interviewId}`);
         const data = await safeJson(res);
+        if (historyLifetime.current !== lifetime) return;
         if (data?.messages) {
           setMessages(
             data.messages.map((m: any) => ({
