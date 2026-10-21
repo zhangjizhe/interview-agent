@@ -1,6 +1,8 @@
 # 当前任务
 
-2026-10-21 INTERVIEW-HISTORY-OWNERSHIP本地限定验收通过：实际Page五项旧GET迟到红测已复现，修复后连正向控制及SSE合计18通过；lint/type/build及独立终审通过。新候选镜像首完整隔离链exit0：API93/Lab+候选真实GET扣留SPA浏览器/严格PG和实际向量恢复通过。精确提交CI及PR合并待核，GitHub只读查询TCPreset不当作成功。见../acceptance/INTERVIEW_HISTORY_OWNERSHIP_EVIDENCE.md。单主题边界：同生命周期刷新/SSE时序另列待办；外部费用0，整体NOT_ACCEPTED。
+2026-10-21 INTERVIEW-HISTORY-ORDER进行中：同面试旧GET覆盖新刷新/新回答已2红6绿复现；请求序号+消息快照/streaming保护后相关21通过、Web构建通过，最终lint/type通过；新镜像首完整隔离链exit0：API93/Lab+候选跨/同会话真实GET浏览器、严格PG和向量恢复均通过。独立终审无新增阻断，精确CI/PR待核。只改消息时序，不声称简历/report并发全覆盖；外部费用0，整体NOT_ACCEPTED。见../acceptance/INTERVIEW_HISTORY_ORDER_EVIDENCE.md。
+
+2026-10-21 INTERVIEW-HISTORY-OWNERSHIP本地限定验收通过：实际Page五项旧GET迟到红测已复现，修复后连正向控制及SSE合计18通过；lint/type/build及独立终审通过。新候选镜像首完整隔离链exit0：API93/Lab+候选真实GET扣留SPA浏览器/严格PG和实际向量恢复通过。PR50精确08813b87ce20051a2f89f48fb0a8a55d01601405全部六项push/PR CI成功，已冻结SHA合并47a25f7d88595597e45992e55365143dbe9a267c；已核远端main与agent-lab均该SHA，本地快进。早期GitHub监听TCPreset已恢复核验，不记产品失败。下一单主题先核同会话history GET/refresh与SSE时序重现，再决定最小修复；不重跑不变已过检查。见../acceptance/INTERVIEW_HISTORY_OWNERSHIP_EVIDENCE.md。单主题边界：同生命周期刷新/SSE时序另列待办；外部费用0，整体NOT_ACCEPTED。
 
 更新：2026-10-19 · PRODUCT-REACCEPTANCE-1 · 整体NOT_ACCEPTED
 

@@ -59,3 +59,39 @@ it('applies current load and refresh, and redirects a current completed session'
   expect(routing.navigate).toHaveBeenCalledWith('/reports/completed', { replace: true });
   view.unmount();
 });
+
+it.each(['newer refresh', 'new answer'])('rejects a history snapshot superseded by %s in the same session', async cause => {
+  let release!: (response: Response) => void;
+  const held = new Promise<Response>(resolve => { release = resolve; });
+  const response = (content: string) => ({ ok: true, text: async () => JSON.stringify({ messages: [{ role: 'assistant', content }], resumeConfirmed: false }) }) as Response;
+  vi.mocked(fetch).mockImplementationOnce(() => held);
+  const view = render(<InterviewPage />);
+  if (cause === 'newer refresh') {
+    vi.mocked(fetch).mockResolvedValueOnce(response('new history'));
+    await act(async () => { await routing.refresh!(); });
+  } else {
+    act(() => {
+      const store = useInterviewStore.getState();
+      store.addMessage({ role: 'assistant', content: 'new history', streaming: true });
+      store.setStreaming(true);
+      store.finalizeLastMessage();
+      store.setStreaming(false);
+    });
+  }
+  await act(async () => { release(response('stale history')); });
+  expect(useInterviewStore.getState().messages[0].content).toBe('new history');
+  view.unmount();
+});
+
+
+it('does not fetch history while an answer is streaming', async () => {
+  vi.mocked(fetch).mockResolvedValue({ ok: true, text: async () => '{}' } as Response);
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  const count = vi.mocked(fetch).mock.calls.length;
+  act(() => { useInterviewStore.getState().setStreaming(true); });
+  await act(async () => { await routing.refresh!(); });
+  expect(fetch).toHaveBeenCalledTimes(count);
+  act(() => { useInterviewStore.getState().setStreaming(false); });
+  view.unmount();
+});

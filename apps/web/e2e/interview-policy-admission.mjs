@@ -32,6 +32,7 @@ try {
   }
   await verifyStreamSessionBoundary(page, data, composer);
   await verifyHistorySessionBoundary(page, data, composer);
+  await verifyHistorySessionBoundary(page, data, composer, true);
   assert.deepEqual(errors, []);
   console.log('PASS candidate policy browser: real SSE refusal, visible generic error, composer restored and explicit retry, no model/ledger/message persistence');
 } catch (error) { firstError = error; throw error; }

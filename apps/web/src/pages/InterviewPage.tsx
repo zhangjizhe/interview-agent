@@ -103,6 +103,7 @@ export function InterviewPage() {
 
   // Each route lifetime has its own identity, including A → B → A.
   const historyLifetime = useRef<object>({});
+  const historyRequest = useRef(0);
   useEffect(() => {
     const lifetime = {};
     historyLifetime.current = lifetime;
@@ -113,10 +114,15 @@ export function InterviewPage() {
     onRefresh: async () => {
       if (!interviewId) return;
       const lifetime = historyLifetime.current;
+      const request = ++historyRequest.current;
+      const snapshot = useInterviewStore.getState().messages;
+      if (useInterviewStore.getState().streaming) return;
       try {
         const res = await fetch(`/api/interview/${interviewId}`);
         const data = await safeJson(res);
-        if (historyLifetime.current !== lifetime) return;
+        if (historyLifetime.current !== lifetime || historyRequest.current !== request
+          || useInterviewStore.getState().streaming
+          || useInterviewStore.getState().messages !== snapshot) return;
         if (data?.messages) {
           setMessages(
             data.messages.map((m: any) => ({
@@ -143,11 +149,15 @@ export function InterviewPage() {
   useEffect(() => {
     if (!interviewId) return;
     const lifetime = historyLifetime.current;
+    const request = ++historyRequest.current;
+    const snapshot = useInterviewStore.getState().messages;
     (async () => {
       try {
         const res = await fetch(`/api/interview/${interviewId}`);
         const data = await safeJson(res);
-        if (historyLifetime.current !== lifetime) return;
+        if (historyLifetime.current !== lifetime || historyRequest.current !== request
+          || useInterviewStore.getState().streaming
+          || useInterviewStore.getState().messages !== snapshot) return;
         if (data?.messages) {
           setMessages(
             data.messages.map((m: any) => ({
