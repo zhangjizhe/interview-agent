@@ -45,6 +45,11 @@ async function stats() {
     await prisma.interview.update({ where: { id: interview.id }, data: { resumeConfirmed: true } });
     await prisma.agent.update({ where: { id: agent.id }, data: { currentVersionId: draft.id } });
     console.log(JSON.stringify({ interviewId: interview.id, alternateId: alternate.id }));
+  } else if (['verify-end-present', 'verify-end-deleted'].includes(process.argv[2])) {
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const interview = await prisma.interview.findUnique({ where: { id: saved.alternateId } });
+    if (process.argv[2] === 'verify-end-deleted') assert.equal(interview, null);
+    else { assert.ok(interview); assert.equal(interview.status, 'IN_PROGRESS'); assert.equal(await prisma.message.count({ where: { interviewId: saved.alternateId } }), 0); }
   } else if (process.argv[2] === 'verify-confirmation') {
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal((await prisma.interview.findUniqueOrThrow({ where: { id: saved.interviewId } })).resumeConfirmed, true);
