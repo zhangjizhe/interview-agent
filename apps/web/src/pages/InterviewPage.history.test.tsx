@@ -193,3 +193,32 @@ it.each(['switch', 'return', 'unmount', 'late failure', 'body'])('ignores the ol
   expect(alert).not.toHaveBeenCalled();
   if (mode !== 'unmount') view.unmount();
 });
+
+it.each(['deadline', 'unmount'])('cleans up an end request stalled after response headers: %s', async mode => {
+  vi.useFakeTimers(); vi.stubGlobal('alert', vi.fn());
+  let signal!: AbortSignal;
+  vi.mocked(fetch).mockImplementation(async (input, init) => {
+    if (!String(input).endsWith('/end')) return { ok: true, text: async () => '{}' } as Response;
+    signal = init!.signal as AbortSignal;
+    return new Response(new ReadableStream({ start(controller) { signal.addEventListener('abort', () => controller.error(new DOMException('aborted', 'AbortError')), { once: true }); } }), { status: 200 });
+  });
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  act(() => { useInterviewStore.getState().setMessages([{ role: 'user', content: 'Synthetic answer' }]); });
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: '结束并生成报告' })); });
+  if (mode === 'unmount') view.unmount();
+  else {
+    await act(async () => { await vi.advanceTimersByTimeAsync(59_999); });
+    expect(signal.aborted).toBe(false); expect(useInterviewStore.getState().ending).toBe(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  }
+  await act(async () => { await Promise.resolve(); });
+  const aborted = signal.aborted;
+  const ending = useInterviewStore.getState().ending;
+  if (mode !== 'unmount') view.unmount();
+  const timers = vi.getTimerCount(); vi.useRealTimers();
+  expect(aborted).toBe(true); expect(ending).toBe(false); expect(timers).toBe(0);
+  expect(routing.navigate).not.toHaveBeenCalled();
+  if (mode === 'deadline') expect(alert).toHaveBeenCalledWith(expect.stringContaining('超时'));
+  else expect(alert).not.toHaveBeenCalled();
+});
