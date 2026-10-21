@@ -1,6 +1,8 @@
 # 待办与验收门
 
-2026-10-21 INTERVIEW-HISTORY-ORDER进行中：同面试旧GET覆盖新刷新/新回答已2红6绿复现；请求序号+消息快照/streaming保护后相关21通过、Web构建通过，最终lint/type通过；新镜像首完整隔离链exit0：API93/Lab+候选跨/同会话真实GET浏览器、严格PG和向量恢复均通过。独立终审无新增阻断，精确CI/PR待核。只改消息时序，不声称简历/report并发全覆盖；外部费用0，整体NOT_ACCEPTED。见../acceptance/INTERVIEW_HISTORY_ORDER_EVIDENCE.md。
+2026-10-21 INTERVIEW-CONFIRM-HISTORY进行中：修正未确认夹具后，旧GET覆盖成功确认/确认在途刷新两项实际Page红测复现（初次按钮定位失败保留，不算产品红测）；最小确认开始失效historyRequest及在途刷新不GET后相关23通过，最终lint/type/build通过，独立终审无新增阻断；首链placeholder定位错误未算通过，修正后第二完整链exit0：API93/Lab及候选真实GET/确认HTTP+PG读回、合成Milvus简历Strong清理、严格PG和向量恢复通过。精确提交CI/PR合并待完成。仅确认并发，不称全部resume/report mutation隔离；外部费用0，整体NOT_ACCEPTED。
+
+2026-10-21 INTERVIEW-HISTORY-ORDER进行中：同面试旧GET覆盖新刷新/新回答已2红6绿复现；请求序号+消息快照/streaming保护后相关21通过、Web构建通过，最终lint/type通过；新镜像首完整隔离链exit0：API93/Lab+候选跨/同会话真实GET浏览器、严格PG和向量恢复均通过。独立终审无新增阻断；PR51精确62c5e6e17a4345b3de1e0891304f3d916b25db5d全部六项push/PR CI成功，已冻结SHA合并320472c6b293deb59fbde3118bddc20696e5f3cf；本轮核远端main与agent-lab均该SHA，本地快进。早期TCPreset已恢复核验，不记产品测试失败。下一单主题先核history GET与简历确认等非消息状态并发，固定重现再最小修复，不重跑不变已过检查。只改消息时序，不声称简历/report并发全覆盖；外部费用0，整体NOT_ACCEPTED。见../acceptance/INTERVIEW_HISTORY_ORDER_EVIDENCE.md。
 
 2026-10-21 INTERVIEW-HISTORY-OWNERSHIP本地限定验收通过：实际Page五项旧GET迟到红测已复现，修复后连正向控制及SSE合计18通过；lint/type/build及独立终审通过。新候选镜像首完整隔离链exit0：API93/Lab+候选真实GET扣留SPA浏览器/严格PG和实际向量恢复通过。PR50精确08813b87ce20051a2f89f48fb0a8a55d01601405全部六项push/PR CI成功，已冻结SHA合并47a25f7d88595597e45992e55365143dbe9a267c；已核远端main与agent-lab均该SHA，本地快进。早期GitHub监听TCPreset已恢复核验，不记产品失败。下一单主题先核同会话history GET/refresh与SSE时序重现，再决定最小修复；不重跑不变已过检查。见../acceptance/INTERVIEW_HISTORY_OWNERSHIP_EVIDENCE.md。单主题边界：同生命周期刷新/SSE时序另列待办；外部费用0，整体NOT_ACCEPTED。
 
@@ -52,3 +54,5 @@ B0-EXTERNAL-INIT限定修复已过定向15/真实PG与API85/浏览器/严格恢�
 B1a可信构造期registry/实际runAgent分发限定检查通过：相关27、实API89/浏览器/严格恢复/独立审核，c79b11a已推送核远端，PR46精确head六项CI成功，已合并核远端main5fba68332751081818f0506dcb64c3632fd5dc37，agent-lab快进。B1其余统一信封/事件/完整能力与替换错误隔离合同仍未完成，不提前进入B2工具接入。
 
 P1 Interview同路由生命周期内多个刷新/历史GET与SSE的顺序一致性：本轮生命周期对象仅拦截跨路由/卸载旧请求，不覆盖同会话先后请求竞态；先固定真实产品重现场景再另主题推进。
+
+P1 Interview历史GET与简历确认/报告等非消息状态并发：本批request+messages snapshot不会拦截只变更resumeConfirmed/report的迟到写入。下一单主题先用实际确认回执与held GET固定重现，禁止扩大为全store已隔离。

@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useInterviewStore } from '../store/interview-store';
 import { InterviewPage } from './InterviewPage';
@@ -93,5 +93,42 @@ it('does not fetch history while an answer is streaming', async () => {
   await act(async () => { await routing.refresh!(); });
   expect(fetch).toHaveBeenCalledTimes(count);
   act(() => { useInterviewStore.getState().setStreaming(false); });
+  view.unmount();
+});
+
+
+it('preserves an acknowledged resume confirmation against an older history GET', async () => {
+  let release!: (response: Response) => void;
+  const held = new Promise<Response>(resolve => { release = resolve; });
+  useInterviewStore.getState().setResumeConfirmed(false);
+  useInterviewStore.getState().setResume({ name: 'Synthetic resume', position: 'Engineer', summary: '', skills: '', createdAt: '' });
+  vi.mocked(fetch).mockImplementationOnce(() => held);
+  vi.mocked(fetch).mockResolvedValue({ ok: true, text: async () => JSON.stringify({ success: true }) } as Response);
+  const view = render(<InterviewPage />);
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: '确认无误，开始面试' })); });
+  expect(useInterviewStore.getState().resumeConfirmed).toBe(true);
+  await act(async () => { release({ ok: true, text: async () => JSON.stringify({ messages: [], resumeConfirmed: false }) } as Response); });
+  expect(useInterviewStore.getState().resumeConfirmed).toBe(true);
+  view.unmount();
+});
+
+it('skips refresh while confirming and allows a fresh read after confirmation failure', async () => {
+  let reject!: (error: Error) => void;
+  const pending = new Promise<Response>((_resolve, rejectPromise) => { reject = rejectPromise; });
+  useInterviewStore.getState().setResumeConfirmed(false);
+  useInterviewStore.getState().setResume({ name: 'Synthetic resume', position: 'Engineer', summary: '', skills: '', createdAt: '' });
+  vi.mocked(fetch).mockResolvedValueOnce({ ok: true, text: async () => '{}' } as Response);
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  vi.mocked(fetch).mockImplementationOnce(() => pending);
+  act(() => { fireEvent.click(view.getByRole('button', { name: '确认无误，开始面试' })); });
+  const count = vi.mocked(fetch).mock.calls.length;
+  await act(async () => { await routing.refresh!(); });
+  expect(fetch).toHaveBeenCalledTimes(count);
+  await act(async () => { reject(new Error('synthetic confirmation failure')); });
+  expect(useInterviewStore.getState().resumeConfirmed).toBe(false);
+  vi.mocked(fetch).mockResolvedValueOnce({ ok: true, text: async () => JSON.stringify({ resumeConfirmed: true }) } as Response);
+  await act(async () => { await routing.refresh!(); });
+  expect(useInterviewStore.getState().resumeConfirmed).toBe(true);
   view.unmount();
 });
