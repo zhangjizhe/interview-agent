@@ -1,6 +1,10 @@
 # 交接
 
-TRAINING-ACTIONS进行中：页面完成/复测回执、共同互锁及岗位版本失效已实现；Web 24文件255项、10项训练页回归、tsc/eslint及新镜像通过。第二链日志包含训练真实API/PG+浏览器与严格存储恢复最终成功标记，独立源码复核无当前阻断；Agent额度中断使原工具exit不可读，保留该边界，待最新CI完整成功后才可合并。详见[训练动作证据](../acceptance/TRAINING_ACTIONS_EVIDENCE.md)。
+2026-10-22：TRAINING-ACTIONS限定工程验收完成。PR57精确候选e56564a39b47d67479e9ffc0788446c846140ff8重新读回六项push/PR检查全部completed/success，冻结SHA经PR合并97e44a2c6b579115f2de3aa918dc254880c2b327。本轮Git读回远端main/agent-lab均该合并SHA，本地agent-lab快进。API网络此前连续reset，已先确认PR仍open再重试合并；成功响应merged=true，后续PR读回又reset，但远端分支一致已核。本地原工具exit未知的限制保留，不继承合成工程证据为模型质量或部署。
+
+唯一活动任务仍PRODUCT-REACCEPTANCE-1，整体NOT_ACCEPTED。当前单主题TRAINING-TIMEOUT：训练complete/start/refresh的响应头或正文长期挂起，需等待有界、明确未知结果、显式刷新核验以及scope失效清理；先实际页面红测，再复用当前隔离API/PG+浏览器做双证据。该阶段尚未通过，无外部模型调用。当前已复现旧码6失败9通过；修复后训练页20项/Web265项、lint/type及新镜像通过，独立浏览器记录refresh60021/complete60149/retest60092ms真实超时与PG未知结果恢复、无自动重发、严格PG和实际向量恢复最终标记。Agent随后额度中断使原工具exit不可读，保留未知，不记exit0；准备定向提交及精确CI，不重跑不变本地检查。见[POST超时证据](../acceptance/TRAINING_TIMEOUT_EVIDENCE.md)。
+
+已过训练动作：Web255项、TrainingPage10项、审计/lint/type/build、API93及真实推荐/Attempt/唯一复测关联/一单位INTERVIEW_START/无模型增量、严格PG及真实向量恢复；对应CI已完整成功。详见[训练动作证据](../acceptance/TRAINING_ACTIONS_EVIDENCE.md)。无关历史修改未提交。
 
 2026-10-22：文档校准PR56精确2a8e4110842af1d15b010b0d68fff23c7946d49f三项可见CI全成功，已冻结SHA合并5c6ecdc3f7dba484c89dc3db009237911201e9b4；本轮读回远端main/agent-lab均该SHA，本地快进。仅文档变化，最近产品代码基线仍35c2353，未新增产品PASS/部署/模型费用。早期自动审批超时及网络重置已恢复核验。
 
@@ -8,7 +12,7 @@ TRAINING-ACTIONS进行中：页面完成/复测回执、共同互锁及岗位版
 
 ## 当前位置
 
-agent-lab产品基线35c235372bd1ba76ca256e91f3151dc02f6ef90c。PR55精确f547a27六项CI成功并冻结合并，上一阶段已核main/agent-lab相同SHA，本地快进。文档校准已合并，当前执行TRAINING-ACTIONS；不调用外部模型、不部署。
+agent-lab产品基线97e44a2c6b579115f2de3aa918dc254880c2b327，PR57冻结合并及远端结果见首条。当前TRAINING-TIMEOUT（POST头/正文）工作区修改尚未交付；不调用外部模型、不部署。
 
 最近工程链API93/Lab+候选浏览器/严格PG和真实向量恢复exit0；37相关回归及实际60,016ms结束等待证据见INTERVIEW_END_TIMEOUT_EVIDENCE。它不证明成功模型黄金链、生产恢复或所有UI状态。
 
@@ -16,7 +20,7 @@ agent-lab产品基线35c235372bd1ba76ca256e91f3151dc02f6ef90c。PR55精确f547a2
 
 ## 当前具体执行
 
-TRAINING-ACTIONS（I13/I14）：先读TrainingPage.tsx、TrainingService/start实际入口和verify-training-loop.cjs。已核现有fixture直接创建合成正式证据，不能称从UI生成报告。先定产品合同/费用和失败分支，再实际Page回归、真实API/PG+浏览器；候选全成功黄金链和真实模型另过门。具体见[缺口复核](../acceptance/REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。
+TRAINING-TIMEOUT（POST头/正文）：继续独立helper的真实180秒等待、持久化恢复和最终严格存储恢复，收exit后才推进PR/CI。已读TrainingPage.tsx、TrainingService/start实际入口和verify-training-loop.cjs。已核现有fixture直接创建合成正式证据，不能称从UI生成报告。先定产品合同/费用和失败分支，再实际Page回归、真实API/PG+浏览器；候选全成功黄金链和真实模型另过门。具体见[缺口复核](../acceptance/REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。
 
 ## 必须保留
 

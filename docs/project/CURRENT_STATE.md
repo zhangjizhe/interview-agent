@@ -1,12 +1,16 @@
 # 当前状态
 
-TRAINING-ACTIONS进行中：页面完成/复测回执、共同互锁及岗位版本失效已实现；Web 24文件255项、10项训练页回归、tsc/eslint及新镜像通过。第二链日志包含训练真实API/PG+浏览器与严格存储恢复最终成功标记，独立源码复核无当前阻断；Agent额度中断使原工具exit不可读，保留该边界，待最新CI完整成功后才可合并。详见[训练动作证据](../acceptance/TRAINING_ACTIONS_EVIDENCE.md)。
+2026-10-22：TRAINING-ACTIONS限定工程验收完成。PR57精确候选e56564a39b47d67479e9ffc0788446c846140ff8重新读回六项push/PR检查全部completed/success，冻结SHA经PR合并97e44a2c6b579115f2de3aa918dc254880c2b327。本轮Git读回远端main/agent-lab均该合并SHA，本地agent-lab快进。API网络此前连续reset，已先确认PR仍open再重试合并；成功响应merged=true，后续PR读回又reset，但远端分支一致已核。本地原工具exit未知的限制保留，不继承合成工程证据为模型质量或部署。
+
+唯一活动任务仍PRODUCT-REACCEPTANCE-1，整体NOT_ACCEPTED。当前单主题TRAINING-TIMEOUT：训练complete/start/refresh的响应头或正文长期挂起，需等待有界、明确未知结果、显式刷新核验以及scope失效清理；先实际页面红测，再复用当前隔离API/PG+浏览器做双证据。该阶段尚未通过，无外部模型调用。当前已复现旧码6失败9通过；修复后训练页20项/Web265项、lint/type及新镜像通过，独立浏览器记录refresh60021/complete60149/retest60092ms真实超时与PG未知结果恢复、无自动重发、严格PG和实际向量恢复最终标记。Agent随后额度中断使原工具exit不可读，保留未知，不记exit0；准备定向提交及精确CI，不重跑不变本地检查。见[POST超时证据](../acceptance/TRAINING_TIMEOUT_EVIDENCE.md)。
+
+已过训练动作：Web255项、TrainingPage10项、审计/lint/type/build、API93及真实推荐/Attempt/唯一复测关联/一单位INTERVIEW_START/无模型增量、严格PG及真实向量恢复；对应CI已完整成功。详见[训练动作证据](../acceptance/TRAINING_ACTIONS_EVIDENCE.md)。无关历史修改未提交。
 
 2026-10-22：文档校准PR56精确2a8e4110842af1d15b010b0d68fff23c7946d49f三项可见CI全成功，已冻结SHA合并5c6ecdc3f7dba484c89dc3db009237911201e9b4；本轮读回远端main/agent-lab均该SHA，本地快进。仅文档变化，最近产品代码基线仍35c2353，未新增产品PASS/部署/模型费用。早期自动审批超时及网络重置已恢复核验。
 
 2026-10-22 · 唯一活动任务 PRODUCT-REACCEPTANCE-1，整体 **NOT_ACCEPTED**。内部预发布可复核限定证据，不能批准完整交付、真实版本质量或生产发布。
 
-## 最近产品基线
+## PR57之前的历史产品基线
 
 PR55精确f547a27fc2c8d46c5a0f2e9bdea772f6c40bb068六项push/PR CI成功，冻结SHA合并35c235372bd1ba76ca256e91f3151dc02f6ef90c；上一阶段已核远端main/agent-lab均该SHA，本地快进。文档校准后本轮执行训练动作检查；不称部署。后续资料提交必须有自己的对应CI。
 
@@ -29,6 +33,6 @@ PR55精确f547a27fc2c8d46c5a0f2e9bdea772f6c40bb068六项push/PR CI成功，冻�
 - 当前业务环境SHA/镜像/配置/迁移、当场备份、生产部署及恢复未核。main合并不等于部署。
 - 安全修补保留历史braces high边界，不宣称零漏洞；模型质量、完整账单和商业生产不可由合成fixture代替。
 
-当前单主题TRAINING-ACTIONS，具体合同见[缺口复核](../acceptance/REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。本轮校准[仪表](../acceptance/INTERNAL_PRE_RELEASE_STATUS.md)，不新增PASS。
+当前单主题TRAINING-TIMEOUT（POST头/正文），具体合同见[缺口复核](../acceptance/REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。PR57已完成冻结合并；当前TRAINING-TIMEOUT已复现并修复，真实浏览器/恢复最终标记已过，原exit未知保留，待精确CI，整体仍不新增PASS。
 
 [待办](TASKS.md) · [交接](THREAD_HANDOFF.md) · [阶段失败/提交/未知费用完整历史](archive/reacceptance-2026-10-22/README.md) · [更早历史](archive/reacceptance-2026-10-18/CURRENT_STATE.md)

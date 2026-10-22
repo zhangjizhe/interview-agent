@@ -7,17 +7,17 @@ import { TrainingPage } from './TrainingPage';
 const recommendation = (status: string) => ({ id: 'rec', targetJobId: 'job', targetJobProfileVersion: 1, skillId: 'skill', objective: 'Synthetic objective', prompts: [], expectedEvidence: [], status, skill: { id: 'skill', name: 'Synthetic skill', slug: 'skill' }, targetJob: { id: 'job', title: 'Synthetic job', level: null, profileVersion: 1 }, sourceEvidence: { reason: null, missingEvidence: [], recommendation: null }, attempts: [] });
 const json = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
 function Location() { return <output data-testid="location">{useLocation().pathname}</output>; }
-function setup(status: string, post: () => Promise<Response>) {
+function setup(status: string, post: (init?: RequestInit) => Promise<Response>) {
   let posts = 0;
   vi.stubGlobal('fetch', vi.fn(async (input, init) => {
-    if (init?.method === 'POST') { posts++; return post(); }
+    if (init?.method === 'POST') { posts++; return post(init); }
     return json(String(input).endsWith('target-jobs') ? [{ id: 'job', title: 'Synthetic job', isActive: true, profileVersion: 1 }] : [recommendation(status)]);
   }));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const view = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={['/training']}><TrainingPage /><Location /></MemoryRouter></QueryClientProvider>);
   return { client, posts: () => posts, close: () => { view.unmount(); client.clear(); } };
 }
-afterEach(() => { vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 it.each(['complete', 'retest'])('locks duplicate %s actions while the response is pending', async kind => {
   let release!: (response: Response) => void;
@@ -92,4 +92,58 @@ it('does not navigate from a receipt for a previous job profile version', async 
   expect(screen.getByTestId('location').textContent).toBe('/training');
   expect(screen.queryByRole('alert')).toBeNull();
   test.close();
+});
+
+it.each(['complete', 'retest', 'refresh'].flatMap(kind => ['headers', 'body'].map(phase => ({ kind, phase }))))('bounds $kind waiting through stalled $phase without applying a late receipt', async ({ kind, phase }) => {
+  let signal: AbortSignal | null | undefined;
+  let release!: (response: Response) => void;
+  let body!: ReadableStreamDefaultController<Uint8Array>;
+  const held = new Promise<Response>(resolve => { release = resolve; });
+  const receipt = kind === 'complete' ? { id: 'attempt', recommendationId: 'rec' }
+    : kind === 'refresh' ? [] : { interviewId: 'late', interview: { id: 'late', targetJobId: 'job', practiceSkillId: 'skill', mode: 'SKILL_PRACTICE' } };
+  const test = setup(kind === 'retest' ? 'COMPLETED' : 'READY', async init => {
+    signal = init?.signal;
+    return phase === 'headers' ? held : new Response(new ReadableStream({ start(controller) { body = controller; } }));
+  });
+  const name = kind === 'complete' ? '完成训练' : kind === 'retest' ? '开始复测' : '更新建议';
+  const button = await screen.findByRole('button', { name });
+  vi.useFakeTimers();
+  let alert = '', unlocked = false, route = '', aborted = false, count = 0;
+  try {
+    await act(async () => { fireEvent.click(button); await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_001); });
+    alert = screen.queryByRole('alert')?.textContent || '';
+    unlocked = !(button as HTMLButtonElement).disabled;
+    aborted = signal?.aborted === true;
+    count = test.posts();
+    await act(async () => {
+      if (phase === 'headers') release(json(receipt));
+      else { body.enqueue(new TextEncoder().encode(JSON.stringify(receipt))); body.close(); }
+    });
+    route = screen.getByTestId('location').textContent || '';
+  } finally { test.close(); vi.useRealTimers(); }
+  expect(alert).toContain('超时'); expect(alert).toContain('尚未确认');
+  expect(unlocked).toBe(true); expect(aborted).toBe(true); expect(count).toBe(1);
+  expect(route).toBe('/training');
+});
+
+it.each(['retest', 'refresh'].flatMap(kind => ['unmount', 'profile'].map(scope => ({ kind, scope }))))('aborts stalled $kind requests on $scope invalidation without late feedback', async ({ kind, scope }) => {
+  let signal: AbortSignal | null | undefined;
+  let release!: (response: Response) => void;
+  const held = new Promise<Response>(resolve => { release = resolve; });
+  const test = setup('COMPLETED', init => { signal = init?.signal; return held; });
+  fireEvent.click(await screen.findByRole('button', { name: kind === 'retest' ? '开始复测' : '更新建议' }));
+  await waitFor(() => expect(test.posts()).toBe(1));
+  try {
+    if (scope === 'unmount') test.close();
+    else {
+      act(() => { test.client.setQueryData(['target-jobs'], [{ id: 'job', title: 'New synthetic profile', isActive: true, profileVersion: 2 }]); });
+      await screen.findByText('New synthetic profile');
+    }
+    const aborted = signal?.aborted;
+    await act(async () => { release(new Response(JSON.stringify({ message: 'Late old failure' }), { status: 503 })); });
+    expect(aborted).toBe(true);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(test.posts()).toBe(1);
+  } finally { test.close(); }
 });

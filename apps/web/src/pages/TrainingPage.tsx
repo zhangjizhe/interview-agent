@@ -56,17 +56,48 @@ export function TrainingPage() {
   const [actionError, setActionError] = useState('');
   const actionBusy = useRef(false);
   const actionScope = useRef<object>({});
+  const actionRequests = useRef(new Map<AbortController, ReturnType<typeof setTimeout>>());
   useEffect(() => {
     actionScope.current = {};
     actionBusy.current = false;
     setPendingAction(null);
     setActionError('');
-    return () => { actionScope.current = {}; actionBusy.current = false; };
+    return () => {
+      actionScope.current = {};
+      actionBusy.current = false;
+      for (const [controller, timer] of actionRequests.current) { clearTimeout(timer); controller.abort(); }
+      actionRequests.current.clear();
+    };
   }, [activeJob?.id, activeJob?.profileVersion]);
 
+  const requestAction = async (url: string, init: RequestInit, fallback: string) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60_000);
+    actionRequests.current.set(controller, timer);
+    let rejectWait!: () => void;
+    const aborted = new Promise<never>((_resolve, reject) => {
+      rejectWait = () => {
+        const error = new Error('训练请求等待超时（60 秒），结果尚未确认。请更新建议后核验。');
+        error.name = 'TrainingActionTimeoutError';
+        reject(error);
+      };
+      controller.signal.addEventListener('abort', rejectWait, { once: true });
+    });
+    try {
+      return await Promise.race([
+        fetch(url, { ...init, signal: controller.signal }).then(response => requireJson(response, fallback)),
+        aborted,
+      ]);
+    } finally {
+      clearTimeout(timer);
+      controller.signal.removeEventListener('abort', rejectWait);
+      actionRequests.current.delete(controller);
+    }
+  };
+
   const refreshRecommendations = useMutation({
-    mutationFn: async ({ jobId }: { jobId: string; scope: object }) => requireJson(
-      await fetch(`/api/interview/target-jobs/${encodeURIComponent(jobId)}/training-recommendations/refresh`, { method: 'POST' }),
+    mutationFn: async ({ jobId }: { jobId: string; scope: object }) => requestAction(
+      `/api/interview/target-jobs/${encodeURIComponent(jobId)}/training-recommendations/refresh`, { method: 'POST' },
       '无法更新训练建议',
     ),
     onSuccess: async (_data, { jobId }) => {
@@ -76,6 +107,8 @@ export function TrainingPage() {
       if (actionScope.current === scope) actionBusy.current = false;
     },
   });
+  const refreshError = refreshRecommendations.error instanceof Error && refreshRecommendations.error.name === 'TrainingActionTimeoutError'
+    ? refreshRecommendations.error.message : '暂时无法更新训练建议，请稍后重试。';
   const refreshPending = refreshRecommendations.isPending && refreshRecommendations.variables?.scope === actionScope.current;
   const refresh = () => {
     if (actionBusy.current || !activeJob) return;
@@ -92,13 +125,14 @@ export function TrainingPage() {
     setActionError('');
     try {
       if (activeJob?.id !== recommendation.targetJobId || activeJob.profileVersion !== recommendation.targetJobProfileVersion) throw new Error('当前岗位已变化，请更新建议后核验。');
-      const data = await requireJson(await fetch(
+      const data = await requestAction(
         kind === 'complete' ? `/api/interview/training-recommendations/${recommendation.id}/complete` : '/api/interview/start',
         kind === 'complete' ? { method: 'POST' } : {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ targetJobId: recommendation.targetJobId, mode: 'SKILL_PRACTICE', practiceSkillId: recommendation.skillId, trainingRecommendationId: recommendation.id }),
         },
-      ), '训练操作失败，请更新建议后核验。');
+        '训练操作失败，请更新建议后核验。',
+      );
       if (actionScope.current !== scope) return;
       const valid = kind === 'complete'
         ? typeof data?.id === 'string' && Boolean(data.id.trim()) && data.recommendationId === recommendation.id
@@ -139,7 +173,7 @@ export function TrainingPage() {
           {refreshPending ? '更新中' : '更新建议'}
         </button>
       </header>
-      {refreshRecommendations.isError && refreshRecommendations.variables?.scope === actionScope.current && <p role="alert" className="mb-5 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">暂时无法更新训练建议，请稍后重试。</p>}
+      {refreshRecommendations.isError && refreshRecommendations.variables?.scope === actionScope.current && <p role="alert" className="mb-5 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{refreshError}</p>}
 
       {actionError && <p role="alert" className="mb-5 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{actionError}</p>}
 
