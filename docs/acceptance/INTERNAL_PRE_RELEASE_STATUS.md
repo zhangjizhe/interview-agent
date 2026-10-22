@@ -2,13 +2,13 @@
 
 更新：2026-10-22。用途：内部证据复核与缺陷关闭；**整体NOT_ACCEPTED，不批准完整产品交付或生产发布**。
 
-本轮为证据与覆盖口径校准，未新增产品测试、部署或模型调用。已复核库存JSON、CI工作流和训练页面/fixture实际入口；见[缺口复核及下一合同](REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。限定阶段合并不能替代整体验收。
+训练动作PR57经限定工程验收及六项精确CI成功后合并；当前训练POST超时继续验收，未通过阶段不记交付。见[训练动作证据](TRAINING_ACTIONS_EVIDENCE.md)及[POST超时进度](TRAINING_TIMEOUT_EVIDENCE.md)。限定阶段合并不能替代整体验收。
 
 ## 固定事实
 
 | 项目 | 已核实事实 | 不能推断 |
 | --- | --- | --- |
-| 最近产品基线 | PR55精确`f547a27`六项CI成功，已合并`35c235372bd1ba76ca256e91f3151dc02f6ef90c`；上一阶段已核main/agent-lab同SHA | 后续文档提交自动通过，或业务环境已部署 |
+| 最近产品基线 | PR57精确`e56564a`六项CI成功，已合并`97e44a2c6b579115f2de3aa918dc254880c2b327`；本轮读回main/agent-lab同SHA | 后续文档提交自动通过，或业务环境已部署 |
 | 镜像/部署身份 | 最近产品CI从对应锁定源构建API、Web及Lab镜像；业务目标环境SHA/镜像/迁移尚未核验 | 隔离镜像或main合并等于当前预览/生产部署 |
 | 最近完整链 | API93/93、Lab及候选限定隔离浏览器、PG schema/行多集/sequence一致、实际Milvus题目/Qdrant向量payload恢复，exit0 | 真实模型质量、生产RPO/RTO或所有UI状态通过 |
 | UI清单 | 988模板：180交互/808展示；988最终NOT_ACCEPTED | 模板数或PARTIAL项等于运行时覆盖率 |
@@ -30,7 +30,7 @@
 
 ## 当前下一执行
 
-TRAINING-ACTIONS（I13/I14）：真实TrainingPage推荐→完成→复测、pending/失败/回执与API/PG关联。现有verify-training-loop直接seed合成正式证据，不是完整候选黄金链；先核start成本，再运行无外部费用的隔离工程验收。真实质量、账单和目标部署仍单独阻断。
+TRAINING-TIMEOUT（I13/I14的POST头/正文）：旧码挂起6项失败，修复后页面20项/Web265通过；独立真实PG/原生等待浏览器链进行中，成功后GET挂起另列。现有verify-training-loop直接seed合成正式证据，不是完整候选黄金链；先核start成本，再运行无外部费用的隔离工程验收。真实质量、账单和目标部署仍单独阻断。
 
 ## 内部审查顺序
 

@@ -28,7 +28,7 @@
 
 ## 本轮优先执行与证据校准
 
-文档校准已合并；当前训练动作本地证据已完成、对应CI待核，整体不新增PASS。最近产品基线PR55/main35c2353；988静态模板均最终NOT_ACCEPTED，不是运行时分母。当前单主题TRAINING-ACTIONS（I13/I14），已核实际start/complete数据流、费用、pending/失败与回执合同及真实API/PG+浏览器证据；现有fixture直接创建合成正式证据，不等同完整简历到报告黄金链。具体见[缺口复核](REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。
+PR57训练动作限定工程门及精确六项CI已成功，冻结合并产品基线97e44a2；988静态模板最终仍NOT_ACCEPTED，不是运行时分母。当前单主题TRAINING-TIMEOUT（POST头/正文），旧码6项挂起失败已复现，修复后页面20/Web265项通过，独立真实API/PG与原生三次60秒浏览器及严格恢复最终标记已过，原工具exit因额度中断不可读，必须精确CI完整成功再合并。成功后refetch/初始GET长期挂起另列后续，不声称全操作60秒。见[POST超时证据](TRAINING_TIMEOUT_EVIDENCE.md)；合成FINAL不等同完整黄金链或真实模型质量。
 
 ## 功能级产品合同与验收矩阵
 
