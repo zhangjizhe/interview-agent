@@ -30,6 +30,8 @@
 
 ## 当前下一执行
 
+最新PR59训练候选的push因新ip-address公告审计失败，当前单主题先处理[最小依赖安全前置](IP_ADDRESS_SECURITY_EVIDENCE.md)，不以先前PR CI成功覆盖它。
+
 TRAINING-READS（I13/I14的GET读取与恢复）：POST限定阶段已合并，读取超时/取消、错误/空状态、仅GET恢复与跨页query隔离已13红测后修复，Web278/build/lint通过；最终实际API93/PG/浏览器/严格恢复exit0，精确CI待完成，见[GET证据](TRAINING_READS_EVIDENCE.md)。现有verify-training-loop直接seed合成正式证据，不是完整候选黄金链；先核start成本，再运行无外部费用的隔离工程验收。真实质量、账单和目标部署仍单独阻断。
 
 ## 内部审查顺序

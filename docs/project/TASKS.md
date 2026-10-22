@@ -1,6 +1,6 @@
 # 待办与验收门
 
-2026-10-22 · PRODUCT-REACCEPTANCE-1，整体NOT_ACCEPTED。最近产品基线PR58合并e108a685f0839f3ad3c7556bcf8818468784e2ac，最新六项作业成功，远端main/agent-lab已核一致。首轮CI取消、重跑和原本地exit未知等失败事实保留在[POST超时证据](../acceptance/TRAINING_TIMEOUT_EVIDENCE.md)，不继承为真实质量/部署通过。当前唯一单主题TRAINING-READS，已红测12失败并修复，组件/构建通过，最终实际API93/PG/浏览器/严格恢复exit0，精确CI待完成。
+2026-10-22 · PRODUCT-REACCEPTANCE-1，整体NOT_ACCEPTED。最近产品基线PR58合并e108a685f0839f3ad3c7556bcf8818468784e2ac，最新六项作业成功，远端main/agent-lab已核一致。首轮CI取消、重跑和原本地exit未知等失败事实保留在[POST超时证据](../acceptance/TRAINING_TIMEOUT_EVIDENCE.md)，不继承为真实质量/部署通过。当前唯一单主题SECURITY-IPADDRESS（TRAINING-READS合并前置，最新push审计新失败），已红测12失败并修复，组件/构建通过，最终实际API93/PG/浏览器/严格恢复exit0，精确CI待完成。
 
 | 优先级 | 范围 | 下一证据/退出门 |
 | --- | --- | --- |
@@ -15,11 +15,12 @@
 | P1 | MCP/管理员控制 | 进程外持久化/多实例、逐服务协议与执行、持久授权审计；所有者按SOP逐目标授权 |
 | P1 | 历史16题复用 | 组织/embedding来源确认→保留源迁入/持久收据/读回/浏览器，禁止跨租户fallback |
 | 限定完成 | 训练POST超时/断线 | PR58最新六项CI作业成功，冻结合并e108a68；保留首轮依赖下载慢导致CI期限取消，非全训练操作60秒 |
-| 当前单主题P0 | TRAINING-READS：成功后refetch/初始GET | 13读取用例含追加跨页query红测后修复，Web278/build/lint通过；最终镜像实际API93/PG/browser/严格恢复exit0，精确CI待完成，不能称整体训练通过 |
+| 已实现待安全前置门 | TRAINING-READS：成功后refetch/初始GET | 13读取用例含追加跨页query红测后修复，Web278/build/lint通过；最终镜像实际API93/PG/browser/严格恢复exit0，精确CI待完成，不能称整体训练通过 |
 | 同一读取主题 | TrainingPage岗位加载错误 | 已复现并修复错误/空状态顺序，仅GET重新加载；与TRAINING-READS同一最终验收门 |
 | P1 | 训练读取逐字段合同 | 本轮仅拒绝非数组外层；岗位/推荐条目缺失或错误字段的运行时校验与用户恢复需另立实际失败用例，不推广为完整响应语义通过 |
 | P1 | 其他异步/错误边界 | 简历上传、HITL、多页面实例共享store等按实际源码重现后独立修复；不由已修历史/结束推广全部安全 |
 | P1 | CI运行时维护 | 本轮GitHub注记Actions Node20弃用与ubuntu-latest迁移；独立核升级兼容性，不在训练修复中顺改或弱化检查 |
+| 当前单主题P0 | SECURITY-IPADDRESS | 新公告GHSA-rxp7-6hxx-x8q5阻断push；SDK→limiter→ip-address10.7.1需10.7.4最小patch与锁文件/真实安装链红绿/审计/完整精确CI，禁止新allowlist或盲重跑 |
 | P1 | 安全维护 | 延续审计/补丁完整性，保留high边界，不声明零漏洞 |
 
 已关闭的限定子缺陷：PR49–55的SSE生命周期、历史跨路由/同会话消息/确认并发、结束回执/跨路由/正文超时；不再作为未复现P0重复列出。其他简历/report并发与完整成功黄金链仍待验收。

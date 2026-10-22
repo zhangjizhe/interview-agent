@@ -38,3 +38,11 @@
 检查web-vitals.ts实际sendBeacon/fallback POST后，helper保留所有POST路径/count，失败打印全map；只排除确切/api/metrics/vitals，其他任何POST仍必须零/一次，未仅白名单训练路径或删除断言。最终链实际记录metrics/vitals两次、当前合成推荐complete一次，独立真实PG Attempt核验及GET恢复COMPLETED通过，无重复complete/start/refresh。最终日志不能反向证明前失败窗口两次必为metrics。
 
 独立Agent编写真实浏览器helper、审过产品读取/取消/key/profile和第13追加红测；最终运行结果复核因其额度中断而失败，未记独立Agent最终运行复核通过。父代理执行并读回最终链exit0及原始PG/browser恢复证据。后续远端CI独立执行仍须精确候选门。
+
+## 精确远端候选
+
+PR59候选ac03104201c361a0c23814405e901e09fa0ff178已提交推送，SSH读回origin/agent-lab同SHA、main仍e108a68，PR59已附当前聊天。最新PR run39831947507绑定该候选；Actions按head/event=push查询total_count0，没有push CI，不补造记录或推断原因。已一次成功workflow_dispatch，响应及Actions读回run39832266991同head；以该分支run与PR run最新六项作业作为相同源码两组门，全部完成成功才冻结head合并。当前仍在运行，不预填通过。
+
+本机gh初次读API失败（TCP reset）是观测网络，未当CI失败。GitHub连接器通用github_fetch支持Actions集合与明确query，可读真实head/event/attempt，避免只返回PR的专用wrapper遗漏分支run。触发dispatch返回明确run URL且远端读回queued，未盲目重放。
+
+后续实测：18:49:10Z平台才生成同head push run39834697409，排队更高优先级请求在18:49:55Z取消旧dispatch39832266991。实际check annotation明确“Canceling since a higher priority waiting request for product-Product verification-refs/heads/agent-lab exists”；不是30分钟超时或源码断言失败。dispatch Docker120011194465取消在browser dependencies，后两项storage/API-browser-recovery skipped；lint120011194938成功、summary120020224704失败保留。日志另有apt20.5MB耗14min9s，但不将它推断为取消原因。未重跑已被替代的dispatch。最新门恢复为push39834697409与已成功PR39831947507（Docker120010079939/lint120010080064/summary120018430376），同head ac03104，等待push最新全成功。

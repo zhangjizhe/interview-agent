@@ -1,16 +1,13 @@
 # 当前任务
 
-2026-10-23 · PRODUCT-REACCEPTANCE-1 · 整体 **NOT_ACCEPTED**。
+2026-10-23 · PRODUCT-REACCEPTANCE-1 · 整体NOT_ACCEPTED。用户授权持续自主推进，不逐Phase请求继续。唯一当前单主题SECURITY-IPADDRESS，作为PR59训练读取合并的前置阻断；TRAINING-READS实现/本地全链验收与PR精确CI已过，但未合并。
 
-用户已授权持续自主推进、独立测试Agent及阶段验收后最新精确CI全绿经PR合并main；不再要求逐Phase说继续。
+PR59 head ac03104201c361a0c23814405e901e09fa0ff178，PR run39831947507三项成功。平台延迟到18:49:10Z生成同head push39834697409，取消旧dispatch39832266991（实际并发组注记，不是超时）；dispatch成功/取消/skipped等全部保留[GET证据](../acceptance/TRAINING_READS_EVIDENCE.md)。最新push lint120020275007在审计失败：新公告GHSA-rxp7-6hxx-x8q5，ip-address<=10.7.3，patched10.7.4。禁止放行/allowlist/盲重跑新安全失败，旧PR通过不能替代最新门。
 
-最近已合并基线PR58：e108a685f0839f3ad3c7556bcf8818468784e2ac，最新六项作业成功，PR/main/agent-lab均读回；首轮取消与历史未知exit保留[POST证据](../acceptance/TRAINING_TIMEOUT_EVIDENCE.md)。
+已核默认模块链 @modelcontextprotocol/sdk1.32.1→express-rate-limit8.5.2→ip-address10.7.1；项目override固定10.7.1。源码limiter用node isIPv6前置保护，未证明项目端点能触发恶意字符串，不编造可利用性；仍应升级受影响依赖而不压审计。
 
-唯一当前单主题TRAINING-READS（I13/I14）：前12新增实际页面红测对原实现全部失败；追加跨页共享在途岗位query复用红测1失败/12通过。已最小修复GET头/正文60秒、signal取消、训练专用岗位子key/推荐profile key、错误≠空状态、仅GET重新加载。全Web25文件278、build/tsc和显式eslint通过；独立Agent源码与fixture复核无阻断。
+执行最小同major patch升级至10.7.4与锁文件；独立提交，检查锁文件无无关升级、真实SDK安装链恶意zone有界子进程红/绿及正常IP/zone/limiter行为、审计/补丁完整性、API相关lint/type/build与精确候选完整CI。新测试子进程timeout3秒防父进程挂死，不调用外部模型。本轮训练API/PG/browser旧镜像通过不冒充升级后完整运行时。
 
-真实链：初版统计全部POST触发2≠0，exit1，最终guard未重放。核对Web Vitals后仅排除明确metrics/vitals且记录全map，其他POST仍零/一次；最终镜像完整链training-reads-final-chain2真实exit0，API93/93/新增GET浏览器/严格PG与实际向量恢复通过。独立Agent源码/合同复核已完成，最终运行复核因额度中断未完成，父代理实际执行与读回，不伪填Agent最终通过。详细[GET报告](../acceptance/TRAINING_READS_EVIDENCE.md)。下一步限定stage、提交推送、最新精确push/PR六项CI全绿后冻结head合并；尚未远端交付。
-复测有效start回执后即使metadata GET失败仍可能导航，这是保留的原合同；本轮独立浏览器仅证明complete后的GET恢复，组件另核retest导航，不推广为完整训练黄金链。990静态模板最终全部NOT_ACCEPTED。
+训练已13实际红测后修复，最终Web278/build/显式lint、最终API93/PG/browser/严格恢复exit0。新990模板（181交互809展示）最终全部NOT_ACCEPTED，完整黄金链/真实质量/部署未通过。独立测试Agent最终运行复核额度中断保留，不记其最终通过。
 
-外部模型单次≤0.5CNY/新发布测试累计≤3CNY；历史已知0.069285另有未知，未对账/核额度前不付费重放。近期私有合成fixture外部0。旧费用报告、旧截图和TASK-034不stage不重置；PR58后交接更新属于本轮相关待提交资料。
-
-[状态](CURRENT_STATE.md) · [待办](TASKS.md) · [交接](THREAD_HANDOFF.md)
+外部≤0.5CNY/次、新发布测试累计≤3CNY；历史已知0.069285另有未知，未对账/核额度前不付费重放。近期fixture外部0。旧费用报告/截图/TASK-034保持不提交；ac提交后的CI交接更新为待后续相关提交资料，不改已冻结候选造证据。

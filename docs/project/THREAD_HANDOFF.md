@@ -26,3 +26,9 @@ Web265（训练页20）、API93、独立实际POST/PG与三次原生60秒、严�
 - 最新合并/CI交接文件为工作区待后续相关提交，不改变已冻结PR58头。无关旧费用报告/截图/TASK-034不stage、不重置。独立测试Agent已获用户授权，若额度中断如实保留限制并自主继续无阻塞工作。
 
 [当前状态](CURRENT_STATE.md) · [任务](TASKS.md) · [当前执行](ACTIVE_TASK.md)
+
+候选已推送并建PR59，head ac03104201c361a0c23814405e901e09fa0ff178。PR run39831947507；该head push查询0（原因未知），一次成功dispatch run39832266991同head。两组最新六项CI全成功才冻结合并，当前等待，不改候选。新交接资料为提交后工作区更新，非已随ac03104发布。通用github_fetch Actions集合可精确查event/head/run_attempt，gh APIreset不代表CI失败。
+
+后续实测：18:49:10Z平台才生成同head push run39834697409，排队更高优先级请求在18:49:55Z取消旧dispatch39832266991。实际check annotation明确“Canceling since a higher priority waiting request for product-Product verification-refs/heads/agent-lab exists”；不是30分钟超时或源码断言失败。dispatch Docker120011194465取消在browser dependencies，后两项storage/API-browser-recovery skipped；lint120011194938成功、summary120020224704失败保留。日志另有apt20.5MB耗14min9s，但不将它推断为取消原因。未重跑已被替代的dispatch。最新门恢复为push39834697409与已成功PR39831947507（Docker120010079939/lint120010080064/summary120018430376），同head ac03104，等待push最新全成功。
+
+当前前置单主题SECURITY-IPADDRESS：最新ac03104 push lint120020275007审计新失败GHSA-rxp7-6hxx-x8q5，不能合并。实际SDK→limiter→ip-address10.7.1链已核；root/lock最小改10.7.4，2新增安装链用例旧1失败1通过、升级后加原braces共12通过，API lint/type/build与真实audit通过（moderate0/high1原braces）。待独立安全提交并重新绑定最新CI，不复用ac旧镜像为新runtime。见[安全证据](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。当前不重跑被更高优先级push替代的dispatch。

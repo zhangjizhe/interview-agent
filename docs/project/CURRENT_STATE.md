@@ -12,6 +12,8 @@ PR58首轮因系统依赖25.9MB下载19min26s耗尽CI30分钟而取消，未记�
 
 ## 当前单主题
 
+SECURITY-IPADDRESS为当前唯一合并前置：ac03104的PR59三项CI成功，但平台延迟push39834697409命中新审计公告GHSA-rxp7-6hxx-x8q5而失败。已核SDK安装链与官方修复，最小pin10.7.4/lock；真实子进程红测、升级后新2+原braces10项、API lint/type/build及audit通过。待安全独立提交/最新候选完整CI；原镜像不推广为新runtime通过。见[安全证据](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。
+
 TRAINING-READS：POST已成功后invalidateQueries及初始岗位/推荐GET仍可能挂起；岗位GET错误先走无activeJob分支，可能误提示设置岗位。先实际页面红测固定缺失/错误/等待/恢复合同，再最小修复与真实API/PG+浏览器。已完成前12红测及跨页复用query追加红测/最小修复，Web278与build/lint通过，最终镜像实际API93/PG/浏览器和严格恢复exit0，精确CI待完成。初链统计混入遥测失败保留，独立Agent最终运行复核额度中断，不继承或伪填通过。见[GET证据](../acceptance/TRAINING_READS_EVIDENCE.md)。
 
 ## 必须保留的边界
