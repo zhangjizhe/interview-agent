@@ -1,3 +1,4 @@
+import { verifyTrainingReads } from './training-read-evidence.mjs';
 import { verifyTrainingTimeouts } from './training-timeout-evidence.mjs';
 import { verifyTrainingActions } from './training-actions-evidence.mjs';
 import { verifyEndTimeout } from './interview-end-timeout-evidence.mjs';
@@ -45,6 +46,7 @@ try {
   await verifyEndLifecycle(page, data, control);
   await verifyTrainingActions(page, control);
   await verifyTrainingTimeouts(page, control);
+  await verifyTrainingReads(page, control);
   assert.deepEqual(errors, []);
   console.log('PASS candidate policy browser: real SSE refusal, visible generic error, composer restored and explicit retry, no model/ledger/message persistence');
 } catch (error) { firstError = error; throw error; }

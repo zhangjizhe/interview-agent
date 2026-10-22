@@ -30,27 +30,53 @@ async function requireJson(response: Response, fallback: string) {
   return data;
 }
 
+// A query owns the full response lifetime, including body consumption. Racing the
+// signal also protects against transports that do not reject on cancellation.
+async function readTrainingArray<T>(url: string, signal: AbortSignal, fallback: string): Promise<T[]> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal.addEventListener('abort', abort, { once: true });
+  if (signal.aborted) controller.abort();
+  const timer = setTimeout(abort, 60_000);
+  let rejectWait!: () => void;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    rejectWait = () => reject(new Error('读取等待超时或已取消，请重新加载。'));
+    controller.signal.addEventListener('abort', rejectWait, { once: true });
+    if (controller.signal.aborted) rejectWait();
+  });
+  try {
+    return await Promise.race([
+      fetch(url, { signal: controller.signal }).then(async response => {
+        const data = await requireJson(response, fallback);
+        if (!Array.isArray(data)) throw new Error(fallback);
+        return data as T[];
+      }),
+      aborted,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', abort);
+    controller.signal.removeEventListener('abort', rejectWait);
+  }
+}
+
 export function TrainingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const jobsQuery = useQuery({
-    queryKey: ['target-jobs'],
-    queryFn: async () => {
-      const response = await fetch('/api/interview/target-jobs');
-      const data = await requireJson(response, '无法读取目标岗位');
-      return Array.isArray(data) ? data as TargetJob[] : [];
-    },
+    queryKey: ['target-jobs', 'training'],
+    retry: false,
+    queryFn: ({ signal }) => readTrainingArray<TargetJob>('/api/interview/target-jobs', signal, '无法读取目标岗位'),
   });
   const activeJob = jobsQuery.data?.find((job) => job.isActive);
   const recommendationsQuery = useQuery({
-    queryKey: ['training-recommendations', activeJob?.id],
+    queryKey: ['training-recommendations', activeJob?.id, activeJob?.profileVersion],
     enabled: Boolean(activeJob),
-    queryFn: async () => {
-      const response = await fetch(`/api/interview/training-recommendations?targetJobId=${encodeURIComponent(activeJob!.id)}`);
-      const data = await requireJson(response, '无法读取训练建议');
-      return Array.isArray(data) ? data as TrainingRecommendation[] : [];
-    },
+    retry: false,
+    queryFn: ({ signal }) => readTrainingArray<TrainingRecommendation>(
+      `/api/interview/training-recommendations?targetJobId=${encodeURIComponent(activeJob!.id)}`, signal, '无法读取训练建议',
+    ),
   });
   const [pendingAction, setPendingAction] = useState<{ id: string; kind: 'complete' | 'retest' } | null>(null);
   const [actionError, setActionError] = useState('');
@@ -152,11 +178,17 @@ export function TrainingPage() {
   if (jobsQuery.isLoading || recommendationsQuery.isLoading) {
     return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-600">正在加载训练建议...</div>;
   }
+  if (jobsQuery.isError || recommendationsQuery.isError) {
+    const failedQuery = jobsQuery.isError ? jobsQuery : recommendationsQuery;
+    return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-red-700">
+      <p role="alert">训练建议暂时无法加载。请重新加载核验最新状态。</p>
+      <button type="button" disabled={failedQuery.isFetching} onClick={() => void failedQuery.refetch()} className="mt-3 border border-slate-300 px-3 py-2 disabled:opacity-50">
+        {failedQuery.isFetching ? '正在重新加载' : '重新加载'}
+      </button>
+    </div>;
+  }
   if (!activeJob) {
     return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-600">请先设置当前目标岗位。</div>;
-  }
-  if (jobsQuery.isError || recommendationsQuery.isError) {
-    return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-red-700">训练建议暂时无法加载。</div>;
   }
 
   const recommendations = recommendationsQuery.data || [];
