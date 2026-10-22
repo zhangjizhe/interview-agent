@@ -1,6 +1,6 @@
 # 产品全链路重新验收计划
 
-更新：2026-10-18 · PRODUCT-REACCEPTANCE-1 · 原清单基线ea4f68f；后续来源hash见UI_INVENTORY.sourceReconciliations
+更新：2026-10-22 · PRODUCT-REACCEPTANCE-1 · 原清单基线ea4f68f；后续来源hash见UI_INVENTORY.sourceReconciliations
 
 状态：Phase 0 清单与验收门完成；产品全链路尚未重新验收，不交付为“全部通过”。这是当前真实可达产品的验收规划，未来愿景功能不能冒充已实现功能。旧验收结果仅作回归线索，所有条目本轮从未验收开始。
 
@@ -24,7 +24,11 @@
 
 ## 源码控件台账
 
-[UI_INVENTORY.json](UI_INVENTORY.json) 按TypeScript AST枚举13个明确产品页面/组件文件，包含新增AgentBuilder及首次发布入口：986源码模板项，180交互/806展示，最终全部NOT_ACCEPTED；部分字段有限定PARTIAL证据。旧e515afa清单673项保留在[旧基线](../project/archive/ui-inventory/e515afa.json)，不能与新项按编号混用。数量不是运行时通过证据或覆盖率；包装标签可能重叠，动态/条件/响应式及文件内实际可达仍需浏览器逐状态展开。生成器 `scripts/ci/generate-ui-inventory.mjs` 在存在已审查结论时拒绝覆盖，必须显式保留/协调证据。
+[UI_INVENTORY.json](UI_INVENTORY.json) 按TypeScript AST枚举13个明确产品页面/组件文件，包含新增AgentBuilder及首次发布入口：987源码模板项，180交互/807展示，最终全部NOT_ACCEPTED；部分字段有限定PARTIAL证据。旧e515afa清单673项保留在[旧基线](../project/archive/ui-inventory/e515afa.json)，不能与新项按编号混用。数量不是运行时通过证据或覆盖率；包装标签可能重叠，动态/条件/响应式及文件内实际可达仍需浏览器逐状态展开。生成器 `scripts/ci/generate-ui-inventory.mjs` 在存在已审查结论时拒绝覆盖，必须显式保留/协调证据。
+
+## 本轮优先执行与证据校准
+
+本轮只对账，不新增产品PASS。产品基线PR55/main35c2353；987静态模板均最终NOT_ACCEPTED，不是运行时分母。下一单主题TRAINING-ACTIONS（I13/I14），先核实际start/complete数据流、费用、pending/失败与回执合同，再真实API/PG+浏览器双证据；现有fixture直接创建合成正式证据，不等同完整简历到报告黄金链。具体见[缺口复核](REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。
 
 ## 功能级产品合同与验收矩阵
 
@@ -62,7 +66,7 @@
 | L14 | 自进化基础资产 | bootstrap/Agent/版本/数据集/Evaluator选择与创建 | 持久化读回；隔离；状态及版本来源准确 | 新组织全空、重复初始化、权限不足、失败 | agents/versions/datasets/evaluators | ControlledEvolution component；API tests |
 | L15 | 发布数据集治理 | Case添加、冻结、审查、版本/资产展示 | 冻结后不可改；格式/覆盖/审查证据完整 | 缺Case/无效输入/重复冻结/冻结后写/跨组织 | dataset cases/freeze/review；immutable data | dataset SQL/API tests；浏览器完整待验 |
 | L16 | 候选版本 | 创建/选择/版本状态/指纹 | DRAFT不成为当前正式版；配置/资产可追溯 | 缺前置、相同版本、错误/并发、跨组织 | evolution/candidates；AgentVersion | controlled evolution tests；浏览器待验 |
-| L17 | 真实评测任务 | 重复次数/预算/基线/候选启动/进度/取消 | 202任务持久化；幂等；样本边界取消；准确费用小计 | 超额、超时、断网、重启、租约过期、重复/取消竞态 | evaluations；jobs；Quota；Ledger | job PG/API/tests；真实模型预算待明确 |
+| L17 | 真实评测任务 | 重复次数/预算/基线/候选启动/进度/取消 | 202任务持久化；幂等；样本边界取消；准确费用小计 | 超额、超时、断网、重启、租约过期、重复/取消竞态 | evaluations；jobs；Quota；Ledger | job PG/API/tests；预算已授权，历史账单/额度与真实模型证据待核 |
 | L18 | 实际对比与发布 | 同集对比/证据门/发布按钮/结果 | 仅完整通过证据门可发布；录制不解锁真实发布 | REJECT/缺证据/不兼容/失败、权限/并发 | comparison；publish；release gate | release tests；真实固定集此前失败 |
 | X01 | 可访问性与展示 | 全部标签/键盘/焦点/布局/格式/单位/文案 | 标签可理解；图表与原始值一致；长文本不遮挡 | 桌面1440、平板768、移动390；空/长数据/错误 | 全部 UI_INVENTORY 条目与CSS | 现有截图不是全覆盖；本轮逐条复核 |
 | X02 | 部署与数据恢复 | readiness、DNS、迁移、故障、恢复 | 新旧部署合同一致；数据保存；认证状态不清空 | API重建、PG/Redis/向量断开、恢复、旧库升级 | Compose/nginx/migration；PG/Redis/vector | verify-phase2/built-api；前端故障浏览器待补 |
@@ -102,6 +106,8 @@ verdict / blocker / fixCommit / verifiedCommit:
 每个展示数字明确公式、分子分母、范围、单位、精度/舍入、空值与时间时区；静态示意单独标记，真实状态与数据来源绑定。输入/按钮检查标签、禁用、pending、重复点击与错误恢复；下载校验文件类型/内容/归属；分页校验全量和末页；所有错误保持具体原因。
 
 ## Phase 0 验证和未完成
+
+本段保留原Phase 0计数与当时运行状态；当前清单为987项，不能沿用本段旧计数作为当前覆盖分母。
 
 已从当前路由和实际导入组件建立源码台账，核对功能/API入口与CI脚本；JSON解析、唯一ID、源码路径/行号、144/529计数与全未验收标记通过。未运行本轮功能/浏览器/模型重新验收，未更改业务行为、schema、API、权限或运行配置，AI Benchmark不适用于本阶段。完整产品测试仍为活动任务，Phase 0 文档不能作为产品交付报告。
 

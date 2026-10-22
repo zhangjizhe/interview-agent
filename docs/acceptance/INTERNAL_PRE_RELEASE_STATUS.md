@@ -1,16 +1,16 @@
 # 当前内部预发布验收仪表
 
-更新：2026-10-18。用途：内部证据复核与缺陷关闭；**整体NOT_ACCEPTED，不批准完整产品交付或生产发布**。
+更新：2026-10-22。用途：内部证据复核与缺陷关闭；**整体NOT_ACCEPTED，不批准完整产品交付或生产发布**。
 
-本轮L05调用前禁用检查、进程作用范围与只读恢复已完成本地测试/构建及独立审查；新镜像隔离链以本轮提交远端CI为准。见 [L05修复证据](LAB_MCP_PROCESS_POLICY_EVIDENCE.md)。
+本轮为证据与覆盖口径校准，未新增产品测试、部署或模型调用。已复核库存JSON、CI工作流和训练页面/fixture实际入口；见[缺口复核及下一合同](REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。限定阶段合并不能替代整体验收。
 
 ## 固定事实
 
 | 项目 | 已核实事实 | 不能推断 |
 | --- | --- | --- |
-| main | PR40已合并，`ade07bf2139f628b49a87d7f0fbf4c892a15649a`；对应head8b943a0六项CI成功 | 后续资料提交或其他SHA自动通过 |
-| 隔离镜像 | API `sha256:0ee7eec3d49142eb5332bb89a513d6a9331af68371edc69b39e0709f54cf3a6c`；Lab `sha256:73da2faf1b42369aa928af58b7142279aa482588982c601dcb93cf2efb2993dc` | 当前业务预览已部署这些镜像 |
-| 最近完整链 | API82/82、完整隔离浏览器、PG schema/行多集/sequence一致、实际Milvus题目/Qdrant向量payload恢复，exit0 | 真实模型质量、生产RPO/RTO或所有UI状态通过 |
+| 最近产品基线 | PR55精确`f547a27`六项CI成功，已合并`35c235372bd1ba76ca256e91f3151dc02f6ef90c`；上一阶段已核main/agent-lab同SHA | 后续文档提交自动通过，或业务环境已部署 |
+| 镜像/部署身份 | 最近产品CI从对应锁定源构建API、Web及Lab镜像；业务目标环境SHA/镜像/迁移尚未核验 | 隔离镜像或main合并等于当前预览/生产部署 |
+| 最近完整链 | API93/93、Lab及候选限定隔离浏览器、PG schema/行多集/sequence一致、实际Milvus题目/Qdrant向量payload恢复，exit0 | 真实模型质量、生产RPO/RTO或所有UI状态通过 |
 | UI清单 | 987模板：180交互/807展示；987最终NOT_ACCEPTED | 模板数或PARTIAL项等于运行时覆盖率 |
 | CI | ci-api已执行隔离浏览器、题目迁移存储合同和恢复链 | 离线fixture证明真实外部协议或模型效果 |
 | 费用 | 近期验收外部0；历史已知评测小计0.069285CNY，另有未知费用 | 未知账单为零，或剩余额度已确认 |
@@ -25,8 +25,12 @@
 | MCP | 运行期开关/真实读回/禁用健康反馈、重载及损坏成功回执恢复 | 重启持久化、多实例协调、外部协议/依赖逐服务可用性和完整执行验收 |
 | 操作日志 | 实际重载日志字段/时间/总数、21条20+1页键盘往返、AND空结果/重置恢复；两按钮名称 | 并发分页、读屏、日期、跨组织、自然故障 |
 | 评测/发布 | 离线样本/持久任务/发布证据门等工程合同 | 真实固定集质量、可允许发布的真实证据与全部UI |
-| Interview/训练 | 正式证据与PG/HTTP训练复测工程合同 | 完整简历→岗位→面试/SSE→报告→训练→复测的浏览器及真实模型黄金链 |
+| Interview/训练 | 原生Response正文超时单测、实际60秒整回执等待/结束删除与PG读回；合成正式证据与PG/HTTP训练复测合同 | 完整简历→岗位→面试/SSE→报告→训练→复测的浏览器及真实模型黄金链 |
 | 部署/恢复 | 私有隔离PG及实际向量恢复 | 当前业务SHA/镜像/迁移证明、当场备份、生产部署及恢复 |
+
+## 当前下一执行
+
+TRAINING-ACTIONS（I13/I14）：真实TrainingPage推荐→完成→复测、pending/失败/回执与API/PG关联。现有verify-training-loop直接seed合成正式证据，不是完整候选黄金链；先核start成本，再运行无外部费用的隔离工程验收。真实质量、账单和目标部署仍单独阻断。
 
 ## 内部审查顺序
 
@@ -40,7 +44,8 @@
 
 ## 证据入口
 
-- [完整验收合同/矩阵](PRODUCT_REACCEPTANCE_PLAN.md)、[983项源码台账](UI_INVENTORY.json)、[当前待办](../project/TASKS.md)
+- [完整验收合同/矩阵](PRODUCT_REACCEPTANCE_PLAN.md)、[987项源码模板台账](UI_INVENTORY.json)、[当前待办](../project/TASKS.md)
+- [候选请求保护与恢复证据](INTERVIEW_END_TIMEOUT_EVIDENCE.md)及其前置阶段报告；限定范围不提升为I06–I14整行PASS。
 - [MCP运行期开关](LAB_MCP_TOGGLE_EVIDENCE.md)、[MCP回执完整性](LAB_MCP_RECEIPT_EVIDENCE.md)
 - [运行归属](LAB_START_TARGET_BINDING_EVIDENCE.md)、[请求关联](LAB_START_REQUEST_BINDING_EVIDENCE.md)、[取消回执](LAB_CANCEL_RECEIPT_EVIDENCE.md)
 - [题库真实双证据](LAB_QUESTION_EVIDENCE.md)、[题库写入完整性](LAB_QUESTION_WRITE_INTEGRITY_EVIDENCE.md)
