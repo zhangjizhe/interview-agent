@@ -86,7 +86,7 @@ it('does not navigate from a receipt for a previous job profile version', async 
   const held = new Promise<Response>(resolve => { release = resolve; });
   const test = setup('COMPLETED', () => held);
   fireEvent.click(await screen.findByRole('button', { name: '开始复测' }));
-  await act(async () => { test.client.setQueryData(['target-jobs'], [{ id: 'job', title: 'Updated synthetic job', isActive: true, profileVersion: 2 }]); });
+  await act(async () => { test.client.setQueryData(['target-jobs', 'training'], [{ id: 'job', title: 'Updated synthetic job', isActive: true, profileVersion: 2 }]); });
   await screen.findByText('Updated synthetic job');
   await act(async () => { release(json({ interviewId: 'old', interview: { id: 'old', targetJobId: 'job', practiceSkillId: 'skill', mode: 'SKILL_PRACTICE' } })); });
   expect(screen.getByTestId('location').textContent).toBe('/training');
@@ -137,7 +137,7 @@ it.each(['retest', 'refresh'].flatMap(kind => ['unmount', 'profile'].map(scope =
   try {
     if (scope === 'unmount') test.close();
     else {
-      act(() => { test.client.setQueryData(['target-jobs'], [{ id: 'job', title: 'New synthetic profile', isActive: true, profileVersion: 2 }]); });
+      act(() => { test.client.setQueryData(['target-jobs', 'training'], [{ id: 'job', title: 'New synthetic profile', isActive: true, profileVersion: 2 }]); });
       await screen.findByText('New synthetic profile');
     }
     const aborted = signal?.aborted;

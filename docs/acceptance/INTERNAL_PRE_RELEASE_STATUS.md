@@ -2,16 +2,16 @@
 
 更新：2026-10-22。用途：内部证据复核与缺陷关闭；**整体NOT_ACCEPTED，不批准完整产品交付或生产发布**。
 
-训练动作PR57经限定工程验收及六项精确CI成功后合并；当前训练POST超时继续验收，未通过阶段不记交付。见[训练动作证据](TRAINING_ACTIONS_EVIDENCE.md)及[POST超时进度](TRAINING_TIMEOUT_EVIDENCE.md)。限定阶段合并不能替代整体验收。
+训练动作PR57及POST超时PR58经限定工程验收与最新六项CI成功后合并；当前进入训练GET读取边界，未通过阶段不记交付。见[训练动作证据](TRAINING_ACTIONS_EVIDENCE.md)及[POST超时进度](TRAINING_TIMEOUT_EVIDENCE.md)。限定阶段合并不能替代整体验收。
 
 ## 固定事实
 
 | 项目 | 已核实事实 | 不能推断 |
 | --- | --- | --- |
-| 最近产品基线 | PR57精确`e56564a`六项CI成功，已合并`97e44a2c6b579115f2de3aa918dc254880c2b327`；本轮读回main/agent-lab同SHA | 后续文档提交自动通过，或业务环境已部署 |
+| 最近产品基线 | PR58精确`ed90ec6`最新六项作业成功，已合并`e108a685f0839f3ad3c7556bcf8818468784e2ac`；PR/远端main/agent-lab均读回该结果，首轮CI取消保留 | 后续文档提交自动通过，或业务环境已部署 |
 | 镜像/部署身份 | 最近产品CI从对应锁定源构建API、Web及Lab镜像；业务目标环境SHA/镜像/迁移尚未核验 | 隔离镜像或main合并等于当前预览/生产部署 |
 | 最近完整链 | API93/93、Lab及候选限定隔离浏览器、PG schema/行多集/sequence一致、实际Milvus题目/Qdrant向量payload恢复，exit0 | 真实模型质量、生产RPO/RTO或所有UI状态通过 |
-| UI清单 | 988模板：180交互/808展示；988最终NOT_ACCEPTED | 模板数或PARTIAL项等于运行时覆盖率 |
+| UI清单 | 990模板：181交互/809展示；990最终NOT_ACCEPTED | 模板数或PARTIAL项等于运行时覆盖率 |
 | CI | ci-api已执行隔离浏览器、题目迁移存储合同和恢复链 | 离线fixture证明真实外部协议或模型效果 |
 | 费用 | 近期验收外部0；历史已知评测小计0.069285CNY，另有未知费用 | 未知账单为零，或剩余额度已确认 |
 
@@ -30,7 +30,9 @@
 
 ## 当前下一执行
 
-TRAINING-TIMEOUT（I13/I14的POST头/正文）：旧码挂起6项失败，修复后页面20项/Web265通过；独立真实PG/原生等待浏览器链进行中，成功后GET挂起另列。现有verify-training-loop直接seed合成正式证据，不是完整候选黄金链；先核start成本，再运行无外部费用的隔离工程验收。真实质量、账单和目标部署仍单独阻断。
+最新PR59训练候选的push因新ip-address公告审计失败，当前单主题先处理[最小依赖安全前置](IP_ADDRESS_SECURITY_EVIDENCE.md)，不以先前PR CI成功覆盖它。
+
+TRAINING-READS（I13/I14的GET读取与恢复）：POST限定阶段已合并，读取超时/取消、错误/空状态、仅GET恢复与跨页query隔离已13红测后修复，Web278/build/lint通过；最终实际API93/PG/浏览器/严格恢复exit0，精确CI待完成，见[GET证据](TRAINING_READS_EVIDENCE.md)。现有verify-training-loop直接seed合成正式证据，不是完整候选黄金链；先核start成本，再运行无外部费用的隔离工程验收。真实质量、账单和目标部署仍单独阻断。
 
 ## 内部审查顺序
 
@@ -44,7 +46,7 @@ TRAINING-TIMEOUT（I13/I14的POST头/正文）：旧码挂起6项失败，修复
 
 ## 证据入口
 
-- [完整验收合同/矩阵](PRODUCT_REACCEPTANCE_PLAN.md)、[988项源码模板台账](UI_INVENTORY.json)、[当前待办](../project/TASKS.md)
+- [完整验收合同/矩阵](PRODUCT_REACCEPTANCE_PLAN.md)、[990项源码模板台账](UI_INVENTORY.json)、[当前待办](../project/TASKS.md)
 - [候选请求保护与恢复证据](INTERVIEW_END_TIMEOUT_EVIDENCE.md)及其前置阶段报告；限定范围不提升为I06–I14整行PASS。
 - [MCP运行期开关](LAB_MCP_TOGGLE_EVIDENCE.md)、[MCP回执完整性](LAB_MCP_RECEIPT_EVIDENCE.md)
 - [运行归属](LAB_START_TARGET_BINDING_EVIDENCE.md)、[请求关联](LAB_START_REQUEST_BINDING_EVIDENCE.md)、[取消回执](LAB_CANCEL_RECEIPT_EVIDENCE.md)

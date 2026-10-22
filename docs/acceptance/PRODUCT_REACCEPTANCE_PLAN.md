@@ -24,11 +24,11 @@
 
 ## 源码控件台账
 
-[UI_INVENTORY.json](UI_INVENTORY.json) 按TypeScript AST枚举13个明确产品页面/组件文件，包含新增AgentBuilder及首次发布入口：988源码模板项，180交互/808展示，最终全部NOT_ACCEPTED；部分字段有限定PARTIAL证据。旧e515afa清单673项保留在[旧基线](../project/archive/ui-inventory/e515afa.json)，不能与新项按编号混用。数量不是运行时通过证据或覆盖率；包装标签可能重叠，动态/条件/响应式及文件内实际可达仍需浏览器逐状态展开。生成器 `scripts/ci/generate-ui-inventory.mjs` 在存在已审查结论时拒绝覆盖，必须显式保留/协调证据。
+[UI_INVENTORY.json](UI_INVENTORY.json) 按TypeScript AST枚举13个明确产品页面/组件文件，包含新增AgentBuilder及首次发布入口：990源码模板项，181交互/809展示，最终全部NOT_ACCEPTED；部分字段有限定PARTIAL证据。旧e515afa清单673项保留在[旧基线](../project/archive/ui-inventory/e515afa.json)，不能与新项按编号混用。数量不是运行时通过证据或覆盖率；包装标签可能重叠，动态/条件/响应式及文件内实际可达仍需浏览器逐状态展开。生成器 `scripts/ci/generate-ui-inventory.mjs` 在存在已审查结论时拒绝覆盖，必须显式保留/协调证据。
 
 ## 本轮优先执行与证据校准
 
-PR57训练动作限定工程门及精确六项CI已成功，冻结合并产品基线97e44a2；988静态模板最终仍NOT_ACCEPTED，不是运行时分母。当前单主题TRAINING-TIMEOUT（POST头/正文），旧码6项挂起失败已复现，修复后页面20/Web265项通过，独立真实API/PG与原生三次60秒浏览器及严格恢复最终标记已过，原工具exit因额度中断不可读，必须精确CI完整成功再合并。成功后refetch/初始GET长期挂起另列后续，不声称全操作60秒。见[POST超时证据](TRAINING_TIMEOUT_EVIDENCE.md)；合成FINAL不等同完整黄金链或真实模型质量。
+PR57训练动作与PR58 POST超时限定工程门已完成，PR58最新六项作业成功后冻结合并e108a68，PR/远端main/agent-lab读回一致。首轮CI因依赖下载19min26s触发30分钟取消，保留失败并仅重跑失败部分，未改断言或执行时限。990静态模板最终仍NOT_ACCEPTED，不是运行时分母。当前单主题TRAINING-READS：成功POST后refetch、初始GET挂起与岗位读取错误/无岗位区分，已实际红测12失败并修复，Web278通过；最终实际API93/PG/浏览器/严格恢复exit0，精确CI待完成，不声称全部操作60秒。见[POST超时证据](TRAINING_TIMEOUT_EVIDENCE.md)；合成FINAL不能替代完整黄金链、真实模型质量或目标部署。
 
 ## 功能级产品合同与验收矩阵
 
@@ -107,7 +107,7 @@ verdict / blocker / fixCommit / verifiedCommit:
 
 ## Phase 0 验证和未完成
 
-本段保留原Phase 0计数与当时运行状态；当前清单为988项，不能沿用本段旧计数作为当前覆盖分母。
+本段保留原Phase 0计数与当时运行状态；当前清单为990项，不能沿用本段旧计数作为当前覆盖分母。
 
 已从当前路由和实际导入组件建立源码台账，核对功能/API入口与CI脚本；JSON解析、唯一ID、源码路径/行号、144/529计数与全未验收标记通过。未运行本轮功能/浏览器/模型重新验收，未更改业务行为、schema、API、权限或运行配置，AI Benchmark不适用于本阶段。完整产品测试仍为活动任务，Phase 0 文档不能作为产品交付报告。
 

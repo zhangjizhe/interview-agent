@@ -1,32 +1,26 @@
 # 待办与验收门
 
-2026-10-22：TRAINING-ACTIONS限定工程验收完成。PR57精确候选e56564a39b47d67479e9ffc0788446c846140ff8重新读回六项push/PR检查全部completed/success，冻结SHA经PR合并97e44a2c6b579115f2de3aa918dc254880c2b327。本轮Git读回远端main/agent-lab均该合并SHA，本地agent-lab快进。API网络此前连续reset，已先确认PR仍open再重试合并；成功响应merged=true，后续PR读回又reset，但远端分支一致已核。本地原工具exit未知的限制保留，不继承合成工程证据为模型质量或部署。
-
-唯一活动任务仍PRODUCT-REACCEPTANCE-1，整体NOT_ACCEPTED。当前单主题TRAINING-TIMEOUT：训练complete/start/refresh的响应头或正文长期挂起，需等待有界、明确未知结果、显式刷新核验以及scope失效清理；先实际页面红测，再复用当前隔离API/PG+浏览器做双证据。该阶段尚未通过，无外部模型调用。当前已复现旧码6失败9通过；修复后训练页20项/Web265项、lint/type及新镜像通过，独立浏览器记录refresh60021/complete60149/retest60092ms真实超时与PG未知结果恢复、无自动重发、严格PG和实际向量恢复最终标记。Agent随后额度中断使原工具exit不可读，保留未知，不记exit0；准备定向提交及精确CI，不重跑不变本地检查。见[POST超时证据](../acceptance/TRAINING_TIMEOUT_EVIDENCE.md)。
-
-已过训练动作：Web255项、TrainingPage10项、审计/lint/type/build、API93及真实推荐/Attempt/唯一复测关联/一单位INTERVIEW_START/无模型增量、严格PG及真实向量恢复；对应CI已完整成功。详见[训练动作证据](../acceptance/TRAINING_ACTIONS_EVIDENCE.md)。无关历史修改未提交。
-
-2026-10-22：文档校准PR56精确2a8e4110842af1d15b010b0d68fff23c7946d49f三项可见CI全成功，已冻结SHA合并5c6ecdc3f7dba484c89dc3db009237911201e9b4；本轮读回远端main/agent-lab均该SHA，本地快进。仅文档变化，最近产品代码基线仍35c2353，未新增产品PASS/部署/模型费用。早期自动审批超时及网络重置已恢复核验。
-
-2026-10-22 · PRODUCT-REACCEPTANCE-1，整体NOT_ACCEPTED。最近产品基线PR55合并35c2353，文档校准已完成；当前训练动作限定工程门和CI已过，等待网络恢复经PR合并；整体仍不新增PASS。
+2026-10-22 · PRODUCT-REACCEPTANCE-1，整体NOT_ACCEPTED。最近产品基线PR58合并e108a685f0839f3ad3c7556bcf8818468784e2ac，最新六项作业成功，远端main/agent-lab已核一致。首轮CI取消、重跑和原本地exit未知等失败事实保留在[POST超时证据](../acceptance/TRAINING_TIMEOUT_EVIDENCE.md)，不继承为真实质量/部署通过。当前唯一单主题SECURITY-IPADDRESS（TRAINING-READS合并前置，最新push审计新失败），已红测12失败并修复，组件/构建通过，最终实际API93/PG/浏览器/严格恢复exit0，精确CI待完成。
 
 | 优先级 | 范围 | 下一证据/退出门 |
 | --- | --- | --- |
 | 限定完成 | 仪表/覆盖口径对账 | 修正过期PR40/API82/986口径，保留988最终NOT_ACCEPTED与全部失败历史，独立审文档、对应CI |
 | 限定完成 | TRAINING-ACTIONS / I13/I14子集 | PR57六项精确CI通过，冻结合并97e44a2，远端main/agent-lab一致；非I13/I14整行通过 |
 | P0 | 完整候选黄金链 | 简历→岗位→成功SSE→报告→训练→复测完整链，合成工程和真实模型质量分别证明 |
-| P0 | 全运行时状态 | 988静态模板逐项展开空/单/多、条件、错误、键盘、1440/768/390；无全分母不报覆盖率 |
+| P0 | 全运行时状态 | 990静态模板逐项展开空/单/多、条件、错误、键盘、1440/768/390；无全分母不报覆盖率 |
 | P0 | Lab剩余业务与完整B1 | 录制/实验/决策/审计/数据集/候选/评测/发布逐状态双证据；信封/事件/能力与替换合同，不以空Registry代替消费 |
 | P0 | 真实质量与账单 | 先核历史未知账单/额度，单次≤0.5及新测试累计≤3CNY有界评测；失败不发布，未知不记零 |
 | P0 | 部署身份与恢复 | 固定SHA/镜像/迁移/配置、当场备份与目标环境恢复，不继承隔离恢复为生产证明 |
 | P1 | 工具/知识/记忆及Bridge恢复 | B2–B5退出门、会话级快照、策略/遥测分离、孤儿Run持久恢复 |
 | P1 | MCP/管理员控制 | 进程外持久化/多实例、逐服务协议与执行、持久授权审计；所有者按SOP逐目标授权 |
 | P1 | 历史16题复用 | 组织/embedding来源确认→保留源迁入/持久收据/读回/浏览器，禁止跨租户fallback |
-| 当前单主题P0 | 训练POST超时/断线 | 旧码6项挂起失败已复现，POST头/正文60秒及scope清理已修复；20项页面回归/Web265已过，独立真实PG/浏览器/严格恢复最终标记已过；原exit因额度中断不可读，精确CI待过门 |
-| P0 | 训练成功后refetch/初始GET挂起 | 当前POST deadline不覆盖invalidateQueries与初始GET，可能继续busy；需独立复现和有界读取/恢复，不能称全部操作60秒 |
-| P1 | TrainingPage岗位加载错误 | 当前先判断无activeJob再判断jobsQuery错误，GET失败可能误导设置岗位；独立复现后修复 |
+| 限定完成 | 训练POST超时/断线 | PR58最新六项CI作业成功，冻结合并e108a68；保留首轮依赖下载慢导致CI期限取消，非全训练操作60秒 |
+| 已实现待安全前置门 | TRAINING-READS：成功后refetch/初始GET | 13读取用例含追加跨页query红测后修复，Web278/build/lint通过；最终镜像实际API93/PG/browser/严格恢复exit0，精确CI待完成，不能称整体训练通过 |
+| 同一读取主题 | TrainingPage岗位加载错误 | 已复现并修复错误/空状态顺序，仅GET重新加载；与TRAINING-READS同一最终验收门 |
+| P1 | 训练读取逐字段合同 | 本轮仅拒绝非数组外层；岗位/推荐条目缺失或错误字段的运行时校验与用户恢复需另立实际失败用例，不推广为完整响应语义通过 |
 | P1 | 其他异步/错误边界 | 简历上传、HITL、多页面实例共享store等按实际源码重现后独立修复；不由已修历史/结束推广全部安全 |
 | P1 | CI运行时维护 | 本轮GitHub注记Actions Node20弃用与ubuntu-latest迁移；独立核升级兼容性，不在训练修复中顺改或弱化检查 |
+| 当前单主题P0 | SECURITY-IPADDRESS | 新公告GHSA-rxp7-6hxx-x8q5阻断push；SDK→limiter→ip-address10.7.1需10.7.4最小patch与锁文件/真实安装链红绿/审计/完整精确CI，禁止新allowlist或盲重跑 |
 | P1 | 安全维护 | 延续审计/补丁完整性，保留high边界，不声明零漏洞 |
 
 已关闭的限定子缺陷：PR49–55的SSE生命周期、历史跨路由/同会话消息/确认并发、结束回执/跨路由/正文超时；不再作为未复现P0重复列出。其他简历/report并发与完整成功黄金链仍待验收。
