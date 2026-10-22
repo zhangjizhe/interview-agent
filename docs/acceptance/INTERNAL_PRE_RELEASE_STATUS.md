@@ -11,7 +11,7 @@
 | 最近产品基线 | PR55精确`f547a27`六项CI成功，已合并`35c235372bd1ba76ca256e91f3151dc02f6ef90c`；上一阶段已核main/agent-lab同SHA | 后续文档提交自动通过，或业务环境已部署 |
 | 镜像/部署身份 | 最近产品CI从对应锁定源构建API、Web及Lab镜像；业务目标环境SHA/镜像/迁移尚未核验 | 隔离镜像或main合并等于当前预览/生产部署 |
 | 最近完整链 | API93/93、Lab及候选限定隔离浏览器、PG schema/行多集/sequence一致、实际Milvus题目/Qdrant向量payload恢复，exit0 | 真实模型质量、生产RPO/RTO或所有UI状态通过 |
-| UI清单 | 987模板：180交互/807展示；987最终NOT_ACCEPTED | 模板数或PARTIAL项等于运行时覆盖率 |
+| UI清单 | 988模板：180交互/808展示；988最终NOT_ACCEPTED | 模板数或PARTIAL项等于运行时覆盖率 |
 | CI | ci-api已执行隔离浏览器、题目迁移存储合同和恢复链 | 离线fixture证明真实外部协议或模型效果 |
 | 费用 | 近期验收外部0；历史已知评测小计0.069285CNY，另有未知费用 | 未知账单为零，或剩余额度已确认 |
 
@@ -44,7 +44,7 @@ TRAINING-ACTIONS（I13/I14）：真实TrainingPage推荐→完成→复测、pen
 
 ## 证据入口
 
-- [完整验收合同/矩阵](PRODUCT_REACCEPTANCE_PLAN.md)、[987项源码模板台账](UI_INVENTORY.json)、[当前待办](../project/TASKS.md)
+- [完整验收合同/矩阵](PRODUCT_REACCEPTANCE_PLAN.md)、[988项源码模板台账](UI_INVENTORY.json)、[当前待办](../project/TASKS.md)
 - [候选请求保护与恢复证据](INTERVIEW_END_TIMEOUT_EVIDENCE.md)及其前置阶段报告；限定范围不提升为I06–I14整行PASS。
 - [MCP运行期开关](LAB_MCP_TOGGLE_EVIDENCE.md)、[MCP回执完整性](LAB_MCP_RECEIPT_EVIDENCE.md)
 - [运行归属](LAB_START_TARGET_BINDING_EVIDENCE.md)、[请求关联](LAB_START_REQUEST_BINDING_EVIDENCE.md)、[取消回执](LAB_CANCEL_RECEIPT_EVIDENCE.md)

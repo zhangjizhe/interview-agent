@@ -24,11 +24,11 @@
 
 ## 源码控件台账
 
-[UI_INVENTORY.json](UI_INVENTORY.json) 按TypeScript AST枚举13个明确产品页面/组件文件，包含新增AgentBuilder及首次发布入口：987源码模板项，180交互/807展示，最终全部NOT_ACCEPTED；部分字段有限定PARTIAL证据。旧e515afa清单673项保留在[旧基线](../project/archive/ui-inventory/e515afa.json)，不能与新项按编号混用。数量不是运行时通过证据或覆盖率；包装标签可能重叠，动态/条件/响应式及文件内实际可达仍需浏览器逐状态展开。生成器 `scripts/ci/generate-ui-inventory.mjs` 在存在已审查结论时拒绝覆盖，必须显式保留/协调证据。
+[UI_INVENTORY.json](UI_INVENTORY.json) 按TypeScript AST枚举13个明确产品页面/组件文件，包含新增AgentBuilder及首次发布入口：988源码模板项，180交互/808展示，最终全部NOT_ACCEPTED；部分字段有限定PARTIAL证据。旧e515afa清单673项保留在[旧基线](../project/archive/ui-inventory/e515afa.json)，不能与新项按编号混用。数量不是运行时通过证据或覆盖率；包装标签可能重叠，动态/条件/响应式及文件内实际可达仍需浏览器逐状态展开。生成器 `scripts/ci/generate-ui-inventory.mjs` 在存在已审查结论时拒绝覆盖，必须显式保留/协调证据。
 
 ## 本轮优先执行与证据校准
 
-本轮只对账，不新增产品PASS。产品基线PR55/main35c2353；987静态模板均最终NOT_ACCEPTED，不是运行时分母。下一单主题TRAINING-ACTIONS（I13/I14），先核实际start/complete数据流、费用、pending/失败与回执合同，再真实API/PG+浏览器双证据；现有fixture直接创建合成正式证据，不等同完整简历到报告黄金链。具体见[缺口复核](REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。
+文档校准已合并；当前训练动作本地证据已完成、对应CI待核，整体不新增PASS。最近产品基线PR55/main35c2353；988静态模板均最终NOT_ACCEPTED，不是运行时分母。当前单主题TRAINING-ACTIONS（I13/I14），已核实际start/complete数据流、费用、pending/失败与回执合同及真实API/PG+浏览器证据；现有fixture直接创建合成正式证据，不等同完整简历到报告黄金链。具体见[缺口复核](REACCEPTANCE_GAP_REVIEW_2026_10_22.md)。
 
 ## 功能级产品合同与验收矩阵
 
@@ -107,7 +107,7 @@ verdict / blocker / fixCommit / verifiedCommit:
 
 ## Phase 0 验证和未完成
 
-本段保留原Phase 0计数与当时运行状态；当前清单为987项，不能沿用本段旧计数作为当前覆盖分母。
+本段保留原Phase 0计数与当时运行状态；当前清单为988项，不能沿用本段旧计数作为当前覆盖分母。
 
 已从当前路由和实际导入组件建立源码台账，核对功能/API入口与CI脚本；JSON解析、唯一ID、源码路径/行号、144/529计数与全未验收标记通过。未运行本轮功能/浏览器/模型重新验收，未更改业务行为、schema、API、权限或运行配置，AI Benchmark不适用于本阶段。完整产品测试仍为活动任务，Phase 0 文档不能作为产品交付报告。
 
