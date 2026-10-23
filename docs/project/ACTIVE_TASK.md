@@ -1,13 +1,13 @@
 # 当前任务
 
-2026-10-23 · PRODUCT-REACCEPTANCE-1 · 整体NOT_ACCEPTED。持续自主推进，已授权独立测试Agent及阶段/最新精确CI通过后经PR合并main。
+2026-10-23 · PRODUCT-REACCEPTANCE-1整体NOT_ACCEPTED。用户授权持续自主推进与独立测试Agent；每阶段双证据、最新精确CI通过后PR冻结合并main。
 
-基线PR59冻结候选43b74cc经最新push/PR六项成功后合并a03ff8afe7f8431ac6d53c9493f8c22077d23aa0，PR/main/agent-lab/本地读回。收据见[GET](../acceptance/TRAINING_READS_EVIDENCE.md)/[安全](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。
+最近限定完成：I06保存回执PR60候选79ce42e，经push39881968453/PR39882026662 attempt1六项全success及原始日志二次复核，合并2758f718d0de1e2cfb31f912c9e3eef93a72185c。PR/main/agent-lab/本地均读回。四次失败及最终链exit0、预算/迟到写边界见[保存证据](../acceptance/RESUME_PERSISTENCE_RECEIPT_EVIDENCE.md)。最终收据为冻结后工作区待相关提交资料，不重跑已过未变检查。
 
-唯一当前子主题RESUME-PERSISTENCE-RECEIPT（I06）：修复吞Milvus异常仍报成功。insert状态/count/ID和Strong同owner/payload确认；完整SDK调用5秒有界等待，未知503不自动重试；显式float/1024finite embedding；Web严格成功回执，NGINX透传业务503。数据库schema/API形状不变。等待超时不取消底层动作，lazy init/embedding整体等待未覆盖。
+唯一当前子主题CANDIDATE-GOLDEN-ENGINEERING：实际成功SSE→正式FINAL报告/技能证据→训练/复测完整工程链。已核默认multi图的supervisor/planner/executor/reviewer、评分/report合同；添加仅私有合成provider profile与原生SSE、未知prompt拒绝。9项纯合同及1项真实本地HTTP协议测试通过，业务工程链另见下方实际收据；不证明模型质量。
 
-已验证32定向、全API841通过/21跳过、Web284、相关lint/type/build、API/Web新镜像及真实NGINX短回归。四次完整隔离链exit1依次暴露SDK隐藏describe等待、NGINX覆盖业务503、双按钮测试歧义、公开清洗与原始summary测试误等；全部保留[本轮证据](../acceptance/RESUME_PERSISTENCE_RECEIPT_EVIDENCE.md)。第五轮resume-receipt-clean-read-chain实际exit0（真实上传、严格PG/向量恢复通过），不提交/推送或声明恢复通过。最新helper区分Strong原始payload与public清洗后的summary，并保留其他字段精确比较。
+当前已修后原probe与扩展真实API训练闭环exit0、严格PG/实际向量恢复通过；30新+原4=34定向、全API871/21跳过、类型/lint及最终镜像通过。9纯合同+1原生HTTP协议通过。增强精确ReactID与新独立真实浏览器全链golden-browser-full-chain实际exit0，API增强/独立UI全环/严格PG与实际向量恢复及二次复核通过，待提交/精确CI。历史首次skill空与跨会话父题对抗红测保留[证据](../acceptance/GOLDEN_SKILL_ATTRIBUTION_EVIDENCE.md)。独立Agent已恢复并复核完整原始日志及退出码。
 
-下一步独立二次核对最终exit0/恢复日志、diff检查，定向提交后绑定最新精确CI，才经PR冻结合并并核远端。后续完整成功SSE/正式报告/技能/训练复测链仍未验收。
+外部预算≤0.5CNY/次、新发布累计≤3CNY；历史已知0.069285另有未知，未对账/核额度不付费重放。本轮私有合成provider外部0不能证明真实质量/学习提升。990模板仍NOT_ACCEPTED、部署/生产恢复未核。最新简历limit/版本、读取吞空、embedding统一账本缺口列TASKS。无关旧费用报告/截图/TASK-034不提交不重置。
 
-预算外部≤0.5CNY/次、新发布累计≤3CNY；历史已知0.069285另有未知，未对账/核额度不付费重放。本轮只有私有合成provider，不能证明真实模型质量/学习提升。990模板均NOT_ACCEPTED，目标部署身份/恢复未核。无关旧费用报告/截图/TASK-034不stage不重置。
+本阶段本地工程门通过（完整链exit0+二次日志复核），仍待最新精确CI/PR冻结合并。首题展示/问候误评分和已结束复测仍显示进行中文案为后续P0；这些不随固定答案工程链通过。无外部模型费用，非质量/学习提升。

@@ -51,3 +51,5 @@ PR59训练GET读取及ip-address最小安全前置，经最新六项CI和独立�
 - [题库真实双证据](LAB_QUESTION_EVIDENCE.md)、[题库写入完整性](LAB_QUESTION_WRITE_INTEGRITY_EVIDENCE.md)
 - [历史10月10日仪表](PRE_RELEASE_REVIEW_2026-10-10.md)仅保留当时快照，不再作为当前状态。
 - [权限SOP](../ADMIN-ACCESS-SOP.md)、[运行手册](../runbook.md)、[完整历史上下文](../project/archive/reacceptance-2026-10-18/CURRENT_STATE.md)
+
+PR60 limited-complete: frozen79ce42e, latest push/PR six CI success and original-log review, merged2758f718d0de1e2cfb31f912c9e3eef93a72185c; PR/remote main/agent-lab/local readback equal. Supersedes pending-CI wording. Overall NOT_ACCEPTED; next active subtheme is full successful golden-chain contract audit.
