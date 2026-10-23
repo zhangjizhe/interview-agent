@@ -26,6 +26,14 @@
 
 依赖风险豁免尚未批准。当前不声明完整账单对账、训练提升、零漏洞、生产 RTO/RPO 或可直接商用。
 
+ADR25 working-tree foundation (not delivered): persist a task/message presentation
+receipt and fenced answer attempt, same-interview/org composite FKs and one
+unresolved question; UNKNOWN has no automatic paid replay. No provider calls under
+the short parent-row transaction. Service is not registered in candidate routes;
+confirmation/history, queue initialization, stream recovery, end coordination and
+UI admission still require integration and acceptance. See
+[question presentation evidence](../acceptance/QUESTION_PRESENTATION_EVIDENCE.md).
+
 ADR24增量B1a（PR46精确CI验收并合并）：采用构造期可信RuntimeAdapterRegistry包装既有引擎并接入实际runAgent；保留领域状态/CAS/费用权限，未知能力显式拒绝，不引入动态代码加载或空注册表。统一事件与完整能力清单另批实现，不宣称完整B1。
 
 B1b增量（本地限定实链验收通过）：runAgent完成前经runtime-result.contract校验显式output/旧response对象；无效输出走既有失败状态/CAS/Trace，保留格式有效的适配器报告用量与估算，未知不补零。无API/schema/权限变更，非语义质量/完整信封/统一事件或真实账单。详见RUNTIME_RESULT_BOUNDARY_EVIDENCE.md；首新镜像API91/浏览器/严格恢复通过，精确CI待核。

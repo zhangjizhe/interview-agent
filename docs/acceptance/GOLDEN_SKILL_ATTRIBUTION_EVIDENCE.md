@@ -51,3 +51,9 @@ golden-interview-loop.mjs使用新browserContext、仅localhost5177路由，关�
 这些分数来自明确baseline/retest fixture参数45/80，既不证明回答题义正确，也不证明学习提升或真实模型质量。模型调用实际发生，外部请求0不等于零模型工作；原重复end embedding+1仍保留成本待办。独立Agent源码复核确认：Page空态仅“开始你的第一句话吧～”，confirm不自动出题，题目直到首消息才初始化并进入同次completeTask，首题先展示/问候不得记答题的产品P0仍未验收。本阶段仅批准限定合成工程证据，整体NOT_ACCEPTED、未部署，必须等待精确候选push/PR全部CI并冻结合并。
 
 额外展示缺口：新FINAL后实际Training仍显示“复测进行中”，对应RETEST_STARTED关系状态；本轮仅验证关联保留，不批准该文案语义。列TASKS后续产品合同，整体不交付。
+
+## PR61最终收据（冻结后工作区补记）
+
+候选ecf28639e13ed42b9c4a81457b1e8d8968dd93a1，push39916240119 attempt1（lint120290329904/Docker120290329931/summary120296300182）、PR39916281271 attempt1（Docker120290457989/lint120290458222/summary120296660996）六项completed/success。独立Agent读两组原始lint/Docker日志：API873通过19跳过、Web284、9纯模型合同+1HTTP，golden API/UI工程链及严格PG/实际向量恢复均通过；与本地871/21环境差异分开，新增suite PASS不伪称CI逐文件打印30。
+
+冻结expected_head_sha ecf28639合并PR61至55230237f2ab7eeea7c4224577d2aee0dac8ba6d，merged_at2026-10-23T12:28:13Z；PR closed/merged/mergeSHA、远端main/agent-lab及本地均实读一致。首题语义、复测文案、重复结束embedding1及真实质量/账单/部署边界保留。整体NOT_ACCEPTED，main不等于部署。此收据留后续相关提交，不倒填冻结候选内容。

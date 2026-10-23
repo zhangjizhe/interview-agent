@@ -712,3 +712,51 @@ Lab原有Registry/Version/Run/Trace与发布门可复用，但执行器仅Interv
 首批落实两个真实链路错误：简历确认必须核验HTTP和success回执；Interview桥在异步前固定已发布版本快照，Run使用同一显式agentVersionId并校验回读，关联失败尽力记为失败。每回合快照不等于全会话锁定，控制器catch-and-continue仍是可选桥而非强制策略加载；后续独立拆分必需策略与可选遥测。付费预算、未知账单、旧题归属和全产品NOT_ACCEPTED边界保持。
 
 取舍：先复用现有持久Run/Job/Trace/发布门；不提前建设微服务、通用无限Agent循环或新队列。每新增真实能力先做权限/能力/预算校验及合同测试，再做API/持久化与浏览器双证据。未来多实例MCP与沙箱另行设计，禁用只阻断后续调用。
+
+## ADR 25: Persisted question presentation and answer admission (2026-10-23)
+
+Status: implementation in progress, not delivered. Actual red on PR61 confirms
+that a start greeting is scored before the task question was presented. Existing
+message deduplication protects one client ID, not two concurrent answers to a task.
+
+Reuse InterviewTask, Message, normalized Question/Answer, gateway and LangGraph.
+Add InterviewQuestionPresentation as an immutable task/text/message receipt with
+OPEN, PROCESSING, UNKNOWN and ANSWERED states. Composite foreign keys require the
+same interview and organization; one unresolved receipt per interview is a partial
+unique index. Existing tasks receive no fabricated presentation history. Old API
+rollback may leave this additive table in place; do not drop it to recover claims.
+
+The first implementation slice is a provider-free persistence service, not a new
+public API. Short transactions serialize on a guarded parent Interview update;
+they must not contain queue generation, retrieval or provider work. Presenting a
+task atomically creates its assistant message and receipt. Claiming requires a
+same-owner, active, confirmed session, the exact current pending task/text and an
+owned candidate message. Only a newly CLAIMED result permits dispatch. Same-message
+replay is read-only; another message cannot acquire the task. Unknown work has no
+automatic expiry/retry. A pre-dispatch release is only allowed before any persisted
+answer; call sites must prove no provider dispatch occurred. Completion requires a
+durable normalized answer, its scoring history and completed task. Late completion
+after session termination is refused; it is not silently replayed or erased.
+
+An OPEN receipt freezes the presented task even if queue priorities change. Each
+new claim has a random attempt token; mutation callbacks require that exact token,
+so a released/reclaimed message is fenced from old callbacks. Public views and
+read-only replays omit the token. Completion also verifies task, normalized
+question and history text against the receipt, and normalized/history answer
+content against the claimed candidate message. Missing IDs/tokens are rejected
+before Prisma can omit undefined filters.
+
+Next integration slice must serialize queue initialization, make confirmation and
+GET return the authoritative receipt, require ANSWER presentation identity, keep
+opening/control operations outside scoring, and coordinate end with claims using
+the same parent-row boundary. Recover the next presentation after answer commit.
+The browser must unlock answering only for an OPEN receipt, recover by GET after
+interruption and distinguish PROCESSING/UNKNOWN. Model prose cannot select the
+question. No existing route is considered fixed by the foundation service alone.
+
+Cost: the persistence service makes no model calls. Unknown results stay blocked
+to avoid duplicate paid scoring; manual reconciliation is a required future UI/API
+contract, not a fabricated zero charge. Test fresh/legacy migration, composite FK
+isolation, concurrent presentation/claim, replay, unknown preservation, stale and
+late results, cascade deletion, then actual API/browser first/subsequent questions
+and restore. Full product and real model quality remain NOT_ACCEPTED.

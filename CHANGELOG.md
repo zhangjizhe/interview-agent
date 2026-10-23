@@ -49,6 +49,11 @@
 
 ### Added
 
+- Provider-free question presentation persistence foundation with same-interview
+  tenant foreign keys, one unresolved question and fenced answer attempts, plus
+  private PostgreSQL/migration regression checks. Candidate API/UI integration and
+  the first-question product fix remain pending; this is not a delivery claim.
+
 - B1a构造期运行适配器注册与Nest实际分发，包装既有legacy/single/finite，未知引擎或缺能力拒绝且不静默降级；完整统一事件合同仍待实现。
 
 - 外部Run初始化的必需消息持久化失败时，条件记录FAILED并保留原错误；清理失败保持未确认并输出脱敏事件。
