@@ -86,6 +86,14 @@ docker cp scripts/ci/verify-training-loop.cjs "$fixture_api:/tmp/verify-training
 docker cp scripts/ci/verify-question-store.cjs "$fixture_api:/tmp/verify-question-store.cjs"
 docker cp scripts/ci/verify-vector-recovery.cjs "$fixture_api:/tmp/verify-vector-recovery.cjs"
 docker exec -i "$fixture_api" node --input-type=module < scripts/ci/verify-built-api.mjs
+if [[ "${FIXTURE_PRESENTATION_STORE:-}" == "1" ]]; then
+  docker cp scripts/ci/verify-question-presentation-store.cjs "$fixture_api:/tmp/verify-question-presentation-store.cjs"
+  docker exec -e GOLDEN_FIXTURE_SYNTHETIC=1 "$fixture_api" node /tmp/verify-question-presentation-store.cjs
+fi
+if [[ "${FIXTURE_PRESENTATION_PROBE:-}" == "1" ]]; then
+  docker cp scripts/ci/verify-question-presentation.mjs "$fixture_api:/tmp/verify-question-presentation.mjs"
+  docker exec -e GOLDEN_FIXTURE_SYNTHETIC=1 "$fixture_api" node /tmp/verify-question-presentation.mjs
+fi
 if [[ "${FIXTURE_GOLDEN_PROBE:-}" == "1" ]]; then
   docker cp scripts/ci/verify-golden-interview.mjs "$fixture_api:/tmp/verify-golden-interview.mjs"
   docker exec -e GOLDEN_FIXTURE_SYNTHETIC=1 "$fixture_api" node /tmp/verify-golden-interview.mjs

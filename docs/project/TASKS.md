@@ -1,4 +1,5 @@
 # 待办与验收门
+2026-10-23 FIRST-QUESTION-PRESENTATION: original real greeting red independently confirmed; provider-free presentation/claim foundation now passes local29 PG checks, strict recovery, migration19 and API871 (21 skipped), with independent log review. Candidate CI/PR pending. Controller/UI/end coordination not connected; overall NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md.
 
 2026-10-23 · PRODUCT-REACCEPTANCE-1整体NOT_ACCEPTED。PR59候选43b74cc最新push/PR六项CI成功及独立复核后，冻结合并a03ff8afe7f8431ac6d53c9493f8c22077d23aa0，PR/main/agent-lab均读回。当前唯一主题CANDIDATE-GOLDEN-ENGINEERING，首个阻断I06保存回执本地隔离第五链exit0，待最终复核/最新精确CI，未交付。失败与前置见[GET](../acceptance/TRAINING_READS_EVIDENCE.md)/[安全](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。
 
@@ -38,6 +39,8 @@ PR60 limited-complete: frozen79ce42e, latest push/PR six CI success and original
 
 黄金链源码边界：end在复用existing FINAL后仍执行memory.memorize且画像含新endedAt，可能产生额外embedding；正式报告幂等不能宣称所有结束调用零模型/费用，待单独实测与有界幂等修复。
 
-P0首轮问答语义（当前只源码核实，待实际问候复现）：start/confirm未初始化并展示真实任务题；processMessage首轮才初始化队列并无条件completeTask(userInput)，因此“开始面试”可能被计作未展示首题的答案。固定答案黄金工程链不能证明首题展示/问答对齐。后续独立产品合同与红测处理，不在技能归属中顺改运行协议。
+P0首轮问答语义（实际红测exit1已独立复核，持久化基础服务在工作区，尚未接Controller/UI）：start/confirm未初始化并展示真实任务题；processMessage首轮才初始化队列并无条件completeTask(userInput)，因此“开始面试”可能被计作未展示首题的答案。固定答案黄金工程链不能证明首题展示/问答对齐。后续独立产品合同与红测处理，不在技能归属中顺改运行协议。
 
 P0复测展示语义：实际新浏览器新FINAL之后Training仍显示“复测进行中”；当前后端仅RETEST_STARTED关系状态未表达新面试完成。该断言只核当前关联保留，不算该文案产品验收；须定义已创建/进行/完成/失败标签及报告入口，不能将本轮工程循环推广为所有展示正确。
+
+PR61阶段最终已冻结合并55230237f2ab7eeea7c4224577d2aee0dac8ba6d：最新精确push/PR六项success、两组原始日志复核，PR/main/agent-lab/本地均读回。上方待CI措辞由此收据替代，详细见技能报告。唯一下一主题FIRST-QUESTION-PRESENTATION，先真实红测与合同设计，未新实现；整体NOT_ACCEPTED。

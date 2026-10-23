@@ -43,8 +43,24 @@ DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/phase2_existing" pnp
 docker exec -i "$fixture_container" psql -h 127.0.0.1 -U postgres -d phase2_existing -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO users (id,email,"updatedAt") VALUES ('legacy-fixture','fixture@example.invalid',CURRENT_TIMESTAMP);
 INSERT INTO interviews (id,"userId",position) VALUES ('legacy-interview','legacy-fixture','Fixture');
+INSERT INTO interview_tasks (id,"interviewId",type,question,category,difficulty,status,"updatedAt") VALUES
+  ('legacy-pending-task','legacy-interview','QUESTION','Synthetic legacy pending question','frontend','easy','PENDING',CURRENT_TIMESTAMP),
+  ('legacy-completed-task','legacy-interview','QUESTION','Synthetic legacy completed question','frontend','easy','COMPLETED',CURRENT_TIMESTAMP);
+INSERT INTO messages (id,"interviewId",role,content) VALUES ('legacy-assistant-message','legacy-interview','assistant','Synthetic old message without a presentation receipt');
 SQL
 for database in phase2_empty phase2_existing; do
   DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/$database" pnpm --filter @interview-agent/api exec prisma migrate deploy
 done
+docker exec -i "$fixture_container" psql -h 127.0.0.1 -U postgres -d phase2_existing -v ON_ERROR_STOP=1 <<'SQL'
+DO $$ BEGIN
+  IF (SELECT count(*) FROM interview_tasks WHERE id IN ('legacy-pending-task','legacy-completed-task')) <> 2
+    OR NOT EXISTS (SELECT 1 FROM interview_tasks WHERE id='legacy-pending-task' AND status='PENDING' AND question='Synthetic legacy pending question')
+    OR NOT EXISTS (SELECT 1 FROM interview_tasks WHERE id='legacy-completed-task' AND status='COMPLETED' AND question='Synthetic legacy completed question')
+    OR (SELECT count(*) FROM messages WHERE id='legacy-assistant-message') <> 1
+    OR (SELECT count(*) FROM interview_question_presentations) <> 0 THEN
+    RAISE EXCEPTION 'Legacy presentation upgrade changed task/message facts or fabricated receipts';
+  END IF;
+END $$;
+SQL
+echo 'PASS legacy presentation upgrade preserves tasks/messages without fabricated receipts'
 TENANT_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/phase2_existing" pnpm --filter @interview-agent/api test:jest --runInBand --testPathPatterns='tenant-database|quota-database|evaluation-jobs.database'

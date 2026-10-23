@@ -59,6 +59,7 @@ model Organization {
   reportRecords Report[]
   userToolPreferenceRecords UserToolPreference[]
   interviewTaskRecords InterviewTask[]
+  questionPresentationRecords InterviewQuestionPresentation[]
   answerHistoryRecords AnswerHistory[]
   targetJobRecords TargetJob[]
   jobSkillRequirementRecords JobSkillRequirement[]
@@ -889,6 +890,7 @@ model Interview {
   report         Report?
   cost           SessionCost?
   tasks          InterviewTask[]
+  questionPresentations InterviewQuestionPresentation[]
   answerHistories AnswerHistory[]
   reflectionLogs ReflectionLog[]
   questions      InterviewQuestion[]
@@ -990,7 +992,10 @@ model Message {
   completionTokens Int       @default(0)
   createdAt        DateTime  @default(now())
   interviewAnswer  InterviewAnswer?
+  questionPresentation InterviewQuestionPresentation? @relation("PresentedQuestionMessage")
+  questionAnswerClaim InterviewQuestionPresentation? @relation("QuestionAnswerClaimMessage")
 
+  @@unique([id, interviewId, organizationId])
   @@index([interviewId, createdAt])
   @@index([interviewId, clientMessageId])
   @@map("messages")
@@ -1066,9 +1071,47 @@ model InterviewTask {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   questionRecord InterviewQuestion?
+  presentation InterviewQuestionPresentation?
 
+  @@unique([id, interviewId, organizationId])
   @@index([interviewId, status, priority])
   @@map("interview_tasks")
+}
+
+enum QuestionPresentationState {
+  OPEN
+  PROCESSING
+  UNKNOWN
+  ANSWERED
+}
+
+// Additive receipt; old tasks retain no invented presentation/claim history.
+model InterviewQuestionPresentation {
+  id String @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  interviewId String
+  interview Interview @relation(fields: [interviewId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  taskId String @unique
+  task InterviewTask @relation(fields: [taskId, interviewId, organizationId], references: [id, interviewId, organizationId], onDelete: Cascade)
+  messageId String @unique
+  message Message @relation("PresentedQuestionMessage", fields: [messageId, interviewId, organizationId], references: [id, interviewId, organizationId], onDelete: NoAction)
+  claimMessageId String? @unique
+  claimToken String? @unique
+  claimMessage Message? @relation("QuestionAnswerClaimMessage", fields: [claimMessageId, interviewId, organizationId], references: [id, interviewId, organizationId], onDelete: NoAction)
+  question String @db.Text
+  state QuestionPresentationState @default(OPEN)
+  claimedAt DateTime?
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([interviewId, state])
+  @@unique([taskId, interviewId, organizationId])
+  @@unique([messageId, interviewId, organizationId])
+  @@unique([claimMessageId, interviewId, organizationId])
+  @@map("interview_question_presentations")
 }
 
 // 答案历史 - 记录面试中的问答及评分
