@@ -2,7 +2,7 @@
 
 更新：2026-10-23。用途：内部证据复核与缺陷关闭；**整体NOT_ACCEPTED，不批准完整产品交付或生产发布**。
 
-PR59训练GET读取及ip-address最小安全前置，经最新六项CI和独立最终复核后合并a03ff8a；PR及远端main/agent-lab读回一致。见[GET证据](TRAINING_READS_EVIDENCE.md)/[安全证据](IP_ADDRESS_SECURITY_EVIDENCE.md)。当前转完整候选成功黄金链工程验收，尚未通过；限定合并不能替代整体交付。
+PR60保存回执候选79ce42e经最新六项CI及原始日志二次复核后合并2758f71，PR/main/agent-lab/本地读回。当前技能归属和合成API/UI训练复测工程链本地exit0，待新候选精确CI；首题语义、复测文案、真实质量和部署仍阻断整体交付。
 
 ## 固定事实
 
@@ -30,7 +30,7 @@ PR59训练GET读取及ip-address最小安全前置，经最新六项CI和独立�
 
 ## 当前下一执行
 
-唯一主题RESUME-PERSISTENCE-RECEIPT（I06）：已修复吞存储失败后报成功；insert及Strong同归属内容读回、503未知与前端严格回执。32定向/API841（21跳过）/Web284与构建通过，四轮失败修复后第五轮实际隔离链exit0（上传/刷新重登录/跨用户/严格PG与向量恢复）；最新精确CI与合并待办，非完整交付。见[证据](RESUME_PERSISTENCE_RECEIPT_EVIDENCE.md)。后续完整成功黄金链仍未通过，现有seed FINAL与拒绝SSE不替代成功链。真实质量、历史账单/额度和目标部署分别阻断。
+唯一主题CANDIDATE-GOLDEN-ENGINEERING：已修完整模拟唯一题干技能归属、明确英文类别和同会话父题；34定向/API871（21跳过）/9纯合同+1HTTP及新镜像真实API/UI全环、严格恢复exit0且二次复核。待新候选精确CI，不作为整体交付。见[技能证据](GOLDEN_SKILL_ATTRIBUTION_EVIDENCE.md)。首次skill空及父题对抗失败保留，固定45/80非学习效果；首题和复测文案P0未验收。
 
 ## 内部审查顺序
 

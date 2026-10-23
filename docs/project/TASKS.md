@@ -30,7 +30,7 @@
 
 无关历史费用失败报告、旧截图目录、旧TASK-034保持现场不提交。全部旧阶段失败/合并/历史TODO原文见[快照](archive/reacceptance-2026-10-22/README.md)，更早历史见[旧归档](archive/reacceptance-2026-10-18/TASKS.md)。
 
-当前源码发现、未扩大本轮修复：FULL_SIMULATION题目skillId可能为空，技能聚合过滤空值，须真实链证明/修复；Milvus简历limit先于客户端排序，不能保证全局最新版本；部分调用将简历读取异常吞为[]，需单独失败语义验收。直接embedding未走统一网关/账本，当前合成调用统计不能当完整成本计量。
+当前源码发现、未扩大本轮修复：FULL_SIMULATION原唯一题干skill缺失已复现并本轮修复，完整工程链本地通过待精确CI；无/歧义匹配仍保留null，历史空值不回填；Milvus简历limit先于客户端排序，不能保证全局最新版本；部分调用将简历读取异常吞为[]，需单独失败语义验收。直接embedding未走统一网关/账本，当前合成调用统计不能当完整成本计量。
 
 PR60 limited-complete: frozen79ce42e, latest push/PR six CI success and original-log review, merged2758f718d0de1e2cfb31f912c9e3eef93a72185c; PR/remote main/agent-lab/local readback equal. Supersedes pending-CI wording. Overall NOT_ACCEPTED; next active subtheme is full successful golden-chain contract audit.
 
