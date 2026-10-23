@@ -30,4 +30,14 @@
 
 无关历史费用失败报告、旧截图目录、旧TASK-034保持现场不提交。全部旧阶段失败/合并/历史TODO原文见[快照](archive/reacceptance-2026-10-22/README.md)，更早历史见[旧归档](archive/reacceptance-2026-10-18/TASKS.md)。
 
-当前源码发现、未扩大本轮修复：FULL_SIMULATION题目skillId可能为空，技能聚合过滤空值，须真实链证明/修复；Milvus简历limit先于客户端排序，不能保证全局最新版本；部分调用将简历读取异常吞为[]，需单独失败语义验收。直接embedding未走统一网关/账本，当前合成调用统计不能当完整成本计量。
+当前源码发现、未扩大本轮修复：FULL_SIMULATION原唯一题干skill缺失已复现并本轮修复，完整工程链本地通过待精确CI；无/歧义匹配仍保留null，历史空值不回填；Milvus简历limit先于客户端排序，不能保证全局最新版本；部分调用将简历读取异常吞为[]，需单独失败语义验收。直接embedding未走统一网关/账本，当前合成调用统计不能当完整成本计量。
+
+PR60 limited-complete: frozen79ce42e, latest push/PR six CI success and original-log review, merged2758f718d0de1e2cfb31f912c9e3eef93a72185c; PR/remote main/agent-lab/local readback equal. Supersedes pending-CI wording. Overall NOT_ACCEPTED; next active subtheme is full successful golden-chain contract audit.
+
+源码对账后续：ARCHITECTURE_MAP/DECISIONS仍含旧阶段待CI措辞和Bridge可选失败描述，需按已合并证据逐段校准；本轮不以这些旧段代替现码。当前技能归属红测已补跨会话父题阻断并最小修复，新30+原4=34通过，新镜像待实际复验。
+
+黄金链源码边界：end在复用existing FINAL后仍执行memory.memorize且画像含新endedAt，可能产生额外embedding；正式报告幂等不能宣称所有结束调用零模型/费用，待单独实测与有界幂等修复。
+
+P0首轮问答语义（当前只源码核实，待实际问候复现）：start/confirm未初始化并展示真实任务题；processMessage首轮才初始化队列并无条件completeTask(userInput)，因此“开始面试”可能被计作未展示首题的答案。固定答案黄金工程链不能证明首题展示/问答对齐。后续独立产品合同与红测处理，不在技能归属中顺改运行协议。
+
+P0复测展示语义：实际新浏览器新FINAL之后Training仍显示“复测进行中”；当前后端仅RETEST_STARTED关系状态未表达新面试完成。该断言只核当前关联保留，不算该文案产品验收；须定义已创建/进行/完成/失败标签及报告入口，不能将本轮工程循环推广为所有展示正确。

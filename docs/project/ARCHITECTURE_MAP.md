@@ -48,3 +48,5 @@ B1b增量（本地限定实链验收通过）：runAgent完成前经runtime-resu
 B0策略准入增量（本地限定实链通过）：InterviewFlowController将startTurn的已发布策略/必需应用关联纳入模型前准入失败处理；不是可选观测失败。SSE错误与消息清理复用旧合同，complete/fail可选回写暂不变；无schema/公开API/权限变更。候选页面订阅错误显示并按会话切换清理，完整策略/遥测拆分及旧在途全局stream归属仍待。见INTERVIEW_POLICY_ADMISSION_EVIDENCE.md，未完成精确CI/发布。
 
 候选SSE生命周期增量：当前唯一InterviewPage消费者将route interviewId传入useInterviewStream；切换/卸载先失效本hook请求代次再abort，旧异步结果不回写后续会话。没有后端取消/退款语义；多实例全局store与迟到HistoryGET另列，详见INTERVIEW_STREAM_SESSION_EVIDENCE.md。限定实链通过，待新headCI。
+
+2026-10-23在验增量：完整模拟的规范题技能归属复用共享job-keywords-v1词典，只将实际题干唯一匹配到当前owned组织/岗位版本的active要求；歧义/未知保持null，记录question-job-lexical/v1依据。受控练习技能取实际Interview，追问父题仅同会话，不回填历史。无schema/模型调用增加；实际新镜像API/浏览器工程链与严格恢复本地通过，待精确CI；首题展示语义仍未验收，见GOLDEN_SKILL_ATTRIBUTION_EVIDENCE.md。

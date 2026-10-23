@@ -5,6 +5,7 @@ import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { LlmGatewayService } from '../../llm/llm.gateway.service';
 import { QuestionBankService } from './question-bank.service';
 import { z } from 'zod';
+import { mapQuestionToJobSkill, QUESTION_SKILL_MAPPING_VERSION } from './question-skill-mapping';
 import {
   extractKeywords,
   estimateCorrectness,
@@ -344,13 +345,14 @@ export class DynamicTaskQueueService {
           where: { sourceTaskId: context.followUpFrom },
         })
       : null;
+    const mapping = await this.resolveQuestionSkill(task, context);
     return this.prisma.interviewQuestion.create({
       data: {
         interviewId: task.interviewId,
         sourceTaskId: task.id,
-        parentQuestionId: parentQuestion?.id,
+        parentQuestionId: parentQuestion?.interviewId === task.interviewId ? parentQuestion.id : undefined,
         externalQuestionId: context.questionId || null,
-        skillId: context.practiceSkillId || null,
+        skillId: mapping.skillId,
         subSkill: context.subSkill || null,
         question: task.question,
         category: task.category,
@@ -364,10 +366,53 @@ export class DynamicTaskQueueService {
           practiceSkillId: context.practiceSkillId || null,
           practiceSkillName: context.practiceSkillName || null,
           taskType: task.type,
+          ...mapping.selection,
+          ...(mapping.metadata ? { skillMapping: mapping.metadata } : {}),
         },
         source: context.advanced ? 'agent-advanced' : task.type === 'FOLLOW_UP' ? 'agent-follow-up' : 'task-queue',
       },
     });
+  }
+
+  private async resolveQuestionSkill(task: any, context: Record<string, any>) {
+    const unavailable = {
+      skillId: null as string | null,
+      metadata: { version: QUESTION_SKILL_MAPPING_VERSION, reason: 'job-unavailable', candidateSkillIds: [] as string[], matchedTerms: [] as string[] },
+      selection: {} as Record<string, any>,
+    };
+    // Legacy unlinked sessions remain unassessed; do not invent a target skill.
+    if (!context.targetJobId) return { skillId: null, metadata: undefined, selection: {} };
+    const interview = await this.prisma.interview.findUnique({
+      where: { id: task.interviewId },
+      select: { id: true, userId: true, organizationId: true, mode: true, practiceSkillId: true, targetJobId: true, targetJobProfileVersion: true },
+    });
+    if (!interview) return unavailable;
+    unavailable.selection = {
+      mode: interview.mode,
+      targetJobId: interview.targetJobId,
+      targetJobProfileVersion: interview.targetJobProfileVersion,
+      practiceSkillId: interview.practiceSkillId,
+      practiceSkillName: null,
+    };
+    if (!interview.targetJobId || !interview.targetJobProfileVersion
+      || context.targetJobId !== interview.targetJobId
+      || context.targetJobProfileVersion !== interview.targetJobProfileVersion) return unavailable;
+    const job = await this.prisma.targetJob.findFirst({
+      where: { id: interview.targetJobId, userId: interview.userId, organizationId: interview.organizationId, profileVersion: interview.targetJobProfileVersion, isActive: true },
+      include: { skillRequirements: { include: { skill: true } } },
+    });
+    if (!job || job.id !== interview.targetJobId || job.userId !== interview.userId
+      || job.organizationId !== interview.organizationId || !job.isActive
+      || job.profileVersion !== interview.targetJobProfileVersion) return unavailable;
+    const requirements = job.skillRequirements.filter(requirement =>
+      requirement.organizationId === job.organizationId && requirement.targetJobId === job.id && requirement.skill.isActive);
+    if (interview.mode === 'SKILL_PRACTICE') {
+      const controlled = requirements.find(requirement => requirement.skillId === interview.practiceSkillId);
+      return { ...unavailable, skillId: controlled?.skillId || null, selection: { ...unavailable.selection, practiceSkillName: controlled?.skill.name || null }, metadata: { ...unavailable.metadata, reason: controlled ? 'controlled-practice' : 'no-match', candidateSkillIds: controlled ? [controlled.skillId] : [] } };
+    }
+    if (interview.mode !== 'FULL_SIMULATION') return unavailable;
+    const mapped = mapQuestionToJobSkill(task.question, requirements);
+    return { ...mapped, selection: unavailable.selection };
   }
 
   private parseTaskContext(context: unknown): Record<string, any> {

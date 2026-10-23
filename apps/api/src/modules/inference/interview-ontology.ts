@@ -53,8 +53,8 @@ const CAPABILITY_KEYWORDS: Array<{
 export function categoryForPosition(position: string): string {
   const normalized = position.toLowerCase();
   if (normalized.includes('agent') || normalized.includes('智能体')) return 'agent';
-  if (position.includes('前端')) return 'frontend';
-  if (position.includes('后端') || position.includes('服务端')) return 'backend';
+  if (position.includes('前端') || /\bfront[- ]?end\b/.test(normalized)) return 'frontend';
+  if (position.includes('后端') || position.includes('服务端') || /\b(back[- ]?end|server[- ]side)\b/.test(normalized)) return 'backend';
   if (position.includes('算法') || normalized.includes('ai')) return 'algorithm';
   if (position.includes('测试')) return 'testing';
   return 'agent';

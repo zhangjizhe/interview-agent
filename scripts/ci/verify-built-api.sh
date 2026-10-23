@@ -74,6 +74,7 @@ docker cp scripts/ci/fixture-model-server.mjs "$fixture_api:/tmp/fixture-model-s
 docker cp scripts/ci/verify-configured-release.mjs "$fixture_api:/tmp/verify-configured-release.mjs"
 docker cp scripts/ci/verify-question-gateway.mjs "$fixture_api:/tmp/verify-question-gateway.mjs"
 docker cp scripts/ci/verify-configured-runtime.mjs "$fixture_api:/tmp/verify-configured-runtime.mjs"
+docker cp scripts/ci/golden-model-contract.mjs "$fixture_api:/tmp/golden-model-contract.mjs"
 docker exec -d "$fixture_api" node /tmp/fixture-model-server.mjs
 docker cp scripts/ci/fixture-mcp-server.cjs "$fixture_api:/tmp/fixture-mcp-server.cjs"
 docker cp scripts/ci/verify-mcp-protocol.cjs "$fixture_api:/tmp/verify-mcp-protocol.cjs"
@@ -85,6 +86,10 @@ docker cp scripts/ci/verify-training-loop.cjs "$fixture_api:/tmp/verify-training
 docker cp scripts/ci/verify-question-store.cjs "$fixture_api:/tmp/verify-question-store.cjs"
 docker cp scripts/ci/verify-vector-recovery.cjs "$fixture_api:/tmp/verify-vector-recovery.cjs"
 docker exec -i "$fixture_api" node --input-type=module < scripts/ci/verify-built-api.mjs
+if [[ "${FIXTURE_GOLDEN_PROBE:-}" == "1" ]]; then
+  docker cp scripts/ci/verify-golden-interview.mjs "$fixture_api:/tmp/verify-golden-interview.mjs"
+  docker exec -e GOLDEN_FIXTURE_SYNTHETIC=1 "$fixture_api" node /tmp/verify-golden-interview.mjs
+fi
 if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]; then
   docker run -d --name "$fixture_lab" --network "$fixture_network" -p 127.0.0.1:5176:80 "${FIXTURE_LAB_IMAGE:-interview-agent-agent-lab}" >/dev/null
   # Docker internal networks do not expose published ports to the host browser.
@@ -112,6 +117,10 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
   docker network connect bridge "$fixture_web"
   docker cp scripts/ci/fixture-policy-browser.cjs "$fixture_api:/tmp/fixture-policy-browser.cjs"
   LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/interview-policy-admission.mjs
+  if [[ "${FIXTURE_GOLDEN_PROBE:-}" == "1" ]]; then
+    docker cp scripts/ci/fixture-golden-inspect.cjs "$fixture_api:/tmp/fixture-golden-inspect.cjs"
+    LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/golden-interview-loop.mjs
+  fi
   docker rm -fv "$fixture_web" >/dev/null
 fi
 docker exec "$fixture_api" node /tmp/verify-vector-recovery.cjs seed
