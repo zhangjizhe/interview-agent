@@ -1,14 +1,14 @@
 # 当前内部预发布验收仪表
 
-更新：2026-10-22。用途：内部证据复核与缺陷关闭；**整体NOT_ACCEPTED，不批准完整产品交付或生产发布**。
+更新：2026-10-23。用途：内部证据复核与缺陷关闭；**整体NOT_ACCEPTED，不批准完整产品交付或生产发布**。
 
-训练动作PR57及POST超时PR58经限定工程验收与最新六项CI成功后合并；当前进入训练GET读取边界，未通过阶段不记交付。见[训练动作证据](TRAINING_ACTIONS_EVIDENCE.md)及[POST超时进度](TRAINING_TIMEOUT_EVIDENCE.md)。限定阶段合并不能替代整体验收。
+PR59训练GET读取及ip-address最小安全前置，经最新六项CI和独立最终复核后合并a03ff8a；PR及远端main/agent-lab读回一致。见[GET证据](TRAINING_READS_EVIDENCE.md)/[安全证据](IP_ADDRESS_SECURITY_EVIDENCE.md)。当前转完整候选成功黄金链工程验收，尚未通过；限定合并不能替代整体交付。
 
 ## 固定事实
 
 | 项目 | 已核实事实 | 不能推断 |
 | --- | --- | --- |
-| 最近产品基线 | PR58精确`ed90ec6`最新六项作业成功，已合并`e108a685f0839f3ad3c7556bcf8818468784e2ac`；PR/远端main/agent-lab均读回该结果，首轮CI取消保留 | 后续文档提交自动通过，或业务环境已部署 |
+| 最近产品基线 | PR59精确`43b74cc`最新push attempt1/PR attempt2六项作业成功，独立复核后冻结合并`a03ff8afe7f8431ac6d53c9493f8c22077d23aa0`，PR/main/agent-lab均读回；全部失败保留 | 后续文档提交自动通过，或业务环境已部署 |
 | 镜像/部署身份 | 最近产品CI从对应锁定源构建API、Web及Lab镜像；业务目标环境SHA/镜像/迁移尚未核验 | 隔离镜像或main合并等于当前预览/生产部署 |
 | 最近完整链 | API93/93、Lab及候选限定隔离浏览器、PG schema/行多集/sequence一致、实际Milvus题目/Qdrant向量payload恢复，exit0 | 真实模型质量、生产RPO/RTO或所有UI状态通过 |
 | UI清单 | 990模板：181交互/809展示；990最终NOT_ACCEPTED | 模板数或PARTIAL项等于运行时覆盖率 |
@@ -30,9 +30,7 @@
 
 ## 当前下一执行
 
-最新PR59训练候选的push因新ip-address公告审计失败，当前单主题先处理[最小依赖安全前置](IP_ADDRESS_SECURITY_EVIDENCE.md)，不以先前PR CI成功覆盖它。
-
-TRAINING-READS（I13/I14的GET读取与恢复）：POST限定阶段已合并，读取超时/取消、错误/空状态、仅GET恢复与跨页query隔离已13红测后修复，Web278/build/lint通过；最终实际API93/PG/浏览器/严格恢复exit0，精确CI待完成，见[GET证据](TRAINING_READS_EVIDENCE.md)。现有verify-training-loop直接seed合成正式证据，不是完整候选黄金链；先核start成本，再运行无外部费用的隔离工程验收。真实质量、账单和目标部署仍单独阻断。
+唯一主题RESUME-PERSISTENCE-RECEIPT（I06）：已修复吞存储失败后报成功；insert及Strong同归属内容读回、503未知与前端严格回执。32定向/API841（21跳过）/Web284与构建通过，四轮失败修复后第五轮实际隔离链exit0（上传/刷新重登录/跨用户/严格PG与向量恢复）；最新精确CI与合并待办，非完整交付。见[证据](RESUME_PERSISTENCE_RECEIPT_EVIDENCE.md)。后续完整成功黄金链仍未通过，现有seed FINAL与拒绝SSE不替代成功链。真实质量、历史账单/额度和目标部署分别阻断。
 
 ## 内部审查顺序
 

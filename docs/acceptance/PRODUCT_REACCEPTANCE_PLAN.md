@@ -28,7 +28,7 @@
 
 ## 本轮优先执行与证据校准
 
-PR57训练动作与PR58 POST超时限定工程门已完成，PR58最新六项作业成功后冻结合并e108a68，PR/远端main/agent-lab读回一致。首轮CI因依赖下载19min26s触发30分钟取消，保留失败并仅重跑失败部分，未改断言或执行时限。990静态模板最终仍NOT_ACCEPTED，不是运行时分母。当前单主题TRAINING-READS：成功POST后refetch、初始GET挂起与岗位读取错误/无岗位区分，已实际红测12失败并修复，Web278通过；最终实际API93/PG/浏览器/严格恢复exit0，精确CI待完成，不声称全部操作60秒。见[POST超时证据](TRAINING_TIMEOUT_EVIDENCE.md)；合成FINAL不能替代完整黄金链、真实模型质量或目标部署。
+PR57动作、PR58 POST超时及PR59 GET读取/最小依赖安全前置均已有各自限定工程门。最新PR59候选43b74cc在push attempt1与PR attempt2六项CI成功、独立复核后冻结合并a03ff8a，PR/main/agent-lab读回一致；全部失败/取消与恢复限制保留[GET证据](TRAINING_READS_EVIDENCE.md)/[安全前置](IP_ADDRESS_SECURITY_EVIDENCE.md)。990静态模板最终仍NOT_ACCEPTED，不是运行时分母。当前单主题I06保存回执修复：32定向/API841/Web284与构建通过，第五隔离链实际exit0，四轮失败保留，待最新精确CI，未交付，见[证据](RESUME_PERSISTENCE_RECEIPT_EVIDENCE.md)。后续真实confirm/成功SSE/正式report/evidence→training/retest完整链尚未通过。合成FINAL不能替代完整成功链、真实模型质量或目标部署。
 
 ## 功能级产品合同与验收矩阵
 

@@ -1,4 +1,5 @@
 import { verifyTrainingReads } from './training-read-evidence.mjs';
+import { verifyResumeUpload } from './resume-upload-evidence.mjs';
 import { verifyTrainingTimeouts } from './training-timeout-evidence.mjs';
 import { verifyTrainingActions } from './training-actions-evidence.mjs';
 import { verifyEndTimeout } from './interview-end-timeout-evidence.mjs';
@@ -37,6 +38,7 @@ try {
     await composer.fill('Ready for explicit retry'); assert.equal(await composer.isEnabled(), true);
     assert.ok(!(await page.locator('body').innerText()).includes('synthetic-private-policy'));
   }
+  await verifyResumeUpload(page, control);
   await verifyStreamSessionBoundary(page, data, composer);
   await verifyHistorySessionBoundary(page, data, composer);
   await verifyHistorySessionBoundary(page, data, composer, true);

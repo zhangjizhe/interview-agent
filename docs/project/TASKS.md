@@ -1,11 +1,12 @@
 # 待办与验收门
 
-2026-10-22 · PRODUCT-REACCEPTANCE-1，整体NOT_ACCEPTED。最近产品基线PR58合并e108a685f0839f3ad3c7556bcf8818468784e2ac，最新六项作业成功，远端main/agent-lab已核一致。首轮CI取消、重跑和原本地exit未知等失败事实保留在[POST超时证据](../acceptance/TRAINING_TIMEOUT_EVIDENCE.md)，不继承为真实质量/部署通过。当前唯一单主题SECURITY-IPADDRESS（TRAINING-READS合并前置，最新push审计新失败），已红测12失败并修复，组件/构建通过，最终实际API93/PG/浏览器/严格恢复exit0，精确CI待完成。
+2026-10-23 · PRODUCT-REACCEPTANCE-1整体NOT_ACCEPTED。PR59候选43b74cc最新push/PR六项CI成功及独立复核后，冻结合并a03ff8afe7f8431ac6d53c9493f8c22077d23aa0，PR/main/agent-lab均读回。当前唯一主题CANDIDATE-GOLDEN-ENGINEERING，首个阻断I06保存回执本地隔离第五链exit0，待最终复核/最新精确CI，未交付。失败与前置见[GET](../acceptance/TRAINING_READS_EVIDENCE.md)/[安全](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。
 
 | 优先级 | 范围 | 下一证据/退出门 |
 | --- | --- | --- |
 | 限定完成 | 仪表/覆盖口径对账 | 修正过期PR40/API82/986口径，保留988最终NOT_ACCEPTED与全部失败历史，独立审文档、对应CI |
 | 限定完成 | TRAINING-ACTIONS / I13/I14子集 | PR57六项精确CI通过，冻结合并97e44a2，远端main/agent-lab一致；非I13/I14整行通过 |
+| 当前单主题P0 | I06简历保存回执 | 本地32/API841/Web284/实际上传与严格恢复exit0；四轮失败保留，待最新精确CI及PR冻结合并 |
 | P0 | 完整候选黄金链 | 简历→岗位→成功SSE→报告→训练→复测完整链，合成工程和真实模型质量分别证明 |
 | P0 | 全运行时状态 | 990静态模板逐项展开空/单/多、条件、错误、键盘、1440/768/390；无全分母不报覆盖率 |
 | P0 | Lab剩余业务与完整B1 | 录制/实验/决策/审计/数据集/候选/评测/发布逐状态双证据；信封/事件/能力与替换合同，不以空Registry代替消费 |
@@ -15,12 +16,12 @@
 | P1 | MCP/管理员控制 | 进程外持久化/多实例、逐服务协议与执行、持久授权审计；所有者按SOP逐目标授权 |
 | P1 | 历史16题复用 | 组织/embedding来源确认→保留源迁入/持久收据/读回/浏览器，禁止跨租户fallback |
 | 限定完成 | 训练POST超时/断线 | PR58最新六项CI作业成功，冻结合并e108a68；保留首轮依赖下载慢导致CI期限取消，非全训练操作60秒 |
-| 已实现待安全前置门 | TRAINING-READS：成功后refetch/初始GET | 13读取用例含追加跨页query红测后修复，Web278/build/lint通过；最终镜像实际API93/PG/browser/严格恢复exit0，精确CI待完成，不能称整体训练通过 |
-| 同一读取主题 | TrainingPage岗位加载错误 | 已复现并修复错误/空状态顺序，仅GET重新加载；与TRAINING-READS同一最终验收门 |
+| 限定完成 | TRAINING-READS：成功后refetch/初始GET | 13读取红测后最小修复，PR59最终双证据/六项CI与独立复核后合并a03ff8a，非整体训练通过 |
+| 限定完成 | TrainingPage岗位加载错误 | 已复现并修复错误/空状态顺序，仅GET重新加载；随TRAINING-READS限定验收合并 |
 | P1 | 训练读取逐字段合同 | 本轮仅拒绝非数组外层；岗位/推荐条目缺失或错误字段的运行时校验与用户恢复需另立实际失败用例，不推广为完整响应语义通过 |
 | P1 | 其他异步/错误边界 | 简历上传、HITL、多页面实例共享store等按实际源码重现后独立修复；不由已修历史/结束推广全部安全 |
 | P1 | CI运行时维护 | 本轮GitHub注记Actions Node20弃用与ubuntu-latest迁移；独立核升级兼容性，不在训练修复中顺改或弱化检查 |
-| 当前单主题P0 | SECURITY-IPADDRESS | 新公告GHSA-rxp7-6hxx-x8q5阻断push；SDK→limiter→ip-address10.7.1需10.7.4最小patch与锁文件/真实安装链红绿/审计/完整精确CI，禁止新allowlist或盲重跑 |
+| 限定完成 | SECURITY-IPADDRESS | SDK→limiter→ip-address最小pin10.7.4，安装链红绿/审计/最新完整CI与独立复核后随PR59合并，保留原braceshigh与所有失败 |
 | P1 | 安全维护 | 延续审计/补丁完整性，保留high边界，不声明零漏洞 |
 
 已关闭的限定子缺陷：PR49–55的SSE生命周期、历史跨路由/同会话消息/确认并发、结束回执/跨路由/正文超时；不再作为未复现P0重复列出。其他简历/report并发与完整成功黄金链仍待验收。
@@ -28,3 +29,5 @@
 交付门：匹配主题验证与独立双证据→定向提交推送agent-lab→最新精确push/PR可见CI全绿→冻结head经PR合并→核远端结果。GitHub重置先读状态恢复，未知POST/PUT不盲重放；不重跑已过不变检查。
 
 无关历史费用失败报告、旧截图目录、旧TASK-034保持现场不提交。全部旧阶段失败/合并/历史TODO原文见[快照](archive/reacceptance-2026-10-22/README.md)，更早历史见[旧归档](archive/reacceptance-2026-10-18/TASKS.md)。
+
+当前源码发现、未扩大本轮修复：FULL_SIMULATION题目skillId可能为空，技能聚合过滤空值，须真实链证明/修复；Milvus简历limit先于客户端排序，不能保证全局最新版本；部分调用将简历读取异常吞为[]，需单独失败语义验收。直接embedding未走统一网关/账本，当前合成调用统计不能当完整成本计量。

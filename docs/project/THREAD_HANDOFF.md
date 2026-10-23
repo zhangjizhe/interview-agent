@@ -1,34 +1,22 @@
 # 交接
 
-2026-10-22 · PRODUCT-REACCEPTANCE-1 · 整体NOT_ACCEPTED。
+2026-10-23 · PRODUCT-REACCEPTANCE-1 · 整体NOT_ACCEPTED。
 
-## 已完成与真实远端
+## 最近真实基线
 
-PR57已按六项精确CI冻结合并97e44a2；PR58候选ed90ec6889ed97709ad6f451780318549b744688的push与最新PR第2次六项作业全部success，固定expected_head_sha合并e108a685f0839f3ad3c7556bcf8818468784e2ac。GitHub再次读取PR58 closed/merged=true及该SHA，Git读回main/agent-lab均同SHA，本地agent-lab快进。
+PR59候选43b74ccbafcde1523bef30e782c34622de48e1a0最新push39837059192 attempt1（lint120028727688/Docker120028728243/summary120042952503）及PR39836664485 attempt2（Docker120029783748/lint120029787281/summary120037524257）六项全success。独立Agent直接读源码/实际安装链、远端原始API811pass19skip/Web278及Docker API93/GET60s/PG/实际向量恢复日志，最终限定复核通过。冻结expected_head_sha合并a03ff8afe7f8431ac6d53c9493f8c22077d23aa0，PR closed/merged/readback、main/agent-lab/本地同SHA均已核。
 
-Web265（训练页20）、API93、独立实际POST/PG与三次原生60秒、严格PG/实际向量恢复在对应CI通过。首轮PR Docker因apt下载25.9MB耗19min26s触发30分钟取消，未当通过；仅失败部分重跑，未改断言/产品60秒/CI30分钟。第2次监测JSON为本SHA/attempt2/completed/success，checked_at15:22:47Z，监测脚本真实exit0已读回并结束。早期本地测试进程exit因Agent额度中断不可读的限制仍留报告，不冒充exit0。
+[GET报告](../acceptance/TRAINING_READS_EVIDENCE.md)/[安全报告](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)保留完整红测、计数错误、延迟push/并发取消、动态新公告审计失败、Docker Hub超时125与仅失败重跑。GET读取错误/仅GET恢复与实际SDK链ip-address10.7.4限定完成；原braceshigh仍保留，不削弱审计门。
 
-完整失败/最新job IDs/合并收据见[POST超时证据](../acceptance/TRAINING_TIMEOUT_EVIDENCE.md)，更早阶段见[历史快照](archive/reacceptance-2026-10-22/README.md)。无需重跑未变更已过检查或重启旧monitor。
+## 当前唯一主题与实测
 
-## 下一单主题：TRAINING-READS
+I06保存回执本地限定验收通过，尚未提交/推送/最新CI。第五轮resume-receipt-clean-read-chain.log/.exit为0；API93、上传unknown503/显式201/Strong/公开清洗/刷新重新登录/跨用户拒绝，原训练60秒读写回归、PG严格schema/行多集/sequence与真实Milvus/Qdrant恢复均通过。API841通过21跳过、Web284、32定向、相关lint/type/build与真实NGINX短门通过。镜像API resume-receipt-bounded/Web resume-receipt-proxy，Lab沿用未变security-20261021；不重启旧链。
 
-本轮已读真实GET权限/数据流、先12组件红测全失败，再追加共享在途岗位query红测1失败/12通过；GET头/正文60秒、signal、训练jobs子key/profile推荐key、错误/空状态和仅GET恢复已最小修复。全Web278/build/显式eslint通过，独立Agent复核无阻断。库存保留988旧ID/review，新增2项总990（181交互809展示）最终仍NOT_ACCEPTED。
+四次失败依次SDK隐藏describe等待、代理覆盖503、双按钮定位、summary清洗预期，保留[完整证据](../acceptance/RESUME_PERSISTENCE_RECEIPT_EVIDENCE.md)。独立Agent参与实现和测试，父二次读审；等最终日志复核再定向commit/push/PR与最新精确CI。后续成功黄金链SSE/正式报告/技能→训练复测仍待完成。未知写入不等于取消、读空不证明未来无迟到，外部0不等于零模型调用。
 
-初版链training-reads-chain exit1，新增helper全POST计数2≠0，原窗口URL未记录；guard最终链未启动。已核web-vitals实际POST，仅排除明确metrics/vitals，所有其他POST仍零/一次且输出全map。最终链session69552的training-reads-final-chain2.log/.exit为真实exit0，实际记录metrics2、complete1；新增GET/PG/strict schema/行多集/sequence与实际Milvus/Qdrant恢复通过。原链失败/未执行恢复不能记通过，独立Agent最终复核额度失败也不记通过；父代理已读取真实最终输出。详细[GET证据](../acceptance/TRAINING_READS_EVIDENCE.md)。当前待限定提交/精确CI/冻结PR合并。
-原有效start回执在有界invalidate结束后仍可导航，即使metadata GETerror；本轮浏览器只证明complete后GET恢复，组件MemoryRouter另断言retest实际location，不把它写成真实browser。两完整链是中间代码在跑时新红测触发修复所需不同镜像验证，不无意义重跑未变更检查。
-本机gh API频繁reset时优先已连接GitHub工具：github_fetch_workflow_run_jobs返回latest attempt作业，github_merge_pull_request支持expected_head_sha。通过ALL_TOOLS完整description读取schema；fetch_commit_workflow_runs仅PR/首分页且曾空返回，空列表不能证明无CI或通过。以已绑定SHA的明确run ID/最新jobs正证据冻结合并，写入失败先读回，禁止盲重放。
+## 工具与边界
 
-## 保留边界与现场
-
-- 库存990模板/181交互/809展示最终全NOT_ACCEPTED，无运行时覆盖率；完整黄金链、Lab剩余逐状态、完整B1/工具生态及真实质量/部署未通过。
-- 真实历史13/36、已知0.069285CNY另有未知，污染缓存36+36无效。单次0.5/新发布测试累计3CNY不解除对账/额度前置；近期外部0，不付费重放。
-- 历史16题组织/embedding来源未知，禁止跨租户fallback；生产身份/备份/恢复未核，main不等于部署；MCP进程边界与安全high保留。
-- 最新合并/CI交接文件为工作区待后续相关提交，不改变已冻结PR58头。无关旧费用报告/截图/TASK-034不stage、不重置。独立测试Agent已获用户授权，若额度中断如实保留限制并自主继续无阻塞工作。
-
-[当前状态](CURRENT_STATE.md) · [任务](TASKS.md) · [当前执行](ACTIVE_TASK.md)
-
-候选已推送并建PR59，head ac03104201c361a0c23814405e901e09fa0ff178。PR run39831947507；该head push查询0（原因未知），一次成功dispatch run39832266991同head。两组最新六项CI全成功才冻结合并，当前等待，不改候选。新交接资料为提交后工作区更新，非已随ac03104发布。通用github_fetch Actions集合可精确查event/head/run_attempt，gh APIreset不代表CI失败。
-
-后续实测：18:49:10Z平台才生成同head push run39834697409，排队更高优先级请求在18:49:55Z取消旧dispatch39832266991。实际check annotation明确“Canceling since a higher priority waiting request for product-Product verification-refs/heads/agent-lab exists”；不是30分钟超时或源码断言失败。dispatch Docker120011194465取消在browser dependencies，后两项storage/API-browser-recovery skipped；lint120011194938成功、summary120020224704失败保留。日志另有apt20.5MB耗14min9s，但不将它推断为取消原因。未重跑已被替代的dispatch。最新门恢复为push39834697409与已成功PR39831947507（Docker120010079939/lint120010080064/summary120018430376），同head ac03104，等待push最新全成功。
-
-当前前置单主题SECURITY-IPADDRESS：最新ac03104 push lint120020275007审计新失败GHSA-rxp7-6hxx-x8q5，不能合并。实际SDK→limiter→ip-address10.7.1链已核；root/lock最小改10.7.4，2新增安装链用例旧1失败1通过、升级后加原braces共12通过，API lint/type/build与真实audit通过（moderate0/high1原braces）。待独立安全提交并重新绑定最新CI，不复用ac旧镜像为新runtime。见[安全证据](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。当前不重跑被更高优先级push替代的dispatch。
+- GitHub通用github_fetch可读Actions集合及query/head/event/attempt；专用fetch_commit_workflow_runs只PR/首页，空不可当通过。gh API会TCP reset，连接器可读。写操作未知先读回，PR合并必expected_head_sha。平台曾延迟push约20分钟，别空列表即盲dispatch；旧dispatch被更高优先级push取消原因已实读注记。
+- 外部单次0.5/新发布累计3CNY；历史已知0.069285另有未知，账单/额度未核不付费重放。本轮外部0，独立Agent曾额度中断后恢复并完成最终复核，历史失败不删。
+- 990模板（181交互809展示）全NOT_ACCEPTED；完整黄金链/真实质量/部署、Lab剩余、完整B1/工具生态待完成。历史16题组织/embedding来源未知，不跨租户fallback。main不等于部署。
+- 当前CI/合并收据及交接为冻结提交后的工作区更新，留后续相关提交。无关旧费用报告/截图/TASK-034不stage不重置。
