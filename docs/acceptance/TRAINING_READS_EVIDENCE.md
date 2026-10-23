@@ -25,7 +25,7 @@
 
 独立测试Agent编写training-read-evidence.mjs并接入原policy链，保留原正常训练动作和POST超时断言。初版Web镜像interview-web:training-reads构建真实exit0；链运行期间新增跨页红测修复，最终镜像interview-web:training-reads-final构建真实exit0，初链结果只能作为中间实现证据，最终链需用最终镜像重验；API/Lab复用未变更已验镜像。最终完整隔离链training-reads-final-chain2真实exit0（最终镜像），API93/93、原有Lab/Interview/训练动作与POST原生60秒断言保留通过；新增读取浏览器门与严格恢复均通过。
 
-本轮实际通过窗口：岗位503不误报无岗位且不自动重试；实际初始推荐GET整回执延迟原生60秒后仅GET恢复；实际完成201与PG唯一Attempt先落库，后续GET延迟60秒，解除等待后仅GET恢复COMPLETED且无重复POST；旧READY GET在SPA卸载/返回后不能覆盖实际COMPLETED。浏览器只延迟整回执，响应正文挂起由原生Response/组件测试覆盖，不混淆两类证据。
+本轮实际通过窗口：岗位503不误报无岗位且不自动重试；实际初始推荐GET整回执延迟原生60秒后仅GET恢复；实际完成201与PG唯一Attempt先落库，后续GET延迟60秒，解除等待后仅GET恢复COMPLETED且无重复POST；旧READY GET在SPA卸载/返回后不能覆盖实际COMPLETED。浏览器只延迟整回执，本轮GET正文挂起由控制text()等待的组件替身覆盖（非原生chunked浏览器正文）；既有POST原生Response证据不推广为GET传输层，不混淆两类证据。
 
 ## 限制、费用与合并门
 
@@ -46,3 +46,9 @@ PR59候选ac03104201c361a0c23814405e901e09fa0ff178已提交推送，SSH读回ori
 本机gh初次读API失败（TCP reset）是观测网络，未当CI失败。GitHub连接器通用github_fetch支持Actions集合与明确query，可读真实head/event/attempt，避免只返回PR的专用wrapper遗漏分支run。触发dispatch返回明确run URL且远端读回queued，未盲目重放。
 
 后续实测：18:49:10Z平台才生成同head push run39834697409，排队更高优先级请求在18:49:55Z取消旧dispatch39832266991。实际check annotation明确“Canceling since a higher priority waiting request for product-Product verification-refs/heads/agent-lab exists”；不是30分钟超时或源码断言失败。dispatch Docker120011194465取消在browser dependencies，后两项storage/API-browser-recovery skipped；lint120011194938成功、summary120020224704失败保留。日志另有apt20.5MB耗14min9s，但不将它推断为取消原因。未重跑已被替代的dispatch。最新门恢复为push39834697409与已成功PR39831947507（Docker120010079939/lint120010080064/summary120018430376），同head ac03104，等待push最新全成功。
+
+独立测试Agent额度恢复后实际完成第二次源码/安全与本地运行结果复核：最终本地chain2.exit0及API93/GET60s/PG/实际向量恢复读回；确认metrics2+complete1且不倒填首轮2归属。直接读取新push lint120028727688原始日志，新parser回归PASS、API99 suites/811pass/19skip、Web278pass、audit moderate0/high1/critical0且原braces checksum一致；另独立读取PR首失败Docker Hub token headers超时125，未到产品链。未发现新增源码阻断。此前额度中断历史仍保留，现不再称未完成源码/本地结果复核；两组最新Docker及summary完整结果仍待完成。
+
+2026-10-23最终候选43b74ccbafcde1523bef30e782c34622de48e1a0最新精确门实际全成功：PR39836664485 attempt2（Docker120029783748、lint120029787281、summary120037524257），push39837059192 attempt1（lint120028727688、Docker120028728243、summary120042952503），六项completed/success且storage/API-browser-recovery/audit步骤均success。持久monitor checked_at2026-10-22T19:35:53Z明确同head、两run completed/success；监测脚本BOTH_LATEST_SUCCESS正常完成，后续再次逐job读回。PR59 head43b74cc/base e108/mergeable=true/open已核。等待独立Agent最终Docker/六job复核再冻结合并；不删除前述失败/取消历史。
+
+限定阶段最终独立复核通过：独立Agent读回43b74cc最新六项CI及Docker原始API93/GET原生60秒/唯一完成写/旧scope/严格PG与实际Milvus/Qdrant恢复。父代理再次核全部job completed/success及PR同head/base/mergeable，再固定expected_head_sha=43b74ccbafcde1523bef30e782c34622de48e1a0合并PR59，得到a03ff8afe7f8431ac6d53c9493f8c22077d23aa0。随后PR读回closed/merged=true、merge_commit_sha同值、merged_at2026-10-22T19:37:24Z；SSH读回main同值，本地agent-lab快进并推送，最终main/agent-lab均同合并SHA。未部署，不扩大整体通过范围。合并与最终CI收据为提交后工作区更新，尚未随已冻结候选提交。

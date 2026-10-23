@@ -118,6 +118,7 @@ export function HomePage({ view = 'overview', openPractice = false }: { view?: '
       const response = await fetch('/api/interview/upload-resume', { method: 'POST', body });
       const data = await safeJson(response);
       if (!response.ok || data?._error) throw new Error(data?.message || '简历上传失败');
+      if (data?.ragIngested !== true) throw new Error('简历保存结果尚未确认，请刷新简历列表核验后再重试。');
       await queryClient.invalidateQueries({ queryKey: ['resumes'] });
       await queryClient.invalidateQueries({ queryKey: ['readiness'] });
       setMessage('简历已更新，可以开始对应岗位的模拟面试。');

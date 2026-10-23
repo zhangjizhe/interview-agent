@@ -1,13 +1,13 @@
 # 当前任务
 
-2026-10-23 · PRODUCT-REACCEPTANCE-1 · 整体NOT_ACCEPTED。用户授权持续自主推进，不逐Phase请求继续。唯一当前单主题SECURITY-IPADDRESS，作为PR59训练读取合并的前置阻断；TRAINING-READS实现/本地全链验收与PR精确CI已过，但未合并。
+2026-10-23 · PRODUCT-REACCEPTANCE-1 · 整体NOT_ACCEPTED。持续自主推进，已授权独立测试Agent及阶段/最新精确CI通过后经PR合并main。
 
-PR59 head ac03104201c361a0c23814405e901e09fa0ff178，PR run39831947507三项成功。平台延迟到18:49:10Z生成同head push39834697409，取消旧dispatch39832266991（实际并发组注记，不是超时）；dispatch成功/取消/skipped等全部保留[GET证据](../acceptance/TRAINING_READS_EVIDENCE.md)。最新push lint120020275007在审计失败：新公告GHSA-rxp7-6hxx-x8q5，ip-address<=10.7.3，patched10.7.4。禁止放行/allowlist/盲重跑新安全失败，旧PR通过不能替代最新门。
+基线PR59冻结候选43b74cc经最新push/PR六项成功后合并a03ff8afe7f8431ac6d53c9493f8c22077d23aa0，PR/main/agent-lab/本地读回。收据见[GET](../acceptance/TRAINING_READS_EVIDENCE.md)/[安全](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。
 
-已核默认模块链 @modelcontextprotocol/sdk1.32.1→express-rate-limit8.5.2→ip-address10.7.1；项目override固定10.7.1。源码limiter用node isIPv6前置保护，未证明项目端点能触发恶意字符串，不编造可利用性；仍应升级受影响依赖而不压审计。
+唯一当前子主题RESUME-PERSISTENCE-RECEIPT（I06）：修复吞Milvus异常仍报成功。insert状态/count/ID和Strong同owner/payload确认；完整SDK调用5秒有界等待，未知503不自动重试；显式float/1024finite embedding；Web严格成功回执，NGINX透传业务503。数据库schema/API形状不变。等待超时不取消底层动作，lazy init/embedding整体等待未覆盖。
 
-执行最小同major patch升级至10.7.4与锁文件；独立提交，检查锁文件无无关升级、真实SDK安装链恶意zone有界子进程红/绿及正常IP/zone/limiter行为、审计/补丁完整性、API相关lint/type/build与精确候选完整CI。新测试子进程timeout3秒防父进程挂死，不调用外部模型。本轮训练API/PG/browser旧镜像通过不冒充升级后完整运行时。
+已验证32定向、全API841通过/21跳过、Web284、相关lint/type/build、API/Web新镜像及真实NGINX短回归。四次完整隔离链exit1依次暴露SDK隐藏describe等待、NGINX覆盖业务503、双按钮测试歧义、公开清洗与原始summary测试误等；全部保留[本轮证据](../acceptance/RESUME_PERSISTENCE_RECEIPT_EVIDENCE.md)。第五轮resume-receipt-clean-read-chain实际exit0（真实上传、严格PG/向量恢复通过），不提交/推送或声明恢复通过。最新helper区分Strong原始payload与public清洗后的summary，并保留其他字段精确比较。
 
-训练已13实际红测后修复，最终Web278/build/显式lint、最终API93/PG/browser/严格恢复exit0。新990模板（181交互809展示）最终全部NOT_ACCEPTED，完整黄金链/真实质量/部署未通过。独立测试Agent最终运行复核额度中断保留，不记其最终通过。
+下一步独立二次核对最终exit0/恢复日志、diff检查，定向提交后绑定最新精确CI，才经PR冻结合并并核远端。后续完整成功SSE/正式报告/技能/训练复测链仍未验收。
 
-外部≤0.5CNY/次、新发布测试累计≤3CNY；历史已知0.069285另有未知，未对账/核额度前不付费重放。近期fixture外部0。旧费用报告/截图/TASK-034保持不提交；ac提交后的CI交接更新为待后续相关提交资料，不改已冻结候选造证据。
+预算外部≤0.5CNY/次、新发布累计≤3CNY；历史已知0.069285另有未知，未对账/核额度不付费重放。本轮只有私有合成provider，不能证明真实模型质量/学习提升。990模板均NOT_ACCEPTED，目标部署身份/恢复未核。无关旧费用报告/截图/TASK-034不stage不重置。

@@ -298,7 +298,7 @@ export function InterviewPage() {
       fd.append('position', resume?.position || '通用岗位');
       const res = await fetch('/api/interview/upload-resume', { method: 'POST', body: fd });
       const data = await safeJson(res);
-      if (data?.ragIngested) {
+      if (res.ok && !data?._error && data?.ragIngested === true) {
         setUploadedName(file.name);
         const res2 = await fetch(`/api/interview/${interviewId}`);
         const data2 = await safeJson(res2);

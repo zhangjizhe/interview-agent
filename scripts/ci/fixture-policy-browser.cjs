@@ -29,6 +29,70 @@ async function stats() {
   for (const key of ['chat', 'embedding', 'rerank', 'externalRequests']) assert.ok(Number.isSafeInteger(value[key]) && value[key] >= 0);
   return value;
 }
+// I06 uses actual HTTP uploads. This control never inserts a resume.
+async function resumeUploadControl(mode) {
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (mode === 'resume-upload-prepare') {
+    assert.ok(!saved.resumeUpload);
+    const suffix = require('node:crypto').randomBytes(6).toString('hex');
+    const userId = `fixture-resume-${suffix}`, organizationId = `synthetic-resume-${suffix}`, jobId = `synthetic-resume-job-${suffix}`;
+    const owner = await prisma.user.findUniqueOrThrow({ where: { id: 'fixture-ci-owner' } });
+    saved.resumeUpload = { userId, organizationId, jobId, baseline: await stats(), ledger: await prisma.usageLedger.count(), runs: await prisma.run.count() };
+    fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
+    await prisma.$transaction(async tx => {
+      await tx.organization.create({ data: { id: organizationId, name: 'Synthetic resume upload', planId: 'free' } });
+      await tx.user.create({ data: { id: userId, email: `${userId}@example.invalid`, organizationId, passwordHash: owner.passwordHash, role: 'USER' } });
+      await tx.targetJob.create({ data: { id: jobId, organizationId, userId, title: 'Synthetic Resume Engineer', level: 'P5', isActive: true } });
+    });
+    return { userId, jobId, position: 'Synthetic Resume Engineer' };
+  }
+  const state = saved.resumeUpload;
+  if (!state && mode === 'resume-upload-cleanup') return { cleaned: true };
+  assert.ok(state); assert.match(state.userId, /^fixture-resume-[a-f0-9]{12}$/);
+  const current = await stats();
+  const afterFailure = ['resume-upload-failure', 'resume-upload-inspect'].includes(mode);
+  const expected = { ...state.baseline, embedding: state.baseline.embedding + (afterFailure ? 1 : 2), chat: state.baseline.chat + (afterFailure ? 0 : 1) };
+  if (mode !== 'resume-upload-cleanup') assert.deepEqual(current, expected);
+  if (mode === 'resume-upload-failure') {
+    assert.equal(await prisma.usageLedger.count({ where: { userId: state.userId } }), 0);
+    return { stats: current };
+  }
+  const client = await resumeClient();
+  try {
+    const filter = `userId == ${JSON.stringify(state.userId)}`;
+    if (mode === 'resume-upload-cleanup') {
+      const removed = await client.deleteEntities({ collection_name: 'resumes', filter, timeout: 5000 });
+      assert.equal(removed.status.error_code, 'Success');
+    }
+    const read = await client.query({ collection_name: 'resumes', filter, timeout: 5000, consistency_level: ConsistencyLevelEnum.Strong,
+      output_fields: ['id', 'userId', 'name', 'position', 'summary', 'skills', 'createdAt'], limit: 10 });
+    assert.equal(read.status.error_code, 'Success'); assert.ok(Array.isArray(read.data));
+    if (mode === 'resume-upload-inspect') return { rows: read.data, stats: current };
+    if (mode === 'resume-upload-read') {
+      const ledger = await prisma.usageLedger.findMany({ where: { userId: state.userId } });
+      assert.equal(ledger.length, 1); assert.equal(ledger[0].type, 'LLM_CALL'); assert.equal(ledger[0].units, 1);
+      assert.equal(await prisma.run.count(), state.runs);
+      state.verified = true; state.expected = expected;
+      fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
+      return { rows: read.data, stats: current, ledger: ledger.length };
+    }
+    assert.equal(mode, 'resume-upload-cleanup'); assert.equal(read.data.length, 0);
+  } finally { await client.closeConnection(); }
+  // No model counters are reset. Accept only previously verified exact deltas.
+  let verificationFailure;
+  try { assert.ok(state.verified); assert.deepEqual(current, state.expected); } catch (error) { verificationFailure = error; }
+  await prisma.$transaction(async tx => {
+    await tx.usageLedger.deleteMany({ where: { userId: state.userId, organizationId: state.organizationId } });
+    await tx.targetJob.deleteMany({ where: { id: state.jobId, userId: state.userId } });
+    await tx.user.deleteMany({ where: { id: state.userId, organizationId: state.organizationId } });
+    await tx.organization.deleteMany({ where: { id: state.organizationId } });
+  });
+  assert.equal(await prisma.usageLedger.count(), state.ledger); assert.equal(await prisma.run.count(), state.runs);
+  if (!verificationFailure) saved.resumeUploadAllowance = { chat: current.chat - state.baseline.chat, embedding: current.embedding - state.baseline.embedding, rerank: 0, externalRequests: 0 };
+  delete saved.resumeUpload; fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
+  if (verificationFailure) throw verificationFailure;
+  return { cleaned: true, allowance: saved.resumeUploadAllowance };
+}
 // Training fixtures seed formal evidence; they never call an evaluator or embedder.
 async function trainingControl(mode) {
   const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -109,7 +173,9 @@ async function trainingControl(mode) {
   return { recommendationId: recommendation.id, attemptId: attempt.id, retestInterviewId: attempt.retestInterviewId };
 }
 (async () => {
-  if (process.argv[2]?.startsWith('training-')) {
+  if (process.argv[2]?.startsWith('resume-upload-')) {
+    console.log(JSON.stringify(await resumeUploadControl(process.argv[2])));
+  } else if (process.argv[2]?.startsWith('training-')) {
     console.log(JSON.stringify(await trainingControl(process.argv[2])));
   } else if (process.argv[2] === 'prepare') {
     assert.ok(!fs.existsSync(file));
@@ -160,12 +226,15 @@ async function trainingControl(mode) {
     if (!fs.existsSync(file)) return;
     let saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     let trainingFailure;
+    if (saved.resumeUpload) { try { await resumeUploadControl('resume-upload-cleanup'); saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { trainingFailure = error; } }
     if (saved.training) { try { await trainingControl('training-cleanup'); saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { trainingFailure = error; } }
     let primary = trainingFailure;
     try {
       assert.equal(await prisma.message.count({ where: { interviewId: saved.interviewId } }), 0);
       assert.equal(await prisma.run.count(), saved.runs); assert.equal(await prisma.usageLedger.count(), saved.ledger);
-      assert.deepEqual(await stats(), saved.stats);
+      const expectedStats = { ...saved.stats };
+      for (const [key, delta] of Object.entries(saved.resumeUploadAllowance || {})) expectedStats[key] += delta;
+      assert.deepEqual(await stats(), expectedStats);
     } catch (error) { primary = primary ? new AggregateError([primary, error], 'Fixture verification failed') : error; } finally {
       const restored = await Promise.allSettled([prisma.agent.update({ where: { id: saved.agentId }, data: { currentVersionId: saved.originalVersionId } }),
       prisma.interview.update({ where: { id: saved.interviewId }, data: { resumeConfirmed: saved.originalConfirmed } }), prisma.interview.deleteMany({ where: { id: { in: [saved.alternateId, saved.lifecycleId, saved.timeoutId] }, userId: 'fixture-ci-owner' } })]);

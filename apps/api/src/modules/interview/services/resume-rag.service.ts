@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
-import { MilvusClient, DataType, MetricType, IndexType } from '@zilliz/milvus2-sdk-node';
+import { MilvusClient, DataType, MetricType, IndexType, ConsistencyLevelEnum } from '@zilliz/milvus2-sdk-node';
 import { ConfigService } from '@nestjs/config';
 import { ParsedResume } from './resume-parser.service';
 import { scrubPdfStructureNoise, isPdfStructureToken } from '../../../common/pdf-noise';
@@ -30,7 +30,7 @@ export class ResumeRAGService {
     const qwenKey = this.config.get<string>('qwen.apiKey');
     const qwenBase = this.config.get<string>('qwen.baseUrl');
 
-    this.client = new MilvusClient({ address: milvusUrl });
+    this.client = new MilvusClient({ address: milvusUrl, timeout: 5000 });
     this.embedder = new OpenAI({ apiKey: qwenKey, baseURL: qwenBase });
   }
 
@@ -107,26 +107,54 @@ export class ResumeRAGService {
       const text = `${summary}\n\n${cleanRawText.slice(0, 1500)}`;
       const vector = await this.embedText(text);
 
-      await this.client.insert({
-        collection_name: this.COLLECTION,
-        data: [
-          {
-            vector,
-            userId,
-            name: cleanName,
-            position,
-            summary,
-            skills: cleanSkills.join('、'),
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      });
+      const row = {
+        vector, userId, name: cleanName, position, summary,
+        skills: cleanSkills.join('、'), createdAt: new Date().toISOString(),
+      };
+      const receipt = await this.storageDeadline(this.client.insert({
+        collection_name: this.COLLECTION, timeout: 5000, data: [row],
+      }));
+      this.assertStorageResponse(receipt);
+      const ids = (receipt.IDs as any)?.int_id?.data;
+      const value = Array.isArray(ids) && ids.length === 1 ? ids[0] : undefined;
+      if (Number(receipt.insert_cnt) !== 1
+        || !((typeof value === 'string' && /^\d+$/.test(value)) || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0))
+        || BigInt(value) > 9223372036854775807n) throw new Error('RESUME_STORAGE_UNCONFIRMED');
+      const id = BigInt(value).toString();
+      const stored = await this.storageDeadline(this.client.query({
+        collection_name: this.COLLECTION, timeout: 5000,
+        consistency_level: ConsistencyLevelEnum.Strong,
+        filter: `id == ${id} && userId == ${JSON.stringify(userId)}`,
+        output_fields: ['id', 'userId', 'name', 'position', 'summary', 'skills', 'createdAt'], limit: 2,
+      }));
+      this.assertStorageResponse(stored);
+      const actual = Array.isArray(stored.data) && stored.data.length === 1 ? stored.data[0] as any : undefined;
+      if (!actual || String(actual.id) !== id
+        || !(['userId', 'name', 'position', 'summary', 'skills', 'createdAt'] as const).every(key => actual[key] === row[key])) {
+        throw new Error('RESUME_STORAGE_UNCONFIRMED');
+      }
 
       this.logger.log(`✅ Resume ingested for ${userId} (position=${position})`);
     } catch (err) {
-      this.logger.error(`Resume ingest failed: ${err.message}`);
+      this.logger.error({ event: 'resume_storage_unconfirmed' });
       throw err;
     }
+  }
+
+  private assertStorageResponse(result: any) {
+    if (!result?.status || !['Success', '0'].includes(String(result.status.error_code))
+      || (result.status.code !== undefined && result.status.code !== 0)) throw new Error('RESUME_STORAGE_UNCONFIRMED');
+  }
+
+  // SDK insert performs a schema lookup before its timed Insert RPC. Bound the
+  // whole call as well; expiry is an unknown write, never proof of cancellation.
+  private async storageDeadline<T>(request: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([request, new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('RESUME_STORAGE_UNCONFIRMED')), 5000);
+      })]);
+    } finally { if (timer) clearTimeout(timer); }
   }
 
   async searchByUser(
@@ -135,13 +163,16 @@ export class ResumeRAGService {
   ): Promise<Array<{ name?: string; position: string; summary: string; skills: string; createdAt: string; score?: number }>> {
     await this.ensureCollection();
     try {
-      const result = await this.client.query({
+      const result = await this.storageDeadline(this.client.query({
         collection_name: this.COLLECTION,
-        filter: `userId == "${userId}"`,
+        filter: `userId == ${JSON.stringify(userId)}`,
+        consistency_level: ConsistencyLevelEnum.Strong, timeout: 5000,
         output_fields: ['name', 'position', 'summary', 'skills', 'createdAt'],
         limit,
-      });
-      const raw = (result.data as any) || [];
+      }));
+      this.assertStorageResponse(result);
+      if (!Array.isArray(result.data)) throw new Error('RESUME_STORAGE_UNCONFIRMED');
+      const raw = result.data as any[];
       // 读取侧清洗：旧数据（修复前上传）可能含 PDF 元数据，
       // 返回前再洗一次 name/skills/summary，确保前端不会展示 %PDF-1.7 / /ICCBased 等
       const cleaned = raw.map((r: any) => ({
@@ -154,7 +185,7 @@ export class ResumeRAGService {
           .filter((s: string) => s && !isPdfStructureToken(s))
           .join('、'),
       }));
-      // 按 createdAt 倒序，取最新（Milvus query 默认不保证顺序）
+      // 仅排序本次 limit 返回窗口；Milvus query 无全局顺序保证，不能据此保证全局最新版本。
       cleaned.sort((a: any, b: any) => (b.createdAt || '').localeCompare(a.createdAt || ''));
       return cleaned;
     } catch (err) {
@@ -195,7 +226,13 @@ export class ResumeRAGService {
     const res = await this.embedder.embeddings.create({
       model: 'text-embedding-v3',
       input: text.slice(0, 2048),
+      encoding_format: 'float',
     });
-    return res.data[0].embedding;
+    const vector = res.data?.[0]?.embedding;
+    if (!Array.isArray(vector) || vector.length !== this.VECTOR_DIM
+      || !Array.from(vector).every(value => typeof value === 'number' && Number.isFinite(value))) {
+      throw new Error('RESUME_EMBEDDING_INVALID');
+    }
+    return vector;
   }
 }

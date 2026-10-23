@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Req,
+  ServiceUnavailableException,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -77,8 +78,9 @@ export class ResumeController {
     const userId = req.user.userId;
     try {
       await this.resumeRag.ingestResume(userId, position, parsed);
-    } catch (err: any) {
-      this.logger.warn(`Resume RAG ingest failed: ${err.message}`);
+    } catch {
+      this.logger.warn({ event: 'resume_storage_unconfirmed' });
+      throw new ServiceUnavailableException('简历保存结果尚未确认，请刷新简历列表核验后再重试。');
     }
 
     // 3. 匹配知识库
@@ -93,7 +95,7 @@ export class ResumeController {
       standardQuestions: pickQuestions(bank, 5),
       personalizedQuestions,
       totalQuestions: 5 + personalizedQuestions.length,
-      ragIngested: !!userId,
+      ragIngested: true,
     };
   }
 
