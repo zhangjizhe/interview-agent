@@ -29,9 +29,7 @@
 ADR25 working-tree foundation (not delivered): persist a task/message presentation
 receipt and fenced answer attempt, same-interview/org composite FKs and one
 unresolved question; UNKNOWN has no automatic paid replay. No provider calls under
-the short parent-row transaction. Service is not registered in candidate routes;
-confirmation/history, queue initialization, stream recovery, end coordination and
-UI admission still require integration and acceptance. See
+the short parent-row transaction. Current uncommitted routes/UI integrate explicit presentation/v1, provider-free bounded stored-row selection, exact receipt scoring/replay and parent-locked end coordination; limited actual API/browser/strict restore local acceptance passed; exact CI/PR remains pending. See
 [question presentation evidence](../acceptance/QUESTION_PRESENTATION_EVIDENCE.md).
 
 ADR24增量B1a（PR46精确CI验收并合并）：采用构造期可信RuntimeAdapterRegistry包装既有引擎并接入实际runAgent；保留领域状态/CAS/费用权限，未知能力显式拒绝，不引入动态代码加载或空注册表。统一事件与完整能力清单另批实现，不宣称完整B1。

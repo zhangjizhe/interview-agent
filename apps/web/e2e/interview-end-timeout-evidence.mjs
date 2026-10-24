@@ -1,9 +1,10 @@
+import { prepareQuestion } from './interview-question-fixture.mjs';
 import assert from 'node:assert/strict';
 
 // This holds the whole actual response, not a fabricated body-only stream.
 export async function verifyEndTimeout(page, data, control) {
   await page.goto(`http://localhost:5177/interview/${data.timeoutId}`);
-  const composer = page.getByPlaceholder('简历已上传，开始面试吧...', { exact: true });
+  const composer = await prepareQuestion(page, data.timeoutId);
   await composer.fill('Synthetic timeout lifecycle');
   const refusal = page.waitForResponse(r => r.url().endsWith(`/interview/${data.timeoutId}/message`) && r.request().method() === 'POST'); refusal.catch(() => undefined);
   await composer.press('Control+Enter'); assert.match(await (await refusal).text(), /"type":"error"/);
@@ -17,7 +18,7 @@ export async function verifyEndTimeout(page, data, control) {
   const handler = async route => {
     started = true;
     try {
-      const upstream = await route.fetch({ timeout: 15000 }); assert.equal(upstream.ok(), true); assert.deepEqual(await upstream.json(), { deleted: true, reason: 'no_messages' });
+      const upstream = await route.fetch({ timeout: 15000 }); assert.equal(upstream.ok(), true); assert.deepEqual(await upstream.json(), { deleted: true, reason: 'no_answers' });
       heldResolve(); await released;
       try { await route.fulfill({ response: upstream }); } catch { await route.abort().catch(() => undefined); }
     } catch (error) { failure = error; heldReject(error); await route.abort().catch(() => undefined); }

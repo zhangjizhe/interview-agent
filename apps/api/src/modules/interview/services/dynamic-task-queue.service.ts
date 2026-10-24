@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { DecisionDomain } from '@prisma/client';
+import { DecisionDomain, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
 import { LlmGatewayService } from '../../llm/llm.gateway.service';
 import { QuestionBankService } from './question-bank.service';
@@ -138,29 +138,39 @@ export class DynamicTaskQueueService {
       return;
     }
 
+    const tasksData = await this.prepareInitialTasks(interviewId, position, level, selection);
+    await this.prisma.interviewTask.createMany({ data: tasksData });
+    this.logger.debug(`[TaskQueue] Initialized queue for ${interviewId} with ${tasksData.length} tasks`);
+  }
+
+  /** Provider-free initial bank read, deliberately outside presentation's DB lock. */
+  async prepareInitialTasks(
+    interviewId: string,
+    position: string,
+    level: string,
+    selection: { mode: string; targetJobId?: string; targetJobProfileVersion?: number; practiceSkillId?: string; practiceSkillName?: string },
+  ): Promise<Prisma.InterviewTaskCreateManyInput[]> {
     const initialQuestions = await this.generateInitialQuestions(position, level);
-    const tasksData = initialQuestions.map((q, index) => ({
+    return initialQuestions.map((q, index) => ({
       interviewId,
       type: 'QUESTION' as const,
       question: q.question,
       category: q.category,
       difficulty: q.difficulty,
       priority: index + 1,
-            context: JSON.stringify({
+      context: JSON.stringify({
         position,
         level,
         ...selection,
         questionId: q.questionId,
+        questionSelectionSource: q.selectionSource,
         capabilities: capabilitiesForQuestion(q.category, q.question),
       }),
     }));
-
-    await this.prisma.interviewTask.createMany({ data: tasksData });
-    this.logger.debug(`[TaskQueue] Initialized queue for ${interviewId} with ${tasksData.length} tasks`);
   }
 
   async generateInitialQuestions(position: string, level: string): Promise<{
-    questionId: string; question: string; category: string; difficulty: string;
+    questionId: string; question: string; category: string; difficulty: string; selectionSource: string;
   }[]> {
     const difficultyMap: Record<string, string> = {
       'P1': 'easy', 'P2': 'easy', 'P3': 'medium', 'P4': 'medium', 'P5': 'hard', 'P6': 'hard',
@@ -168,26 +178,27 @@ export class DynamicTaskQueueService {
     const targetDifficulty = difficultyMap[level] || 'medium';
     const category = this.getCategoryByPosition(position);
 
-    // 优先从 Milvus 知识库检索
+    // Initial presentation is a bounded stored-row read, not an embedding call.
+    let fallbackReason = this.questionBank ? 'no-compatible-stored-question' : 'bank-unavailable';
     if (this.questionBank) {
       try {
-        const results = await this.questionBank.search(category, {
-          position,
-          level,
-          category,
-          limit: 5,
-          rerank: true,
-        });
+        let timer: ReturnType<typeof setTimeout>;
+        const results = await Promise.race([
+          this.questionBank.selectInitial(position, level, category),
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Initial question read timed out')), 5000); }),
+        ]).finally(() => clearTimeout(timer));
         if (results.length > 0) {
           return results.map((r) => ({
             questionId: r.questionId,
             question: r.question,
             category: r.category || category,
-            difficulty: (r as any).difficulty || targetDifficulty,
+            difficulty: targetDifficulty,
+            selectionSource: 'stored-category-level/v1',
           }));
         }
       } catch (err: any) {
-        this.logger.warn(`[TaskQueue] Milvus search failed, using local fallback: ${err.message}`);
+        fallbackReason = 'stored-read-unconfirmed';
+        this.logger.warn(`[TaskQueue] Initial stored-row read unconfirmed; using local fallback: ${err.message}`);
       }
     }
 
@@ -201,6 +212,7 @@ export class DynamicTaskQueueService {
         question: q.question,
         category,
         difficulty: q.difficulty,
+        selectionSource: `local-fallback/${fallbackReason}/v1`,
       }));
   }
 
@@ -214,6 +226,41 @@ export class DynamicTaskQueueService {
       orderBy: { priority: 'asc' },
     });
 
+    return this.taskView(task);
+  }
+
+  async getTask(interviewId: string, taskId: string): Promise<InterviewTask | undefined> {
+    const task = await this.prisma.interviewTask.findFirst({ where: { id: taskId, interviewId, status: 'PENDING' } });
+    return this.taskView(task);
+  }
+
+  async getClaimedTask(
+    interviewId: string, userId: string, taskId: string, answer: string, messageId: string,
+    claim: { presentationId: string; claimToken: string },
+  ): Promise<InterviewTask> {
+    const receipt = await this.verifyPresentedAnswer(this.prisma, interviewId, userId, taskId, answer, messageId, claim);
+    return this.taskView(receipt.task)!;
+  }
+
+  private async verifyPresentedAnswer(
+    tx: Prisma.TransactionClient, interviewId: string, userId: string, taskId: string,
+    answer: string, messageId: string, claim: { presentationId: string; claimToken: string },
+  ) {
+    if ([interviewId, userId, taskId, messageId, claim?.presentationId, claim?.claimToken].some(value => typeof value !== 'string' || !value.trim())) {
+      throw new Error('An exact presented answer claim is required');
+    }
+    const receipt = await tx.interviewQuestionPresentation.findFirst({
+      where: { id: claim.presentationId, interviewId, taskId, claimMessageId: messageId, claimToken: claim.claimToken, state: 'PROCESSING' },
+      include: { task: true, interview: true, claimMessage: true },
+    });
+    if (!receipt || receipt.interview.userId !== userId || receipt.interview.status !== 'IN_PROGRESS'
+      || !receipt.interview.resumeConfirmed || receipt.task.status !== 'PENDING'
+      || receipt.question !== receipt.task.question || receipt.claimMessage?.role !== 'user'
+      || receipt.claimMessage.content !== answer) throw new Error('The presented answer claim is no longer current');
+    return receipt;
+  }
+
+  private taskView(task: any): InterviewTask | undefined {
     if (!task) return undefined;
 
     return {
@@ -255,9 +302,12 @@ export class DynamicTaskQueueService {
     taskId: string,
     answer: string,
     answerMessageId?: string,
+    claim?: { presentationId: string; claimToken: string },
   ): Promise<void> {
     const task = await this.prisma.interviewTask.findUnique({ where: { id: taskId } });
     if (!task) return;
+    if (task.interviewId !== interviewId) throw new Error('Task does not belong to the interview');
+    if (claim) await this.verifyPresentedAnswer(this.prisma, interviewId, userId, taskId, answer, answerMessageId!, claim);
 
     const questionRecord = await this.ensureQuestionRecord(task);
     if (answerMessageId) {
@@ -275,6 +325,16 @@ export class DynamicTaskQueueService {
 
     // 写入评分记录
     const answerHistory = await this.prisma.$transaction(async (tx) => {
+      if (claim) {
+        const lock = await tx.interview.updateMany({
+          where: { id: interviewId, userId, status: 'IN_PROGRESS', resumeConfirmed: true },
+          data: { resumeConfirmed: true },
+        });
+        if (lock.count !== 1) throw new Error('Interview is no longer active');
+        await this.verifyPresentedAnswer(tx, interviewId, userId, taskId, answer, answerMessageId!, claim);
+        const normalized = await tx.interviewQuestion.findFirst({ where: { id: questionRecord.id, interviewId, sourceTaskId: taskId, question: task.question } });
+        if (!normalized) throw new Error('Normalized question no longer matches its presentation');
+      }
       const answerRecord = answerMessageId
         ? await tx.interviewAnswer.create({
             data: {
@@ -366,6 +426,7 @@ export class DynamicTaskQueueService {
           practiceSkillId: context.practiceSkillId || null,
           practiceSkillName: context.practiceSkillName || null,
           taskType: task.type,
+          questionSelectionSource: context.questionSelectionSource || null,
           ...mapping.selection,
           ...(mapping.metadata ? { skillMapping: mapping.metadata } : {}),
         },

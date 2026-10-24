@@ -10,7 +10,7 @@ interface UseInterviewStreamReturn {
   streaming: boolean;
   reconnecting: boolean;
   error: string | null;
-  send: (interviewId: string, userId: string, content: string) => Promise<void>;
+  send: (interviewId: string, userId: string, content: string, presentationId?: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -47,7 +47,7 @@ export function useInterviewStream(sessionId?: string): UseInterviewStreamReturn
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const send = useCallback(
-    async (interviewId: string, userId: string, content: string) => {
+    async (interviewId: string, userId: string, content: string, presentationId?: string) => {
       // Each send owns its own lifecycle. A stale timeout or aborted reader from
       // an earlier turn must never finalize the newer turn's placeholder message.
       abortRef.current?.abort();
@@ -114,7 +114,7 @@ export function useInterviewStream(sessionId?: string): UseInterviewStreamReturn
             const res = await fetch(`/api/interview/${interviewId}/message`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId, content, clientMessageId }),
+              body: JSON.stringify({ userId, content, clientMessageId, operation: 'ANSWER', presentationId }),
               signal: controller.signal,
             });
 

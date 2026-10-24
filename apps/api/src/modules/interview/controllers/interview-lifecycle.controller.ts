@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Body,
   Controller,
   Delete,
@@ -9,6 +10,7 @@ import {
   Post,
   Query,
   Req,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InterviewAgentService } from '../../agent/interview-agent.service';
 import { MultiAgentService } from '../../agent/multi-agent.service';
@@ -20,6 +22,8 @@ import { TrainingService } from '../services/training.service';
 import { UsageService } from '../../llm/usage/usage.service';
 import type { ChatMessage } from '../../llm/providers/types';
 import { requireOwnedInterview } from '../../../common/ownership.util';
+import { QuestionPresentationService } from '../services/question-presentation.service';
+import { QuestionConfirmationService } from '../services/question-confirmation.service';
 
 interface StartInterviewDto {
   userId: string;
@@ -57,6 +61,8 @@ export class InterviewLifecycleController {
     private evaluation: EvaluationService,
     private training: TrainingService,
     private usage: UsageService,
+    private questionConfirmation: QuestionConfirmationService,
+    private questionPresentation: QuestionPresentationService,
   ) {}
 
   // ===== 静态路由（必须在 :interviewId 之前）=====
@@ -318,6 +324,8 @@ export class InterviewLifecycleController {
         createdAt: latest.createdAt,
       } : null,
       resumeConfirmed: interview.resumeConfirmed,
+      questionProtocol: 'presentation/v1',
+      currentQuestion: await this.questionPresentation.readCurrent(interviewId, req.user.userId),
       // IN_PROGRESS 时 report 字段置 null，前端 setReport(null) 不触发报告视图
       report: isCompleted ? interview.report : null,
     };
@@ -329,42 +337,30 @@ export class InterviewLifecycleController {
    */
   @Post(':interviewId/confirm-resume')
   async confirmResume(@Param('interviewId') interviewId: string, @Req() req: any) {
-    await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
-    await this.prisma.interview.update({
-      where: { id: interviewId },
-      data: { resumeConfirmed: true },
-    });
-    this.logger.log(`Resume confirmed for interview ${interviewId}`);
-    return { success: true };
+    return this.questionConfirmation.confirm(interviewId, req.user.userId);
   }
 
   @Post(':interviewId/end')
   async endInterview(@Param('interviewId') interviewId: string, @Req() req: any) {
-    const interview: any = await requireOwnedInterview(this.prisma, interviewId, req.user.userId, {
-      include: { messages: { orderBy: { createdAt: 'asc' } } },
-    });
-
-    // 空面试：直接删除（不保留无聊天记录的空面试）
-    if (interview.messages.length === 0) {
-      await this.prisma.interview.delete({ where: { id: interviewId } });
-      this.logger.log(`Deleted empty interview ${interviewId} (no messages)`);
-      return { deleted: true, reason: 'no_messages' };
+    const ending = await this.questionPresentation.reserveEnd(interviewId, req.user.userId);
+    if (ending.state === 'EMPTY_DELETED') return { deleted: true, reason: ending.reason };
+    if (ending.state === 'ALREADY_ENDED') {
+      if (!ending.interview.report) throw new ConflictException('报告正在生成或结果尚待核验，请刷新查看状态。');
+      return { report: ending.interview.report, evaluationRunId: ending.interview.report.currentEvaluationRunId, repeated: true };
     }
+    const interview: any = ending.interview;
 
     // 2026-06-23 修复：try/catch/finally 兜底 status='COMPLETED' 写入
     // 原 bug：generateReport → upsert report → memory.memorize → update status
     // 若 generateReport 或 memory 抛错，status 仍是 IN_PROGRESS，
     // 用户刷新页面看到 report=null + 聊天区 + textarea 可输入 → "二次进入还可点击"
     // 现在：try 块跑核心流程，catch 兜底生成错误报告，finally 强制 status=COMPLETED
-    const conversation: ChatMessage[] = interview.messages.map((m) => ({
-      role: m.role as any,
-      content: m.content,
-    }));
+    let conversation: ChatMessage[] = [];
     const totalTokens = interview.messages.reduce(
       (sum, m) => sum + (m.promptTokens || 0) + (m.completionTokens || 0),
       0,
     );
-    const endedAt = new Date();
+    const endedAt = interview.endedAt;
     const durationMs = endedAt.getTime() - interview.startedAt.getTime();
     const durationMin = Math.max(1, Math.round(durationMs / 60000));
 
@@ -377,6 +373,10 @@ export class InterviewLifecycleController {
 
     try {
       const evaluation = await this.evaluation.beginFinalEvaluation(interviewId);
+      conversation = evaluation.answers.flatMap(answer => [
+        { role: 'assistant' as const, content: answer.question.question },
+        { role: 'user' as const, content: answer.content },
+      ]);
       evaluationRunId = evaluation.run.id;
       if (evaluation.existing) {
         savedReport = await this.prisma.report.findFirst({
@@ -418,11 +418,13 @@ export class InterviewLifecycleController {
         data: {
           status: 'COMPLETED',
           endedAt,
-          summary: `总 token: ${totalTokens}, 得分: ${report?.overallScore ?? 0}`,
+          summary: report ? `总 token: ${totalTokens}, 得分: ${report.overallScore}` : '报告结果尚未确认',
         },
       });
       this.logger.log(`[end] interview ${interviewId} status=COMPLETED`);
     }
+
+    if (!savedReport) throw new ServiceUnavailableException('报告生成结果尚未确认，请刷新面试状态后核验。');
 
     // ===== 结构化归档：长期记忆（独立 try/catch，不影响主流程） =====
     try {

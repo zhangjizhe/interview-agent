@@ -155,3 +155,49 @@ API/golden/browser/recovery gates. New exact candidate CI is pending. Do not mer
 until both latest push and PR runs are green and original logs reviewed. No paid
 external model replay occurred; private provider calls in the full chain remain
 synthetic, and direct store fixtures do not validate semantic scoring.
+
+
+## PR62 final receipt (post-freeze documentation)
+
+Candidate `5194edcb981713b3f11e939931b02fbbfbe5e621` passed the latest exact
+push39974325503 and PR39974398837, both attempt1/completed/success. Jobs:
+
+| Event | lint/type/test | Docker/API/browser/recovery | summary |
+| --- | --- | --- | --- |
+| push | 120484878732 | 120484879180 | 120493129454 |
+| PR | 120485128693 | 120485128443 | 120493822523 |
+
+Both original lint logs and both Docker logs were read and independently reviewed.
+Each CI lint run: API873 passed19 skipped (local871/21 differs by Redis test setup),
+Web284, golden contracts10, legacy migration19 with no fabricated presentation.
+Each Docker run: API93,29 direct-service/PG store checks, existing real API and
+browser golden engineering loops, candidate policy/browser recovery, complete
+PostgreSQL schema/row-multiset/sequence equality and actual Milvus/Qdrant recovery.
+The golden loop remains fixed synthetic data and is not proof that first-question
+API/UI semantics are fixed. The CI registry audit receipt reported no current
+moderate/high/critical findings; no dependency/allowlist change was made here and
+this is not a zero-vulnerability product claim.
+
+Independent acceptance approved only the provider-free persistence foundation.
+PR62 was frozen with expected_head_sha5194edcb and merged at2026-10-23T18:32:14Z as
+`7e29d768fd7fd0a979ff80915d696f02f14035aa`. PR readback is closed/merged with the
+expected head/merge SHA; remote main, remote agent-lab and local HEAD were read
+back at that exact merge SHA. No deployment or complete product acceptance is
+claimed. These final receipts were written after the frozen candidate and remain
+working-tree documentation for the next related commit.
+
+## Uncommitted product integration (2026-10-24, not accepted)
+
+- Full local API883 passed/21 skipped; Web307 passed; added HTTP/SSE11 passed. API/Web types, relevant lint/diff and API/Web images passed.
+- Narrow recovery44 passed using real PostgreSQL and real completeTask with explicit synthetic in-process decision dependency. Proves next-presentation rollback/confirmation repair with unchanged scores/calls and post-score follow-up failure retained UNKNOWN. Does not prove HTTP failure injection or model quality.
+- Full-final run exit1 at default browser binary missing after API93/store39/saved-bank consumption/OPEN zero scoring/provider increments and actual synthetic multi/FINAL/training/retest/repeated end zero embedding passed. Browser and strict restore were not reached.
+- Earlier fixture failures preserved: active-job uniqueness in narrow/full fixture; preparation ledger assertion included legitimate INTERVIEW_START (69!=68). Corrected probe separately requires exactly one INTERVIEW_START before confirm/GET/OPEN zero-ledger/provider delta. No original product negative assertion removed.
+- Existing temporary cache Chromium145.0.7632.6 verified. Current browser-ready full run pending. No new commit/PR/exact CI or delivery.
+
+Additional local evidence: stable-browser exit1 retained after actual Lab and all candidate policy/session/history/confirmation/zero-answer-end/native60s/UNKNOWN/Training browser helpers passed. Failure was an unconditional nextOPEN expectation in golden retest; current script first reads actual org-scoped PG tasks/receipts/answers/history before accepting either nextOPEN or a genuinely exhausted queue. Missing presentation with pending tasks remains a failure. Explicit focused golden-recovery run pending; CI scope remains all. Legacy-preservation narrow45 exit0 adds old unscored message preservation to recovery44. No overall/production/model-quality acceptance.
+
+### Final limited local freeze gate
+
+presentation-protocol-golden-recovery.exit0: API93/store45/actual saved question and OPEN no scoring or new provider work, goldenAPI and actual PG nextOPEN plus exhausted pending0/unresolved0 browser branches, original normalized scoring/FINAL/Training/retest loop, strict PG schema/row-multiset/sequence and actual Milvus/Qdrant payload/vector restoration all passed. stable-browser has independently reviewed Lab/policy/UNKNOWN/native/Training browser passes but remains exit1; no full-run pass is invented. Default CI still runs all suites; focused mode is explicit, validated and labeled. Auditor independently reviewed original logs and approved the bounded local freeze.
+
+Source/type/build/lint/diff gates passed; API-full-next883/21 skipped, subsequentSSE11 and Web-full-next307 exits0. No new migration beyond PR62. Candidate/exact push+PR CI and merge remain pending. API/Web coordinated deployment, real model quality/learning, historical bill reconciliation, UNKNOWN manual resolution and global990 inventory are not accepted.

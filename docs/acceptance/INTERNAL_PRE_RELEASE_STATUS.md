@@ -1,5 +1,5 @@
 # 当前内部预发布验收仪表
-2026-10-23 FIRST-QUESTION-PRESENTATION: original real greeting red independently confirmed; provider-free presentation/claim foundation now passes local29 PG checks, strict recovery, migration19 and API871 (21 skipped), with independent log review. Candidate CI/PR pending. Controller/UI/end coordination not connected; overall NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md.
+2026-10-24 latest: FIRST-QUESTION-PRESENTATION protocol integration passed its limited local API/browser/strict-restore gate and independent original-log review; exact new candidate CI/PR is pending. Last merged baseline PR62/7e29d768 is foundation only. Overall NOT_ACCEPTED; see QUESTION_PRESENTATION_EVIDENCE.md.
 
 更新：2026-10-23。用途：内部证据复核与缺陷关闭；**整体NOT_ACCEPTED，不批准完整产品交付或生产发布**。
 
@@ -31,7 +31,7 @@ PR60保存回执候选79ce42e经最新六项CI及原始日志二次复核后合�
 
 ## 当前下一执行
 
-唯一主题CANDIDATE-GOLDEN-ENGINEERING：已修完整模拟唯一题干技能归属、明确英文类别和同会话父题；34定向/API871（21跳过）/9纯合同+1HTTP及新镜像真实API/UI全环、严格恢复exit0且二次复核。待新候选精确CI，不作为整体交付。见[技能证据](GOLDEN_SKILL_ATTRIBUTION_EVIDENCE.md)。首次skill空及父题对抗失败保留，固定45/80非学习效果；首题和复测文案P0未验收。
+历史阶段CANDIDATE-GOLDEN-ENGINEERING：已修完整模拟唯一题干技能归属、明确英文类别和同会话父题；34定向/API871（21跳过）/9纯合同+1HTTP及新镜像真实API/UI全环、严格恢复exit0且二次复核。待新候选精确CI，不作为整体交付。见[技能证据](GOLDEN_SKILL_ATTRIBUTION_EVIDENCE.md)。首次skill空及父题对抗失败保留，固定45/80非学习效果；首题和复测文案P0未验收。
 
 ## 内部审查顺序
 
@@ -56,3 +56,7 @@ PR60保存回执候选79ce42e经最新六项CI及原始日志二次复核后合�
 PR60 limited-complete: frozen79ce42e, latest push/PR six CI success and original-log review, merged2758f718d0de1e2cfb31f912c9e3eef93a72185c; PR/remote main/agent-lab/local readback equal. Supersedes pending-CI wording. Overall NOT_ACCEPTED; next active subtheme is full successful golden-chain contract audit.
 
 PR61阶段最终已冻结合并55230237f2ab7eeea7c4224577d2aee0dac8ba6d：最新精确push/PR六项success、两组原始日志复核，PR/main/agent-lab/本地均读回。上方待CI措辞由此收据替代，详细见技能报告。唯一下一主题FIRST-QUESTION-PRESENTATION，先真实红测与合同设计，未新实现；整体NOT_ACCEPTED。
+
+PR62 final limited foundation gate: candidate5194edcb passed exact push39974325503/PR39974398837 attempt1 six jobs and independent original-log review; merged7e29d768fd7fd0a979ff80915d696f02f14035aa at2026-10-23T18:32:14Z. PR/main/agent-lab/local read back. API/UI first-question protocol remains unconnected and NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md. Final merge receipt is post-freeze working-tree documentation.
+
+Current single active theme FIRST-QUESTION-PRESENTATION: local API883/21 skipped plus SSE11, Web307, real PG/business45, actual saved-bank/OPEN, Lab/policy/UNKNOWN browser and focused golden/strict PG+Milvus/Qdrant recovery passed with independent review. stable-browser exit1 remains retained; its scoped browser passes are combined with focused exit0, not relabeled full pass. Freeze candidate/exact CI/PR next. No new migration, paid external work, model-quality or production acceptance.

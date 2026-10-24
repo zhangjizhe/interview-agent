@@ -21,19 +21,22 @@ const mode = process.argv[2];
       assert.equal(requirement.targetJobId, job.id); assert.equal(requirement.organizationId, user.organizationId);
     }
     const interviews = await prisma.interview.findMany({ where: { userId }, orderBy: { startedAt: 'asc' } });
-    const where = { interviewId: { in: interviews.map(row => row.id) } };
-    const [messages, questions, answers, history, runs, reports, evidence, states, recommendations, attempts, usage] = await Promise.all([
+    const where = { interviewId: { in: interviews.map(row => row.id) }, organizationId: user.organizationId };
+    const [messages, questions, answers, history, runs, reports, evidence, states, recommendations, attempts, usage, tasks, presentations] = await Promise.all([
       prisma.message.findMany({ where }), prisma.interviewQuestion.findMany({ where }), prisma.interviewAnswer.findMany({ where }),
       prisma.answerHistory.findMany({ where }), prisma.evaluationRun.findMany({ where }), prisma.report.findMany({ where }),
       prisma.assessmentEvidence.findMany({ where }), prisma.candidateSkillState.findMany({ where: { userId } }),
       prisma.trainingRecommendation.findMany({ where: { userId } }), prisma.trainingAttempt.findMany({ where: { userId } }),
       prisma.usageLedger.findMany({ where: { userId }, select: { id: true, organizationId: true, interviewId: true, type: true, units: true } }),
+      prisma.interviewTask.findMany({ where, select: { id: true, organizationId: true, interviewId: true, question: true, type: true, status: true, priority: true } }),
+      // Explicit select: the claim fencing token is never exported to the host.
+      prisma.interviewQuestionPresentation.findMany({ where, select: { id: true, organizationId: true, interviewId: true, taskId: true, messageId: true, question: true, state: true, claimMessageId: true } }),
     ]);
-    for (const rows of [jobs, interviews, messages, questions, answers, history, runs, reports, evidence, states, recommendations, attempts, usage]) {
+    for (const rows of [jobs, interviews, messages, questions, answers, history, runs, reports, evidence, states, recommendations, attempts, usage, tasks, presentations]) {
       for (const row of rows) assert.equal(row.organizationId, user.organizationId);
     }
     const response = await fetch('http://127.0.0.1:3335/fixture/stats', { signal: AbortSignal.timeout(3000) }); assert.equal(response.status, 200);
     const stats = await response.json(); assert.equal(stats.externalRequests, 0);
-    console.log(JSON.stringify({ user, jobs, interviews, messages, questions, answers, history, runs, reports, evidence, states, recommendations, attempts, usage, stats }));
+    console.log(JSON.stringify({ user, jobs, interviews, messages, questions, answers, history, runs, reports, evidence, states, recommendations, attempts, usage, tasks, presentations, stats }));
   } finally { await prisma.$disconnect(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

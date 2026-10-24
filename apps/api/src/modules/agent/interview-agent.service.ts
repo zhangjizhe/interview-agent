@@ -57,6 +57,9 @@ export interface AgentContext {
   level: string;
   provider?: string; // P0-3 修复：按 provider 取 maxTokens 配置
   answerMessageId?: string;
+  answerTaskId?: string;
+  answerPresentationId?: string;
+  answerClaimToken?: string;
   interviewMode?: 'FULL_SIMULATION' | 'SKILL_PRACTICE';
   targetJobId?: string;
   targetJobProfileVersion?: number;
@@ -105,6 +108,11 @@ export class InterviewAgentService {
     const traceId = trace?.id;
 
     try {
+      const claimedTask = ctx.answerTaskId
+        ? await this.taskQueue.getClaimedTask(ctx.sessionId, ctx.userId, ctx.answerTaskId, userInput, ctx.answerMessageId!, {
+            presentationId: ctx.answerPresentationId!, claimToken: ctx.answerClaimToken!,
+          })
+        : undefined;
       await this.memory.appendMessage(ctx.sessionId, {
         role: 'user',
         content: userInput,
@@ -129,7 +137,7 @@ export class InterviewAgentService {
 
       // ===== 动态任务队列驱动（统一题号追踪）=====
       // 初始化队列（幂等操作）
-      await this.taskQueue.initializeQueue(ctx.sessionId, ctx.position, ctx.level, {
+      if (!ctx.answerTaskId) await this.taskQueue.initializeQueue(ctx.sessionId, ctx.position, ctx.level, {
         mode: ctx.interviewMode || 'FULL_SIMULATION',
         targetJobId: ctx.targetJobId,
         targetJobProfileVersion: ctx.targetJobProfileVersion,
@@ -138,7 +146,8 @@ export class InterviewAgentService {
       });
       
       // 获取当前任务（支持动态出题、follow-up、自适应）
-      const currentTask = await this.taskQueue.getNextTask(ctx.sessionId);
+      const currentTask = claimedTask || await this.taskQueue.getNextTask(ctx.sessionId);
+      if (ctx.answerTaskId && !currentTask) throw new Error('The claimed question is no longer pending');
       
       // 知识库驱动备选：根据岗位匹配选题（兼容旧逻辑）
       const bank: BankKey = matchBank(ctx.position);
@@ -409,11 +418,11 @@ export class InterviewAgentService {
             currentTask.id,
             userInput,
             ctx.answerMessageId,
+            ctx.answerTaskId ? { presentationId: ctx.answerPresentationId!, claimToken: ctx.answerClaimToken! } : undefined,
           );
         } catch (e: any) {
-          this.logger.warn(
-            `completeTask failed for ${currentTask.id} (non-fatal): ${e.message}`,
-          );
+          if (ctx.answerTaskId) throw e;
+          this.logger.warn(`completeTask failed for ${currentTask.id} (non-fatal): ${e.message}`);
         }
       }
 

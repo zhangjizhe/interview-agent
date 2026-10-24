@@ -79,7 +79,8 @@ describe('useInterviewStream', () => {
     } });
     vi.mocked(global.fetch).mockResolvedValue({ ok: true, status: 200, body } as Response);
     const { result } = renderHook(() => useInterviewStream('session-current'));
-    await act(async () => { await result.current.send('session-current', 'synthetic-user', 'answer'); });
+    await act(async () => { await result.current.send('session-current', 'synthetic-user', 'answer', 'presentation-current'); });
+    expect(JSON.parse(vi.mocked(global.fetch).mock.calls[0][1]!.body as string)).toMatchObject({ operation: 'ANSWER', presentationId: 'presentation-current', content: 'answer' });
     expect(useInterviewStore.getState().messages.at(-1)).toMatchObject({ role: 'assistant', content: 'current session answer', streaming: false });
     expect(useInterviewStore.getState().streaming).toBe(false);
     expect(useInterviewStore.getState().error).toBeNull();
