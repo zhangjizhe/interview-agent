@@ -715,7 +715,7 @@ Lab原有Registry/Version/Run/Trace与发布门可复用，但执行器仅Interv
 
 ## ADR 25: Persisted question presentation and answer admission (2026-10-23)
 
-Status: implementation in progress, not delivered. Actual red on PR61 confirms
+Status: persistence foundation merged in PR62; protocol integration passed its limited local gate, pending exact CI/PR and deployment. Actual red on PR61 confirms
 that a start greeting is scored before the task question was presented. Existing
 message deduplication protects one client ID, not two concurrent answers to a task.
 
@@ -746,13 +746,29 @@ question and history text against the receipt, and normalized/history answer
 content against the claimed candidate message. Missing IDs/tokens are rejected
 before Prisma can omit undefined filters.
 
-Next integration slice must serialize queue initialization, make confirmation and
-GET return the authoritative receipt, require ANSWER presentation identity, keep
-opening/control operations outside scoring, and coordinate end with claims using
-the same parent-row boundary. Recover the next presentation after answer commit.
-The browser must unlock answering only for an OPEN receipt, recover by GET after
-interruption and distinguish PROCESSING/UNKNOWN. Model prose cannot select the
-question. No existing route is considered fixed by the foundation service alone.
+Current integration (uncommitted, acceptance pending): QuestionBankModule shares
+one stored-question provider with TaskQueue and Interview. Initial selection reads
+at most100 tenant rows matching category/level, prefers exact position and records
+source provenance. It has a 5-second whole-read deadline and explicit local
+fallback reason; no embedding/rerank/model work is needed to prepare a question.
+The bounded read occurs outside the parent transaction. Confirmation rechecks the
+pinned interview context and locks the current owned active job/profileVersion,
+then atomically publishes queue, assistant message, receipt and confirmed flag.
+GET remains read-only. OPEN only reads; ANSWER requires receipt identity, and
+replay additionally requires the matching ANSWERED receipt. The Agent scores the
+claimed task and rechecks the token under the scoring write lock.
+
+End uses the same parent lock, refuses PROCESSING/UNKNOWN, deletes only verified
+question-only zero-answer sessions, and reserves COMPLETED before final dispatch.
+A repeated end returns its existing report or an explicit unconfirmed result;
+it cannot silently repeat report/model/archive work. Final report input consists
+of normalized scored question/answer pairs. The browser answers only OPEN, binds
+the receipt ID and performs a bounded10-second post-stream GET. UNKNOWN stays
+closed; confirmation can recover missing next presentation without rescoring.
+Actual API/browser, failure recovery and exact CI remain required before delivery.
+API compatibility: legacy answer payloads without explicit operation/presentation ID
+fail closed before scoring. Deploy matching API and Web artifacts together; stale
+clients must refresh. Main merge alone is not a deployment or rollback rehearsal.
 
 Cost: the persistence service makes no model calls. Unknown results stay blocked
 to avoid duplicate paid scoring; manual reconciliation is a required future UI/API

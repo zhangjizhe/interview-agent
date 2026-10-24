@@ -91,6 +91,7 @@ describe('DynamicTaskQueueService persistence', () => {
           practiceSkillId: null,
           practiceSkillName: null,
           taskType: 'QUESTION',
+          questionSelectionSource: null,
         },
       }),
     });

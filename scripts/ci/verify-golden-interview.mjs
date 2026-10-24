@@ -12,6 +12,19 @@ const request = async (path, body, expected = 200) => {
   const response = await fetch(base + path, { method: body ? 'POST' : 'GET', headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(30000) });
   const data = await response.json(); assert.equal(response.status, expected, `HTTP ${path}`); return data;
 };
+const confirmQuestion = async interviewId => {
+  const receipt = await request(`/interview/${interviewId}/confirm-resume`, {}, 201);
+  assert.equal(receipt.success, true); assert.equal(receipt.questionProtocol, 'presentation/v1');
+  const question = receipt.currentQuestion;
+  assert.ok(question && question.state === 'OPEN');
+  for (const key of ['presentationId', 'taskId', 'messageId', 'question']) assert.ok(typeof question[key] === 'string' && question[key].trim(), `confirmed ${key}`);
+  const persisted = await prisma.interviewQuestionPresentation.findUniqueOrThrow({ where: { id: question.presentationId }, include: { message: true, task: true } });
+  assert.equal(persisted.interviewId, interviewId); assert.equal(persisted.state, 'OPEN');
+  assert.equal(persisted.taskId, question.taskId); assert.equal(persisted.messageId, question.messageId);
+  assert.equal(persisted.question, question.question); assert.equal(persisted.message.role, 'assistant');
+  assert.equal(persisted.message.content, question.question); assert.equal(persisted.task.status, 'PENDING');
+  return question;
+};
 const profile = async stage => {
   const response = await fetch('http://127.0.0.1:3335/fixture/golden-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage }), signal: AbortSignal.timeout(2000) });
   assert.equal(response.status, 200);
@@ -30,9 +43,9 @@ try {
   assert.equal(uploaded.status, 201); assert.equal((await uploaded.json()).ragIngested, true);
   const started = await request('/interview/start', { position: job.title, targetJobId: job.id, mode: 'FULL_SIMULATION' }, 201);
   const interviewId = started.interviewId; assert.ok(interviewId); assert.equal(started.interview.mode, 'FULL_SIMULATION');
-  await request(`/interview/${interviewId}/confirm-resume`, {}, 201);
+  const questionReceipt = await confirmQuestion(interviewId);
   const messageId = `golden-${randomBytes(8).toString('hex')}`;
-  const response = await fetch(base + `/interview/${interviewId}/message`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Synthetic interview answer: React effects apply after rendering and cleanup releases resources.', clientMessageId: messageId }), signal: AbortSignal.timeout(60000) });
+  const response = await fetch(base + `/interview/${interviewId}/message`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Synthetic interview answer: React effects apply after rendering and cleanup releases resources.', clientMessageId: messageId, operation: 'ANSWER', presentationId: questionReceipt.presentationId }), signal: AbortSignal.timeout(60000) });
   assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /text\/event-stream/);
   const raw = await response.text(); const frames = raw.split('\n\n').filter(line => line.startsWith('data: ')).map(line => line.slice(6));
   assert.equal(frames.at(-1), '[DONE]', 'successful candidate stream must finish');
@@ -89,8 +102,8 @@ try {
   assert.equal(completedState.score, states[0].score); assert.equal(completedState.evidenceCount, states[0].evidenceCount);
   await profile('retest');
   const retest = await request('/interview/start', { position: job.title, targetJobId: job.id, mode: 'SKILL_PRACTICE', practiceSkillId: recommendation.skillId, trainingRecommendationId: recommendation.id }, 201);
-  await request(`/interview/${retest.interviewId}/confirm-resume`, {}, 201);
-  const retestReply = await fetch(base + `/interview/${retest.interviewId}/message`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Synthetic retest answer: verify effect cleanup and retries with explicit assertions and bounded execution.', clientMessageId: `retest-${randomBytes(8).toString('hex')}` }), signal: AbortSignal.timeout(60000) });
+  const retestQuestionReceipt = await confirmQuestion(retest.interviewId);
+  const retestReply = await fetch(base + `/interview/${retest.interviewId}/message`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Synthetic retest answer: verify effect cleanup and retries with explicit assertions and bounded execution.', clientMessageId: `retest-${randomBytes(8).toString('hex')}`, operation: 'ANSWER', presentationId: retestQuestionReceipt.presentationId }), signal: AbortSignal.timeout(60000) });
   assert.equal(retestReply.status, 200); const retestText = await retestReply.text();
   assert.ok(retestText.includes('data: [DONE]')); assert.ok(!retestText.includes('"type":"error"'));
   const retestHistory = await prisma.answerHistory.findMany({ where: { interviewId: retest.interviewId } });

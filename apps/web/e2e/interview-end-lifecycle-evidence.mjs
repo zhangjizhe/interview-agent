@@ -1,8 +1,9 @@
+import { prepareQuestion } from './interview-question-fixture.mjs';
 import assert from 'node:assert/strict';
 
 export async function verifyEndLifecycle(page, data, control) {
   await page.goto(`http://localhost:5177/interview/${data.lifecycleId}`);
-  const composer = page.getByPlaceholder('简历已上传，开始面试吧...', { exact: true });
+  const composer = await prepareQuestion(page, data.lifecycleId);
   await composer.fill('Synthetic held end lifecycle');
   const refusal = page.waitForResponse(r => r.url().endsWith(`/interview/${data.lifecycleId}/message`) && r.request().method() === 'POST'); refusal.catch(() => undefined);
   await composer.press('Control+Enter'); assert.match(await (await refusal).text(), /"type":"error"/);
@@ -17,7 +18,7 @@ export async function verifyEndLifecycle(page, data, control) {
   const handler = async route => {
     started = true;
     try {
-      const upstream = await route.fetch({ timeout: 15000 }); assert.equal(upstream.ok(), true); assert.deepEqual(await upstream.json(), { deleted: true, reason: 'no_messages' });
+      const upstream = await route.fetch({ timeout: 15000 }); assert.equal(upstream.ok(), true); assert.deepEqual(await upstream.json(), { deleted: true, reason: 'no_answers' });
       heldResolve(); await released; await route.fulfill({ response: upstream });
     } catch (error) { failure = error; heldReject(error); await route.abort().catch(() => undefined); }
     finally { finishedResolve(); }
@@ -29,6 +30,7 @@ export async function verifyEndLifecycle(page, data, control) {
     const loaded = page.waitForResponse(r => r.url().endsWith(`/api/interview/${data.interviewId}`) && r.ok()); loaded.catch(() => undefined);
     await page.evaluate(path => { history.pushState(null, '', path); dispatchEvent(new PopStateEvent('popstate')); }, `/interview/${data.interviewId}`);
     await Promise.race([loaded, timeout]);
+    await prepareQuestion(page, data.interviewId);
     await composer.fill('Current interview draft survives late end');
     release(); await Promise.race([finished, timeout]); if (failure) throw failure;
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));

@@ -25,12 +25,15 @@ import { extractKeywordsFromQuestion } from './keyword-extract.util';
 import { requireOwnedInterview } from '../../../common/ownership.util';
 import { toCandidateStreamEvent } from '../services/candidate-stream-event.util';
 import { StreamMessageDeliveryService } from '../services/stream-message-delivery.service';
+import { QuestionPresentationService } from '../services/question-presentation.service';
 import { InterviewLabBridgeService } from '../../agent-lab/interview-lab-bridge.service';
 
 interface MessageDto {
   userId: string;
   content: string;
   clientMessageId?: string;
+  operation?: 'OPEN' | 'ANSWER';
+  presentationId?: string;
 }
 
 /**
@@ -56,6 +59,7 @@ export class InterviewFlowController {
     private prisma: PrismaService,
     private streamDelivery: StreamMessageDeliveryService,
     private interviewLab: InterviewLabBridgeService,
+    private questionPresentation: QuestionPresentationService,
     @Optional() private metrics?: MetricsService,
   ) {}
 
@@ -246,11 +250,34 @@ export class InterviewFlowController {
       return Promise.resolve();
     };
 
-    const claim = await this.streamDelivery.claimCandidateMessage(
+    if (dto.operation === 'OPEN') {
+      try {
+        const question = await this.questionPresentation.readCurrent(interviewId, req.user.userId);
+        if (!question || question.state !== 'OPEN') throw new Error('Question unavailable');
+        await writeEvent({ type: 'token', content: question.question });
+        res.write('data: [DONE]\n\n');
+      } catch {
+        await writeEvent({ type: 'error', error: '请刷新并核验当前题目状态。' });
+      }
+      stopHeartbeat(); res.end(); return;
+    }
+    if (dto.operation !== 'ANSWER' || typeof dto.presentationId !== 'string' || !dto.presentationId.trim() || dto.presentationId.length > 256) {
+      await writeEvent({ type: 'error', error: '请刷新页面，在已展示的当前题目下作答。' });
+      stopHeartbeat(); res.end(); return;
+    }
+
+    let claim: Awaited<ReturnType<StreamMessageDeliveryService['claimCandidateMessage']>>;
+    try {
+      claim = await this.streamDelivery.claimCandidateMessage(
       interviewId,
       dto.content,
       dto.clientMessageId,
+      dto.presentationId,
     );
+    } catch {
+      await writeEvent({ type: 'error', error: '回答保存结果尚待核验，请刷新查看状态。' });
+      stopHeartbeat(); res.end(); return;
+    }
     if (claim.state === 'conflict') {
       await writeEvent({ type: 'error', error: '请求标识与已有消息不匹配，请重新发送。' });
       stopHeartbeat();
@@ -258,7 +285,7 @@ export class InterviewFlowController {
       return;
     }
     if (claim.state === 'pending') {
-      await writeEvent({ type: 'error', error: '上一次回答仍在处理中，请稍后重试。' });
+      await writeEvent({ type: 'error', error: '上一次回答正在处理中或等待核验，请刷新查看状态。' });
       stopHeartbeat();
       res.end();
       return;
@@ -277,8 +304,13 @@ export class InterviewFlowController {
     let labRunId: string | null = null;
     let fullResponse = '';
     let assistantPersisted = false;
+    let answerClaim: { taskId: string; claimToken: string } | null = null;
+    let dispatchStarted = false;
 
     try {
+      const accepted = await this.questionPresentation.claimAnswer(interviewId, req.user.userId, dto.presentationId, candidateMessage.id);
+      if (accepted.state !== 'CLAIMED' || !accepted.claimToken) throw new Error('The answer is pending or unknown');
+      answerClaim = { taskId: accepted.taskId, claimToken: accepted.claimToken };
       const labRun = await this.interviewLab.startTurn(req.user.userId, interview, dto.content);
       labRunId = labRun.id;
       // Published policy and application association are required admission facts.
@@ -293,6 +325,9 @@ export class InterviewFlowController {
         // P0-3 修复：传 provider，让 maxTokens 走对应 provider 配置
         provider: (dto as any).provider || 'qwen',
         answerMessageId: candidateMessage.id,
+        answerTaskId: answerClaim.taskId,
+        answerPresentationId: dto.presentationId,
+        answerClaimToken: answerClaim.claimToken,
         interviewMode: interview.mode,
         practiceSkillId: interview.practiceSkill?.id,
         practiceSkillName: interview.practiceSkill?.name,
@@ -305,6 +340,7 @@ export class InterviewFlowController {
       // 路径：processMessage → MultiAgentService.stream → graph.stream(streamMode='messages')
       // LlmGatewayChatModel adapter 确保 multi 模式也经过 LlmGateway（P0 缓存层）
       // llm-direct 模式走 LlmGatewayService.streamChat（纯 LLM，无 Agent 拓扑）
+      dispatchStarted = true;
       for await (const event of this.agent.processMessage(ctx, dto.content)) {
         const quotaFailure = tenantContext.getStore()?.quotaFailure;
         if (quotaFailure) throw new HttpException(quotaFailure, quotaFailure.status);
@@ -336,6 +372,8 @@ export class InterviewFlowController {
         totalCompletion,
       );
       assistantPersisted = true;
+      await this.questionPresentation.finishAnswer(interviewId, req.user.userId, dto.presentationId, candidateMessage.id, answerClaim.claimToken);
+      await this.questionPresentation.presentCurrent(interviewId, req.user.userId);
 
       // Token 用量仅持久化在受保护的成本记录中，不进入候选人 SSE 合同。
       if (labRunId) {
@@ -353,7 +391,14 @@ export class InterviewFlowController {
         res.end(() => resolve());
       });
     } catch (err: any) {
-      if (!assistantPersisted) {
+      if (answerClaim) {
+        if (dispatchStarted) {
+          await this.questionPresentation.markUnknown(interviewId, req.user.userId, dto.presentationId, candidateMessage.id, answerClaim.claimToken).catch(() => undefined);
+        } else {
+          await this.questionPresentation.releaseBeforeDispatch(interviewId, req.user.userId, dto.presentationId, candidateMessage.id, answerClaim.claimToken).catch(() => undefined);
+        }
+      }
+      if (!assistantPersisted && (!answerClaim || !dispatchStarted)) {
         await this.streamDelivery.releaseUnansweredMessage(candidateMessage.id).catch(() => undefined);
       }
       if (labRunId) await this.interviewLab.failTurn(labRunId, err).catch(() => undefined);

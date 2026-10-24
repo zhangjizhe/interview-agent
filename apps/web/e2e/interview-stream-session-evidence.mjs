@@ -1,3 +1,4 @@
+import { prepareQuestion } from './interview-question-fixture.mjs';
 import assert from 'node:assert/strict';
 
 // Hold an actual zero-model draft-policy refusal, never manufacture SSE tokens.
@@ -31,6 +32,7 @@ export async function verifyStreamSessionBoundary(page, data, composer) {
     const loaded = page.waitForResponse(r => r.url().endsWith(`/api/interview/${data.alternateId}`) && r.ok()); loaded.catch(() => undefined);
     await page.evaluate(path => { history.pushState(null, '', path); dispatchEvent(new PopStateEvent('popstate')); }, `/interview/${data.alternateId}`);
     await Promise.race([loaded, timeout]);
+    await prepareQuestion(page, data.alternateId);
     await composer.fill('New session draft must survive');
     release(); await Promise.race([finished, timeout]);
     if (handlerError) throw handlerError;
