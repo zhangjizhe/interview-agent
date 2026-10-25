@@ -1,35 +1,48 @@
-import { createRequire } from 'node:module';
-import { createServer, type Server } from 'node:http';
+import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { ConfigService } from '@nestjs/config';
+import { Mem0CloudMemory } from '../modules/memory/long-term/mem0.store';
 
-// Exercise the installed Mem0 -> Axios transport chain, never a cloud endpoint.
-const memoryRequire = createRequire(require.resolve('mem0ai'));
-const axiosRequire = createRequire(memoryRequire.resolve('axios'));
-const redirects = axiosRequire('follow-redirects');
 const listen = (server: Server) => new Promise<number>(resolve => server.listen(0, '127.0.0.1', () => resolve((server.address() as AddressInfo).port)));
 const close = (server: Server) => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 
-describe('installed redirect transport credential boundary', () => {
-  it.each(['array', 'special-names'])('strips cross-host credential headers (%s) while completing a normal redirect', async mode => {
-    const target = createServer((request, response) => { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify(request.headers)); });
-    const port = await listen(target);
-    const source = createServer((_request, response) => { response.writeHead(302, { Location: `http://127.0.0.1:${port}/final` }); response.end(); });
+// Mem0CloudMemory uses native fetch; the unused Mem0 SDK/Axios chain is removed.
+// Exercise the actual product transport against loopback fixtures only.
+describe('Mem0 REST transport credential boundary', () => {
+  it.each([false, true])('preserves POST payload across a redirect; cross-origin=%s', async crossOrigin => {
+    const received: Array<{ authorization?: string; method?: string; body: unknown }> = [];
+    const capture = (request: IncomingMessage, response: ServerResponse) => {
+      let body = '';
+      request.setEncoding('utf8');
+      request.on('data', chunk => { body += chunk; });
+      request.on('end', () => {
+        received.push({ authorization: request.headers.authorization, method: request.method, body: JSON.parse(body) });
+        response.setHeader('Content-Type', 'application/json');
+        response.end('{}');
+      });
+    };
+    const target = createServer(capture);
+    const targetPort = await listen(target);
+    const source = createServer((request, response) => {
+      if (request.url === '/final') return capture(request, response);
+      response.writeHead(307, { Location: crossOrigin ? `http://127.0.0.1:${targetPort}/final` : '/final' });
+      response.end();
+    });
     const sourcePort = await listen(source);
     try {
-      const sensitiveHeaders = ['x-fixture^secret', 'x-fixture|secret'];
-      const fields = { Authorization: 'synthetic', Cookie: 'synthetic=1', 'Proxy-Authorization': 'synthetic', 'x-fixture^secret': 'synthetic', 'x-fixture|secret': 'synthetic', 'x-public-fixture': 'retained' };
-      const headers = mode === 'array' ? Object.entries(fields).flat() : fields;
-      const received: any = await new Promise((resolve, reject) => {
-        const request = redirects.http.get({ hostname: 'localhost', port: sourcePort, path: '/', headers, sensitiveHeaders,
-          lookup: (_hostname: string, options: any, callback: any) => options.all ? callback(null, [{ address: '127.0.0.1', family: 4 }]) : callback(null, '127.0.0.1', 4),
-        }, (response: any) => {
-          let body = ''; response.setEncoding('utf8'); response.on('data', (chunk: string) => { body += chunk; });
-          response.on('end', () => { try { resolve(JSON.parse(body)); } catch (error) { reject(error); } }); response.on('error', reject);
-        });
-        request.setTimeout(3000, () => request.destroy(new Error('Local redirect fixture timeout'))); request.on('error', reject);
-      });
-      expect(received['x-public-fixture']).toBe('retained');
-      for (const name of ['authorization', 'cookie', 'proxy-authorization', ...sensitiveHeaders]) expect(received[name]).toBeUndefined();
+      const memory = new Mem0CloudMemory(new ConfigService({ mem0: { apiKey: 'synthetic-fixture-key' } }));
+      // Suppress only startup's delayed probe; memorize still uses real native fetch.
+      jest.useFakeTimers();
+      try { await memory.onModuleInit(); } finally { jest.clearAllTimers(); jest.useRealTimers(); }
+      (memory as unknown as { baseUrl: string }).baseUrl = `http://127.0.0.1:${sourcePort}`;
+      expect(memory.isEnabled()).toBe(true);
+      expect(memory.getMode()).toBe('cloud');
+      await memory.memorize('fixture-user', [{ role: 'user', content: 'fixture memory' }]);
+      expect(received).toEqual([{
+        authorization: crossOrigin ? undefined : 'Token synthetic-fixture-key',
+        method: 'POST',
+        body: { user_id: 'fixture-user', messages: [{ role: 'user', content: 'fixture memory' }] },
+      }]);
     } finally { await Promise.all([close(source), close(target)]); }
   });
 });

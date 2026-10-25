@@ -272,7 +272,7 @@ export function InterviewPage() {
   };
 
   const handleEnd = async () => {
-    if (!interviewId || ending) return;
+    if (!interviewId || ending || confirming || confirmPending.current) return;
     const lifetime = pageLifetime.current;
     const isCurrentEnd = () => pageLifetime.current === lifetime;
     setEnding(true);
@@ -598,7 +598,7 @@ export function InterviewPage() {
           ) : messages.length > 0 ? (
             <button
               onClick={handleEnd}
-              disabled={ending || streaming}
+              disabled={ending || streaming || confirming}
               className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2 px-3 rounded-lg transition disabled:opacity-50"
             >
               {ending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
@@ -606,10 +606,15 @@ export function InterviewPage() {
             </button>
           ) : (
             <button
-              onClick={() => navigate('/')}
+              onClick={() => {
+                if (confirmPending.current) return;
+                if (resumeConfirmed || currentQuestion) void handleEnd();
+                else navigate('/');
+              }}
+              disabled={ending || streaming || confirming}
               className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2 px-3 rounded-lg transition"
             >
-              <X className="w-4 h-4" /> 放弃面试，返回首页
+              <X className="w-4 h-4" /> {ending ? '退出中...' : resumeConfirmed || currentQuestion ? '退出面试，不生成报告' : '放弃面试，返回首页'}
             </button>
           )}
         </div>

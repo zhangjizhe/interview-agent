@@ -306,3 +306,36 @@ it('rejects after-stream GET after switching to a different interview', async ()
   expect(routing.navigate).not.toHaveBeenCalled();
   view.unmount();
 });
+
+it.each(['success', 'bad receipt'])('ends a freshly confirmed question-only session before leaving: %s', async outcome => {
+  vi.stubGlobal('alert', vi.fn());
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse({ messages: [], status: 'IN_PROGRESS', resumeConfirmed: false, resume: { name: 'Synthetic resume', position: 'Engineer', summary: '', skills: '', createdAt: '' } }));
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse({ success: true, questionProtocol: 'presentation/v1', currentQuestion: validQuestion }));
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: '确认无误，开始面试' })); });
+  expect(useInterviewStore.getState().messages).toEqual([]);
+  expect(view.getByRole('region', { name: '当前题目' }).textContent).toContain(validQuestion.question);
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse(outcome === 'success' ? { deleted: true, reason: 'no_answers' } : {}));
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: /放弃面试|退出面试/ })); });
+  expect(vi.mocked(fetch).mock.calls.filter(([url, init]) => url === '/api/interview/a/end' && init?.method === 'POST')).toHaveLength(1);
+  if (outcome === 'success') expect(routing.navigate).toHaveBeenCalledWith('/');
+  else expect(routing.navigate).not.toHaveBeenCalled();
+  expect(stream.send).not.toHaveBeenCalled();
+  view.unmount();
+});
+
+it('does not bypass end while resume confirmation is pending', async () => {
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse({ messages: [], status: 'IN_PROGRESS', resumeConfirmed: false, resume: { name: 'Synthetic resume', position: 'Engineer', summary: '', skills: '', createdAt: '' } }));
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  let release!: (response: Response) => void;
+  vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  act(() => { fireEvent.click(view.getByRole('button', { name: '确认无误，开始面试' })); });
+  const exit = view.getByRole('button', { name: /放弃面试|退出面试/ }) as HTMLButtonElement;
+  expect(exit.disabled).toBe(true);
+  fireEvent.click(exit);
+  expect(routing.navigate).not.toHaveBeenCalled();
+  await act(async () => { release(historyResponse({ success: true, questionProtocol: 'presentation/v1', currentQuestion: validQuestion })); });
+  view.unmount();
+});

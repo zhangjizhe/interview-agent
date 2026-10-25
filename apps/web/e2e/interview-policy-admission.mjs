@@ -1,3 +1,4 @@
+import { verifyFreshConfirmationExit } from './interview-fresh-exit-evidence.mjs';
 import { verifyUnknownQuestion } from './interview-unknown-evidence.mjs';
 import { verifyTrainingReads } from './training-read-evidence.mjs';
 import { verifyResumeUpload } from './resume-upload-evidence.mjs';
@@ -61,6 +62,7 @@ try {
   await verifyHistorySessionBoundary(page, data, composer);
   await verifyHistorySessionBoundary(page, data, composer, true);
   await verifyConfirmationHistory(page, data, control);
+  await verifyFreshConfirmationExit(page, data, control);
   await verifyEndReceipt(page, data, control);
   await verifyEndTimeout(page, data, control);
   await verifyEndLifecycle(page, data, control);
