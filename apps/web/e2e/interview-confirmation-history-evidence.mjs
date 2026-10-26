@@ -1,3 +1,4 @@
+import { assertPresentedQuestion } from './interview-question-fixture.mjs';
 import assert from 'node:assert/strict';
 
 export async function verifyConfirmationHistory(page, data, control) {
@@ -35,13 +36,15 @@ export async function verifyConfirmationHistory(page, data, control) {
     await Promise.race([held, timeout]);
     const receipt = page.waitForResponse(r => r.url().endsWith(`/interview/${data.interviewId}/confirm-resume`) && r.request().method() === 'POST');
     receipt.catch(() => undefined);
-    await confirm.click(); const confirmed = await receipt; assert.equal(confirmed.ok(), true); assert.equal((await confirmed.json()).success, true);
-    await page.getByPlaceholder('简历已上传，开始面试吧...', { exact: true }).waitFor();
+    await confirm.click(); const confirmed = await receipt; assert.equal(confirmed.ok(), true);
+    const confirmation = await confirmed.json();
+    // APIRequestContext GET is independent of the held page GET.
+    await assertPresentedQuestion(page, data.interviewId, confirmation);
     control('verify-confirmation');
     release(); await Promise.race([finished, timeout]); if (failure) throw failure;
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     assert.equal(await confirm.count(), 0);
-    assert.equal(await page.getByPlaceholder('简历已上传，开始面试吧...', { exact: true }).isEnabled(), true);
+    assert.equal(await page.getByPlaceholder('输入当前题目的回答...', { exact: true }).isEnabled(), true);
     console.log('PASS confirmation history browser: actual pending refresh GET false cannot undo real acknowledged/PG-persisted confirmation; synthetic Milvus resume, no model');
   } finally { clearTimeout(timer); release(); if (started) await finished; await page.unroute(pattern, handler); }
 }

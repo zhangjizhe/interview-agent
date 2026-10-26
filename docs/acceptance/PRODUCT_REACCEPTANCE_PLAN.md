@@ -118,3 +118,7 @@ verdict / blocker / fixCommit / verifiedCommit:
 PR60 limited-complete: frozen79ce42e, latest push/PR six CI success and original-log review, merged2758f718d0de1e2cfb31f912c9e3eef93a72185c; PR/remote main/agent-lab/local readback equal. Supersedes pending-CI wording. Overall NOT_ACCEPTED; next active subtheme is full successful golden-chain contract audit.
 
 PR61阶段最终已冻结合并55230237f2ab7eeea7c4224577d2aee0dac8ba6d：最新精确push/PR六项success、两组原始日志复核，PR/main/agent-lab/本地均读回。上方待CI措辞由此收据替代，详细见技能报告。唯一下一主题FIRST-QUESTION-PRESENTATION，先真实红测与合同设计，未新实现；整体NOT_ACCEPTED。
+
+PR62 final limited foundation gate: candidate5194edcb passed exact push39974325503/PR39974398837 attempt1 six jobs and independent original-log review; merged7e29d768fd7fd0a979ff80915d696f02f14035aa at2026-10-23T18:32:14Z. PR/main/agent-lab/local read back. API/UI first-question protocol remains unconnected and NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md. Final merge receipt is post-freeze working-tree documentation.
+
+Current FIRST-QUESTION-PRESENTATION protocol integration passed bounded local API/browser/strict restore and independent review. Existing PR62 receipt above describes only the frozen foundation. New exact CI/PR remains pending; all broader inventory/quality/billing/deployment exits stay open. Evidence combines stable scoped Lab/policy/UNKNOWN passes (exit1 preserved) with focused golden/strict restore exit0.

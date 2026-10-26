@@ -454,6 +454,30 @@ export class QuestionBankService {
   /**
    * 列出所有题目（按 position 过滤）
    */
+  /** Initial presentation reads stored rows only. It must not call embedding or
+   * reranking before the candidate has even seen a question. Selection is bounded
+   * category/level matching, not a semantic retrieval quality claim. */
+  async selectInitial(position: string, level: string, category: string): Promise<QuestionItem[]> {
+    await this.ensureCollection();
+    const result = await this.client.query({
+      collection_name: this.COLLECTION,
+      consistency_level: ConsistencyLevelEnum.Strong,
+      filter: `category == "${escapeMilvusString(category)}" and level == "${escapeMilvusString(level)}"`,
+      output_fields: ['questionId', 'position', 'level', 'category', 'question', 'tags', 'createdAt'],
+      limit: 100,
+    });
+    this.assertRpcSuccess(result, 'initial-selection');
+    if (!Array.isArray(result.data)) throw new Error('Question selection response is not confirmed');
+    return result.data
+      .filter((row: any) => row.category === category && row.level === level
+        && typeof row.questionId === 'string' && row.questionId.length > 0
+        && typeof row.question === 'string' && row.question.trim().length > 0)
+      .sort((a: any, b: any) => Number(b.position === position) - Number(a.position === position)
+        || String(a.questionId).localeCompare(String(b.questionId)))
+      .slice(0, 5)
+      .map((row: any) => ({ ...row, answer: '' }));
+  }
+
   async list(position?: string, limit = 20): Promise<QuestionItem[]> {
     await this.ensureCollection();
     try {

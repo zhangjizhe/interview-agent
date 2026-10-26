@@ -3,14 +3,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useInterviewStore } from '../store/interview-store';
 import { InterviewPage } from './InterviewPage';
 
+const stream = vi.hoisted(() => ({ send: vi.fn() }));
 const routing = vi.hoisted(() => ({ id: 'a', navigate: vi.fn(), refresh: undefined as undefined | (() => Promise<void>) }));
 vi.mock('react-router-dom', () => ({ useParams: () => ({ id: routing.id }), useNavigate: () => routing.navigate, Link: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
-vi.mock('../hooks/useInterviewStream', () => ({ useInterviewStream: () => ({ send: vi.fn() }) }));
+vi.mock('../hooks/useInterviewStream', () => ({ useInterviewStream: () => ({ send: stream.send }) }));
 vi.mock('../hooks/usePullToRefresh', () => ({ usePullToRefresh: ({ onRefresh }: { onRefresh: () => Promise<void> }) => { routing.refresh = onRefresh; return { pullDistance: 0, refreshing: false, pullRef: { current: null } }; } }));
 
-afterEach(() => { vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-beforeEach(() => { routing.id = 'a'; routing.navigate.mockReset(); useInterviewStore.getState().reset(); vi.stubGlobal('fetch', vi.fn()); });
+beforeEach(() => { routing.id = 'a'; routing.navigate.mockReset(); stream.send.mockReset(); stream.send.mockResolvedValue(undefined); useInterviewStore.getState().reset(); vi.stubGlobal('fetch', vi.fn()); });
 
 it.each(['load', 'refresh', 'body', 'return', 'unmount'])('rejects late history after lifecycle change: %s', async mode => {
   let release!: (value: any) => void;
@@ -103,7 +104,7 @@ it('preserves an acknowledged resume confirmation against an older history GET',
   useInterviewStore.getState().setResumeConfirmed(false);
   useInterviewStore.getState().setResume({ name: 'Synthetic resume', position: 'Engineer', summary: '', skills: '', createdAt: '' });
   vi.mocked(fetch).mockImplementationOnce(() => held);
-  vi.mocked(fetch).mockResolvedValue({ ok: true, text: async () => JSON.stringify({ success: true }) } as Response);
+  vi.mocked(fetch).mockResolvedValue({ ok: true, text: async () => JSON.stringify({ success: true, questionProtocol: 'presentation/v1', currentQuestion: validQuestion }) } as Response);
   const view = render(<InterviewPage />);
   await act(async () => { fireEvent.click(view.getByRole('button', { name: '确认无误，开始面试' })); });
   expect(useInterviewStore.getState().resumeConfirmed).toBe(true);
@@ -221,4 +222,120 @@ it.each(['deadline', 'unmount'])('cleans up an end request stalled after respons
   expect(routing.navigate).not.toHaveBeenCalled();
   if (mode === 'deadline') expect(alert).toHaveBeenCalledWith(expect.stringContaining('超时'));
   else expect(alert).not.toHaveBeenCalled();
+});
+
+const validQuestion = { presentationId: 'receipt-a', taskId: 'task-a', messageId: 'message-a', question: 'Explain this exact presented constraint', state: 'OPEN' };
+const historyResponse = (data: any) => ({ ok: true, text: async () => JSON.stringify(data) }) as Response;
+const readyHistory = (question: any = validQuestion) => historyResponse({ messages: [], status: 'IN_PROGRESS', resumeConfirmed: true, questionProtocol: 'presentation/v1', currentQuestion: question });
+
+it.each(['valid', 'missing protocol', 'missing receipt', 'blank receipt', 'processing'])('gates first answer on confirmed question protocol: %s', async kind => {
+  useInterviewStore.getState().setResume({ name: 'Synthetic resume', position: 'Engineer', summary: '', skills: '', createdAt: '' });
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse({ messages: [], resumeConfirmed: false }));
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  const question = kind === 'blank receipt' ? { ...validQuestion, presentationId: ' ' } : kind === 'processing' ? { ...validQuestion, state: 'PROCESSING' } : validQuestion;
+  const receipt = kind === 'missing protocol' ? { success: true, currentQuestion: question } : { success: true, questionProtocol: 'presentation/v1', ...(kind === 'missing receipt' ? {} : { currentQuestion: question }) };
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse(receipt));
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: '确认无误，开始面试' })); });
+  expect((view.getByRole('textbox') as HTMLTextAreaElement).disabled).toBe(kind !== 'valid');
+  expect(useInterviewStore.getState().resumeConfirmed).toBe(kind === 'valid' || kind === 'processing');
+  if (kind === 'valid') expect(view.getByRole('region', { name: '当前题目' }).textContent).toContain(validQuestion.question);
+  view.unmount();
+});
+
+it('submits the exact durable presentation ID and reads the next current question', async () => {
+  vi.mocked(fetch).mockResolvedValueOnce(readyHistory());
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  vi.mocked(fetch).mockResolvedValueOnce(readyHistory({ ...validQuestion, presentationId: 'receipt-next', question: 'Next authoritative question' }));
+  await act(async () => {
+    fireEvent.change(view.getByRole('textbox'), { target: { value: 'Synthetic specific answer' } });
+    fireEvent.keyDown(view.getByRole('textbox'), { key: 'Enter', ctrlKey: true });
+  });
+  expect(stream.send).toHaveBeenCalledTimes(1);
+  expect(stream.send.mock.calls[0]).toEqual(['a', expect.any(String), 'Synthetic specific answer', 'receipt-a']);
+  expect(view.getByRole('region', { name: '当前题目' }).textContent).toContain('Next authoritative question');
+  view.unmount();
+});
+
+it.each(['headers', 'body'])('bounds after-stream GET %s at ten seconds and rejects late recovery', async mode => {
+  vi.useFakeTimers();
+  vi.mocked(fetch).mockResolvedValueOnce(readyHistory());
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  let release!: (value: any) => void;
+  const held = new Promise<any>(resolve => { release = resolve; });
+  let signal!: AbortSignal;
+  vi.mocked(fetch).mockImplementationOnce((_url, init) => {
+    signal = init!.signal as AbortSignal;
+    return mode === 'headers' ? held : Promise.resolve({ ok: true, text: () => held } as Response);
+  });
+  await act(async () => {
+    fireEvent.change(view.getByRole('textbox'), { target: { value: 'Synthetic bounded answer' } });
+    fireEvent.keyDown(view.getByRole('textbox'), { key: 'Enter', ctrlKey: true });
+  });
+  await act(async () => { await vi.advanceTimersByTimeAsync(9999); });
+  expect(signal.aborted).toBe(false);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(signal.aborted).toBe(true);
+  expect(view.getByRole('alert').textContent).toContain('尚未确认');
+  expect((view.getByRole('textbox') as HTMLTextAreaElement).disabled).toBe(true);
+  const late = { messages: [], resumeConfirmed: true, questionProtocol: 'presentation/v1', currentQuestion: { ...validQuestion, question: 'Late unsafe replacement' } };
+  await act(async () => { release(mode === 'headers' ? historyResponse(late) : JSON.stringify(late)); });
+  expect(view.queryByText('Late unsafe replacement')).toBeNull();
+  expect(stream.send).toHaveBeenCalledTimes(1);
+  view.unmount();
+});
+
+it('rejects after-stream GET after switching to a different interview', async () => {
+  vi.mocked(fetch).mockResolvedValueOnce(readyHistory());
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  let release!: (value: Response) => void;
+  vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  await act(async () => {
+    fireEvent.change(view.getByRole('textbox'), { target: { value: 'Answer for A only' } });
+    fireEvent.keyDown(view.getByRole('textbox'), { key: 'Enter', ctrlKey: true });
+  });
+  vi.mocked(fetch).mockResolvedValueOnce(readyHistory({ ...validQuestion, presentationId: 'receipt-b', question: 'Authoritative B question' }));
+  routing.id = 'b'; view.rerender(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  await act(async () => { release(readyHistory({ ...validQuestion, question: 'Stale A question' })); });
+  expect(view.getByRole('region', { name: '当前题目' }).textContent).toContain('Authoritative B question');
+  expect(view.queryByText('Stale A question')).toBeNull();
+  expect(routing.navigate).not.toHaveBeenCalled();
+  view.unmount();
+});
+
+it.each(['success', 'bad receipt'])('ends a freshly confirmed question-only session before leaving: %s', async outcome => {
+  vi.stubGlobal('alert', vi.fn());
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse({ messages: [], status: 'IN_PROGRESS', resumeConfirmed: false, resume: { name: 'Synthetic resume', position: 'Engineer', summary: '', skills: '', createdAt: '' } }));
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse({ success: true, questionProtocol: 'presentation/v1', currentQuestion: validQuestion }));
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: '确认无误，开始面试' })); });
+  expect(useInterviewStore.getState().messages).toEqual([]);
+  expect(view.getByRole('region', { name: '当前题目' }).textContent).toContain(validQuestion.question);
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse(outcome === 'success' ? { deleted: true, reason: 'no_answers' } : {}));
+  await act(async () => { fireEvent.click(view.getByRole('button', { name: /放弃面试|退出面试/ })); });
+  expect(vi.mocked(fetch).mock.calls.filter(([url, init]) => url === '/api/interview/a/end' && init?.method === 'POST')).toHaveLength(1);
+  if (outcome === 'success') expect(routing.navigate).toHaveBeenCalledWith('/');
+  else expect(routing.navigate).not.toHaveBeenCalled();
+  expect(stream.send).not.toHaveBeenCalled();
+  view.unmount();
+});
+
+it('does not bypass end while resume confirmation is pending', async () => {
+  vi.mocked(fetch).mockResolvedValueOnce(historyResponse({ messages: [], status: 'IN_PROGRESS', resumeConfirmed: false, resume: { name: 'Synthetic resume', position: 'Engineer', summary: '', skills: '', createdAt: '' } }));
+  const view = render(<InterviewPage />);
+  await act(async () => { await Promise.resolve(); });
+  let release!: (response: Response) => void;
+  vi.mocked(fetch).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+  act(() => { fireEvent.click(view.getByRole('button', { name: '确认无误，开始面试' })); });
+  const exit = view.getByRole('button', { name: /放弃面试|退出面试/ }) as HTMLButtonElement;
+  expect(exit.disabled).toBe(true);
+  fireEvent.click(exit);
+  expect(routing.navigate).not.toHaveBeenCalled();
+  await act(async () => { release(historyResponse({ success: true, questionProtocol: 'presentation/v1', currentQuestion: validQuestion })); });
+  view.unmount();
 });

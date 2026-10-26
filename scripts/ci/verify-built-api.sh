@@ -3,6 +3,12 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$repo_root"
 fixture_image="${1:-interview-api:verification}"
+fixture_browser_scope="${FIXTURE_BROWSER_SCOPE:-all}"
+case "$fixture_browser_scope" in
+  all) ;;
+  golden) test "${FIXTURE_BROWSER_TEST:-}" = "1"; test "${FIXTURE_GOLDEN_PROBE:-}" = "1"; echo 'Focused golden browser run: Lab and candidate-policy browser suites are not included.' ;;
+  *) echo 'Invalid FIXTURE_BROWSER_SCOPE' >&2; exit 2 ;;
+esac
 fixture_network="interview-built-check-$$"
 fixture_pg="$fixture_network-pg"
 fixture_redis="$fixture_network-redis"
@@ -109,9 +115,9 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
     sleep 1
   done
   test "$fixture_lab_ready" = true
-  if [[ "${FIXTURE_BROWSER_TEST:-}" == "1" ]]; then
+  if [[ "${FIXTURE_BROWSER_TEST:-}" == "1" && "$fixture_browser_scope" == "all" ]]; then
     LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/lab-isolated-acceptance.mjs
-  else
+  elif [[ "${FIXTURE_BROWSER_TEST:-}" != "1" ]]; then
     echo 'BROWSER FIXTURE READY at http://localhost:5176; waiting for local gate file'
     fixture_browser_ready=false
     for attempt in {1..900}; do
@@ -124,7 +130,9 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
   docker run -d --name "$fixture_web" --network "$fixture_network" -p 127.0.0.1:5177:80 "${FIXTURE_WEB_IMAGE:-interview-web:verification}" >/dev/null
   docker network connect bridge "$fixture_web"
   docker cp scripts/ci/fixture-policy-browser.cjs "$fixture_api:/tmp/fixture-policy-browser.cjs"
-  LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/interview-policy-admission.mjs
+  if [[ "$fixture_browser_scope" == "all" ]]; then
+    LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/interview-policy-admission.mjs
+  fi
   if [[ "${FIXTURE_GOLDEN_PROBE:-}" == "1" ]]; then
     docker cp scripts/ci/fixture-golden-inspect.cjs "$fixture_api:/tmp/fixture-golden-inspect.cjs"
     LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/golden-interview-loop.mjs

@@ -10,6 +10,12 @@
 
 ### Fixed
 
+- Confirmed question-only sessions now exit through the verified end receipt instead of navigation alone; confirmation in progress blocks exit, and the empty-message action states that no report is generated. Component red/green and complete private browser/strict recovery passed with independent original-log review; exact candidate CI remains pending.
+
+- PR63 CI prerequisite (local security and complete private gates passed, exact remote CI pending): pin supported Ubuntu24.04 runners and minimal dependency security updates, remove unused Mem0 SDK while testing the actual REST credential boundary, and add checksum-verified Zod3 collection guards alongside Zod4.6.6. Upstream Zod3 HIGH remains disclosed; raw oversized sets reject before element transforms. See SECURITY_DEPENDENCY_GATE_2026_10_24.md.
+
+- Local stage verified, exact CI/PR pending: explicit persisted question presentation and answer identity, saved-bank initial selection, fenced scoring/replay, safe end coordination and bounded browser state recovery. Limited real API/browser and strict restore passed; exact CI/PR and deployment remain pending.
+
 - 完整模拟规范题仅将真实题干唯一匹配到当前用户/组织/岗位版本的有效技能要求，保留歧义与未知；补明确英文前后端类别及同会话追问父题限制。增加私有合成provider/默认多Agent实际API与浏览器训练复测工程链，不代表首题展示、真实模型质量或整体验收通过。
 
 - 简历上传校验Milvus写入状态与Strong同归属内容读回；存储结果未知时返回503并停止后续个性化调用，候选页面仅接受明确保存成功回执。增加完整SDK等待上限、float向量验证及业务503透传；隔离API/浏览器与严格恢复通过，未作为完整产品发布通过。

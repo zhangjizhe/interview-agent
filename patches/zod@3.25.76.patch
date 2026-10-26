@@ -1,0 +1,270 @@
+diff --git a/v3/types.cjs b/v3/types.cjs
+--- a/v3/types.cjs
++++ b/v3/types.cjs
+@@ -1819,6 +1819,11 @@
+                 status.dirty();
+             }
+         }
++        // Reject oversized collections before walking elements (CVE-2023-54404 backport).
++        if ((def.exactLength !== null && ctx.data.length > def.exactLength.value) ||
++            (def.maxLength !== null && ctx.data.length > def.maxLength.value)) {
++            return parseUtil_js_1.INVALID;
++        }
+         if (ctx.common.async) {
+             return Promise.all([...ctx.data].map((item, i) => {
+                 return def.type._parseAsync(new ParseInputLazyPath(ctx, item, ctx.path, i));
+@@ -2845,6 +2850,10 @@
+                 });
+                 status.dirty();
+             }
++        }
++        // Keep the original size issue, but never visit oversized set elements.
++        if (def.maxSize !== null && ctx.data.size > def.maxSize.value) {
++            return parseUtil_js_1.INVALID;
+         }
+         const valueType = this._def.valueType;
+         function finalizeSet(elements) {
+diff --git a/v3/types.js b/v3/types.js
+--- a/v3/types.js
++++ b/v3/types.js
+@@ -1798,6 +1798,11 @@
+                 status.dirty();
+             }
+         }
++        // Reject oversized collections before walking elements (CVE-2023-54404 backport).
++        if ((def.exactLength !== null && ctx.data.length > def.exactLength.value) ||
++            (def.maxLength !== null && ctx.data.length > def.maxLength.value)) {
++            return INVALID;
++        }
+         if (ctx.common.async) {
+             return Promise.all([...ctx.data].map((item, i) => {
+                 return def.type._parseAsync(new ParseInputLazyPath(ctx, item, ctx.path, i));
+@@ -2816,6 +2821,10 @@
+                 });
+                 status.dirty();
+             }
++        }
++        // Keep the original size issue, but never visit oversized set elements.
++        if (def.maxSize !== null && ctx.data.size > def.maxSize.value) {
++            return INVALID;
+         }
+         const valueType = this._def.valueType;
+         function finalizeSet(elements) {
+diff --git a/src/v3/types.ts b/src/v3/types.ts
+--- a/src/v3/types.ts
++++ b/src/v3/types.ts
+@@ -2295,6 +2295,11 @@
+       }
+     }
+ 
++    // Reject oversized collections before walking elements (CVE-2023-54404 backport).
++    if ((def.exactLength !== null && ctx.data.length > def.exactLength.value) ||
++        (def.maxLength !== null && ctx.data.length > def.maxLength.value)) {
++        return INVALID;
++    }
+     if (ctx.common.async) {
+       return Promise.all(
+         ([...ctx.data] as any[]).map((item, i) => {
+@@ -3727,6 +3732,10 @@
+       }
+     }
+ 
++    // Keep the original size issue, but never visit oversized set elements.
++    if (def.maxSize !== null && ctx.data.size > def.maxSize.value) {
++        return INVALID;
++    }
+     const valueType = this._def.valueType;
+ 
+     function finalizeSet(elements: SyncParseReturnType<any>[]) {
+diff --git a/v4/core/schemas.cjs b/v4/core/schemas.cjs
+--- a/v4/core/schemas.cjs
++++ b/v4/core/schemas.cjs
+@@ -644,6 +644,36 @@
+         return payload;
+     };
+ });
++// Backport the upstream leading-size gate without evaluating element parsers.
++// Stop at custom/overwrite checks: an earlier check may rewrite the value.
++function gateCollectionSize(inst, sizeOf) {
++    const caps = [];
++    for (const check of inst._zod.def.checks ?? []) {
++        const def = check._zod.def;
++        if (!/^(max_length|min_length|length_equals|max_size|min_size|size_equals)$/.test(def.check)) break;
++        const maximum = def.maximum ?? def.length ?? def.size;
++        if (typeof maximum === "number" && maximum >= 0) caps.push([maximum, check]);
++    }
++    if (!caps.length) return;
++    inst._zod.deferred ??= [];
++    inst._zod.deferred.push(() => {
++    const run = inst._zod.run;
++    inst._zod.run = (payload, ctx) => {
++        if (ctx?.skipChecks || ctx?.direction === "backward") return run(payload, ctx);
++        const size = sizeOf(payload.value);
++        for (const [maximum, check] of caps) {
++            if (size <= maximum || (check._zod.def.when && !check._zod.def.when(payload))) continue;
++            const start = payload.issues.length;
++            check._zod.check(payload);
++            if (payload.issues.length === start) continue;
++            for (let i = start; i < payload.issues.length; i++) payload.issues[i].continue = false;
++            return payload;
++        }
++        return run(payload, ctx);
++    };
++    });
++}
++
+ function handleArrayResult(result, final, index) {
+     if (result.issues.length) {
+         final.issues.push(...util.prefixIssues(index, result.issues));
+@@ -683,6 +713,7 @@
+         }
+         return payload; //handleArrayResultsAsync(parseResults, final);
+     };
++    gateCollectionSize(inst, (value) => Array.isArray(value) ? value.length : -1);
+ });
+ function handleObjectResult(result, final, key) {
+     // if(isOptional)
+@@ -1304,6 +1335,7 @@
+             return Promise.all(proms).then(() => payload);
+         return payload;
+     };
++    gateCollectionSize(inst, (value) => value instanceof Map ? value.size : -1);
+ });
+ function handleMapResult(keyResult, valueResult, final, key, input, inst, ctx) {
+     if (keyResult.issues.length) {
+@@ -1364,6 +1396,7 @@
+             return Promise.all(proms).then(() => payload);
+         return payload;
+     };
++    gateCollectionSize(inst, (value) => value instanceof Set ? value.size : -1);
+ });
+ function handleSetResult(result, final) {
+     if (result.issues.length) {
+diff --git a/v4/core/schemas.js b/v4/core/schemas.js
+--- a/v4/core/schemas.js
++++ b/v4/core/schemas.js
+@@ -613,6 +613,36 @@
+         return payload;
+     };
+ });
++// Backport the upstream leading-size gate without evaluating element parsers.
++// Stop at custom/overwrite checks: an earlier check may rewrite the value.
++function gateCollectionSize(inst, sizeOf) {
++    const caps = [];
++    for (const check of inst._zod.def.checks ?? []) {
++        const def = check._zod.def;
++        if (!/^(max_length|min_length|length_equals|max_size|min_size|size_equals)$/.test(def.check)) break;
++        const maximum = def.maximum ?? def.length ?? def.size;
++        if (typeof maximum === "number" && maximum >= 0) caps.push([maximum, check]);
++    }
++    if (!caps.length) return;
++    inst._zod.deferred ??= [];
++    inst._zod.deferred.push(() => {
++    const run = inst._zod.run;
++    inst._zod.run = (payload, ctx) => {
++        if (ctx?.skipChecks || ctx?.direction === "backward") return run(payload, ctx);
++        const size = sizeOf(payload.value);
++        for (const [maximum, check] of caps) {
++            if (size <= maximum || (check._zod.def.when && !check._zod.def.when(payload))) continue;
++            const start = payload.issues.length;
++            check._zod.check(payload);
++            if (payload.issues.length === start) continue;
++            for (let i = start; i < payload.issues.length; i++) payload.issues[i].continue = false;
++            return payload;
++        }
++        return run(payload, ctx);
++    };
++    });
++}
++
+ function handleArrayResult(result, final, index) {
+     if (result.issues.length) {
+         final.issues.push(...util.prefixIssues(index, result.issues));
+@@ -652,6 +682,7 @@
+         }
+         return payload; //handleArrayResultsAsync(parseResults, final);
+     };
++    gateCollectionSize(inst, (value) => Array.isArray(value) ? value.length : -1);
+ });
+ function handleObjectResult(result, final, key) {
+     // if(isOptional)
+@@ -1273,6 +1304,7 @@
+             return Promise.all(proms).then(() => payload);
+         return payload;
+     };
++    gateCollectionSize(inst, (value) => value instanceof Map ? value.size : -1);
+ });
+ function handleMapResult(keyResult, valueResult, final, key, input, inst, ctx) {
+     if (keyResult.issues.length) {
+@@ -1333,6 +1365,7 @@
+             return Promise.all(proms).then(() => payload);
+         return payload;
+     };
++    gateCollectionSize(inst, (value) => value instanceof Set ? value.size : -1);
+ });
+ function handleSetResult(result, final) {
+     if (result.issues.length) {
+diff --git a/src/v4/core/schemas.ts b/src/v4/core/schemas.ts
+--- a/src/v4/core/schemas.ts
++++ b/src/v4/core/schemas.ts
+@@ -1507,6 +1507,36 @@
+ 
+ export interface $ZodArray<T extends SomeType = $ZodType> extends $ZodType<any, any, $ZodArrayInternals<T>> {}
+ 
++// Backport the upstream leading-size gate without evaluating element parsers.
++// Stop at custom/overwrite checks: an earlier check may rewrite the value.
++function gateCollectionSize(inst: any, sizeOf: (value: any) => number) {
++    const caps: [number, any][] = [];
++    for (const check of inst._zod.def.checks ?? []) {
++        const def = check._zod.def;
++        if (!/^(max_length|min_length|length_equals|max_size|min_size|size_equals)$/.test(def.check)) break;
++        const maximum = def.maximum ?? def.length ?? def.size;
++        if (typeof maximum === "number" && maximum >= 0) caps.push([maximum, check]);
++    }
++    if (!caps.length) return;
++    inst._zod.deferred ??= [];
++    inst._zod.deferred.push(() => {
++    const run = inst._zod.run;
++    inst._zod.run = (payload: any, ctx: any) => {
++        if (ctx?.skipChecks || ctx?.direction === "backward") return run(payload, ctx);
++        const size = sizeOf(payload.value);
++        for (const [maximum, check] of caps) {
++            if (size <= maximum || (check._zod.def.when && !check._zod.def.when(payload))) continue;
++            const start = payload.issues.length;
++            check._zod.check(payload);
++            if (payload.issues.length === start) continue;
++            for (let i = start; i < payload.issues.length; i++) payload.issues[i].continue = false;
++            return payload;
++        }
++        return run(payload, ctx);
++    };
++    });
++}
++
+ function handleArrayResult(result: ParsePayload<any>, final: ParsePayload<any[]>, index: number) {
+   if (result.issues.length) {
+     final.issues.push(...util.prefixIssues(index, result.issues));
+@@ -1555,6 +1585,7 @@
+ 
+     return payload; //handleArrayResultsAsync(parseResults, final);
+   };
++    gateCollectionSize(inst, (value) => Array.isArray(value) ? value.length : -1);
+ });
+ 
+ //////////////////////////////////////////
+@@ -2599,6 +2630,7 @@
+     if (proms.length) return Promise.all(proms).then(() => payload);
+     return payload;
+   };
++    gateCollectionSize(inst, (value) => value instanceof Map ? value.size : -1);
+ });
+ 
+ function handleMapResult(
+@@ -2691,6 +2723,7 @@
+     if (proms.length) return Promise.all(proms).then(() => payload);
+     return payload;
+   };
++    gateCollectionSize(inst, (value) => value instanceof Set ? value.size : -1);
+ });
+ 
+ function handleSetResult(result: ParsePayload, final: ParsePayload<Set<any>>) {

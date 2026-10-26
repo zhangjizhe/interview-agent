@@ -7,14 +7,16 @@ assert.equal(process.env.NODE_ENV, 'production');
 assert.equal(process.env.DATABASE_URL, 'postgresql://postgres@fixture-pg:5432/fixture');
 const product = createRequire(`${process.cwd()}/package.json`);
 const { PrismaClient } = product('@prisma/client');
+const { DynamicTaskQueueService } = product('./dist/modules/interview/services/dynamic-task-queue.service');
 const { QuestionPresentationService } = product('./dist/modules/interview/services/question-presentation.service');
 const { tenantContext } = product('./dist/modules/organizations/tenant-context');
 const { tenantMiddleware } = product('./dist/modules/organizations/tenant-policy');
 const raw = new PrismaClient(); const scoped = new PrismaClient(); scoped.$use(tenantMiddleware);
 const service = new QuestionPresentationService(scoped);
-let failNextPresentation = false;
+let failNextPresentation = false; let failNextFollowUp = false;
 scoped.$use(async (params, next) => {
   if (failNextPresentation && params.model === 'InterviewQuestionPresentation' && params.action === 'create') { failNextPresentation = false; throw new Error('Synthetic presentation persistence failure'); }
+  if (failNextFollowUp && params.model === 'InterviewTask' && params.action === 'create' && params.args.data.type === 'FOLLOW_UP') { failNextFollowUp = false; throw new Error('Synthetic follow-up persistence failure'); }
   return next(params);
 });
 let checks = 0;
@@ -178,6 +180,138 @@ async function run() {
   ]);
   const terminalReceipt = await raw.interviewQuestionPresentation.findUniqueOrThrow({ where: { id: racingReceipt.presentationId } });
   check('completion versus unknown race admits one durable transition', terminalRace.filter(row => row.status === 'fulfilled').length === 1 && terminalRace.filter(row => row.status === 'rejected' && row.reason.getStatus?.() === 409).length === 1 && ['ANSWERED', 'UNKNOWN'].includes(terminalReceipt.state));
+  // Integrated confirmation/end persistence tests. Selection/provider work is
+  // deliberately excluded: prepared rows are explicit synthetic store input.
+  const snapshotOf = row => Object.fromEntries(['position', 'level', 'mode', 'targetJobId', 'targetJobProfileVersion', 'practiceSkillId'].map(key => [key, row[key]]));
+  const preparedFor = row => [1, 2].map(priority => ({
+    interviewId: row.id, organizationId: owner.organizationId, type: 'QUESTION',
+    category: 'frontend', difficulty: 'easy', priority,
+    question: `Synthetic confirmation question ${priority}`,
+    context: JSON.stringify({ ...snapshotOf(row), questionSelectionSource: 'synthetic-store-fixture/v1' }),
+  }));
+  const confirm = row => scope(() => service.confirmPrepared(row.id, owner.id, snapshotOf(row), preparedFor(row)));
+  const freshConfirmation = data => raw.interview.create({ data: {
+    organizationId: owner.organizationId, userId: owner.id,
+    position: 'Synthetic atomic confirmation', resumeConfirmed: false, ...data,
+  } });
+  const concurrent = await freshConfirmation();
+  const confirmed = await Promise.all(Array.from({ length: 8 }, () => confirm(concurrent)));
+  check('concurrent confirmation publishes exactly one queue and receipt', confirmed.every(row => row?.presentationId === confirmed[0]?.presentationId)
+    && await raw.interviewTask.count({ where: { interviewId: concurrent.id } }) === 2
+    && await raw.message.count({ where: { interviewId: concurrent.id } }) === 1
+    && await raw.interviewQuestionPresentation.count({ where: { interviewId: concurrent.id } }) === 1
+    && (await raw.interview.findUniqueOrThrow({ where: { id: concurrent.id } })).resumeConfirmed);
+  const atomic = await freshConfirmation(); failNextPresentation = true;
+  await assert.rejects(confirm(atomic), /Synthetic presentation persistence failure/);
+  check('failed confirmation atomically rolls back flag queue message and receipt', !(await raw.interview.findUniqueOrThrow({ where: { id: atomic.id } })).resumeConfirmed
+    && await raw.interviewTask.count({ where: { interviewId: atomic.id } }) === 0
+    && await raw.message.count({ where: { interviewId: atomic.id } }) === 0
+    && await raw.interviewQuestionPresentation.count({ where: { interviewId: atomic.id } }) === 0);
+  await confirm(atomic);
+  check('explicit retry after atomic rollback creates one prepared queue', await raw.interviewTask.count({ where: { interviewId: atomic.id } }) === 2);
+  const originalActiveIds = (await raw.targetJob.findMany({ where: { userId: owner.id, organizationId: owner.organizationId, isActive: true }, select: { id: true } })).map(row => row.id).sort();
+  const temporaryJobIds = []; let jobFailure;
+  try {
+    await raw.targetJob.updateMany({ where: { id: { in: originalActiveIds }, userId: owner.id, organizationId: owner.organizationId }, data: { isActive: false } });
+  for (const change of [{ profileVersion: 2 }, { isActive: false }]) {
+    const job = await raw.targetJob.create({ data: { organizationId: owner.organizationId, userId: owner.id, title: 'Synthetic pinned confirmation job', isActive: true } });
+    temporaryJobIds.push(job.id);
+    const stale = await freshConfirmation({ targetJobId: job.id, targetJobProfileVersion: 1 });
+    await raw.targetJob.update({ where: { id: job.id }, data: change });
+    await refuses(confirm(stale), 409);
+    check(`confirmation refuses changed job ${Object.keys(change)[0]} before any publication`, !(await raw.interview.findUniqueOrThrow({ where: { id: stale.id } })).resumeConfirmed
+      && await raw.interviewTask.count({ where: { interviewId: stale.id } }) === 0
+      && await raw.message.count({ where: { interviewId: stale.id } }) === 0);
+    // Respect the real one-active-job-per-user index between independent cases.
+    await raw.targetJob.update({ where: { id: job.id }, data: { isActive: false } });
+  }
+  } catch (error) { jobFailure = error; throw error; }
+  finally {
+    const failures = [];
+    try { await raw.targetJob.updateMany({ where: { id: { in: temporaryJobIds }, userId: owner.id, organizationId: owner.organizationId }, data: { isActive: false } }); } catch (error) { failures.push(error); }
+    const restored = await Promise.allSettled(originalActiveIds.map(id => raw.targetJob.update({ where: { id }, data: { isActive: true } })));
+    for (const result of restored) if (result.status === 'rejected') failures.push(result.reason);
+    if (failures.length) throw new AggregateError([...(jobFailure ? [jobFailure] : []), ...failures], 'Synthetic confirmation job fixture restoration failed');
+  }
+  check('confirmation job cases restore the original active job IDs', JSON.stringify((await raw.targetJob.findMany({ where: { userId: owner.id, organizationId: owner.organizationId, isActive: true }, select: { id: true } })).map(row => row.id).sort()) === JSON.stringify(originalActiveIds));
+  const noAnswer = await freshConfirmation(); await confirm(noAnswer);
+  const emptyEnd = await scope(() => service.reserveEnd(noAnswer.id, owner.id));
+  check('only presented questions exit as no_answers with complete cascade', emptyEnd.state === 'EMPTY_DELETED' && emptyEnd.reason === 'no_answers'
+    && await raw.interview.count({ where: { id: noAnswer.id } }) === 0
+    && await raw.interviewTask.count({ where: { interviewId: noAnswer.id } }) === 0
+    && await raw.message.count({ where: { interviewId: noAnswer.id } }) === 0
+    && await raw.interviewQuestionPresentation.count({ where: { interviewId: noAnswer.id } }) === 0);
+  const legacyUnscored = await freshConfirmation();
+  const legacyMessage = await raw.message.create({ data: { organizationId: owner.organizationId, interviewId: legacyUnscored.id, role: 'assistant', content: 'Synthetic legacy message without a presentation receipt' } });
+  await refuses(scope(() => service.reserveEnd(legacyUnscored.id, owner.id)), 409);
+  check('legacy unscored messages without receipts are preserved instead of treated as empty', await raw.interview.count({ where: { id: legacyUnscored.id, status: 'IN_PROGRESS' } }) === 1
+    && await raw.message.count({ where: { id: legacyMessage.id, content: legacyMessage.content } }) === 1
+    && await raw.interviewQuestionPresentation.count({ where: { interviewId: legacyUnscored.id } }) === 0);
+  const blockedEnd = await freshConfirmation(); const blockedReceipt = await confirm(blockedEnd); const blockedInput = await message(blockedEnd);
+  await claim(blockedEnd, blockedReceipt, blockedInput);
+  await scope(() => service.markUnknown(blockedEnd.id, owner.id, blockedReceipt.presentationId, blockedInput.id, token(blockedReceipt)));
+  await refuses(scope(() => service.reserveEnd(blockedEnd.id, owner.id)), 409);
+  check('UNKNOWN prevents closing or deleting the interview', (await raw.interview.findUniqueOrThrow({ where: { id: blockedEnd.id } })).status === 'IN_PROGRESS'
+    && (await raw.interviewQuestionPresentation.findUniqueOrThrow({ where: { id: blockedReceipt.presentationId } })).state === 'UNKNOWN');
+  // releasable already contains one explicit synthetic scored answer above.
+  // That avoids an unrelated no-answer/history rejection deciding this race.
+  const endRaceInput = await message(releasable);
+  const endRace = await Promise.allSettled([
+    claim(releasable, next, endRaceInput),
+    scope(() => service.reserveEnd(releasable.id, owner.id)),
+  ]);
+  check('end versus answer claim admits exactly one side under the parent lock', endRace.filter(row => row.status === 'fulfilled').length === 1
+    && endRace.filter(row => row.status === 'rejected' && row.reason.getStatus?.() === 409).length === 1);
+  const endRaceInterview = await raw.interview.findUniqueOrThrow({ where: { id: releasable.id } });
+  const endRaceReceipt = await raw.interviewQuestionPresentation.findUniqueOrThrow({ where: { id: next.presentationId } });
+  check('end versus claim leaves no processing claim on a completed interview', (endRaceInterview.status === 'COMPLETED' && endRaceReceipt.state === 'OPEN')
+    || (endRaceInterview.status === 'IN_PROGRESS' && endRaceReceipt.state === 'PROCESSING'));
+  // Actual business method with an explicit in-process synthetic LLM dependency.
+  // No gateway/provider is contacted and no scored rows are seeded for these cases.
+  let syntheticDecisionCalls = 0; let requestFollowUp = false;
+  const queue = new DynamicTaskQueueService(scoped, { chat: async () => {
+    syntheticDecisionCalls++;
+    return { content: JSON.stringify({ score: 0.5, completeness: 0.5, correctness: 0.5, depth: 0.5,
+      feedback: 'Synthetic business recovery decision', keyPoints: ['constraint'], missingPoints: [],
+      shouldFollowUp: requestFollowUp, followUpQuestion: requestFollowUp ? 'Synthetic follow-up constraint?' : null,
+      followUpReason: requestFollowUp ? 'Synthetic recovery fixture' : null, shouldAdvance: false, advancedQuestion: null }) };
+  } });
+  const durableCounts = async interviewId => ({
+    answers: await raw.interviewAnswer.count({ where: { interviewId } }),
+    history: await raw.answerHistory.count({ where: { interviewId } }),
+    ledger: await raw.usageLedger.count(), syntheticDecisionCalls,
+  });
+  const nextRecovery = await freshConfirmation(); const nextRecoveryReceipt = await confirm(nextRecovery); const nextRecoveryInput = await message(nextRecovery);
+  await claim(nextRecovery, nextRecoveryReceipt, nextRecoveryInput);
+  await scope(() => queue.completeTask(nextRecovery.id, owner.id, nextRecoveryReceipt.taskId, nextRecoveryInput.content, nextRecoveryInput.id, { presentationId: nextRecoveryReceipt.presentationId, claimToken: token(nextRecoveryReceipt) }));
+  await scope(() => service.finishAnswer(nextRecovery.id, owner.id, nextRecoveryReceipt.presentationId, nextRecoveryInput.id, token(nextRecoveryReceipt)));
+  const completedCounts = await durableCounts(nextRecovery.id);
+  assert.equal(completedCounts.answers, 1); assert.equal(completedCounts.history, 1); assert.equal(completedCounts.syntheticDecisionCalls, 1);
+  failNextPresentation = true;
+  await assert.rejects(present(nextRecovery), /Synthetic presentation persistence failure/);
+  check('failed next presentation preserves the completed answer with pure read returning null', await scope(() => service.readCurrent(nextRecovery.id, owner.id)) === null
+    && (await raw.interviewQuestionPresentation.findUniqueOrThrow({ where: { id: nextRecoveryReceipt.presentationId } })).state === 'ANSWERED');
+  const recoveredQuestion = await confirm(nextRecovery);
+  assert.notEqual(recoveredQuestion.presentationId, nextRecoveryReceipt.presentationId); assert.equal(recoveredQuestion.state, 'OPEN');
+  assert.deepEqual(await durableCounts(nextRecovery.id), completedCounts);
+  check('explicit confirmation repairs next presentation without repeated score history ledger or synthetic decision', recoveredQuestion.taskId !== nextRecoveryReceipt.taskId);
+  check('failed next presentation rolls back assistant message before successful repair', await raw.message.count({ where: { interviewId: nextRecovery.id, role: 'assistant' } }) === 2);
+
+  const followFailure = await freshConfirmation(); const followReceipt = await confirm(followFailure); const followInput = await message(followFailure);
+  await claim(followFailure, followReceipt, followInput); requestFollowUp = true; failNextFollowUp = true;
+  await assert.rejects(scope(() => queue.completeTask(followFailure.id, owner.id, followReceipt.taskId, followInput.content, followInput.id, { presentationId: followReceipt.presentationId, claimToken: token(followReceipt) })), /Synthetic follow-up persistence failure/);
+  check('real completeTask can fail follow-up insertion after durable normalized scoring', await raw.interviewAnswer.count({ where: { interviewId: followFailure.id } }) === 1
+    && await raw.answerHistory.count({ where: { interviewId: followFailure.id } }) === 1
+    && (await raw.interviewTask.findUniqueOrThrow({ where: { id: followReceipt.taskId } })).status === 'COMPLETED'
+    && await raw.interviewTask.count({ where: { interviewId: followFailure.id, type: 'FOLLOW_UP' } }) === 0 && !failNextFollowUp);
+  await scope(() => service.markUnknown(followFailure.id, owner.id, followReceipt.presentationId, followInput.id, token(followReceipt)));
+  const unknownCounts = await durableCounts(followFailure.id);
+  const replayClaim = await claim(followFailure, followReceipt, followInput);
+  assert.equal(replayClaim.state, 'UNKNOWN'); assert.equal(replayClaim.claimToken, undefined);
+  await refuses(claim(followFailure, followReceipt, await message(followFailure)), 409);
+  await refuses(scope(() => service.reserveEnd(followFailure.id, owner.id)), 409);
+  assert.deepEqual(await durableCounts(followFailure.id), unknownCounts);
+  check('post-scoring failure remains UNKNOWN and replay cannot authorize another dispatch', (await scope(() => service.readCurrent(followFailure.id, owner.id))).state === 'UNKNOWN' && syntheticDecisionCalls === 2);
   check('store tests create no model usage ledger entries', await raw.usageLedger.count() === beforeLedger);
   console.log(`Question presentation persistence: ${checks} checks passed; synthetic direct-service/database fixture only; candidate API/browser fix remains pending.`);
 }

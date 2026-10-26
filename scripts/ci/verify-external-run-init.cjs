@@ -37,15 +37,34 @@ module.exports = async ({ request, admin, owner, check }) => {
     const readStats = async () => { const response = await fetch('http://127.0.0.1:3335/fixture/stats', { signal: AbortSignal.timeout(5000) }); assert.equal(response.status, 200); const value = await response.json(); for (const key of ['chat', 'embedding', 'rerank', 'externalRequests']) assert.ok(Number.isSafeInteger(value[key]) && value[key] >= 0); return value; };
     const statsBefore = await readStats();
     const runCount = await raw.run.count();
+    // Real confirmation publishes the provider-free queue and authoritative
+    // receipt. A subsequent error must therefore come after a valid claim,
+    // rather than from the missing-question protocol guard.
+    const confirmation = await request(`/interview/${interview.id}/confirm-resume`, { method: 'POST', token: owner });
+    assert.equal(confirmation.status, 201); assert.equal(confirmation.data.success, true);
+    assert.equal(confirmation.data.questionProtocol, 'presentation/v1');
+    const question = confirmation.data.currentQuestion;
+    assert.ok(question && question.state === 'OPEN' && typeof question.presentationId === 'string' && question.presentationId.trim());
+    const originalReceipt = await raw.interviewQuestionPresentation.findUniqueOrThrow({ where: { id: question.presentationId }, include: { task: true, message: true } });
+    assert.equal(originalReceipt.interviewId, interview.id); assert.equal(originalReceipt.task.status, 'PENDING');
+    assert.equal(originalReceipt.task.question, question.question); assert.equal(originalReceipt.message.content, question.question);
+    assert.equal(originalReceipt.message.role, 'assistant');
+    const publishedMessages = await raw.message.count({ where: { interviewId: interview.id } });
+    assert.equal(publishedMessages, 1);
     let primaryFailure;
     try {
       await raw.agent.update({ where: { id: builtin.id }, data: { currentVersionId: draft.id } });
       for (let attempt = 0; attempt < 2; attempt++) {
-        const reply = await fetch(`http://127.0.0.1:3001/api/interview/${interview.id}/message`, { method: 'POST', headers: { Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Synthetic admission input', clientMessageId: 'fixture-policy-admission-1' }), signal: AbortSignal.timeout(5000) });
+        const reply = await fetch(`http://127.0.0.1:3001/api/interview/${interview.id}/message`, { method: 'POST', headers: { Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Synthetic admission input', clientMessageId: 'fixture-policy-admission-1', operation: 'ANSWER', presentationId: question.presentationId }), signal: AbortSignal.timeout(5000) });
         const text = await reply.text();
         assert.equal(reply.status, 200); assert.match(text, /"type":"error"/);
         assert.match(text, /当前回答暂时无法处理/); assert.ok(!text.includes('[DONE]') && !text.includes('"type":"token"') && !text.includes('synthetic-private-policy'));
-        assert.equal(await raw.message.count({ where: { interviewId: interview.id } }), 0);
+        assert.equal(await raw.message.count({ where: { interviewId: interview.id, role: 'user' } }), 0);
+        assert.equal(await raw.message.count({ where: { interviewId: interview.id } }), publishedMessages);
+        const released = await raw.interviewQuestionPresentation.findUniqueOrThrow({ where: { id: question.presentationId } });
+        assert.equal(released.state, 'OPEN'); assert.equal(released.claimMessageId, null); assert.equal(released.claimToken, null);
+        assert.equal(await raw.interviewAnswer.count({ where: { interviewId: interview.id } }), 0);
+        assert.equal(await raw.answerHistory.count({ where: { interviewId: interview.id } }), 0);
       }
       check('draft policy actual SSE refuses twice with generic error and releases real candidate claims', true);
       check('required policy refusal adds no Run, model call or usage ledger', await raw.run.count() === runCount && await raw.usageLedger.count() === ledgerBefore && JSON.stringify(await readStats()) === JSON.stringify(statsBefore));

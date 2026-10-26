@@ -2,6 +2,7 @@ import { StreamMessageDeliveryService } from '../modules/interview/services/stre
 
 describe('StreamMessageDeliveryService', () => {
   const prisma = {
+    interviewQuestionPresentation: { findFirst: jest.fn() },
     message: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
@@ -12,6 +13,27 @@ describe('StreamMessageDeliveryService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it.each(['PROCESSING', 'UNKNOWN', 'OPEN'])('does not replay a saved reply while its presentation is %s', async state => {
+    prisma.message.findUnique.mockResolvedValue({ id: 'message-1', interviewId: 'interview-1', role: 'user', content: 'answer', metadata: { presentationId: 'presentation-1' } });
+    prisma.interviewQuestionPresentation.findFirst.mockResolvedValue({ state });
+    prisma.message.findFirst.mockResolvedValue({ content: 'saved reply' });
+    const service = new StreamMessageDeliveryService(prisma as any);
+    await expect(service.claimCandidateMessage('interview-1', 'answer', 'request-1', 'presentation-1')).resolves.toEqual({ state: 'pending' });
+    expect(prisma.message.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('replays only a matching ANSWERED presentation and refuses receipt substitution', async () => {
+    prisma.message.findUnique.mockResolvedValue({ id: 'message-1', interviewId: 'interview-1', role: 'user', content: 'answer', metadata: { presentationId: 'presentation-1' } });
+    prisma.interviewQuestionPresentation.findFirst.mockResolvedValue({ state: 'ANSWERED' });
+    prisma.message.findFirst.mockResolvedValue({ content: 'saved reply' });
+    const service = new StreamMessageDeliveryService(prisma as any);
+    await expect(service.claimCandidateMessage('interview-1', 'answer', 'request-1', 'presentation-1')).resolves.toEqual({ state: 'replay', content: 'saved reply' });
+    prisma.interviewQuestionPresentation.findFirst.mockClear();
+    await expect(service.claimCandidateMessage('interview-1', 'answer', 'request-1', 'presentation-other')).resolves.toEqual({ state: 'conflict' });
+    expect(prisma.interviewQuestionPresentation.findFirst).not.toHaveBeenCalled();
+    expect(prisma.message.create).not.toHaveBeenCalled();
   });
 
   it('creates a new candidate message for a new client request ID', async () => {

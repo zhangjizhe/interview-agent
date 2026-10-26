@@ -7,6 +7,7 @@ vi.mock('../utils/auth', () => ({ getSession: () => ({ userId: 'synthetic-user' 
 vi.mock('../hooks/useInterviewStream', () => ({ useInterviewStream: () => ({ send: vi.fn() }) }));
 vi.mock('../hooks/usePullToRefresh', () => ({ usePullToRefresh: () => ({ pullDistance: 0, refreshing: false, pullRef: { current: null } }) }));
 const resume = { name: 'Synthetic candidate', position: 'Synthetic role', summary: 'Synthetic profile', skills: 'TypeScript', createdAt: '2026-10-19T00:00:00Z' };
+const receipt = { success: true, questionProtocol: 'presentation/v1', currentQuestion: { presentationId: 'synthetic-presentation', taskId: 'synthetic-task', messageId: 'synthetic-question-message', question: 'Synthetic actual question?', state: 'OPEN' } };
 let confirm: () => Promise<Response>;
 let transport: ReturnType<typeof vi.fn>;
 function mount() {
@@ -16,7 +17,7 @@ function confirmationCalls() { return transport.mock.calls.filter(call => String
 beforeEach(() => {
   useInterviewStore.getState().reset();
   useInterviewStore.setState({ resume, resumeConfirmed: false, interviewStatus: 'IN_PROGRESS' });
-  confirm = async () => new Response(JSON.stringify({ success: true }), { status: 201 });
+  confirm = async () => new Response(JSON.stringify(receipt), { status: 201 });
   transport = vi.fn(async (path: string) => {
     if (path.endsWith('/confirm-resume')) return confirm();
     if (path === '/api/interview/synthetic-interview' || path === '/api/interview/synthetic-second') return new Response(JSON.stringify({ resume, resumeConfirmed: false, status: 'IN_PROGRESS', messages: [] }));
@@ -32,10 +33,10 @@ describe('Interview resume confirmation receipt', () => {
     ['forbidden', 403, JSON.stringify({ message: 'Synthetic access denied', success: true }), 'Synthetic access denied'],
     ['server error', 500, JSON.stringify({ message: 'Synthetic server unavailable' }), 'Synthetic server unavailable'],
     ['HTML gateway failure', 502, '<html>unavailable</html>', '服务不可用 (HTTP 502)'],
-    ['missing success', 201, '{}', '简历确认结果未确认，请刷新面试状态后核验。'],
-    ['false success', 201, '{"success":false}', '简历确认结果未确认，请刷新面试状态后核验。'],
-    ['nonboolean success', 201, '{"success":"true"}', '简历确认结果未确认，请刷新面试状态后核验。'],
-    ['malformed JSON', 201, '<html>unexpected</html>', '简历确认结果未确认，请刷新面试状态后核验。'],
+    ['missing success', 201, '{}', '题目准备结果未确认，请刷新面试状态后核验。'],
+    ['false success', 201, '{"success":false}', '题目准备结果未确认，请刷新面试状态后核验。'],
+    ['nonboolean success', 201, '{"success":"true"}', '题目准备结果未确认，请刷新面试状态后核验。'],
+    ['malformed JSON', 201, '<html>unexpected</html>', '题目准备结果未确认，请刷新面试状态后核验。'],
   ])('keeps the interview locked on %s and displays a recoverable error', async (_label, status, body, message) => {
     confirm = async () => new Response(body, { status });
     mount();
@@ -55,7 +56,7 @@ describe('Interview resume confirmation receipt', () => {
     fireEvent.click(await screen.findByRole('button', { name: '确认无误，开始面试' }));
     await screen.findByText('Synthetic network interruption');
     expect(useInterviewStore.getState().resumeConfirmed).toBe(false);
-    confirm = async () => new Response('{"success":true}', { status: 201 });
+    confirm = async () => new Response(JSON.stringify(receipt), { status: 201 });
     fireEvent.click(screen.getByRole('button', { name: '确认无误，开始面试' }));
     await waitFor(() => expect(useInterviewStore.getState().resumeConfirmed).toBe(true));
     expect(screen.queryByRole('alert')).toBeNull();
@@ -70,7 +71,7 @@ describe('Interview resume confirmation receipt', () => {
     await screen.findByRole('button', { name: '正在确认简历' });
     cleanup();
     useInterviewStore.setState({ resumeConfirmed: false, confirming: true });
-    await act(async () => { release(new Response('{"success":true}', { status: 201 })); });
+    await act(async () => { release(new Response(JSON.stringify(receipt), { status: 201 })); });
     expect(useInterviewStore.getState().resumeConfirmed).toBe(false);
     expect(useInterviewStore.getState().confirming).toBe(true);
   });
@@ -97,11 +98,11 @@ describe('Interview resume confirmation receipt', () => {
     expect(confirmationCalls().map(call => call[0])).toEqual([
       '/api/interview/synthetic-interview/confirm-resume', '/api/interview/synthetic-second/confirm-resume',
     ]);
-    await act(async () => { releaseA(new Response('{"success":true}', { status: 201 })); });
+    await act(async () => { releaseA(new Response(JSON.stringify(receipt), { status: 201 })); });
     expect(useInterviewStore.getState().resumeConfirmed).toBe(false);
     expect(useInterviewStore.getState().confirming).toBe(true);
     expect(screen.getByRole('button', { name: '正在确认简历' }).hasAttribute('disabled')).toBe(true);
-    await act(async () => { releaseB(new Response('{"success":true}', { status: 201 })); });
+    await act(async () => { releaseB(new Response(JSON.stringify(receipt), { status: 201 })); });
     await waitFor(() => expect(useInterviewStore.getState().resumeConfirmed).toBe(true));
     expect(useInterviewStore.getState().confirming).toBe(false);
   });
@@ -117,7 +118,7 @@ describe('Interview resume confirmation receipt', () => {
     expect(pending.hasAttribute('disabled')).toBe(true);
     expect(useInterviewStore.getState().resumeConfirmed).toBe(false);
     expect(confirmationCalls()).toHaveLength(1);
-    release(new Response('{"success":true}', { status: 201 }));
+    release(new Response(JSON.stringify(receipt), { status: 201 }));
     await waitFor(() => expect(useInterviewStore.getState().resumeConfirmed).toBe(true));
     expect(screen.queryByRole('button', { name: '确认无误，开始面试' })).toBeNull();
   });

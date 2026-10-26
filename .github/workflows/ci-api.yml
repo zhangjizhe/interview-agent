@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   lint-type-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       redis:
@@ -40,7 +40,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
       - name: Production audit and reviewed patch integrity
-        run: node scripts/ci/security-audit.mjs
+        run: |
+          node --test scripts/ci/security-audit-policy.test.mjs
+          node scripts/ci/security-audit.mjs
       - name: Lint (fail closed)
         run: pnpm lint --max-warnings 0
       - name: Typecheck all product applications
@@ -67,7 +69,7 @@ jobs:
         run: pnpm build
 
   docker-build-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -95,12 +97,13 @@ jobs:
           FIXTURE_BROWSER_TEST: '1'
           FIXTURE_GOLDEN_PROBE: '1'
           FIXTURE_PRESENTATION_STORE: '1'
+          FIXTURE_PRESENTATION_PROBE: '1'
           FIXTURE_LAB_IMAGE: interview-lab:verification
           FIXTURE_WEB_IMAGE: interview-web:verification
         run: bash scripts/ci/verify-built-api.sh interview-api:verification
 
   ci-summary:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [lint-type-test, docker-build-test]
     if: always()
     steps:

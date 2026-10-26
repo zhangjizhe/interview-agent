@@ -1,3 +1,4 @@
+jest.mock('../modules/interview/services/question-confirmation.service', () => ({ QuestionConfirmationService: class {} }));
 import { BadRequestException } from '@nestjs/common';
 
 jest.mock('../modules/interview/services/resume-rag.service', () => ({

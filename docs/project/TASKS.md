@@ -1,5 +1,5 @@
 # 待办与验收门
-2026-10-23 FIRST-QUESTION-PRESENTATION: original real greeting red independently confirmed; provider-free presentation/claim foundation now passes local29 PG checks, strict recovery, migration19 and API871 (21 skipped), with independent log review. Candidate CI/PR pending. Controller/UI/end coordination not connected; overall NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md.
+2026-10-24 latest: PR62 foundation candidate5194edcb passed exact six CI jobs plus independent original logs, merged7e29d768fd7fd0a979ff80915d696f02f14035aa; PR/main/agent-lab/local read back. Only persistence foundation accepted; first-question API/UI protocol remains unconnected and NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md.
 
 2026-10-23 · PRODUCT-REACCEPTANCE-1整体NOT_ACCEPTED。PR59候选43b74cc最新push/PR六项CI成功及独立复核后，冻结合并a03ff8afe7f8431ac6d53c9493f8c22077d23aa0，PR/main/agent-lab均读回。当前唯一主题CANDIDATE-GOLDEN-ENGINEERING，首个阻断I06保存回执本地隔离第五链exit0，待最终复核/最新精确CI，未交付。失败与前置见[GET](../acceptance/TRAINING_READS_EVIDENCE.md)/[安全](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。
 
@@ -44,3 +44,21 @@ P0首轮问答语义（实际红测exit1已独立复核，持久化基础服务�
 P0复测展示语义：实际新浏览器新FINAL之后Training仍显示“复测进行中”；当前后端仅RETEST_STARTED关系状态未表达新面试完成。该断言只核当前关联保留，不算该文案产品验收；须定义已创建/进行/完成/失败标签及报告入口，不能将本轮工程循环推广为所有展示正确。
 
 PR61阶段最终已冻结合并55230237f2ab7eeea7c4224577d2aee0dac8ba6d：最新精确push/PR六项success、两组原始日志复核，PR/main/agent-lab/本地均读回。上方待CI措辞由此收据替代，详细见技能报告。唯一下一主题FIRST-QUESTION-PRESENTATION，先真实红测与合同设计，未新实现；整体NOT_ACCEPTED。
+
+PR62 final limited foundation gate: candidate5194edcb passed exact push39974325503/PR39974398837 attempt1 six jobs and independent original-log review; merged7e29d768fd7fd0a979ff80915d696f02f14035aa at2026-10-23T18:32:14Z. PR/main/agent-lab/local read back. API/UI first-question protocol remains unconnected and NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md. Final merge receipt is post-freeze working-tree documentation.
+
+FIRST-QUESTION-PRESENTATION integration prerequisite, source checked only (not a new reproduced concurrency failure): Lifecycle.end uses total message emptiness, which becomes wrong after assistant-only presentation; EvaluationService.beginFinalEvaluation unconditionally sets non-SUCCEEDED/DEGRADED runs RUNNING after upsert, so the current idempotency key alone does not exclude concurrent model dispatch. Reuse EvaluationRun CAS/parent Interview coordination and add actual zero-answer/end/claim race tests. Queue initialization can call embedding/rerank; retain published-policy and quota admission when moving it into confirmation. These caller gaps are not fixed by the merged provider-free presentation store.
+
+Current FIRST-QUESTION-PRESENTATION WIP: protocol integration is written but unaccepted; validate current private run, actual first/subsequent displayed-question API/browser, saved-bank consumption and unknown recovery, then full relevant gates/exact CI before PR. See CURRENT_STATE; no overall acceptance.
+
+Question-bank selection follow-up (not accepted by this phase): initial saved-row reuse currently requires tenant+role-category+level and prefers exact position inside a bounded100-row window. Free-form topic categories, legacy16-question ownership/transfer and broader semantic selection remain unresolved; do not describe the narrow stored-row contract as reuse of every historical question or retrieval-quality acceptance.
+
+FIRST-QUESTION-PRESENTATION limited local freeze approved independently: source/type/build/lint/diff, API883/21+SSE11/Web307, direct-businessPG45 and combined scoped Lab/policy/UNKNOWN+golden/strict restore evidence passed. Exact candidate CI/PR merge remains next; not global acceptance or deployment.
+
+2026-10-24 PR63 release blocker: exact push40048015400/PR40048049704 failed browser dependency install on Ubuntu26.04 and new production advisories. CI prerequisite in progress; no merge/acceptance. Independent Zod installed-chain red72/green28 retained; minimal patches and full new-lock verification pending. See CURRENT_STATE.
+
+2026-10-25 readback: security prerequisite complete default private API93/store45/Lab+policy+golden/strict PG+Milvus+Qdrant runner and separate transfer storage both exited0. New-lock API1011/21skip plus final Zod126, Web307, type/lint/images pass. Final independent review/new frozen-head CI pending; PR63 remains unmerged and whole product NOT_ACCEPTED.
+
+2026-10-25 final PR review found a missed normal branch: fresh confirmation publishes an assistant question but local messages remain empty; the old sidebar abandoned via navigation without POST/end. New component red3/original34 passed, then minimal fix37 passed. Empty-message confirmed exit now uses end with a no-report label; confirming blocks exit. Root added real browser/API/PG cascade and refused/malformed receipt checks (no answer POST). New Web full/image/default browser verification is pending; earlier complete default pass does not cover this new branch. UI inventory only existing exit nodes UI0266/268/269 are source-reconciled; all990 baseline verdicts remain NOT_ACCEPTED and other nodes retain old baseline.
+
+2026-10-25 final local freeze gate achieved: fresh-confirm red3/green37, Web310, durable full default ALL private exit0 with actual new no_answers exit/PG cascade and strict PG+vectors restore; independent original-log review approves related local freeze only. New exact candidate CI/PR merge pending; overall NOT_ACCEPTED.

@@ -3,6 +3,7 @@ import { DynamicTaskQueueService } from '../interview/services/dynamic-task-queu
 import { LlmModule } from '../llm/llm.module';
 import { MemoryModule } from '../memory/memory.module';
 import { InferenceModule } from '../inference/inference.module';
+import { QuestionBankModule } from '../interview/question-bank.module';
 
 /**
  * TaskQueueModule - 抽取 DynamicTaskQueueService
@@ -11,7 +12,7 @@ import { InferenceModule } from '../inference/inference.module';
  * 解法：单独建模块，双方都导入这个
  */
 @Module({
-  imports: [LlmModule, MemoryModule, InferenceModule],
+  imports: [LlmModule, MemoryModule, InferenceModule, QuestionBankModule],
   providers: [DynamicTaskQueueService],
   exports: [DynamicTaskQueueService],
 })

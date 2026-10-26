@@ -172,8 +172,65 @@ async function trainingControl(mode) {
   assert.deepEqual(await stats(), training.stats);
   return { recommendationId: recommendation.id, attemptId: attempt.id, retestInterviewId: attempt.retestInterviewId };
 }
+// Isolated UNKNOWN view fixture: real services, no scoring/provider dispatch.
+async function unknownControl(mode) {
+  assert.equal(process.env.NODE_ENV, 'production');
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (mode === 'unknown-prepare') {
+    assert.ok(!saved.unknown);
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: 'fixture-ci-owner' } });
+    const id = `synthetic-unknown-${require('node:crypto').randomUUID()}`;
+    saved.unknown = { id, organizationId: user.organizationId, ledger: await prisma.usageLedger.count(), runs: await prisma.run.count(), stats: await stats() };
+    fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
+    await prisma.interview.create({ data: { id, userId: user.id, organizationId: user.organizationId, position: 'Synthetic Frontend UNKNOWN fixture', resumeConfirmed: false } });
+    return { interviewId: id };
+  }
+  const fixture = saved.unknown;
+  if (!fixture) { assert.equal(mode, 'unknown-cleanup'); return {}; }
+  assert.match(fixture.id, /^synthetic-unknown-[0-9a-f-]{36}$/);
+  if (mode === 'unknown-cleanup') {
+    // Cleanup still executes when an assertion below fails; preserve both errors.
+    let verificationError;
+    try { assert.equal(await prisma.usageLedger.count(), fixture.ledger); assert.equal(await prisma.run.count(), fixture.runs); assert.deepEqual(await stats(), fixture.stats); }
+    catch (error) { verificationError = error; }
+    try {
+      await prisma.interview.deleteMany({ where: { id: fixture.id, userId: 'fixture-ci-owner', organizationId: fixture.organizationId } });
+      assert.equal(await prisma.interview.count({ where: { id: fixture.id } }), 0);
+      delete saved.unknown; fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
+    } catch (cleanupError) { throw new AggregateError([...(verificationError ? [verificationError] : []), cleanupError], 'UNKNOWN fixture cleanup failed'); }
+    if (verificationError) throw verificationError;
+    return {};
+  }
+  if (mode === 'unknown-mark') {
+    const { tenantContext } = product('./dist/modules/organizations/tenant-context');
+    const { tenantMiddleware } = product('./dist/modules/organizations/tenant-policy');
+    const { QuestionPresentationService } = product('./dist/modules/interview/services/question-presentation.service');
+    const scoped = new PrismaClient(); scoped.$use(tenantMiddleware);
+    try {
+      await tenantContext.run({ organizationId: fixture.organizationId, userId: 'fixture-ci-owner' }, async () => {
+        const service = new QuestionPresentationService(scoped);
+        const receipt = await service.readCurrent(fixture.id, 'fixture-ci-owner'); assert.equal(receipt?.state, 'OPEN');
+        const message = await scoped.message.create({ data: { interviewId: fixture.id, role: 'user', content: 'Synthetic controlled UNKNOWN input; no provider dispatched' } });
+        const claim = await service.claimAnswer(fixture.id, 'fixture-ci-owner', receipt.presentationId, message.id);
+        assert.equal(claim.state, 'CLAIMED'); assert.ok(claim.claimToken);
+        await service.markUnknown(fixture.id, 'fixture-ci-owner', receipt.presentationId, message.id, claim.claimToken);
+      });
+    } finally { await scoped.$disconnect(); }
+  } else assert.equal(mode, 'unknown-verify');
+  const interview = await prisma.interview.findFirstOrThrow({ where: { id: fixture.id, userId: 'fixture-ci-owner', organizationId: fixture.organizationId } });
+  assert.equal(interview.status, 'IN_PROGRESS'); assert.equal(interview.resumeConfirmed, true);
+  const receipts = await prisma.interviewQuestionPresentation.findMany({ where: { interviewId: fixture.id } }); assert.equal(receipts.length, 1);
+  assert.equal(receipts[0].state, 'UNKNOWN'); assert.ok(receipts[0].claimMessageId); assert.ok(receipts[0].claimToken);
+  assert.equal(await prisma.interviewAnswer.count({ where: { interviewId: fixture.id } }), 0);
+  assert.equal(await prisma.answerHistory.count({ where: { interviewId: fixture.id } }), 0);
+  assert.equal(await prisma.message.count({ where: { interviewId: fixture.id, role: 'user' } }), 1);
+  assert.equal(await prisma.usageLedger.count(), fixture.ledger); assert.equal(await prisma.run.count(), fixture.runs); assert.deepEqual(await stats(), fixture.stats);
+  return { interviewId: fixture.id, presentationId: receipts[0].id, question: receipts[0].question, state: receipts[0].state };
+}
 (async () => {
-  if (process.argv[2]?.startsWith('resume-upload-')) {
+  if (process.argv[2]?.startsWith('unknown-')) {
+    console.log(JSON.stringify(await unknownControl(process.argv[2])));
+  } else if (process.argv[2]?.startsWith('resume-upload-')) {
     console.log(JSON.stringify(await resumeUploadControl(process.argv[2])));
   } else if (process.argv[2]?.startsWith('training-')) {
     console.log(JSON.stringify(await trainingControl(process.argv[2])));
@@ -186,14 +243,34 @@ async function trainingControl(mode) {
     const draft = await prisma.agentVersion.findUniqueOrThrow({ where: { agentId_version: { agentId: agent.id, version: '99.0.0' } } });
     assert.equal(draft.status, 'DRAFT');
     const interview = await prisma.interview.findFirstOrThrow({ where: { userId: user.id, position: 'Synthetic admission fixture' } });
+    const freshExit = await prisma.interview.create({ data: { organizationId: user.organizationId, userId: user.id, position: 'Synthetic fresh confirmation exit', resumeConfirmed: false } });
     const alternate = await prisma.interview.create({ data: { organizationId: user.organizationId, userId: user.id, position: 'Synthetic error scope', resumeConfirmed: true } });
     const lifecycle = await prisma.interview.create({ data: { organizationId: user.organizationId, userId: user.id, position: 'Synthetic end lifecycle', resumeConfirmed: true } });
     const timeoutInterview = await prisma.interview.create({ data: { organizationId: user.organizationId, userId: user.id, position: 'Synthetic end timeout', resumeConfirmed: true } });
-    const saved = { timeoutId: timeoutInterview.id, lifecycleId: lifecycle.id, alternateId: alternate.id, agentId: agent.id, originalVersionId: agent.currentVersionId, interviewId: interview.id, originalConfirmed: interview.resumeConfirmed, runs: await prisma.run.count(), ledger: await prisma.usageLedger.count(), stats: await stats() };
+    const saved = { freshExitId: freshExit.id, timeoutId: timeoutInterview.id, lifecycleId: lifecycle.id, alternateId: alternate.id, agentId: agent.id, originalVersionId: agent.currentVersionId, interviewId: interview.id, originalConfirmed: interview.resumeConfirmed, runs: await prisma.run.count(), ledger: await prisma.usageLedger.count(), stats: await stats() };
+    saved.questionMessages = (await prisma.message.findMany({ where: { interviewId: interview.id }, orderBy: { id: 'asc' }, select: { id: true, role: true, content: true } }));
+    const receipts = await prisma.interviewQuestionPresentation.findMany({ where: { interviewId: interview.id } });
+    assert.equal(receipts.length, 1); assert.equal(receipts[0].state, 'OPEN');
+    assert.deepEqual(saved.questionMessages, [{ id: receipts[0].messageId, role: 'assistant', content: receipts[0].question }]);
     fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
     await prisma.interview.update({ where: { id: interview.id }, data: { resumeConfirmed: true } });
     await prisma.agent.update({ where: { id: agent.id }, data: { currentVersionId: draft.id } });
-    console.log(JSON.stringify({ interviewId: interview.id, alternateId: alternate.id, lifecycleId: lifecycle.id, timeoutId: timeoutInterview.id }));
+    console.log(JSON.stringify({ freshExitId: freshExit.id, interviewId: interview.id, alternateId: alternate.id, lifecycleId: lifecycle.id, timeoutId: timeoutInterview.id }));
+  } else if (['verify-fresh-exit-present', 'verify-fresh-exit-deleted'].includes(process.argv[2])) {
+    const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const interview = await prisma.interview.findUnique({ where: { id: saved.freshExitId } });
+    if (process.argv[2] === 'verify-fresh-exit-deleted') {
+      assert.equal(interview, null);
+      for (const model of ['message', 'interviewTask', 'interviewQuestionPresentation', 'interviewAnswer', 'answerHistory']) {
+        assert.equal(await prisma[model].count({ where: { interviewId: saved.freshExitId } }), 0);
+      }
+    } else {
+      assert.ok(interview); assert.equal(interview.status, 'IN_PROGRESS'); assert.equal(interview.resumeConfirmed, true);
+      const receipt = await prisma.interviewQuestionPresentation.findFirstOrThrow({ where: { interviewId: saved.freshExitId, state: 'OPEN' } });
+      assert.deepEqual(await prisma.message.findMany({ where: { interviewId: saved.freshExitId }, select: { id: true, role: true, content: true } }), [{ id: receipt.messageId, role: 'assistant', content: receipt.question }]);
+      assert.equal(await prisma.interviewAnswer.count({ where: { interviewId: saved.freshExitId } }), 0);
+      assert.equal(await prisma.answerHistory.count({ where: { interviewId: saved.freshExitId } }), 0);
+    }
   } else if (process.argv[2] === 'verify-timeout-deleted') {
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal(await prisma.interview.findUnique({ where: { id: saved.timeoutId } }), null);
@@ -204,7 +281,13 @@ async function trainingControl(mode) {
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     const interview = await prisma.interview.findUnique({ where: { id: saved.alternateId } });
     if (process.argv[2] === 'verify-end-deleted') assert.equal(interview, null);
-    else { assert.ok(interview); assert.equal(interview.status, 'IN_PROGRESS'); assert.equal(await prisma.message.count({ where: { interviewId: saved.alternateId } }), 0); }
+    else {
+      assert.ok(interview); assert.equal(interview.status, 'IN_PROGRESS');
+      const receipt = await prisma.interviewQuestionPresentation.findFirstOrThrow({ where: { interviewId: saved.alternateId, state: 'OPEN' } });
+      const messages = await prisma.message.findMany({ where: { interviewId: saved.alternateId }, select: { id: true, role: true, content: true } });
+      assert.deepEqual(messages, [{ id: receipt.messageId, role: 'assistant', content: receipt.question }]);
+      assert.equal(await prisma.interviewAnswer.count({ where: { interviewId: saved.alternateId } }), 0);
+    }
   } else if (process.argv[2] === 'verify-confirmation') {
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     assert.equal((await prisma.interview.findUniqueOrThrow({ where: { id: saved.interviewId } })).resumeConfirmed, true);
@@ -226,18 +309,21 @@ async function trainingControl(mode) {
     if (!fs.existsSync(file)) return;
     let saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     let trainingFailure;
-    if (saved.resumeUpload) { try { await resumeUploadControl('resume-upload-cleanup'); saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { trainingFailure = error; } }
-    if (saved.training) { try { await trainingControl('training-cleanup'); saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { trainingFailure = error; } }
+    if (saved.unknown) { try { await unknownControl('unknown-cleanup'); saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { trainingFailure = trainingFailure ? new AggregateError([trainingFailure, error], 'Synthetic fixture cleanup failures') : error; } }
+    if (saved.resumeUpload) { try { await resumeUploadControl('resume-upload-cleanup'); saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { trainingFailure = trainingFailure ? new AggregateError([trainingFailure, error], 'Synthetic fixture cleanup failures') : error; } }
+    if (saved.training) { try { await trainingControl('training-cleanup'); saved = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { trainingFailure = trainingFailure ? new AggregateError([trainingFailure, error], 'Synthetic fixture cleanup failures') : error; } }
     let primary = trainingFailure;
     try {
-      assert.equal(await prisma.message.count({ where: { interviewId: saved.interviewId } }), 0);
+      assert.deepEqual(await prisma.message.findMany({ where: { interviewId: saved.interviewId }, orderBy: { id: 'asc' }, select: { id: true, role: true, content: true } }), saved.questionMessages);
+      assert.equal(await prisma.interviewAnswer.count({ where: { interviewId: saved.interviewId } }), 0);
+      assert.equal(await prisma.answerHistory.count({ where: { interviewId: saved.interviewId } }), 0);
       assert.equal(await prisma.run.count(), saved.runs); assert.equal(await prisma.usageLedger.count(), saved.ledger);
       const expectedStats = { ...saved.stats };
       for (const [key, delta] of Object.entries(saved.resumeUploadAllowance || {})) expectedStats[key] += delta;
       assert.deepEqual(await stats(), expectedStats);
     } catch (error) { primary = primary ? new AggregateError([primary, error], 'Fixture verification failed') : error; } finally {
       const restored = await Promise.allSettled([prisma.agent.update({ where: { id: saved.agentId }, data: { currentVersionId: saved.originalVersionId } }),
-      prisma.interview.update({ where: { id: saved.interviewId }, data: { resumeConfirmed: saved.originalConfirmed } }), prisma.interview.deleteMany({ where: { id: { in: [saved.alternateId, saved.lifecycleId, saved.timeoutId] }, userId: 'fixture-ci-owner' } })]);
+      prisma.interview.update({ where: { id: saved.interviewId }, data: { resumeConfirmed: saved.originalConfirmed } }), prisma.interview.deleteMany({ where: { id: { in: [saved.alternateId, saved.lifecycleId, saved.timeoutId, saved.freshExitId] }, userId: 'fixture-ci-owner' } })]);
       if (saved.confirmationResume) {
         try { await removeResume(); } catch (error) { restored.push({ status: 'rejected', reason: error }); }
       }

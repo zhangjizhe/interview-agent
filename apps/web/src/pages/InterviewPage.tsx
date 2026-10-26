@@ -25,6 +25,7 @@ import { ChatBubble } from '../components/ChatBubble';
 import { useInterviewStore } from '../store/interview-store';
 import type { Report } from '@interview-agent/shared-types';
 import { getSession } from '../utils/auth';
+import { readPresentedQuestion, type PresentedQuestion } from '../utils/presentedQuestion';
 
 // safeJson 已提取到 utils/safeJson.ts（审查员 R-P2-17 去重）
 
@@ -68,6 +69,9 @@ export function InterviewPage() {
   const setConfirming = useInterviewStore((s) => s.setConfirming);
 
   const { send } = useInterviewStream(interviewId);
+  const [questionState, setQuestionState] = useState<{ sessionId?: string; question: PresentedQuestion | null }>({ question: null });
+  const currentQuestion = questionState.sessionId === interviewId ? questionState.question : null;
+  const canAnswer = currentQuestion?.state === 'OPEN';
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +148,7 @@ export function InterviewPage() {
         if (typeof data?.resumeConfirmed === 'boolean') {
           setResumeConfirmed(data.resumeConfirmed);
         }
+        setQuestionState({ sessionId: interviewId, question: data?.questionProtocol === 'presentation/v1' ? readPresentedQuestion(data.currentQuestion) : null });
       } catch (err) {
         console.error('刷新失败:', err);
       }
@@ -191,6 +196,7 @@ export function InterviewPage() {
         if (typeof data?.resumeConfirmed === 'boolean') {
           setResumeConfirmed(data.resumeConfirmed);
         }
+        setQuestionState({ sessionId: interviewId, question: data?.questionProtocol === 'presentation/v1' ? readPresentedQuestion(data.currentQuestion) : null });
       } catch (err) {
         console.error('加载失败:', err);
       }
@@ -211,7 +217,7 @@ export function InterviewPage() {
 
   // ========== 业务逻辑 ==========
   const handleSend = async () => {
-    if (!input.trim() || streaming || !interviewId) return;
+    if (!input.trim() || streaming || !interviewId || !currentQuestion || !canAnswer) return;
     // 2026-06-23 修复：已结束面试禁止发消息（双层防御，后端 message 端点也会拒绝）
     if (isReadOnly) {
       alert('此面试已结束，请返回首页查看报告');
@@ -224,7 +230,36 @@ export function InterviewPage() {
     const content = input.trim();
     setInput('');
     resetComposerHeight();
-    await send(interviewId, userId, content);
+    const submittedQuestion = currentQuestion;
+    const lifetime = pageLifetime.current;
+    historyRequest.current += 1;
+    setQuestionState({ sessionId: interviewId, question: { ...submittedQuestion, state: 'PROCESSING' } });
+    await send(interviewId, userId, content, submittedQuestion.presentationId);
+    if (pageLifetime.current !== lifetime || useInterviewStore.getState().streaming) return;
+    const request = ++historyRequest.current;
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 10000);
+    try {
+      const dataResponse = await Promise.race([
+        (async () => {
+          const res = await fetch(`/api/interview/${interviewId}`, { signal: controller.signal });
+          return { res, data: await safeJson(res) };
+        })(),
+        new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error('Question state deadline exceeded')), { once: true })),
+      ]);
+      const { res, data } = dataResponse;
+      if (pageLifetime.current !== lifetime || historyRequest.current !== request || useInterviewStore.getState().streaming) return;
+      if (!res.ok || data?.questionProtocol !== 'presentation/v1') throw new Error('Question state is unconfirmed');
+      setQuestionState({ sessionId: interviewId, question: readPresentedQuestion(data.currentQuestion) });
+      if (Array.isArray(data.messages)) setMessages(data.messages.map((message: any) => ({ role: message.role, content: message.content, streaming: false })));
+      if (data.status) setInterviewStatus(data.status);
+    } catch {
+      if (pageLifetime.current === lifetime && historyRequest.current === request) {
+        setQuestionState({ sessionId: interviewId, question: { ...submittedQuestion, state: 'UNKNOWN' } });
+      }
+    } finally {
+      clearTimeout(deadline);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -237,7 +272,7 @@ export function InterviewPage() {
   };
 
   const handleEnd = async () => {
-    if (!interviewId || ending) return;
+    if (!interviewId || ending || confirming || confirmPending.current) return;
     const lifetime = pageLifetime.current;
     const isCurrentEnd = () => pageLifetime.current === lifetime;
     setEnding(true);
@@ -259,11 +294,11 @@ export function InterviewPage() {
       const data = await safeJson(res);
       if (!isCurrentEnd()) return;
       if (!res.ok) throw new Error(`结束面试失败 (HTTP ${res.status})`);
-      if (data?.deleted === true && data.reason !== 'no_messages') {
+      if (data?.deleted === true && !['no_messages', 'no_answers'].includes(data.reason)) {
         throw new Error('结束结果未确认，请刷新面试状态后核验。');
       }
-      if (data?.deleted === true && data.reason === 'no_messages') {
-        alert(data.reason === 'no_messages' ? '空面试已退出，不保存' : '已退出');
+      if (data?.deleted === true && ['no_messages', 'no_answers'].includes(data.reason)) {
+        alert('尚未作答，本场面试已退出，不生成报告。');
         navigate('/');
         return;
       }
@@ -329,8 +364,12 @@ export function InterviewPage() {
       const response = await fetch(`/api/interview/${submittedInterviewId}/confirm-resume`, { method: 'POST' });
       const receipt = await safeJson(response);
       if (!response.ok) throw new Error(receipt?.message || `确认简历失败 (HTTP ${response.status})`);
-      if (receipt?.success !== true) throw new Error('简历确认结果未确认，请刷新面试状态后核验。');
-      if (confirmationMounted.current && confirmationAttempt.current === attempt && currentInterviewId.current === submittedInterviewId) setResumeConfirmed(true);
+      if (receipt?.success !== true || receipt.questionProtocol !== 'presentation/v1'
+        || (receipt.currentQuestion !== null && !readPresentedQuestion(receipt.currentQuestion))) throw new Error('题目准备结果未确认，请刷新面试状态后核验。');
+      if (confirmationMounted.current && confirmationAttempt.current === attempt && currentInterviewId.current === submittedInterviewId) {
+        setResumeConfirmed(true);
+        setQuestionState({ sessionId: submittedInterviewId, question: readPresentedQuestion(receipt.currentQuestion) });
+      }
     } catch (err) {
       if (confirmationMounted.current && confirmationAttempt.current === attempt && currentInterviewId.current === submittedInterviewId) {
         setConfirmationError(err instanceof Error ? err.message : '确认简历失败，请重试。');
@@ -559,7 +598,7 @@ export function InterviewPage() {
           ) : messages.length > 0 ? (
             <button
               onClick={handleEnd}
-              disabled={ending}
+              disabled={ending || streaming || confirming}
               className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2 px-3 rounded-lg transition disabled:opacity-50"
             >
               {ending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
@@ -567,10 +606,15 @@ export function InterviewPage() {
             </button>
           ) : (
             <button
-              onClick={() => navigate('/')}
+              onClick={() => {
+                if (confirmPending.current) return;
+                if (resumeConfirmed || currentQuestion) void handleEnd();
+                else navigate('/');
+              }}
+              disabled={ending || streaming || confirming}
               className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2 px-3 rounded-lg transition"
             >
-              <X className="w-4 h-4" /> 放弃面试，返回首页
+              <X className="w-4 h-4" /> {ending ? '退出中...' : resumeConfirmed || currentQuestion ? '退出面试，不生成报告' : '放弃面试，返回首页'}
             </button>
           )}
         </div>
@@ -780,7 +824,7 @@ export function InterviewPage() {
                 {messages.length === 0 && !isReadOnly && (
                   <div className="text-center text-slate-400 py-12 md:py-20">
                     <Bot className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-                    <p>开始你的第一句话吧～</p>
+                    <p>题目准备后，请围绕当前题目作答。</p>
                   </div>
                 )}
                 {messages.map((msg, i) => (
@@ -812,6 +856,17 @@ export function InterviewPage() {
             </div>
 
             {streamError && <p role="alert" className="mx-auto max-w-3xl px-3 py-2 text-sm text-red-700">{streamError}</p>}
+
+            {resumeConfirmed && !isReadOnly && (
+              <section aria-label="当前题目" className="mx-auto w-full max-w-3xl px-4 py-3 text-sm text-slate-700 border-t border-slate-200">
+                {currentQuestion && <p className="whitespace-pre-wrap">{currentQuestion.question}</p>}
+                {currentQuestion?.state === 'PROCESSING' && <p role="status">回答正在处理，请稍候；可刷新核验进度。</p>}
+                {currentQuestion?.state === 'UNKNOWN' && <p role="alert">回答结果尚未确认，已暂停重复提交。请刷新核验状态。</p>}
+                {!currentQuestion && <p>当前没有可作答题目，可核验题目状态或结束面试。</p>}
+                {!streaming && <button type="button" onClick={confirmResumeStart} disabled={confirming} className="mt-2 text-blue-700 disabled:opacity-50">{confirming ? '正在核验...' : '核验题目状态'}</button>}
+                {confirmationError && <p role="alert" className="mt-2 text-red-700">{confirmationError}</p>}
+              </section>
+            )}
 
             {/* 输入区 */}
             <div
@@ -850,17 +905,17 @@ export function InterviewPage() {
                       ? '此面试已结束...'
                       : !resumeConfirmed
                         ? '请先确认上方简历信息...'
-                        : resume
-                          ? '简历已上传，开始面试吧...'
-                          : '输入消息...'
+                        : !canAnswer
+                          ? '请先核验当前题目状态...'
+                          : '输入当前题目的回答...'
                   }
                   rows={1}
-                  disabled={streaming || !resumeConfirmed || isReadOnly}
+                  disabled={streaming || !resumeConfirmed || !canAnswer || isReadOnly}
                   className="flex-1 min-h-10 px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none overflow-y-auto disabled:bg-slate-50 max-h-32"
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() || streaming || !resumeConfirmed || isReadOnly}
+                  disabled={!input.trim() || streaming || !resumeConfirmed || !canAnswer || isReadOnly}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-5 rounded-xl font-medium transition disabled:opacity-50 flex items-center gap-2 h-10 md:h-11"
                 >
                   {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
