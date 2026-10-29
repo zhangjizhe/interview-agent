@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './controlled-evolution.css';
 import { api } from './api';
+import { acquireEvaluationRequest, confirmEvaluationRequest, requireEvaluationReceipt } from './evaluation-receipt';
 
 type AgentVersion = {
   id: string;
@@ -15,6 +16,51 @@ type Agent = {
   name: string;
   currentVersion?: AgentVersion | null;
 };
+
+type QualityEvidence = {
+  kind?: string;
+  scope?: string;
+  contractHash?: string;
+  notAssessed?: string[];
+  assertionCount?: number;
+  passed?: number;
+  failed?: number;
+  unavailable?: number;
+  semanticQuality?: string;
+};
+
+const BUSINESS_CONTRACT_VERSION = 'business-assertions/v1';
+const BUSINESS_CASE_EXAMPLE = JSON.stringify({
+  contractVersion: BUSINESS_CONTRACT_VERSION,
+  assertions: [
+    { id: 'score-range', source: 'response-json', op: 'number-range', path: ['score'], minimum: 0, maximum: 1 },
+    { id: 'decision', source: 'response-json', op: 'equals', path: ['decision'], expected: 'FOLLOW_UP' },
+  ],
+}, null, 2);
+
+function parseCaseContract(text: string): Record<string, unknown> {
+  if (text.length > 32768) throw new Error('业务断言 JSON 不能超过 32768 个字符。');
+  let value: unknown;
+  try { value = JSON.parse(text); } catch { throw new Error('业务断言 JSON 格式无效，请检查引号、逗号和括号。'); }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('业务断言 JSON 必须是对象。');
+  const contract = value as Record<string, unknown>;
+  if (contract.contractVersion !== BUSINESS_CONTRACT_VERSION || !Array.isArray(contract.assertions) || contract.assertions.length === 0) {
+    throw new Error('业务断言需要 contractVersion: business-assertions/v1 和非空 assertions 数组。');
+  }
+  return contract;
+}
+
+function QualityEvidenceSummary({ evidence }: { evidence?: QualityEvidence }) {
+  return <div className="evolution-quality-evidence">
+    <p>{evidence?.kind === 'deterministic-business-contract' ? '确定性业务合同证据' : evidence?.kind === 'contract-smoke' ? '冒烟检查证据' : '证据范围未记录'}</p>
+    <p>语义质量未评估；这些断言不能证明题目、追问或评分的语义正确性。</p>
+    {evidence?.scope && <p>检查范围：{evidence.scope}</p>}
+    {evidence?.contractHash && <p>合同指纹：{evidence.contractHash}</p>}
+    {typeof evidence?.assertionCount === 'number' && <p>断言 {evidence.assertionCount} · 通过 {evidence.passed ?? '未记录'} · 失败 {evidence.failed ?? '未记录'} · 不可评测 {evidence.unavailable ?? '未记录'}</p>}
+  </div>;
+}
+
+type AssertionResult = { id: string; passed: boolean; reason: string; evidence?: { runId?: string; seq?: number; eventType?: string; path?: string[]; actual?: unknown } };
 
 type Evaluation = {
   id: string;
@@ -35,7 +81,8 @@ type Evaluation = {
   completedAt?: string;
   error?: string;
   metrics?: { repeatCount?: number; totalSamples?: number; cachePolicy?: string;
-    budget?: { completedSamples?: number; spentCny?: number; costEvidenceStatus?: string } };
+    budget?: { completedSamples?: number; spentCny?: number; costEvidenceStatus?: string }; qualityEvidence?: QualityEvidence };
+  results?: Array<{ id: string; passed: boolean; failureMessage?: string; datasetCase?: { key: string }; metrics?: unknown; evidence?: { samples?: Array<{ assertions?: AssertionResult[] }> } }>;
 };
 
 export function ControlledEvolutionWorkspace() {
@@ -48,19 +95,24 @@ export function ControlledEvolutionWorkspace() {
   const [comparison, setComparison] = useState<any>(null);
   const [firstReleaseGate, setFirstReleaseGate] = useState<any>(null);
   const [feedback, setFeedback] = useState('');
-  const pendingRequest = useRef<{ signature: string; key: string }>();
   const [datasetKey, setDatasetKey] = useState('interview-regression');
   const [datasetName, setDatasetName] = useState('Interview 回归集');
-  const [evaluatorKey, setEvaluatorKey] = useState('interview-keywords');
-  const [evaluatorName, setEvaluatorName] = useState('Interview 关键词检查');
-  const [caseKey, setCaseKey] = useState('job-relevance');
-  const [caseMessage, setCaseMessage] = useState('请提出一道与当前岗位直接相关的面试题。');
+  const [evaluatorKey, setEvaluatorKey] = useState('interview-business-contract');
+  const [evaluatorName, setEvaluatorName] = useState('Interview 确定性业务合同');
+  const [evaluatorType, setEvaluatorType] = useState<'BUSINESS_ASSERTIONS' | 'KEYWORD'>('BUSINESS_ASSERTIONS');
+  const [caseContract, setCaseContract] = useState(BUSINESS_CASE_EXAMPLE);
+  const [selectedEvaluationId, setSelectedEvaluationId] = useState('');
+  const [caseType, setCaseType] = useState<'BUSINESS_ASSERTIONS' | 'KEYWORD'>('BUSINESS_ASSERTIONS');
+  const [caseKey, setCaseKey] = useState('output-decision-contract');
+  const [caseMessage, setCaseMessage] = useState('请严格返回 JSON {"score":0.5,"decision":"FOLLOW_UP"}，不添加其他文字。');
   const [caseKeywords, setCaseKeywords] = useState('问题');
+  const [caseOwner, setCaseOwner] = useState('');
+  const [casePrivacyConfirmed, setCasePrivacyConfirmed] = useState(false);
   const [caseJobFamily, setCaseJobFamily] = useState('ai-agent-engineer');
   const [caseSkill, setCaseSkill] = useState('agent-evaluation');
   const [caseDifficulty, setCaseDifficulty] = useState('intermediate');
   const [repeatCount, setRepeatCount] = useState(3);
-  const [maxEstimatedCostCny, setMaxEstimatedCostCny] = useState(5);
+  const [maxEstimatedCostCny, setMaxEstimatedCostCny] = useState(3);
 
   const agents = useQuery<Agent[]>({
     queryKey: ['registry-agents'],
@@ -81,6 +133,13 @@ export function ControlledEvolutionWorkspace() {
     queryFn: () => api(`/agent-lab/agents/${agentId}/evaluations`),
     enabled: Boolean(agentId),
   });
+  const evaluationDetails = useQuery<Evaluation>({
+    queryKey: ['registry-evaluation-detail', selectedEvaluationId],
+    queryFn: () => api(`/agent-lab/evaluations/${selectedEvaluationId}`),
+    enabled: Boolean(selectedEvaluationId),
+    refetchInterval: (query) => ['PENDING', 'RUNNING'].includes(query.state.data?.status || '') ? 2000 : false,
+  });
+  useEffect(() => { setSelectedEvaluationId(''); }, [agentId]);
   const datasets = useQuery<any[]>({
     queryKey: ['registry-datasets'],
     queryFn: () => api('/agent-lab/datasets'),
@@ -164,8 +223,8 @@ export function ControlledEvolutionWorkspace() {
       body: JSON.stringify({
         key: evaluatorKey,
         name: evaluatorName,
-        type: 'KEYWORD',
-        config: { minScore: 100 },
+        type: evaluatorType,
+        config: evaluatorType === 'BUSINESS_ASSERTIONS' ? { contractVersion: BUSINESS_CONTRACT_VERSION } : { minScore: 100 },
       }),
     }),
     onSuccess: async (result) => {
@@ -181,10 +240,11 @@ export function ControlledEvolutionWorkspace() {
       body: JSON.stringify({
         key: caseKey,
         input: { message: caseMessage },
-        expectedOutput: {
+        expectedOutput: caseType === 'BUSINESS_ASSERTIONS' ? parseCaseContract(caseContract) : {
           keywords: caseKeywords.split(',').map((item) => item.trim()).filter(Boolean),
         },
         metadata: {
+          provenance: { sourceType: 'maintainer-authored-synthetic', owner: caseOwner.trim(), allowedUse: 'agent-release-evaluation', containsCandidateData: false, containsPersonalData: false },
           segments: {
             jobFamily: caseJobFamily,
             skill: caseSkill,
@@ -195,7 +255,7 @@ export function ControlledEvolutionWorkspace() {
     }),
     onSuccess: async () => {
       setFeedback('评测 Case 已加入 Dataset。');
-      await queryClient.invalidateQueries({ queryKey: ['registry-datasets'] });
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['registry-datasets'] }), queryClient.invalidateQueries({ queryKey: ['registry-dataset', datasetId] })]);
     },
     onError: (error: Error) => setFeedback(error.message),
   });
@@ -232,17 +292,18 @@ export function ControlledEvolutionWorkspace() {
     onError: (error: Error) => setFeedback(error.message),
   });
   const runEvaluation = useMutation({
-    mutationFn: (versionId: string) => {
+    mutationFn: async (versionId: string) => {
       const payload = { agentVersionId: versionId, datasetId, evaluatorId, repeatCount, maxEstimatedCostCny };
-      const signature = JSON.stringify({ agentId, ...payload });
-      if (pendingRequest.current?.signature !== signature) pendingRequest.current = { signature, key: crypto.randomUUID() };
-      return api(`/agent-lab/agents/${agentId}/evaluations`, {
-        method: 'POST', body: JSON.stringify({ ...payload, requestKey: pendingRequest.current.key }),
+      const request = acquireEvaluationRequest({ agentId, ...payload });
+      const result = await api(`/agent-lab/agents/${agentId}/evaluations`, {
+        method: 'POST', body: JSON.stringify({ ...payload, requestKey: request.requestKey }),
       });
+      const receipt = requireEvaluationReceipt(result);
+      confirmEvaluationRequest(request);
+      return receipt;
     },
     onMutate: () => setComparison(null),
     onSuccess: async (result) => {
-      pendingRequest.current = undefined;
       setFeedback(`任务 ${result.id} 已${result.reused ? '复用' : '提交'}；状态 ${result.status}，可在任务列表查看真实进度。`);
       await refresh();
     },
@@ -302,7 +363,7 @@ export function ControlledEvolutionWorkspace() {
 
     <details className="evolution-assets">
       <summary>配置评测资产</summary>
-      <p>创建 Dataset、关键词 Evaluator 和 Case。这里仅写入测试资产，不调用模型。</p>
+      <p>创建 Dataset、确定性业务合同或术语冒烟 Evaluator 和 Case。这里仅保存评测资产，不调用模型。</p>
       <div className="lab-actions">
         <button onClick={() => bootstrapReleaseDataset.mutate()} disabled={busy}>导入内置发布回归集 v1</button>
       </div>
@@ -314,27 +375,36 @@ export function ControlledEvolutionWorkspace() {
       <div className="lab-form-grid">
         <label>Evaluator key<input value={evaluatorKey} onChange={(event) => setEvaluatorKey(event.target.value)} /></label>
         <label>Evaluator 名称<input value={evaluatorName} onChange={(event) => setEvaluatorName(event.target.value)} /></label>
+        <label>评测规则<select value={evaluatorType} disabled={busy} onChange={event => setEvaluatorType(event.target.value as 'BUSINESS_ASSERTIONS' | 'KEYWORD')}><option value="BUSINESS_ASSERTIONS">确定性业务合同</option><option value="KEYWORD">关键词冒烟检查</option></select></label>
         <button onClick={() => createEvaluator.mutate()} disabled={busy || !evaluatorKey || !evaluatorName}>创建 Evaluator</button>
       </div>
       <div className="lab-form-grid">
+        <label>Case 期望格式<select value={caseType} disabled={busy} onChange={event => setCaseType(event.target.value as 'BUSINESS_ASSERTIONS' | 'KEYWORD')}><option value="BUSINESS_ASSERTIONS">确定性业务合同</option><option value="KEYWORD">关键词冒烟检查</option></select></label>
         <label>Case key<input value={caseKey} onChange={(event) => setCaseKey(event.target.value)} /></label>
         <label>输入消息<input value={caseMessage} onChange={(event) => setCaseMessage(event.target.value)} /></label>
-        <label>必含关键词（逗号分隔）<input value={caseKeywords} onChange={(event) => setCaseKeywords(event.target.value)} /></label>
+        {caseType === 'KEYWORD' && <label>必含关键词（逗号分隔）<input value={caseKeywords} onChange={(event) => setCaseKeywords(event.target.value)} /></label>}
         <label>岗位族标签<input value={caseJobFamily} onChange={(event) => setCaseJobFamily(event.target.value)} placeholder="ai-agent-engineer" /></label>
         <label>技能标签<input value={caseSkill} onChange={(event) => setCaseSkill(event.target.value)} placeholder="agent-evaluation" /></label>
         <label>难度标签<input value={caseDifficulty} onChange={(event) => setCaseDifficulty(event.target.value)} placeholder="intermediate" /></label>
       </div>
+      {caseType === 'BUSINESS_ASSERTIONS' && <div>
+        <label>业务断言 JSON<textarea rows={12} maxLength={32768} value={caseContract} onChange={event => setCaseContract(event.target.value)} /></label>
+        <p>范例用于检查结构化输出合同，不代表真实面试质量样本。Case 期望格式须与执行时选择的 Evaluator 一致。范例检查 response 中 JSON 的 score 范围和 decision 值；请按输入任务修改期望。逐项断言必须全部通过，不支持任意代码或正则。服务端在运行前核验合同。</p>
+        <button disabled={busy} onClick={() => setCaseContract(BUSINESS_CASE_EXAMPLE)}>恢复业务断言范例</button>
+      </div>}
+      <label>Case 责任人<input maxLength={120} value={caseOwner} onChange={event => setCaseOwner(event.target.value)} /></label>
+      <label className="evolution-confirm"><input type="checkbox" checked={casePrivacyConfirmed} onChange={event => setCasePrivacyConfirmed(event.target.checked)} />我确认该 Case 为自编合成样本，不含候选人或个人数据，允许用于发布评测。</label>
       <div className="lab-actions">
-        <button onClick={() => addCase.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt || !caseKey || !caseMessage || !caseKeywords || !caseJobFamily || !caseSkill || !caseDifficulty}>添加 Case 到当前 Dataset</button>
+        <button onClick={() => addCase.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt || !caseKey || !caseMessage || !caseOwner.trim() || !casePrivacyConfirmed || (caseType === 'KEYWORD' ? !caseKeywords : !caseContract.trim()) || !caseJobFamily || !caseSkill || !caseDifficulty}>添加 Case 到当前 Dataset</button>
         <button onClick={() => freezeDataset.mutate()} disabled={busy || !datasetId || selectedDataset?.frozenAt}>冻结当前 Dataset</button>
       </div>
       {datasetDetails.data && <details className="evolution-assets">
         <summary>审查当前 Dataset · {datasetDetails.data.cases?.length || 0} Cases · {datasetDetails.data.metadata?.review?.status || 'PENDING'}</summary>
-        <p>批准表示当前管理员已核对输入、期望关键词、业务切片、来源与无个人数据声明。批准记录不修改冻结内容指纹。</p>
+        <p>批准表示当前管理员已核对输入、期望断言、业务切片、来源与无个人数据声明。批准记录不修改冻结内容指纹。</p>
         {datasetDetails.data.cases?.map((item: any) => <article className="lab-row" key={item.id}>
           <div><h3>{item.key}</h3><p>{item.input?.message}</p></div>
           <div className="lab-row-metrics">
-            <span>来源 {item.metadata?.provenance?.sourceType || '未声明'}</span><span>关键词 {(item.expectedOutput?.keywords || []).join('、')}</span>
+            <span>来源 {item.metadata?.provenance?.sourceType || '未声明'}</span>{item.expectedOutput?.contractVersion === BUSINESS_CONTRACT_VERSION ? <details><summary>业务断言合同</summary><pre>{JSON.stringify(item.expectedOutput, null, 2)}</pre></details> : <span>关键词 {(item.expectedOutput?.keywords || []).join('、')}</span>}
             <span>{item.metadata?.segments?.skill}</span>
             <span>{item.metadata?.segments?.difficulty}</span>
             <span>{item.metadata?.provenance?.containsPersonalData === false ? '无个人数据（声明）' : item.metadata?.provenance?.containsPersonalData === true ? '含个人数据' : '隐私未声明'}</span>
@@ -370,13 +440,14 @@ export function ControlledEvolutionWorkspace() {
 
     {selectedDataset && !releaseEvidenceReady && <p className="lab-feedback">发布评测要求 Dataset 已冻结、至少 10 个带完整业务切片的 Case，并由管理员逐条审查批准。</p>}
 
+    {firstReleaseGate && <p>发布范围：{firstReleaseGate.gate.outcome.acceptanceScope || '未记录'}；语义质量未评估。</p>}
     {comparison && <article className="lab-row">
       <div><p className={`decision-${comparison.releaseRecommendation.toLowerCase()}`}>{comparison.releaseRecommendation}</p><h2>同集评测结果</h2><p>Dataset {comparison.datasetId} · Evaluator {comparison.evaluatorId}</p></div>
-      <div>{comparison.reasons?.map((reason: string) => <p className="evolution-rejection" key={reason}>{reason}</p>)}<p>以下是原始术语分数；发布门拒绝时不能作为有效发布依据，也不代表完整面试质量。</p></div>
-      <div className="lab-row-metrics"><span>基线 {comparison.baseline.score}</span><span>候选 {comparison.candidate.score}</span><span>变化 {comparison.scoreDelta >= 0 ? '+' : ''}{comparison.scoreDelta}</span><span>发布证据 {comparison.releaseGate.ruleSetVersion}</span>{comparison.releaseGate.evidence?.statisticalComparison && <span>95% 下界 {comparison.releaseGate.evidence.statisticalComparison.lowerConfidenceBoundPoints ?? '不可用'} · 配对 {comparison.releaseGate.evidence.statisticalComparison.pairedCaseCount}</span>}</div>
+      <div>{comparison.reasons?.map((reason: string) => <p className="evolution-rejection" key={reason}>{reason}</p>)}<p>以下是所选规则的原始分数；发布门拒绝时不能作为有效发布依据。语义质量未评估。</p></div>
+      <div className="lab-row-metrics"><span>基线 {comparison.baseline.score}</span><span>候选 {comparison.candidate.score}</span><span>变化 {comparison.scoreDelta >= 0 ? '+' : ''}{comparison.scoreDelta}</span><span>发布证据 {comparison.releaseGate.ruleSetVersion}</span><span>发布范围 {comparison.releaseGate.outcome?.acceptanceScope || '未记录'}</span>{comparison.releaseGate.evidence?.statisticalComparison && <span>95% 下界 {comparison.releaseGate.evidence.statisticalComparison.lowerConfidenceBoundPoints ?? '不可用'} · 配对 {comparison.releaseGate.evidence.statisticalComparison.pairedCaseCount}</span>}</div>
     </article>}
     <section className="evolution-jobs" aria-label="评测任务与证据">
-      <div><p className="agent-eyebrow">EVALUATION EVIDENCE</p><h3>评测任务与证据</h3><p>来自当前工作区的持久化运行；关键词分数仅表示术语遵循，不代表完整面试质量。</p></div>
+      <div><p className="agent-eyebrow">EVALUATION EVIDENCE</p><h3>评测任务与证据</h3><p>来自当前工作区的持久化运行；确定性业务合同检查字段与必要事件；术语冒烟仅检查关键词。语义质量未评估。</p></div>
       {evaluations.isError && <p role="alert">评测记录暂不可用，请刷新；不会展示伪造进度。</p>}
       {evaluations.data?.length === 0 && <p>尚无评测记录。提交有界任务后，进度与证据会在这里更新。</p>}
       {evaluations.data?.slice(0, 6).map(item => {
@@ -387,6 +458,8 @@ export function ControlledEvolutionWorkspace() {
           <div className="evolution-job-head"><strong>{item.agentVersion.version} · {item.dataset.name}</strong><span className={`evolution-status status-${item.status.toLowerCase()}`}>{item.status}</span></div>
           <p>{item.id} · {item.evaluator.name}</p>
           <div className="evolution-job-metrics"><span>样本 {samples ?? '未记录'}/{total ?? '总数未记录'}</span><span>得分 {item.score == null ? '—' : item.score.toFixed(1)}</span><span>费用小计 {typeof item.metrics?.budget?.spentCny === 'number' ? `¥${item.metrics.budget.spentCny.toFixed(6)}` : '未核验'}</span></div>
+          <QualityEvidenceSummary evidence={item.metrics?.qualityEvidence} />
+          <button onClick={() => setSelectedEvaluationId(item.id)}>查看 {item.id} 的逐项证据</button>
           <progress aria-label="已完成样本" max={Math.max(total ?? completed, 1)} value={total == null || samples == null ? undefined : completed} />
           {(item.status === 'PENDING' || item.status === 'RUNNING') && <button disabled={Boolean(item.cancelRequestedAt) || cancelEvaluation.isPending} onClick={() => cancelEvaluation.mutate(item.id)}>{item.cancelRequestedAt ? '等待停止与结算' : '取消后续样本'}</button>}
           {item.error && <p className="evolution-rejection">{item.error}</p>}
@@ -396,6 +469,28 @@ export function ControlledEvolutionWorkspace() {
         </article>;
       })}
     </section>
-    {feedback && <p className="lab-feedback">{feedback}</p>}
+    {selectedEvaluationId && <section aria-label="逐项断言证据" className="evolution-job">
+      <h3>逐项断言证据 · {selectedEvaluationId}</h3>
+      {evaluationDetails.isLoading && <p>正在读取持久化证据…</p>}
+      {evaluationDetails.isError && <p role="alert">{evaluationDetails.error.message}</p>}
+      {evaluationDetails.data && <>
+        <QualityEvidenceSummary evidence={evaluationDetails.data.metrics?.qualityEvidence} />
+        {!evaluationDetails.data.results?.length && <p>尚无逐项结果；不表示断言已通过。</p>}
+        {evaluationDetails.data.results?.map(result => <article key={result.id}>
+          <h4>{result.datasetCase?.key || result.id} · {result.passed ? '通过' : '未通过'}</h4>
+          {result.failureMessage && <p className="evolution-rejection">{result.failureMessage}</p>}
+          {result.evidence?.samples?.map((sample, index) => <section key={index} aria-label={`样本 ${index + 1} 断言`}>
+            <h5>样本 {index + 1}</h5>
+            {!sample.assertions?.length && <p>该样本未记录业务断言，不表示通过。</p>}
+            <ul>{sample.assertions?.map(assertion => <li key={assertion.id}>
+              <strong>{assertion.id} · {assertion.passed ? '通过' : '未通过'}</strong>：{assertion.reason}
+              {assertion.evidence?.runId && <p>Trace 引用：{assertion.evidence.runId}{assertion.evidence.seq == null ? '' : ` #${assertion.evidence.seq}`}{assertion.evidence.eventType ? ` · ${assertion.evidence.eventType}` : ''}</p>}
+            </li>)}</ul>
+          </section>)}
+          <details><summary>原始断言证据</summary><pre>{JSON.stringify({ metrics: result.metrics, evidence: result.evidence }, null, 2)}</pre></details>
+        </article>)}
+      </>}
+    </section>}
+    {feedback && <p role="status" className="lab-feedback">{feedback}</p>}
   </section>;
 }

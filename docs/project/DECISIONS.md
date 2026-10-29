@@ -41,3 +41,5 @@ B0策略准入增量（本地限定实链通过）：InterviewFlowController将s
 候选SSE生命周期增量：当前唯一InterviewPage消费者将route interviewId传入useInterviewStream；切换/卸载先失效本hook请求代次再abort，旧异步结果不回写后续会话。没有后端取消/退款语义；多实例全局store与迟到HistoryGET另列，详见INTERVIEW_STREAM_SESSION_EVIDENCE.md。限定实链通过，待新headCI。
 
 2026-10-23在验增量：完整模拟的规范题技能归属复用共享job-keywords-v1词典，只将实际题干唯一匹配到当前owned组织/岗位版本的active要求；歧义/未知保持null，记录question-job-lexical/v1依据。受控练习技能取实际Interview，追问父题仅同会话，不回填历史。无schema/模型调用增加；实际新镜像API/浏览器工程链与严格恢复本地通过，待精确CI；首题展示语义仍未验收，见GOLDEN_SKILL_ATTRIBUTION_EVIDENCE.md。
+
+ADR26 (2026-10-29, candidate): distinguish deterministic business contracts from semantic quality; release-gate/v6 refuses smoke-only new releases, requires matching server-produced assertion evidence. Share production Interview decision requests/parser with the calibration runner rather than maintaining a second scoring Prompt. Explicit heuristic source, unknown costs/receipts and missing samples fail closed. Preserve legacy publication compatibility without retroactive certification. See ../harness/BUSINESS_ASSERTIONS.md.

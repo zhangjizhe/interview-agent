@@ -743,6 +743,7 @@ model EvaluationCase {
 }
 
 enum EvaluatorType {
+  BUSINESS_ASSERTIONS
   KEYWORD
   JSON_SCHEMA
   LATENCY
