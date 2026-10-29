@@ -1,4 +1,5 @@
 import { assertSchema } from './configured-runtime.contract';
+import { BUSINESS_ASSERTIONS_VERSION, BUSINESS_EVIDENCE_VERSION, businessContractHash, evaluateBusinessAssertions, validateBusinessAssertions, validateBusinessEvaluatorConfig } from './business-assertions.contract';
 import {
   BadRequestException,
   ConflictException,
@@ -21,7 +22,7 @@ import {
   CURATED_INTERVIEW_RELEASE_EVALUATOR,
 } from './curated-release-dataset';
 
-const DEFAULT_RELEASE_EVALUATION_BUDGET_CNY = 5;
+const DEFAULT_RELEASE_EVALUATION_BUDGET_CNY = 3;
 
 class ReleaseEvaluationBudgetError extends Error {}
 
@@ -227,6 +228,10 @@ export class EvaluationService {
     if (dataset.frozenAt) {
       throw new ConflictException('Dataset 已冻结，不能再追加 Case；请创建新版本');
     }
+    if (dto.expectedOutput?.contractVersion === BUSINESS_ASSERTIONS_VERSION) {
+      // A Dataset is not bound to an adapter. Validate shape now and actual Trace support at prepareEvaluation.
+      validateBusinessAssertions(dto.expectedOutput, undefined, false);
+    }
     try {
       return await this.prisma.evaluationCase.create({
         data: {
@@ -285,6 +290,7 @@ export class EvaluationService {
   }
 
   async createEvaluator(userId: string, dto: CreateEvaluatorDto) {
+    if (dto.type === 'BUSINESS_ASSERTIONS') validateBusinessEvaluatorConfig(dto.config);
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     try {
       return await this.prisma.evaluator.create({
@@ -334,6 +340,11 @@ export class EvaluationService {
       throw new BadRequestException('Dataset 至少需要一个启用的 case 才能运行评测');
     }
     const repeatCount = dto.repeatCount ?? 1;
+    if (!Number.isInteger(repeatCount) || repeatCount < 1 || repeatCount > 5) throw new BadRequestException('repeatCount 须为1至5');
+    if (dataset.cases.length > 50) throw new BadRequestException('每次评测最多50个启用 Case');
+    if (dto.maxEstimatedCostCny !== undefined && (!Number.isFinite(dto.maxEstimatedCostCny) || dto.maxEstimatedCostCny < 0.01 || dto.maxEstimatedCostCny > 100)) {
+      throw new BadRequestException('maxEstimatedCostCny 须为0.01至100之间的有限数值');
+    }
     if (repeatCount >= 3 && (!dataset.frozenAt || !dataset.contentHash)) {
       throw new BadRequestException('3–5 次发布证据评测要求先冻结 Dataset 并生成内容指纹');
     }
@@ -359,9 +370,13 @@ export class EvaluationService {
       }
     }
     const evaluator = await this.requireEvaluator(workspace.id, dto.evaluatorId);
-    const effectiveBudgetCny = repeatCount >= 3
-      ? Math.min(dto.maxEstimatedCostCny!, this.releaseBudgetCeilingCny())
-      : null;
+    let assertionContractHash: string | undefined;
+    if (evaluator.type === 'BUSINESS_ASSERTIONS') {
+      validateBusinessEvaluatorConfig(evaluator.config);
+      for (const item of dataset.cases) validateBusinessAssertions(item.expectedOutput, (version.runtimeConfig as any)?.adapter);
+      assertionContractHash = businessContractHash(evaluator.config, dataset.cases);
+    }
+    const effectiveBudgetCny = Math.min(dto.maxEstimatedCostCny ?? this.releaseBudgetCeilingCny(), this.releaseBudgetCeilingCny());
     const assetHash = this.datasetContentHash(dataset.version, {
       cases: dataset.cases, evaluator: { type: evaluator.type, config: evaluator.config },
       version: { systemPrompt: version.systemPrompt, modelConfig: version.modelConfig,
@@ -369,13 +384,13 @@ export class EvaluationService {
         knowledgeBindings: version.knowledgeBindings, memoryBindings: version.memoryBindings,
         inputSchema: version.inputSchema, outputSchema: version.outputSchema },
     });
-    return { workspace, agent, version, dataset, evaluator, repeatCount, effectiveBudgetCny, assetHash };
+    return { workspace, agent, version, dataset, evaluator, repeatCount, effectiveBudgetCny, assetHash, assertionContractHash };
   }
 
   async runEvaluation(userId: string, agentId: string, dto: RunEvaluationDto, job?: EvaluationJobExecution) {
     const prepared = await this.prepareEvaluation(userId, agentId, dto);
     if (job && job.assetHash !== prepared.assetHash) throw new ConflictException('评测资产已变化，请明确创建新任务');
-    const { workspace, agent, version, dataset, evaluator, repeatCount, effectiveBudgetCny } = prepared;
+    const { workspace, agent, version, dataset, evaluator, repeatCount, effectiveBudgetCny, assertionContractHash } = prepared;
     const startedAt = job?.startedAt ?? new Date();
     let spentCostCny = 0;
     let completedSamples = 0;
@@ -411,6 +426,7 @@ export class EvaluationService {
         metadata: unknown;
       }> = [];
       const allRuns: any[] = [];
+      const assertionResults: Array<{ passed: boolean }> = [];
       for (const datasetCase of dataset.cases) {
         const samples: Array<{ rule: RuleEvaluation; run?: any; error?: string }> = [];
         for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
@@ -449,31 +465,28 @@ export class EvaluationService {
                 );
               }
             }
-            samples.push({ rule: this.evaluateRule(evaluator, datasetCase, run), run });
+            let rule: RuleEvaluation;
+            if (evaluator.type === 'BUSINESS_ASSERTIONS') {
+              const contract = validateBusinessAssertions(datasetCase.expectedOutput, (version.runtimeConfig as any)?.adapter);
+              const events = contract.assertions.some(item => item.source === 'trace')
+                ? await this.prisma.traceEvent.findMany({ where: { runId: run.id, run: { workspaceId: workspace.id } }, orderBy: { seq: 'asc' } }) : [];
+              const assertions = evaluateBusinessAssertions(contract, run, events);
+              assertionResults.push(...assertions);
+              const passed = assertions.every(item => item.passed);
+              rule = { score: passed ? 100 : 0, passed,
+                metrics: { contractVersion: BUSINESS_ASSERTIONS_VERSION, assertionCount: assertions.length, passedAssertions: assertions.filter(item => item.passed).length },
+                evidence: { runId: run.id, assertions, semanticQuality: 'not-assessed', traceCoverage: 'positive-events-only' },
+                ...(passed ? {} : { failureCategory: 'BUSINESS_ASSERTION_FAILED', failureMessage: assertions.filter(item => !item.passed).map(item => `${item.id}: ${item.reason}`).join('; ') }),
+              };
+            } else rule = this.evaluateRule(evaluator, datasetCase, run);
+            samples.push({ rule, run });
             await progress();
           } catch (error: any) {
             if (error instanceof ReleaseEvaluationBudgetError || error instanceof EvaluationCancellationError) throw error;
-            if (effectiveBudgetCny !== null) {
-              interruptedRunId = error?.agentLabRunId ?? null;
-              costEvidenceUnavailable = true;
-              // A failed runtime can already have incurred Provider charges.
-              // Without complete usage evidence, continuing cannot enforce the budget.
-              throw new ReleaseEvaluationBudgetError('发布评测样本失败，费用无法完整核验，已停止后续 Provider 调用');
-            }
-            const message = error?.message || '运行或规则评测失败';
+            interruptedRunId = error?.agentLabRunId ?? null;
             costEvidenceUnavailable = true;
-            samples.push({
-              rule: {
-                score: 0,
-                passed: false,
-                metrics: {},
-                evidence: { error: message, runId: error?.agentLabRunId ?? null },
-                failureCategory: 'RUN_FAILED',
-                failureMessage: message,
-              },
-              error: message,
-              run: error?.agentLabRunId ? { id: error.agentLabRunId } : undefined,
-            });
+            // An interrupted sample may have incurred an unconfirmed charge. Never spend again under that uncertainty.
+            throw new ReleaseEvaluationBudgetError('评测样本失败，费用无法完整核验，已停止后续 Provider 调用');
           }
         }
         const score = samples.reduce((sum, item) => sum + item.rule.score, 0) / samples.length;
@@ -530,6 +543,15 @@ export class EvaluationService {
           metrics: {
             evaluatorType: evaluator.type,
             outputContractVersion: 'final-output/v1',
+            qualityEvidence: evaluator.type === 'BUSINESS_ASSERTIONS' ? {
+              version: BUSINESS_EVIDENCE_VERSION, kind: 'deterministic-business-contract', scope: 'output-contract',
+              contractVersion: BUSINESS_ASSERTIONS_VERSION, contractHash: assertionContractHash,
+              assertionCount: assertionResults.length, passed: assertionResults.filter(item => item.passed).length,
+              failed: assertionResults.filter(item => !item.passed).length,
+              unavailable: dataset.cases.reduce((sum: number, item: any) => sum + item.expectedOutput.assertions.length * repeatCount, 0) - assertionResults.length,
+              semanticQuality: 'not-assessed', notAssessed: ['interview-semantic-quality', 'training-effectiveness', 'complete-trajectory'],
+            } : { version: BUSINESS_EVIDENCE_VERSION, kind: 'contract-smoke', scope: 'smoke', semanticQuality: 'not-assessed',
+              notAssessed: ['interview-semantic-quality', 'training-effectiveness', 'complete-trajectory'] },
             cachePolicy: 'semantic-cache-bypass/v1',
             datasetContentHash: dataset.contentHash ?? null,
             datasetFrozenAt: dataset.frozenAt ?? null,
@@ -540,9 +562,7 @@ export class EvaluationService {
             failedCases: caseResults.length - passedCases,
             averageScore: score,
             wallClockLatencyMs: completedAt.getTime() - startedAt.getTime(),
-            budget: effectiveBudgetCny === null
-              ? { status: 'not-required', spentCny: Number(spentCostCny.toFixed(6)), costEvidenceStatus: costEvidenceUnavailable ? 'unavailable' : 'available' }
-              : {
+            budget: {
                   status: 'within-limit',
                   limitCny: effectiveBudgetCny,
                   spentCny: Number(spentCostCny.toFixed(6)),
@@ -858,7 +878,7 @@ export class EvaluationService {
   private releaseBudgetCeilingCny() {
     const configured = Number(process.env.AGENT_LAB_MAX_EVALUATION_COST_CNY);
     return Number.isFinite(configured) && configured >= 0.01
-      ? configured
+      ? Math.min(configured, DEFAULT_RELEASE_EVALUATION_BUDGET_CNY)
       : DEFAULT_RELEASE_EVALUATION_BUDGET_CNY;
   }
 

@@ -1,200 +1,32 @@
-# Golden Dataset 评估体系
+# Golden 评分合同评测
 
-> v1.0.0 · 创建于 2026-06-21
+更新2026-10-29。数据文件1.0.0含30题、60个参考回答。它是现有参考资产，不据样本数推断统计充分，也未证明独立人工双评或生产评分准确性。
 
-## 这是什么
+## 当前实现
 
-**Golden Dataset** = 30 条面试评测 case,用于**回归测试** LLM 评分质量。
+`EvalRunner` 与实际 `DynamicTaskQueueService.agentDecide` 共用 `interview-decision/v1` 的请求构造及有界结构解析。生产0–1评分转换为报告0–100分；不额外发明另一个加权评分Prompt。生产无效决策降级为明确非模型来源；Golden评测将无效决策保留为失败，不把兜底结果算模型成功。
 
-| 维度 | 数量 | 说明 |
-|---|---|---|
-| 岗位 | 15 前端 + 15 AI Agent | 跨方向 |
-| 难度 | 8 easy / 14 medium / 8 hard | 真实分布 |
-| 题型 | 8 概念 / 8 设计 / 6 经验 / 4 对比 / 4 边界 | 全覆盖 |
-| 回答档位 | 每题 2-3 档 (excellent/poor) | 评模型稳定性 |
-| **总样本** | **60+ 个评分样本** | 统计有意义 |
+报告包括 MAE、相关性、档位/关键词一致率、三维误差、预期/尝试/有效/错误样本及覆盖率、实际模型/Provider、Prompt hash和合同版本。调用错误、非有限/越界字段、缺样本、空样本或旧合同不能通过；不得只展示成功子集证明质量。模型/费用未知不填默认值。数值阈值是当前工程规则，不代表已被独立业务校准。
 
-每条 case 包含:
-- 题面
-- 多档模拟回答 (excellent / good / average / poor)
-- 期望分数 (expectedScore 0-100)
-- 期望多维评分 (correctness / depth / completeness)
-- 期望反馈关键词
-- 标注 reason(为什么这个分数)
+## Provider-free 校验
 
----
-
-## 5 个核心指标
-
-| 指标 | 含义 | 目标值 | 公式 |
-|---|---|---|---|
-| **scorePearson** | LLM 评分 vs 期望分数的皮尔逊相关系数 | ≥ 0.7 | 1.0 完美相关 |
-| **scoreMAE** | 平均绝对误差(分) | ≤ 20 | 期望 100 给 85 = 15 |
-| **levelAccuracy** | 档位一致率(excellent/good/average/poor) | ≥ 65% | 分类正确比例 |
-| **keywordHitRate** | 反馈关键词命中率 | ≥ 50% | 期望关键词被覆盖比例 |
-| **sampleSize** | 样本数 | ≥ 30 | 统计有效 |
-
----
-
-## 使用方法
-
-### 1. 校验数据集(无需 LLM)
-
-```bash
-cd apps/api
-pnpm ts-node src/evals/eval-runner.ts --validate
+```sh
+corepack pnpm@9.0.0 --filter api eval:validate
+corepack pnpm@9.0.0 --filter api test:jest --runInBand golden-dataset.eval.spec.ts golden-evaluation-contract.spec.ts agent-lab-recording.spec.ts
 ```
 
-✅ 通过 = 数据集 JSON 格式正确
+部分受限环境不允许tsx CLI创建IPC pipe，可以在apps/api目录用 `node --import tsx src/evals/eval-runner.ts --validate`；同样仅校验schema，不运行模型。
 
-### 2. 跑全量评估(需 LLM API)
+## 真实模型执行边界
 
-```bash
-cd apps/api
-export QWEN_API_KEY=sk-xxx   # 必须,脚本第一件事就检查
-pnpm ts-node src/evals/eval-runner.ts
-```
+旧版默认直连Qwen的CLI已移除，因为它绕过统一预算、用量和费用证据。裸执行/仅配置API Key不会发起付费请求；不会用一次外部失败继续无界跑全量。受审计的服务端执行器可以注入scorer调用Runner，但必须自行提供认证主体/配额/预算/usage，当前没有完成该真实执行器验收。共享请求/解析不等于真实生产评分已校准。
 
-可选环境变量:
-- `QWEN_API_KEY` (必填) — DashScope API key
-- `QWEN_MODEL` (默认 `qwen-plus`)
-- `QWEN_BASE_URL` (默认 `https://dashscope.aliyuncs.com/compatible-mode/v1`)
+`runGoldenCli` 对执行器的FAIL结果返回非零状态；当前默认CLI仅允许 `--validate`。CI的合成scorer测试检查执行/报告合同，不是实际模型能力门禁。
 
-⏱️ 约 5-8 分钟(30 case × 2-3 档 × ~5s LLM 调用)
+## Recorded 导入
 
-> **设计说明**:CLI 入口脱离 NestJS DI,直接 fetch Qwen API。
-> 原因:eval 只调 LLM,拉起 AppModule 会撞 prisma generate / .env / Redis 等基础设施问题。
-> EvalRunner 类本身还兼容 LlmGatewayService(未来要在 NestJS 上下文跑,把 `StandaloneQwenScorer` 换成注入的 service 即可)。
+`toAgentLabRecordedRun` 拒绝FAIL、缺失/旧合同、错误或不完整样本，以及缺真实资源证据的报告。不得将未知Token/费用伪造为0。当前Runner不制造resourceEvidence，因此其报告不能直接升级为可发布Recorded证据；录制导入仍与真实Agent发布分离。
 
-输出:
-- `apps/api/src/evals/reports/eval-report-{timestamp}.json` — 完整数据
-- `apps/api/src/evals/reports/eval-report-{timestamp}.md` — Markdown 报告
+## 下一步
 
-### 3. 跑单条 case 调试
-
-```bash
-pnpm ts-node src/evals/eval-runner.ts --case case-001-fe-react-hooks
-```
-
-### 4. CI 集成(vitest)
-
-```bash
-pnpm vitest run src/__tests__/golden-dataset.eval.spec.ts
-```
-
-**CI 行为**: 任意指标不达标 → 测试失败 → 阻断 merge
-
----
-
-## 报告示例
-
-```markdown
-# Eval 报告 — 2026-06-21T01:30:00
-
-## 📊 整体指标
-
-| 指标 | 实际 | 阈值 | 通过 |
-|---|---|---|---|
-| 分数相关性 (Pearson) | 0.78 | ≥ 0.7 | ✅ |
-| 平均绝对偏差 (MAE)   | 15.3 | ≤ 20  | ✅ |
-| 档位一致率            | 70%  | ≥ 65% | ✅ |
-| 关键词命中率          | 55%  | ≥ 50% | ✅ |
-
-## 📈 按难度分组
-...
-
-## ❌ 失败 Case
-| Case | 档位 | 偏差 | 原因 |
-| case-013-fe-typescript | poor | 38 | LLM 给 73 分 |
-```
-
----
-
-## 扩展指南
-
-### 加新 case
-
-编辑 `apps/api/src/evals/golden-dataset.json`,加一个 case 节点:
-
-```json
-{
-  "id": "case-031-agent-xxx",
-  "position": "AI Agent 工程师",
-  "level": "P6",
-  "category": "rag",
-  "difficulty": "medium",
-  "question": "你的问题?",
-  "responses": [
-    {
-      "level": "excellent",
-      "answer": "...",
-      "expectedScore": 90,
-      "expectedCorrectness": 0.9,
-      "expectedDepth": 0.9,
-      "expectedCompleteness": 0.9,
-      "expectedFeedbackKeywords": ["关键词1", "关键词2"],
-      "reason": "为什么这个分数"
-    },
-    {
-      "level": "poor",
-      ...
-    }
-  ],
-  "tags": ["rag", "embedding"],
-  "notes": "考察..."
-}
-```
-
-然后跑 `--validate` 校验 + 跑全量看新 case 评分是否合理。
-
-### 改评分 prompt
-
-改 `apps/api/src/evals/eval-runner.ts` 的 `SCORING_PROMPT` 常量,跑全量 eval,看指标变化:
-
-```diff
-- 平均绝对偏差 (MAE)  15.3 → 18.7 ❌ 退化
-+ 档位一致率           70% → 78% ✅ 提升
-```
-
-→ 通过对比决定是否采用新 prompt。
-
-### 接 Langfuse Dataset (可选)
-
-在 `eval-runner.ts` 的 `runCase` 里加 Langfuse Dataset API,把 case 推上去 + 关联 trace,长期追踪评分变化。
-
----
-
-## 文件结构
-
-```
-apps/api/src/evals/
-├── golden-dataset.json          # 30 条 case 数据
-├── golden-dataset.schema.ts     # Zod schema 强校验
-├── eval-runner.ts               # 核心: 跑模型 → 对比 → 算指标
-├── eval-reporter.ts             # 输出 JSON + Markdown 报告
-├── README.md                    # 本文件
-└── reports/                     # 生成的报告 (gitignore)
-    ├── eval-report-2026-06-21T01-30-00.json
-    └── eval-report-2026-06-21T01-30-00.md
-
-apps/api/src/__tests__/
-└── golden-dataset.eval.spec.ts  # vitest 集成 (CI 门禁)
-```
-
----
-
-## 面试话术
-
-> "我做了 30 条 Golden Dataset,每题多档回答,跑 4 个核心指标(分数相关 / MAE / 档位一致率 / 关键词命中率)。改了 prompt 必须先跑回归,5 个指标全部达标才能发版。"
->
-> "未来可以接 Langfuse Dataset,把 case 关联到 trace,长期追踪评分漂移。"
-
----
-
-## TODO (未来扩展)
-
-- [ ] 接 Langfuse Dataset API
-- [ ] 加 pairwise 比较(A/B prompt 哪个好)
-- [ ] 加人工评测入口(把 LLM 输出存盘,人工 review)
-- [ ] 多模型对比(Qwen vs DeepSeek 谁评分更准)
-- [ ] Auto-evolve:case 自动挖掘(从生产对话里找"评分漏判"的样本)
+先建立独立专家双评、分歧仲裁、证据准确率与过度/不足评分参考，再接受预算约束的真实生产评分校准。新旧Prompt合同不可混用历史报告。Lab确定性业务评测的可用入口见 [BUSINESS_ASSERTIONS](../../../../docs/harness/BUSINESS_ASSERTIONS.md)。

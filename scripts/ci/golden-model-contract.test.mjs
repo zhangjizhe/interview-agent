@@ -32,7 +32,7 @@ test('real reviewer template satisfies the complete approval envelope without as
   assert.deepEqual(result.issues, []); assert.deepEqual(result.issue_tags, []);
   assert.equal(typeof result.suggestion, 'string'); assert.equal(typeof result.reflection, 'string'); assert.ok(result.confidence >= 0 && result.confidence <= 1);
 });
-const decisionBody = () => body(template('apps/api/src/modules/interview/services/dynamic-task-queue.service.ts', '你是一位资深技术面试官，需要同时完成两件事：'));
+const decisionBody = () => body(template('apps/api/src/modules/interview/services/interview-decision.contract.ts', '你是一位资深技术面试官，需要同时完成两件事：'));
 test('actual scoring template carries all required dimensions and nullable routing fields', () => {
   const result = parse(decisionBody());
   for (const key of ['score', 'completeness', 'correctness', 'depth']) assert.equal(result[key], 0.45);

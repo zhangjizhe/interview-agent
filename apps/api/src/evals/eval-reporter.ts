@@ -11,6 +11,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { GoldenDataset } from './golden-dataset.schema';
+import { INTERVIEW_DECISION_CONTRACT_VERSION } from '../modules/interview/services/interview-decision.contract';
 
 export interface CaseResult {
   caseId: string;
@@ -27,6 +28,10 @@ export interface CaseResult {
     expectedFeedback: string;
     actualFeedback: string;
     error?: string;
+    observedModel?: string;
+    observedProvider?: string;
+    expectedDimensions?: Record<'correctness' | 'depth' | 'completeness', number>;
+    actualDimensions?: Record<'correctness' | 'depth' | 'completeness', number>;
   }[];
   metrics: {
     scoreMAE: number;
@@ -42,6 +47,12 @@ export interface EvalReport {
     datasetVersion: string;
     durationMs: number;
     model: string;
+    configuredModel: string;
+    observedModels: string[];
+    observedProviders: string[];
+    promptHash: string | null;
+    scope: 'interview-decision-contract-evaluation';
+    scorerContractVersion: string | null;
   };
   overall: {
     scorePearson: number;
@@ -49,12 +60,23 @@ export interface EvalReport {
     levelAccuracy: number;
     keywordHitRate: number;
     sampleSize: number;
+    expectedSamples: number;
+    attemptedSamples: number;
+    validSamples: number;
+    errorSamples: number;
+    errorRate: number;
+    coverageRate: number;
+    dimensionEvidenceStatus: 'available' | 'unavailable';
+    dimensionMAE: Record<'correctness' | 'depth' | 'completeness', number | null>;
     passThreshold: { pearson: number; mae: number; levelAcc: number; keywordHit: number };
   };
   byDifficulty: Record<string, { scoreMAE: number; levelAccuracy: number; sampleSize: number }>;
   byPosition: Record<string, { scoreMAE: number; levelAccuracy: number; sampleSize: number }>;
   failedCases: { caseId: string; reason: string; level: string; deviation: number }[];
   caseResults: CaseResult[];
+  qualityVerdict: { status: 'PASS' | 'FAIL'; reasons: string[] };
+  // Only a budget-audited host may supply this; the provider-free CLI cannot.
+  resourceEvidence?: { status: 'available'; inputTokens: number; outputTokens: number; estimatedCostCny: number };
 }
 
 export class EvalReporter {
@@ -64,30 +86,50 @@ export class EvalReporter {
     dataset: GoldenDataset,
     results: CaseResult[],
     durationMs: number,
+    execution?: { configuredModel: string; promptHash?: string; scorerContractVersion?: string; expectedCaseIds?: readonly string[] },
   ): EvalReport {
     // 1. 计算整体指标
+    const expectedIds = execution?.expectedCaseIds ?? dataset.cases.map(item => item.id);
+    const expectedSet = new Set(expectedIds);
+    const expectedSamples = dataset.cases.filter(item => expectedSet.has(item.id)).reduce((sum, item) => sum + item.responses.length, 0);
+    const attemptedSamples = results.reduce((sum, item) => sum + item.responses.length, 0);
     const allPairs = results
       .flatMap((r) => r.responses)
       .filter((r) => !r.error);
     const expectedScores = allPairs.map((r) => r.expectedScore);
     const actualScores = allPairs.map((r) => r.actualScore);
 
+    const dimensions = ['correctness', 'depth', 'completeness'] as const;
+    const dimensionEvidenceAvailable = allPairs.length > 0 && allPairs.every(item => dimensions.every(dimension =>
+      typeof item.expectedDimensions?.[dimension] === 'number' && Number.isFinite(item.expectedDimensions[dimension])
+      && typeof item.actualDimensions?.[dimension] === 'number' && Number.isFinite(item.actualDimensions[dimension])));
+    const dimensionMAE = Object.fromEntries(dimensions.map(dimension => [dimension, dimensionEvidenceAvailable
+      ? allPairs.reduce((sum, item) => sum + Math.abs(item.actualDimensions![dimension] - item.expectedDimensions![dimension]) * 100, 0) / allPairs.length
+      : null])) as Record<typeof dimensions[number], number | null>;
     const overall = {
       scorePearson: this.pearson(expectedScores, actualScores),
-      scoreMAE:
+      scoreMAE: !allPairs.length ? 100 :
         allPairs.reduce((s, r) => s + Math.abs(r.actualScore - r.expectedScore), 0) /
-        allPairs.length,
+        (allPairs.length || 1),
       levelAccuracy:
         allPairs.filter(
           (r) => this.scoreToLevel(r.actualScore) === r.level,
-        ).length / allPairs.length,
+        ).length / (allPairs.length || 1),
       keywordHitRate:
         allPairs.reduce((s, r) => {
           const exp = new Set(r.expectedKeywords.map((k) => k.toLowerCase()));
-          const hit = r.actualKeywords.filter((k) => exp.has(k.toLowerCase())).length;
+          const hit = new Set(r.actualKeywords.filter((k) => exp.has(k.toLowerCase())).map(k => k.toLowerCase())).size;
           return s + (exp.size > 0 ? hit / exp.size : 0);
-        }, 0) / allPairs.length,
+        }, 0) / (allPairs.length || 1),
       sampleSize: allPairs.length,
+      expectedSamples,
+      attemptedSamples,
+      validSamples: allPairs.length,
+      errorSamples: attemptedSamples - allPairs.length,
+      errorRate: attemptedSamples ? (attemptedSamples - allPairs.length) / attemptedSamples : 0,
+      coverageRate: expectedSamples ? allPairs.length / expectedSamples : 0,
+      dimensionEvidenceStatus: dimensionEvidenceAvailable ? 'available' as const : 'unavailable' as const,
+      dimensionMAE,
       passThreshold: { pearson: 0.7, mae: 20, levelAcc: 0.65, keywordHit: 0.5 },
     };
 
@@ -147,12 +189,39 @@ export class EvalReporter {
       }
     }
 
+    const reasons: string[] = [];
+    if (execution?.scorerContractVersion !== INTERVIEW_DECISION_CONTRACT_VERSION) reasons.push('SCORER_CONTRACT_UNVERIFIED');
+    if (!dimensionEvidenceAvailable) reasons.push('DIMENSION_EVIDENCE_UNAVAILABLE');
+    if (!expectedSamples || !attemptedSamples || !allPairs.length) reasons.push('NO_VALID_SAMPLES');
+    if (overall.errorSamples > 0) reasons.push('JUDGE_OR_PROVIDER_FAILURE');
+    if (expectedIds.length !== expectedSet.size || expectedIds.some(id => !dataset.cases.some(item => item.id === id))
+      || results.length !== expectedSet.size || new Set(results.map(item => item.caseId)).size !== results.length
+      || results.some(item => !expectedSet.has(item.caseId)
+        || item.responses.length !== dataset.cases.find(candidate => candidate.id === item.caseId)?.responses.length)
+      || allPairs.length !== expectedSamples) reasons.push('INCOMPLETE_SAMPLE_COVERAGE');
+    if (![overall.scorePearson, overall.scoreMAE, overall.levelAccuracy, overall.keywordHitRate].every(Number.isFinite)) reasons.push('NON_FINITE_METRIC');
+    if (overall.scorePearson < overall.passThreshold.pearson) reasons.push('SCORE_CORRELATION_BELOW_THRESHOLD');
+    if (overall.scoreMAE > overall.passThreshold.mae) reasons.push('SCORE_MAE_ABOVE_THRESHOLD');
+    if (overall.levelAccuracy < overall.passThreshold.levelAcc) reasons.push('LEVEL_ACCURACY_BELOW_THRESHOLD');
+    if (overall.keywordHitRate < overall.passThreshold.keywordHit) reasons.push('KEYWORD_HIT_BELOW_THRESHOLD');
+    const observedModels = [...new Set(allPairs.map(item => item.observedModel ?? 'unknown'))].sort();
+    const observedProviders = [...new Set(allPairs.map(item => item.observedProvider ?? 'unknown'))].sort();
+    const identified = (value: unknown) => typeof value === 'string' && value.trim().length > 0 && value !== 'unknown' && value.length <= 200;
+    if (!allPairs.length || !allPairs.every(item => identified(item.observedModel) && identified(item.observedProvider))) reasons.push('MODEL_IDENTITY_UNAVAILABLE');
+    if (!execution?.promptHash || !/^[0-9a-f]{64}$/.test(execution.promptHash)) reasons.push('PROMPT_IDENTITY_UNAVAILABLE');
     return {
+      qualityVerdict: { status: reasons.length ? 'FAIL' : 'PASS', reasons },
       metadata: {
         timestamp: new Date().toISOString(),
         datasetVersion: dataset.version,
         durationMs,
-        model: 'qwen',
+        model: observedModels.length === 1 ? observedModels[0] : observedModels.length ? 'mixed' : 'unknown',
+        configuredModel: execution?.configuredModel ?? 'unknown',
+        observedModels,
+        observedProviders,
+        promptHash: execution?.promptHash ?? null,
+        scope: 'interview-decision-contract-evaluation',
+        scorerContractVersion: execution?.scorerContractVersion ?? null,
       },
       overall,
       byDifficulty,
@@ -180,9 +249,19 @@ export class EvalReporter {
     const passMAE = o.scoreMAE <= o.passThreshold.mae ? '✅' : '❌';
     const passLevel = o.levelAccuracy >= o.passThreshold.levelAcc ? '✅' : '❌';
     const passKw = o.keywordHitRate >= o.passThreshold.keywordHit ? '✅' : '❌';
-    const allPass = passPearson === '✅' && passMAE === '✅' && passLevel === '✅' && passKw === '✅';
+    const allPass = report.qualityVerdict.status === 'PASS';
 
     const md = `# Eval 报告 — ${report.metadata.timestamp}
+
+范围：生产 Interview 决策的请求/解析合同评测；不代表人工校准通过或完整 Agent 业务验收。
+
+**质量判定**：${report.qualityVerdict.status} ${report.qualityVerdict.reasons.join(', ')}
+
+**样本证据**：预期 ${o.expectedSamples} / 尝试 ${o.attemptedSamples} / 有效 ${o.validSamples} / 错误 ${o.errorSamples}；错误率 ${o.errorRate.toFixed(3)}，覆盖率 ${o.coverageRate.toFixed(3)}。
+
+**维度平均绝对误差（分）**：correctness ${o.dimensionMAE.correctness ?? 'unavailable'} / depth ${o.dimensionMAE.depth ?? 'unavailable'} / completeness ${o.dimensionMAE.completeness ?? 'unavailable'}。
+
+**实际模型**：${report.metadata.observedModels.join(', ') || 'unknown'}；配置模型：${report.metadata.configuredModel}。
 
 ## 📊 整体指标
 

@@ -26,7 +26,7 @@ const server = http.createServer(async (req, res) => {
     });
     if (message.includes('fixture-delay')) await new Promise(resolve => setTimeout(resolve, 3000));
     let content;
-    try { content = goldenProfile ? goldenModelReply(body, { stage: goldenProfile }) : prompt.includes('fixture-route') ? 'route-yes' : `fixture-response:${message}`; }
+    try { content = goldenProfile ? goldenModelReply(body, { stage: goldenProfile }) : prompt === 'fixture-business-contract' || prompt === 'fixture-business-invalid' ? JSON.stringify({ score: prompt === 'fixture-business-invalid' ? 1.2 : 0.75, decision: 'FOLLOW_UP', summary: 'fixture-response:synthetic-release' }) : prompt.includes('fixture-route') ? 'route-yes' : `fixture-response:${message}`; }
     catch { res.statusCode = 422; return res.end(JSON.stringify({ error: { message: 'Unsupported synthetic golden contract' } })); }
     if (body.stream === true) {
       res.setHeader('Content-Type', 'text/event-stream');
