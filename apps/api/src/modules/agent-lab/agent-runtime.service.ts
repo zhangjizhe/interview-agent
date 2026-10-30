@@ -1,6 +1,7 @@
 import { assertSchema } from './configured-runtime.contract';
 import type { ConfiguredRuntimeService } from './configured-runtime.service';
 import { RuntimeCancelledError } from './configured-runtime.contract';
+import { createBuiltinRuntimeAdapters, RUNTIME_ADAPTER_REGISTRY, RuntimeAdapterRegistry } from './runtime-adapter';
 import {
   BadRequestException,
   ConflictException,
@@ -19,6 +20,7 @@ import { TraceBundleService } from './trace-bundle.service';
 @Injectable()
 export class AgentRuntimeService {
   private readonly logger = new Logger(AgentRuntimeService.name);
+  private readonly adapters: RuntimeAdapterRegistry;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -26,15 +28,19 @@ export class AgentRuntimeService {
     private readonly trace: TraceEventService,
     private readonly traceBundles: TraceBundleService,
     @Optional() @Inject('CONFIGURED_RUNTIME') private readonly configured?: ConfiguredRuntimeService,
-  ) {}
+    @Optional() @Inject(RUNTIME_ADAPTER_REGISTRY) adapters?: RuntimeAdapterRegistry,
+  ) {
+    this.adapters = adapters ?? createBuiltinRuntimeAdapters(multiAgent, configured);
+  }
 
   async prepareConfiguredRun(userId: string, agentId: string, dto: RunAgentDto, allowDraft: boolean) {
     const workspace = await this.getOrCreateDefaultWorkspace(userId);
     const agent = await this.prisma.agent.findFirst({ where: { id: agentId, workspaceId: workspace.id }, include: { currentVersion: true } });
     if (!agent) throw new NotFoundException('Agent不存在或无权访问');
     const version = await this.resolveVersion(agent, dto.agentVersionId, allowDraft);
-    if (!this.configured) throw new ConflictException('配置运行时不可用');
-    await this.configured.prepare(version, workspace.id, allowDraft);
+    const adapter = this.adapters.resolve((version.runtimeConfig as any)?.adapter);
+    if (!adapter.manifest.capabilities.requiresQueue) throw new BadRequestException('该运行适配器不支持配置队列入口');
+    await adapter.prepare({ version, workspaceId: workspace.id, allowDraft });
     assertSchema(version.inputSchema ?? { type: 'object' }, dto.input);
     if (typeof dto.input.message !== 'string' || !dto.input.message.trim() || dto.input.message.length > 10000) throw new BadRequestException('input.message须为1至10000字符');
     return { workspace, version };
@@ -71,17 +77,11 @@ export class AgentRuntimeService {
     }
 
     const runtimeConfig = (version.runtimeConfig || {}) as Record<string, unknown>;
-    const isConfigured = ['single-agent-v1', 'finite-workflow-v1'].includes(String(runtimeConfig.adapter));
-    if (isConfigured && !options.queuedRun && !options.allowDraftVersion) {
+    const adapter = this.adapters.resolve(runtimeConfig.adapter);
+    if (adapter.manifest.capabilities.requiresQueue && !options.queuedRun && !options.allowDraftVersion) {
       throw new ConflictException('配置运行必须通过带 requestKey 的 runs 队列入口启动');
     }
-    const prepared = isConfigured && this.configured
-      ? await this.configured.prepare(version, workspace.id, options.allowDraftVersion === true) : undefined;
-    if (runtimeConfig.adapter !== 'interview-multi-agent' && !prepared) {
-      throw new BadRequestException(
-        `当前仅支持 interview-multi-agent 适配器，版本 ${version.version} 未配置该适配器`,
-      );
-    }
+    const prepared = await adapter.prepare({ version, workspaceId: workspace.id, allowDraft: options.allowDraftVersion === true });
 
     const startedAt = new Date();
     const run = options.queuedRun || await this.prisma.run.create({
@@ -114,19 +114,8 @@ export class AgentRuntimeService {
     });
 
     try {
-      if (!prepared && !this.multiAgent.isEnabled()) {
-        throw new ConflictException('interview-multi-agent 运行时当前未启用');
-      }
-
-      const graphResult: any = prepared
-        ? await this.configured!.execute(userId, run, version, dto.input, prepared)
-        : await this.multiAgent.run(
-        message,
-        dto.externalRunId || run.id,
-        [],
-        version.systemPrompt,
-        { bypassSemanticCache: options.bypassSemanticCache === true },
-      );
+      const graphResult: any = await adapter.execute({ userId, run, version, input: dto.input,
+        externalRunId: dto.externalRunId, bypassSemanticCache: options.bypassSemanticCache === true }, prepared);
       const completedAt = new Date();
       const latencyMs = completedAt.getTime() - startedAt.getTime();
       const output = graphResult.output || {

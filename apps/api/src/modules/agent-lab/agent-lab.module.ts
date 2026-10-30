@@ -1,4 +1,6 @@
 import { ConfiguredRunJobsService } from './configured-run-jobs.service';
+import { MultiAgentService } from '../agent/multi-agent.service';
+import { createBuiltinRuntimeAdapters, RUNTIME_ADAPTER_REGISTRY } from './runtime-adapter';
 import { LlmModule } from '../llm/llm.module';
 import { ConfiguredRuntimeService } from './configured-runtime.service';
 import { AgentLabController } from './agent-lab.controller';
@@ -34,6 +36,8 @@ import { ControlledEvolutionService } from './controlled-evolution.service';
     AgentLabService,
     ConfiguredRuntimeService,
     { provide: 'CONFIGURED_RUNTIME', useExisting: ConfiguredRuntimeService },
+    { provide: RUNTIME_ADAPTER_REGISTRY, inject: [MultiAgentService, ConfiguredRuntimeService],
+      useFactory: createBuiltinRuntimeAdapters },
     ConfiguredRunJobsService,
     AgentRegistryService,
     AgentRuntimeService,
