@@ -88,4 +88,6 @@ export async function verifyConfiguredRelease({ request, admin, check }) {
   check('keyword-bearing JSON with invalid score fails all business cases', failed.failedCases === 10 && failed.passedCases === 0 && failed.results.every(item => item.passed === false));
   check('failed assertion receipts preserve the failing rule', failed.results.every(item => item.evidence?.samples?.some(sample => sample.assertions?.some(rule => rule.id === 'score-range' && rule.passed === false))));
   check('invalid score cannot publish', (await call(`/agent-lab/agents/${invalid.data.id}/versions/${invalid.data.versions[0].id}/publish`)).status === 409);
+  const afterRelease = await fixtureStats();
+  check('release suite executes exactly 120 bounded synthetic samples without external calls', afterRelease.chat - beforeInvalid.chat === 120 && afterRelease.externalRequests === 0);
 }

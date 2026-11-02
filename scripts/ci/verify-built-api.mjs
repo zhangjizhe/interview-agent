@@ -44,6 +44,16 @@ const fixtureRequire = createRequire(`${process.cwd()}/package.json`);
 const { PrismaClient } = fixtureRequire('@prisma/client');
 const fixturePrisma = new PrismaClient();
 try {
+  // This suite intentionally executes 4 * 10 * 3 release samples, plus runtime,
+  // retrieval and browser checks. Keep a finite synthetic-only allowance on the
+  // fixture administrator's organization; never raise the shared Free plan.
+  const fixtureAdmin = await fixturePrisma.user.findUniqueOrThrow({ where: { id: 'fixture-ci-admin' }, include: { organization: { include: { plan: true } } } });
+  const { monthlyInterviews, maxInputBytes, maxOutputTokens } = fixtureAdmin.organization.plan;
+  const fixturePlan = { name: 'Isolated synthetic CI', monthlyLlmCalls: 200, monthlyInterviews, maxInputBytes, maxOutputTokens };
+  await fixturePrisma.plan.upsert({ where: { id: 'isolated-ci-admin' }, create: { id: 'isolated-ci-admin', ...fixturePlan }, update: fixturePlan });
+  await fixturePrisma.organization.update({ where: { id: fixtureAdmin.organizationId }, data: { planId: 'isolated-ci-admin' } });
+  const ordinary = await fixturePrisma.user.findUniqueOrThrow({ where: { id: 'fixture-ci-owner' }, include: { organization: { include: { plan: true } } } });
+  check('synthetic administrator has a finite isolated allowance without changing Free users', ordinary.organization.planId === 'free' && ordinary.organization.plan.monthlyLlmCalls === 100 && (await fixturePrisma.plan.findUniqueOrThrow({ where: { id: 'isolated-ci-admin' } })).monthlyLlmCalls === 200);
   await fixturePrisma.user.update({ where: { id: 'fixture-ci-foreign' }, data: { role: 'ADMIN' } });
   const promoted = await request('/auth/login', { method: 'POST', body: { userId: 'fixture-ci-foreign', password: 'isolated-fixture-password' } });
   check('promoted USER re-login issues ADMIN session', promoted.status === 200 && promoted.data.role === 'ADMIN');
