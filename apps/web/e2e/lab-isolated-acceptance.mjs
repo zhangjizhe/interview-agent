@@ -1,3 +1,4 @@
+import { verifyBusinessAssertions } from './lab-business-assertions-evidence.mjs';
 import { verifyRuntimeAdapterHistory } from './lab-runtime-adapter-evidence.mjs';
 import { verifyExternalInitialization } from './lab-external-init-evidence.mjs';
 import { verifyOperationLogs } from './lab-operation-log-evidence.mjs';
@@ -6,6 +7,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { verifyControlRecovery } from './lab-control-recovery.mjs';
 import { verifyQuestionEvidence } from './lab-question-evidence.mjs';
+import { verifyQuestionCatalogEvidence } from './lab-question-catalog-evidence.mjs';
 import { verifySessionRevocation } from './lab-session-revocation-evidence.mjs';
 import { verifyUserPermission } from './lab-user-permission-evidence.mjs';
 import { verifyBuilderSavePending } from './lab-builder-save-pending-evidence.mjs';
@@ -110,11 +112,13 @@ try {
   await textContains('fixture-response:route-yes');
   console.log('PASS browser workflow: saved new fixed-version draft and executed real branching nodes');
   await verifyQuestionEvidence(page, context, url);
+  await verifyQuestionCatalogEvidence(page, context, url);
   await page.getByRole('button', { name: '自进化', exact: true }).click();
   await page.getByRole('combobox', { name: 'Agent', exact: true }).selectOption({ label: 'browser-ci-agent · 无当前版本' });
   await page.getByRole('button', { name: '核验首次发布门禁', exact: true }).click();
   await textContains('版本必须先完成一次评测，才可以发布。');
   assert.equal(await page.getByRole('button', { name: '管理员发布', exact: true }).isDisabled(), true);
+  await verifyBusinessAssertions(page, context, url);
   const navigation = [['控制中心', '控制中心'], ['运行编排', 'Agent 与工作流编排'], ['MCP 与工具', 'MCP 与工具治理'],
     ['题库治理', '题库治理'], ['Trace', 'Trace 运行记录'], ['评测', '评测证据'], ['自进化', '受控自进化'],
     ['实验', '实验比较'], ['发布', '发布决策'], ['审计', '审计查询'], ['操作日志', '操作日志']];

@@ -1,7 +1,7 @@
 jest.mock('@zilliz/milvus2-sdk-node', () => ({ MilvusClient: jest.fn(() => ({})), ConsistencyLevelEnum: { Strong: 'Strong' } }));
 jest.mock('../modules/llm/llm.gateway.service', () => ({ LlmGatewayService: class {} }));
 import { ConfigService } from '@nestjs/config';
-import { QuestionBankService } from '../modules/interview/services/question-bank.service';
+import { QuestionVectorIndexService as QuestionBankService } from '../modules/interview/services/question-vector-index.service';
 import { tenantContext } from '../modules/organizations/tenant-context';
 
 const ok = { status: { error_code: 'Success', code: 0 } };

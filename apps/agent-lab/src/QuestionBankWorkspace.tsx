@@ -14,6 +14,8 @@ export type QuestionBankItem = {
   tags: string[] | string;
   difficulty?: string;
   source: string;
+  version?: number;
+  indexStatus?: string;
 };
 
 export function QuestionBankWorkspace({
@@ -49,6 +51,7 @@ export function QuestionBankWorkspace({
 }) {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
   const [form, setForm] = useState({ position: 'AI Agent 工程师', level: 'P5', category: '通用', question: '', answer: '', tags: '' });
   const createQuestion = useMutation({
     mutationFn: async () => {
@@ -62,10 +65,14 @@ export function QuestionBankWorkspace({
       }
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setSaveMessage(result.mode === 'CATALOG' && result.indexStatus === 'PENDING'
+        ? '题目已保存到主数据，检索索引尚未就绪。请在上方处理待索引题目，无需重复新增。'
+        : '题目保存已确认。');
       setShowCreate(false);
       setForm({ position: 'AI Agent 工程师', level: 'P5', category: '通用', question: '', answer: '', tags: '' });
       queryClient.invalidateQueries({ queryKey: ['agent-lab-question-bank'] });
+      queryClient.invalidateQueries({ queryKey: ['question-catalog-status'] });
       onClearSearch();
     },
   });
@@ -75,7 +82,7 @@ export function QuestionBankWorkspace({
       if (result.deleted !== true) throw new Error('删除未确认，请刷新后核验。');
       return result;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['agent-lab-question-bank'] }); onClearSearch(); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['agent-lab-question-bank'] }); queryClient.invalidateQueries({ queryKey: ['question-catalog-status'] }); onClearSearch(); },
   });
   const visibleQuestions = searchResults ?? questions;
 
@@ -92,6 +99,7 @@ export function QuestionBankWorkspace({
       </div>
     </section>
     {message && <p className="agent-error">{message}</p>}
+    {saveMessage && <p role="status">{saveMessage}</p>}
     {createQuestion.isError && <p className="agent-error">{createQuestion.error instanceof Error ? createQuestion.error.message : '题目保存失败'}。若结果未知，请先刷新核验，避免重复调用模型。</p>}
     {deleteQuestion.isError && <p className="agent-error" role="alert">题目删除失败，请刷新核验后重试。</p>}
     {showCreate && <form className="lab-command-form question-bank-create" onSubmit={(event) => { event.preventDefault(); if (!createQuestion.isPending) createQuestion.mutate(); }}>
@@ -104,7 +112,7 @@ export function QuestionBankWorkspace({
       <button className="agent-command" type="submit" disabled={createQuestion.isPending}><Plus size={16}/>{createQuestion.isPending ? '保存中' : '保存题目'}</button>
     </form>}
     {!visibleQuestions.length ? loading ? <EmptyState title="正在读取题库" text="请稍候" /> : message ? null : <EmptyState title="暂无题目" text={searchResults ? '没有匹配的题目。' : '题库列表为空，可新增题目或导入脱敏题库。'} /> : <section className="lab-list">{visibleQuestions.map((item) => <article className="lab-row question-bank-row" key={item.questionId || item.id}>
-      <div><p className="agent-eyebrow">{item.position} / {item.level || '未指定'} / {item.category || '通用'}</p><h2>{item.question}</h2><details><summary>参考答案</summary><p>{item.answer || '未提供参考答案'}</p></details><p>{item.source || '来源未记录'} · {Array.isArray(item.tags) ? item.tags.join('、') : item.tags || '无标签'}</p></div>
+      <div><p className="agent-eyebrow">{item.position} / {item.level || '未指定'} / {item.category || '通用'}</p><h2>{item.question}</h2><details><summary>参考答案</summary><p>{item.answer || '未提供参考答案'}</p></details><p>{item.source || '来源未记录'} · {Array.isArray(item.tags) ? item.tags.join('、') : item.tags || '无标签'}</p>{item.version && <p>主数据版本 {item.version} · {item.indexStatus === 'READY' ? '索引就绪' : '待索引'}</p>}</div>
       <div className="question-bank-row-actions"><button className="icon-command danger-command" type="button" title="删除题目" onClick={() => { if (item.questionId && window.confirm('删除这道题目？')) deleteQuestion.mutate(item.questionId); }} disabled={deleteQuestion.isPending || !item.questionId}><Trash2 size={16}/></button></div>
     </article>)}</section>}
   </div>;

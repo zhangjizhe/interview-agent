@@ -2,6 +2,7 @@
 export function redactTelemetry(value: unknown, ancestors = new WeakSet<object>()): any {
   if (typeof value === 'string') {
     return value
+      .replace(/[a-f0-9]{48}\.[A-Za-z0-9_-]{43}/g, '[REDACTED_CAPABILITY]')
       .replace(/\bBearer\s+[^\s"',;]+/gi, 'Bearer [REDACTED]')
       .replace(/\bsk-[a-zA-Z0-9_-]+/g, '[REDACTED]')
       .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')

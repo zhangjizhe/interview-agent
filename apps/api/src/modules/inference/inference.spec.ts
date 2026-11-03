@@ -7,6 +7,12 @@ function releaseMetrics(overrides: Record<string, unknown> = {}, scores = Array(
   return {
     repeatCount: 3,
     cachePolicy: 'semantic-cache-bypass/v1',
+    evaluatorType: 'BUSINESS_ASSERTIONS',
+    qualityEvidence: {
+      version: 'evaluation-evidence/v1', kind: 'deterministic-business-contract', scope: 'output-contract',
+      contractVersion: 'business-assertions/v1', contractHash: 'a'.repeat(64),
+      assertionCount: 30, passed: 30, failed: 0, unavailable: 0, semanticQuality: 'not-assessed',
+    },
     outputContractVersion: 'final-output/v1',
     latency: { p95Ms: 1000 },
     tokenUsage: { status: 'available', totalTokens: 300 },
@@ -97,6 +103,44 @@ describe('Interview inference', () => {
 });
 
 describe('Release gate inference', () => {
+  const completeEvaluation = (metrics = releaseMetrics()) => ({
+    id: 'evaluation', status: 'COMPLETED', score: 100, totalCases: 10, passedCases: 10, failedCases: 0,
+    completedAt: new Date(), datasetFrozenAt: new Date(), datasetContentHash: 'sha256:dataset', metrics,
+  });
+
+  it.each(['KEYWORD', 'JSON_SCHEMA', 'LATENCY'])('keeps %s smoke distinct from business-contract release evidence even at 100 points', evaluatorType => {
+    const decision = inferReleaseGate(completeEvaluation(releaseMetrics({ evaluatorType, qualityEvidence: {
+      version: 'evaluation-evidence/v1', kind: 'contract-smoke', scope: 'smoke', semanticQuality: 'not-assessed',
+    } })));
+    expect(decision.outcome.allowed).toBe(false);
+    expect(decision.matchedRules).toContain('RG-024:business-contract-evidence-required');
+  });
+
+  it.each([
+    { kind: 'semantic-quality' }, { scope: 'interview-quality' }, { semanticQuality: 'proven' },
+    { unavailable: 1 }, { failed: 1 }, { passed: 29 }, { assertionCount: 0, passed: 0 }, { contractHash: 'unknown' },
+  ])('rejects forged or incomplete business-contract summaries: %j', override => {
+    const metrics = releaseMetrics();
+    const decision = inferReleaseGate(completeEvaluation({ ...metrics, qualityEvidence: { ...metrics.qualityEvidence, ...override } }));
+    expect(decision.outcome.allowed).toBe(false);
+    expect(decision.matchedRules).toContain('RG-024:business-contract-evidence-required');
+  });
+
+  it('requires the exact same business assertion fingerprint for candidate and baseline', () => {
+    const metrics = releaseMetrics();
+    const baseline = completeEvaluation({ ...metrics, qualityEvidence: { ...metrics.qualityEvidence, contractHash: 'b'.repeat(64) } });
+    const decision = inferReleaseGate(completeEvaluation(), { required: true, baseline });
+    expect(decision.outcome.allowed).toBe(false);
+    expect(decision.matchedRules).toContain('RG-025:business-contract-fingerprint-mismatch');
+  });
+
+  it('states the accepted deterministic scope while leaving semantic quality explicitly unassessed', () => {
+    expect(inferReleaseGate(completeEvaluation()).outcome).toMatchObject({
+      allowed: true, acceptanceScope: 'deterministic-output-contract',
+      notAssessed: expect.arrayContaining(['interview-semantic-quality', 'complete-trajectory']),
+    });
+  });
+
   it('denies publication without a completed evaluation', () => {
     expect(inferReleaseGate(null).outcome.allowed).toBe(false);
   });
@@ -223,7 +267,7 @@ describe('Release gate inference', () => {
     const decision = inferReleaseGate(candidate, { required: true, baseline });
 
     expect(decision.outcome.allowed).toBe(true);
-    expect(decision.ruleSetVersion).toBe('release-gate/v5');
+    expect(decision.ruleSetVersion).toBe('release-gate/v6');
     expect(decision.evidence.statisticalComparison).toMatchObject({
       status: 'available', pairedCaseCount: 10, nonInferior: true,
     });

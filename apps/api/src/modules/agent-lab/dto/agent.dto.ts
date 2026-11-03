@@ -195,8 +195,8 @@ export class CreateEvaluatorDto {
   name!: string;
 
   @IsString()
-  @IsIn(['KEYWORD', 'JSON_SCHEMA', 'LATENCY'])
-  type!: 'KEYWORD' | 'JSON_SCHEMA' | 'LATENCY';
+  @IsIn(['KEYWORD', 'JSON_SCHEMA', 'LATENCY', 'BUSINESS_ASSERTIONS'])
+  type!: 'KEYWORD' | 'JSON_SCHEMA' | 'LATENCY' | 'BUSINESS_ASSERTIONS';
 
   @IsOptional()
   @IsObject()

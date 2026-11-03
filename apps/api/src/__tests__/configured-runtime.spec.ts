@@ -88,11 +88,24 @@ describe('Configured runtime independent regression', () => {
     expect(result.tokenUsage.calls).toBe(2);
     expect(result.estimatedCostCny).toBe(0.02);
     expect(h.gateway.chat.mock.calls.every(call => call[0].allowFallback === false)).toBe(true);
+    expect(h.gateway.chat.mock.calls.every(call => !Object.hasOwn(call[0], 'interviewId'))).toBe(true);
   });
   it('checks budget before issuing even one Gateway call', async () => {
     const h = harness(), version = single(); h.pricing.estimateCall.mockReturnValue({ status: 'available', totalCny: 2 });
     await expect(h.service.execute('user', h.run, version, { message: 'initial' }, await h.service.prepare(version, 'workspace'))).rejects.toThrow();
     expect(h.gateway.chat).not.toHaveBeenCalled();
+  });
+  it('keeps Lab usage on Run evidence without impersonating an Interview session', async () => {
+    const h = harness(), version = single();
+    const result = await h.service.execute('user', h.run, version, { message: 'initial' }, await h.service.prepare(version, 'workspace'));
+    expect(h.gateway.chat).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user', allowFallback: false }), 'qwen');
+    expect(h.gateway.chat.mock.calls[0][0]).not.toHaveProperty('interviewId');
+    expect(result.tokenUsage).toMatchObject({ promptTokens: 10, completionTokens: 5, calls: 1 });
+    expect(result.estimatedCostCny).toBe(0.01);
+    expect(h.prisma.run.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'parent' }),
+      data: expect.objectContaining({ estimatedCost: 0.01, tokenUsage: expect.objectContaining({ totalTokens: 15 }) }),
+    }));
   });
   it('preserves parent billable evidence when output schema fails', async () => {
     const h = harness(), version = single('one', { outputSchema: { type: 'object', properties: { response: { type: 'integer' } }, required: ['response'] } });

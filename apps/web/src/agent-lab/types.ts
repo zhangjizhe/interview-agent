@@ -96,7 +96,7 @@ export interface Evaluator {
   id: string;
   key: string;
   name: string;
-  type: 'KEYWORD' | 'JSON_SCHEMA' | 'LATENCY';
+  type: 'KEYWORD' | 'JSON_SCHEMA' | 'LATENCY' | 'BUSINESS_ASSERTIONS';
   config?: JsonObject | null;
 }
 

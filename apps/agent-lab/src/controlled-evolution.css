@@ -90,3 +90,9 @@
     flex-direction: column;
   }
 }
+
+.evolution-assets textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 8px; resize: vertical; font-family: ui-monospace, monospace; }
+.evolution-confirm { display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+.agent-workspace .evolution-confirm input { width: auto; min-height: 0; padding: 0; flex: 0 0 auto; margin-top: 4px; }
+.evolution-quality-evidence { border-left: 3px solid #798092; padding-left: 12px; margin: 12px 0; }
+.evolution-job pre, .evolution-assets pre { max-width: 100%; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }

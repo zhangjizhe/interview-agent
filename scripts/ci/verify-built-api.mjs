@@ -4,10 +4,10 @@ import { createRequire } from 'node:module';
 // Isolated synthetic fixtures. Configured runs use a deterministic localhost provider; no external models.
 const base = process.env.API_BASE_URL || 'http://127.0.0.1:3001/api';
 let passed = 0;
-async function request(path, { method = 'GET', token, body } = {}) {
+async function request(path, { method = 'GET', token, body, timeoutMs = 5000, headers = {} } = {}) {
   const response = await fetch(`${base}${path}`, {
-    method, signal: AbortSignal.timeout(5000),
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    method, signal: AbortSignal.timeout(timeoutMs),
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}), ...headers },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const data = await response.json();
@@ -44,6 +44,16 @@ const fixtureRequire = createRequire(`${process.cwd()}/package.json`);
 const { PrismaClient } = fixtureRequire('@prisma/client');
 const fixturePrisma = new PrismaClient();
 try {
+  // This suite intentionally executes 4 * 10 * 3 release samples, plus runtime,
+  // retrieval and browser checks. Keep a finite synthetic-only allowance on the
+  // fixture administrator's organization; never raise the shared Free plan.
+  const fixtureAdmin = await fixturePrisma.user.findUniqueOrThrow({ where: { id: 'fixture-ci-admin' }, include: { organization: { include: { plan: true } } } });
+  const { monthlyInterviews, maxInputBytes, maxOutputTokens } = fixtureAdmin.organization.plan;
+  const fixturePlan = { name: 'Isolated synthetic CI', monthlyLlmCalls: 200, monthlyInterviews, maxInputBytes, maxOutputTokens };
+  await fixturePrisma.plan.upsert({ where: { id: 'isolated-ci-admin' }, create: { id: 'isolated-ci-admin', ...fixturePlan }, update: fixturePlan });
+  await fixturePrisma.organization.update({ where: { id: fixtureAdmin.organizationId }, data: { planId: 'isolated-ci-admin' } });
+  const ordinary = await fixturePrisma.user.findUniqueOrThrow({ where: { id: 'fixture-ci-owner' }, include: { organization: { include: { plan: true } } } });
+  check('synthetic administrator has a finite isolated allowance without changing Free users', ordinary.organization.planId === 'free' && ordinary.organization.plan.monthlyLlmCalls === 100 && (await fixturePrisma.plan.findUniqueOrThrow({ where: { id: 'isolated-ci-admin' } })).monthlyLlmCalls === 200);
   await fixturePrisma.user.update({ where: { id: 'fixture-ci-foreign' }, data: { role: 'ADMIN' } });
   const promoted = await request('/auth/login', { method: 'POST', body: { userId: 'fixture-ci-foreign', password: 'isolated-fixture-password' } });
   check('promoted USER re-login issues ADMIN session', promoted.status === 200 && promoted.data.role === 'ADMIN');
@@ -77,6 +87,8 @@ check('MCP count reflects enabled execution bindings', afterReload.data.runningC
 await request('/admin/mcp-servers/toggle', { method: 'POST', token: admin, body: { toolName: 'knowledge_bank', enabled: true } });
 await (await import('/tmp/verify-configured-runtime.mjs')).verifyConfigured({ request, admin, owner, check });
 await (await import('/tmp/verify-question-gateway.mjs')).verifyQuestionGateway({ request, admin, check });
+await (await import('/tmp/verify-question-catalog.mjs')).verifyQuestionCatalog({ request, admin, owner, check });
+await (await import('/tmp/verify-portfolio-assistant.mjs')).verifyPortfolioAssistant({ request, check });
 await (await import('/tmp/verify-configured-release.mjs')).verifyConfiguredRelease({ request, admin, check });
 check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: sibling.data.accessToken })).status === 200);
 check('logged out access token rejected', (await request('/auth/profile', { token: sibling.data.accessToken })).status === 401);

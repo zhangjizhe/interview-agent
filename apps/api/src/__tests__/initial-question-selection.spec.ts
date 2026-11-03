@@ -1,7 +1,7 @@
 jest.mock('@zilliz/milvus2-sdk-node', () => ({ MilvusClient: jest.fn(() => ({})), ConsistencyLevelEnum: { Strong: 'Strong' } }));
 jest.mock('../modules/llm/llm.gateway.service', () => ({ LlmGatewayService: class {} }));
 import { ConfigService } from '@nestjs/config';
-import { QuestionBankService } from '../modules/interview/services/question-bank.service';
+import { QuestionVectorIndexService as QuestionBankService } from '../modules/interview/services/question-vector-index.service';
 import { DynamicTaskQueueService } from '../modules/interview/services/dynamic-task-queue.service';
 import { tenantContext } from '../modules/organizations/tenant-context';
 
@@ -25,6 +25,11 @@ describe('Initial question selection is an owned stored-row read', () => {
     expect(JSON.parse(tasks[0].context as string)).toMatchObject({ questionId: 'saved-react', questionSelectionSource: 'stored-category-level/v1' });
     expect(storage.query).toHaveBeenCalledWith(expect.objectContaining({ consistency_level: 'Strong', filter: 'category == "frontend" and level == "P5"', limit: 100 }));
     expect(gateway.chat).not.toHaveBeenCalled(); expect(gateway.embedText).not.toHaveBeenCalled(); expect(gateway.rerank).not.toHaveBeenCalled();
+  });
+  it('carries an actual catalog version and hash into the persisted task context', async () => {
+    bank.selectInitial = jest.fn().mockResolvedValue([{ ...row('saved-react'), catalogVersionId: 'synthetic-entry:2', catalogContentHash: 'synthetic-hash' }]);
+    const tasks = await scope(() => queue.prepareInitialTasks('synthetic-session', 'Frontend Engineer', 'P5', { mode: 'FULL_SIMULATION' }));
+    expect(JSON.parse(tasks[0].context as string)).toMatchObject({ questionId: 'saved-react', catalogVersionId: 'synthetic-entry:2', catalogContentHash: 'synthetic-hash' });
   });
   it('does not use rows from another role or level or empty/malformed questions', async () => {
     storage.query.mockResolvedValue({ ...ok, data: [row('other-level', { level: 'P4' }), row('other-role', { category: 'backend' }), row('blank', { question: '  ' }), row('', {}), row('good')] });

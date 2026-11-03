@@ -59,6 +59,9 @@ test "$fixture_vector_ready" = true
 docker exec "$fixture_pg" createdb -U postgres fixture
 docker run --rm --network "$fixture_network" -e DATABASE_URL=postgresql://postgres@fixture-pg:5432/fixture --entrypoint /usr/local/bin/migration-entrypoint.sh "$fixture_image" >/dev/null
 docker run -d --name "$fixture_api" --network "$fixture_network" --network-alias api \
+  -e PORTFOLIO_ASSISTANT_ENABLED=true -e PORTFOLIO_ASSISTANT_OWNER_ID=fixture-portfolio-admin \
+  -e PORTFOLIO_ASSISTANT_VERSION_ID=fixture-portfolio-v1 -e PORTFOLIO_ASSISTANT_ORIGINS=http://localhost:5173 \
+  -e PORTFOLIO_ASSISTANT_TICKET_SECRET=isolated_portfolio_ticket_secret_at_least_32_chars \
   -e DATABASE_URL=postgresql://postgres@fixture-pg:5432/fixture -e REDIS_URL=redis://fixture-redis:6379 \
   -e JWT_SECRET=isolated_ci_fixture_secret_at_least_32_characters \
   -e ADMIN_USER_IDS=fixture-ci-admin -e NODE_ENV=production \
@@ -79,6 +82,8 @@ fi
 docker cp scripts/ci/fixture-model-server.mjs "$fixture_api:/tmp/fixture-model-server.mjs"
 docker cp scripts/ci/verify-configured-release.mjs "$fixture_api:/tmp/verify-configured-release.mjs"
 docker cp scripts/ci/verify-question-gateway.mjs "$fixture_api:/tmp/verify-question-gateway.mjs"
+docker cp scripts/ci/verify-question-catalog.mjs "$fixture_api:/tmp/verify-question-catalog.mjs"
+docker cp scripts/ci/verify-portfolio-assistant.mjs "$fixture_api:/tmp/verify-portfolio-assistant.mjs"
 docker cp scripts/ci/verify-configured-runtime.mjs "$fixture_api:/tmp/verify-configured-runtime.mjs"
 docker cp scripts/ci/golden-model-contract.mjs "$fixture_api:/tmp/golden-model-contract.mjs"
 docker exec -d "$fixture_api" node /tmp/fixture-model-server.mjs

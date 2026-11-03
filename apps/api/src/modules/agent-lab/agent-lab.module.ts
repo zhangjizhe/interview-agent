@@ -55,6 +55,7 @@ import { ControlledEvolutionService } from './controlled-evolution.service';
     ControlledEvolutionService,
   ],
   exports: [
+    ConfiguredRunJobsService,
     AgentRegistryService,
     AgentRuntimeService,
     EvaluationService,

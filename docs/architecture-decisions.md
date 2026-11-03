@@ -776,3 +776,11 @@ contract, not a fabricated zero charge. Test fresh/legacy migration, composite F
 isolation, concurrent presentation/claim, replay, unknown preservation, stale and
 late results, cascade deletion, then actual API/browser first/subsequent questions
 and restore. Full product and real model quality remain NOT_ACCEPTED.
+
+## ADR 26：确定性业务合同与语义质量分离（2026-10-29，候选）
+
+问题：关键词/结构/延迟规则即使统计与资源门禁严格，也不能证明面试正确性；独立Golden Prompt与生产决策不一致，失败子集及未知费用可能制造误导证据。
+
+决定：复用现有模块化单体、评测任务和发布事务，增加有界BUSINESS_ASSERTIONS/v1及加性EvaluatorType枚举。v6新发布要求服务端实际断言证据/合同指纹和既有门禁，并明确限定验收范围。未知Trace不当作无工具；仅支持已记录的正向必要事件，不执行自定义代码。共享生产决策请求/解析；显式fallback来源，缺/坏样本及未知资源证据拒绝升级。所有trial有样本/预算上限，未知提交用原key核验。
+
+影响：新枚举先迁移，API/Web/Lab一起更新。旧规则仍可探索运行但不能独立满足新发布；既有bootstrap和PUBLISHED兼容路径未追认质量。无需重写框架或引入另一个平台。回滚保留历史/枚举，不能将旧规则结果冒充新证据。真正语义任务、专家校准、Case归因与评测标准迭代另行实施验收。

@@ -70,6 +70,9 @@ model Organization {
   candidateSkillStateRecords CandidateSkillState[]
   trainingRecommendationRecords TrainingRecommendation[]
   trainingAttemptRecords TrainingAttempt[]
+  questionCatalogStates QuestionCatalogState[]
+  questionCatalogEntries QuestionCatalogEntry[]
+  questionCatalogVersions QuestionCatalogVersion[]
   reflectionLogRecords ReflectionLog[]
   @@map("organizations")
 }
@@ -743,6 +746,7 @@ model EvaluationCase {
 }
 
 enum EvaluatorType {
+  BUSINESS_ASSERTIONS
   KEYWORD
   JSON_SCHEMA
   LATENCY
@@ -1613,4 +1617,58 @@ enum LabOperationObject {
 enum LabOperationOutcome {
   SUCCEEDED
   REJECTED
+}
+
+// Interview owns the canonical bank. Vector collections are disposable indexes.
+model QuestionCatalogState {
+  organizationId String @id
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  mode String @default("LEGACY")
+  revision Int @default(0)
+  adoptedAt DateTime?
+  sourceHash String?
+  sourceCount Int?
+  @@map("question_catalog_states")
+}
+
+model QuestionCatalogEntry {
+  id String @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  questionId String
+  currentVersion Int
+  contentHash String
+  indexKey String @unique
+  indexStatus String @default("PENDING")
+  position String
+  level String
+  category String
+  question String @db.Text
+  answer String @db.Text
+  tags String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  versions QuestionCatalogVersion[]
+  @@unique([organizationId, questionId])
+  @@unique([id, organizationId])
+  @@index([organizationId, deletedAt, category, level])
+  @@map("question_catalog_entries")
+}
+
+model QuestionCatalogVersion {
+  id String @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  entryId String
+  entry QuestionCatalogEntry @relation(fields: [entryId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  version Int
+  contentHash String
+  snapshot Json
+  origin String
+  createdAt DateTime @default(now())
+  @@unique([entryId, version])
+  @@unique([id, organizationId])
+  @@index([organizationId, entryId])
+  @@map("question_catalog_versions")
 }

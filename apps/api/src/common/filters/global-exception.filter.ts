@@ -15,7 +15,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const requestPath = request.path || request.url.split('?')[0];
+    // Public answer URLs contain a read capability, including on 404/503 paths.
+    const requestPath = (request.path || request.url.split('?')[0])
+      .replace(/(\/portfolio-assistant\/answers\/)[^/?#]+/g, '$1[REDACTED]');
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: any = 'Internal server error';

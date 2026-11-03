@@ -72,7 +72,10 @@ export class ConfiguredRuntimeService {
       const result = await this.gateway.chat({ messages: [
         { role: 'system', content: target.systemPrompt }, { role: 'user', content: message },
       ], maxTokens: config.maxTokens, temperature: config.temperature, userId,
-      interviewId: childRun.id, allowFallback: false }, config.provider);
+      // A Lab Run is not an Interview. Quota remains tenant-scoped in Gateway;
+      // actual Lab usage/cost is persisted below on Run and Trace, never on the
+      // Interview-only SessionCost relation using an unrelated Run identifier.
+      allowFallback: false }, config.provider);
       const cost = result.usage.promptTokens + result.usage.completionTokens > 0
         ? this.pricing.estimateCall({ provider: result.provider, model: result.model, ...result.usage })
         : { status: 'unavailable' as const, reason: 'Provider未返回有效usage，不能将未知费用记零' };

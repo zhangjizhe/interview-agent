@@ -11,7 +11,7 @@ Interview 连接目标岗位、简历、模拟面试、报告与训练入口。A
 
 > **交付状态 · 2026-10-08**：本地工程与浏览器验收通过。真实业务版本对比尚未通过；生产环境部署与商用验收尚未完成。本文中的测试数量是实际执行结果，录制数据与合成场景不代表真实模型效果。
 
-[交付报告](docs/DELIVERY-REPORT-2026-10-08.md) · [开发入口](AGENTS.md) · [当前状态](docs/project/CURRENT_STATE.md) · [待办](docs/project/TASKS.md) · [能力边界](docs/agent-lab-status.md)
+[项目 wiki](docs/wiki/Home.md) · [交付报告](docs/DELIVERY-REPORT-2026-10-08.md) · [开发入口](AGENTS.md) · [当前状态](docs/project/CURRENT_STATE.md) · [待办](docs/project/TASKS.md) · [能力边界](docs/agent-lab-status.md)
 
 ![本机受控评测与真实失败证据](docs/assets/lab-evidence-2026-10-08.png)
 

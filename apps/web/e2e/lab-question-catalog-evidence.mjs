@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import { questionInputSnapshot } from './lab-question-input-snapshot.mjs';
+
+export async function verifyQuestionCatalogEvidence(page, context, origin) {
+  assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
+  assert.equal(origin, 'http://localhost:5176');
+  const token = await page.evaluate(() => localStorage.getItem('ia_access_token'));
+  const headers = { Authorization: `Bearer ${token}` };
+  const base = `${origin}/api/interview/question-bank`;
+  const input = { questionId: 'browser-catalog-source', position: 'Catalog Fixture', level: 'P5', category: 'frontend', question: 'Synthetic catalog boundary question', answer: 'Keep canonical business records independent of vector indexes.', tags: ['catalog'] };
+  const created = await context.request.post(base, { headers, data: input, timeout: 90000 });
+  assert.equal(created.status(), 201);
+  await page.getByRole('button', { name: '题库治理', exact: true }).click();
+  const panel = page.getByRole('region', { name: '题库主数据与检索索引' });
+  const migrate = panel.getByRole('button', { name: '迁移当前组织题库', exact: true });
+  await migrate.waitFor(); assert.equal(await migrate.isDisabled(), true);
+  const before = await questionInputSnapshot();
+  await panel.getByRole('checkbox').check();
+  const adopted = page.waitForResponse(r => new URL(r.url()).pathname === '/api/interview/question-bank/catalog/adopt-legacy' && r.request().method() === 'POST', { timeout: 90000 });
+  await migrate.click();
+  const adoption = await adopted; assert.equal(adoption.status(), 201);
+  const receipt = await adoption.json(); assert.equal(receipt.contractVersion, 'question-catalog/v1'); assert.equal(receipt.adoptedCount, 1); assert.equal(receipt.providerCalls, 0);
+  await panel.getByText(/主数据：PostgreSQL · 1 题 · 待索引 1 题/).waitFor();
+  assert.deepEqual(await questionInputSnapshot(), before);
+  const rebuilt = page.waitForResponse(r => new URL(r.url()).pathname === '/api/interview/question-bank/catalog/rebuild-index' && r.request().method() === 'POST', { timeout: 90000 });
+  await panel.getByRole('button', { name: '处理待索引题目（最多20题）', exact: true }).click();
+  const rebuiltResponse = await rebuilt; assert.equal(rebuiltResponse.status(), 201); assert.equal((await rebuiltResponse.json()).indexStatus, 'READY');
+  await panel.getByText(/主数据：PostgreSQL · 1 题 · 待索引 0 题/).waitFor();
+  const after = await questionInputSnapshot(); assert.equal(after.provider.embedding - before.provider.embedding, 1); assert.equal(after.ledger - before.ledger, 1);
+  const listed = await context.request.get(`${base}/list?limit=50`, { headers });
+  assert.equal(listed.status(), 200); const item = (await listed.json()).results.find(q => q.questionId === input.questionId);
+  assert.equal(item.question, input.question); assert.equal(item.version, 1); assert.equal(item.indexStatus, 'READY'); assert.ok(item.catalogVersionId); assert.match(item.catalogContentHash, /^[a-f0-9]{64}$/);
+  const row = page.locator('article.question-bank-row').filter({ has: page.getByRole('heading', { name: input.question, exact: true }) });
+  await row.getByText('主数据版本 1 · 索引就绪', { exact: true }).waitFor();
+  page.once('dialog', dialog => dialog.accept());
+  await row.getByRole('button', { name: '删除题目', exact: true }).click();
+  await panel.getByText(/主数据：PostgreSQL · 0 题 · 待索引 0 题/).waitFor();
+  await page.reload(); await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
+  await page.getByRole('button', { name: '题库治理', exact: true }).click();
+  await page.getByRole('region', { name: '题库主数据与检索索引' }).getByText(/主数据：PostgreSQL · 0 题 · 待索引 0 题/).waitFor();
+  console.log('PASS browser canonical question catalog: maintenance acknowledgment, real adoption without provider calls, one bounded embedding, PG version readback, soft-delete and reload');
+}

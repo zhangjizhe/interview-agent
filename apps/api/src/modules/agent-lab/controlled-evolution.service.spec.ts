@@ -9,6 +9,12 @@ import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-stati
 
 function releaseMetrics(score: number, p95Ms: number) {
   return {
+    evaluatorType: 'BUSINESS_ASSERTIONS',
+    qualityEvidence: {
+      version: 'evaluation-evidence/v1', kind: 'deterministic-business-contract', scope: 'output-contract',
+      contractVersion: 'business-assertions/v1', contractHash: 'a'.repeat(64),
+      assertionCount: 30, passed: 30, failed: 0, unavailable: 0, semanticQuality: 'not-assessed',
+    },
     outputContractVersion: 'final-output/v1',
     repeatCount: 3,
     cachePolicy: 'semantic-cache-bypass/v1',

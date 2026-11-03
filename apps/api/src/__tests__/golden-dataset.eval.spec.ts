@@ -15,7 +15,7 @@ describe('Golden Dataset offline contract', () => {
   });
   it('runs the actual scorer pipeline with a synthetic provider and preserves provider failures', async () => {
     const dataset = loadGoldenDataset(datasetPath);
-    const llm = { chat: jest.fn().mockResolvedValue({ content: JSON.stringify({ correctness: 0.5, depth: 0.5, completeness: 0.5, score: 50, feedbackKeywords: ['fixture'], feedback: 'Synthetic feedback' }) }) };
+    const llm = { chat: jest.fn().mockResolvedValue({ content: JSON.stringify({ correctness: 0.5, depth: 0.5, completeness: 0.5, score: 0.5, keyPoints: ['fixture', 'synthetic'], feedback: 'Synthetic feedback', missingPoints: [], shouldFollowUp: false, followUpQuestion: null, followUpReason: null, shouldAdvance: false, advancedQuestion: null }) }) };
     llm.chat.mockRejectedValueOnce(new Error('synthetic failure'));
     const reporter = new EvalReporter('unused-fixture-output');
     jest.spyOn(reporter, 'writeJson').mockResolvedValue('not-written'); jest.spyOn(reporter, 'writeMarkdown').mockResolvedValue('not-written');
@@ -24,5 +24,8 @@ describe('Golden Dataset offline contract', () => {
     expect(report.caseResults).toHaveLength(1);
     expect(report.caseResults[0].responses[0].error).toBe('synthetic failure');
     expect(report.overall.sampleSize).toBe(dataset.cases[0].responses.length - 1);
+    expect(report.overall.attemptedSamples).toBe(dataset.cases[0].responses.length);
+    expect(report.overall.errorSamples).toBe(1);
+    expect(report.qualityVerdict.status).toBe('FAIL');
   });
 });

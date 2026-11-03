@@ -8,7 +8,7 @@ import { QuestionBankController } from '../modules/interview/controllers/questio
 
 describe('question bank administrative read boundary', () => {
   const guard = new RolesGuard(new Reflector());
-  it.each(['searchQuestionBank', 'listQuestionBank'])('%s refuses USER and unauthenticated callers', handler => {
+  it.each(['searchQuestionBank', 'listQuestionBank', 'catalogStatus', 'adoptLegacy', 'rebuildIndex'])('%s refuses USER and unauthenticated callers', handler => {
     const context = (role?: string): any => ({ getHandler: () => QuestionBankController.prototype[handler], getClass: () => QuestionBankController,
       switchToHttp: () => ({ getRequest: () => ({ user: role ? { role } : undefined }) }) });
     expect(() => guard.canActivate(context())).toThrow(ForbiddenException);

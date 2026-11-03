@@ -10,6 +10,7 @@ jest.mock('./agent-runtime.service', () => ({
 
 import { EvaluationService } from './evaluation.service';
 import { CURATED_INTERVIEW_RELEASE_EVALUATOR } from './curated-release-dataset';
+import { BUSINESS_ASSERTIONS_VERSION } from './business-assertions.contract';
 
 function createPrismaMock() {
   const prisma: any = {
@@ -47,6 +48,7 @@ function createPrismaMock() {
     evaluationResult: {
       create: jest.fn(),
     },
+    traceEvent: { findMany: jest.fn() },
   };
   prisma.$transaction = jest.fn(async (callback: (tx: any) => unknown) => callback(prisma));
   return prisma;
@@ -94,6 +96,118 @@ describe('EvaluationService', () => {
     jest.clearAllMocks();
   });
 
+  const businessConfig = { contractVersion: BUSINESS_ASSERTIONS_VERSION };
+  const businessExpected = (extra: unknown[] = []) => ({ contractVersion: BUSINESS_ASSERTIONS_VERSION, assertions: [
+    { id: 'score', source: 'response-json', path: ['score'], op: 'number-range', minimum: 0.5, maximum: 1 },
+    { id: 'decision', source: 'response-json', path: ['decision'], op: 'equals', expected: 'FOLLOW_UP' }, ...extra,
+  ] });
+  const businessCase = (expectedOutput = businessExpected()) => ({ id: 'case-1', key: 'case-one', input: { message: 'evaluate' }, expectedOutput });
+  function setupBusiness(prisma: any, cases = [businessCase()], adapter = 'single-agent-v1') {
+    prepareEvaluation(prisma, { id: 'evaluator-1', type: 'BUSINESS_ASSERTIONS', config: businessConfig }, cases);
+    prisma.agent.findFirst.mockResolvedValue({ id: 'agent-1', currentVersion: { ...publishedVersion, runtimeConfig: { adapter } } });
+  }
+
+  it.each(['unsupported-op', 'forbidden-tool', 'legacy-trace', 'forged-scope'])('preflights every Case before creating a Run or invoking a provider: %s', async invalid => {
+    const prisma: any = createPrismaMock();
+    const extra = invalid === 'forbidden-tool' ? { id: 'no-tool', source: 'trace', op: 'forbidden-tool', toolName: 'send_email' }
+      : invalid === 'legacy-trace' ? { id: 'model-evidence', source: 'trace', op: 'event-exists', eventType: 'model.end' }
+      : { id: 'unknown', source: 'response-json', path: ['score'], op: 'eval', expression: 'true' };
+    setupBusiness(prisma, [businessCase(), { ...businessCase(businessExpected([extra])), id: 'case-2', key: 'case-two' }], invalid === 'legacy-trace' ? 'interview-multi-agent' : 'single-agent-v1');
+    if (invalid === 'forged-scope') prisma.evaluator.findFirst.mockResolvedValue({ id: 'evaluator-1', type: 'BUSINESS_ASSERTIONS', config: { ...businessConfig, scope: 'interview-quality' } });
+    const runtime = { runAgent: jest.fn() };
+    await expect(new EvaluationService(prisma, runtime as any).runEvaluation('user-a', 'agent-1', { datasetId: 'dataset-1', evaluatorId: 'evaluator-1' })).rejects.toThrow('业务断言无效');
+    expect(runtime.runAgent).not.toHaveBeenCalled();
+    expect(prisma.agentEvaluationRun.create).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('persists actual deterministic field results and a server-generated non-semantic evidence scope (valid=%s)', async valid => {
+    const prisma: any = createPrismaMock();
+    setupBusiness(prisma);
+    const runtime = { runAgent: jest.fn().mockResolvedValue({ id: 'run-1', latencyMs: 10, estimatedCost: 0.001,
+      output: { response: JSON.stringify({ score: valid ? 0.75 : 75, decision: valid ? 'FOLLOW_UP' : 'ADVANCE', summary: 'FOLLOW_UP score .75 keywords' }) },
+    }) };
+    await new EvaluationService(prisma, runtime as any).runEvaluation('user-a', 'agent-1', { datasetId: 'dataset-1', evaluatorId: 'evaluator-1' });
+    expect(prisma.evaluationResult.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      passed: valid, score: valid ? 100 : 0,
+      evidence: expect.objectContaining({ samples: [expect.objectContaining({ assertions: [expect.objectContaining({ id: 'score', passed: valid }), expect.objectContaining({ id: 'decision', passed: valid })], semanticQuality: 'not-assessed' })] }),
+    }) }));
+    expect(prisma.agentEvaluationRun.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ metrics: expect.objectContaining({
+      evaluatorType: 'BUSINESS_ASSERTIONS', qualityEvidence: expect.objectContaining({
+        kind: 'deterministic-business-contract', scope: 'output-contract', semanticQuality: 'not-assessed',
+        contractHash: expect.stringMatching(/^[a-f0-9]{64}$/), assertionCount: 2, passed: valid ? 2 : 0, failed: valid ? 0 : 2, unavailable: 0,
+      }),
+    }) }) }));
+    expect(prisma.traceEvent.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('consumes scoped persisted Trace event references rather than output claims (event present=%s)', async present => {
+    const prisma: any = createPrismaMock();
+    setupBusiness(prisma, [businessCase(businessExpected([{ id: 'model-done', source: 'trace', op: 'event-exists', eventType: 'model.end', step: 'configured-agent' }]))]);
+    prisma.traceEvent.findMany.mockResolvedValue(present ? [{ runId: 'run-1', seq: 4, type: 'model.end', step: 'configured-agent' }] : []);
+    const runtime = { runAgent: jest.fn().mockResolvedValue({ id: 'run-1', estimatedCost: 0.001, output: { response: '{"score":0.75,"decision":"FOLLOW_UP","claim":"model.end"}' } }) };
+    await new EvaluationService(prisma, runtime as any).runEvaluation('user-a', 'agent-1', { datasetId: 'dataset-1', evaluatorId: 'evaluator-1' });
+    expect(prisma.traceEvent.findMany).toHaveBeenCalledWith({ where: { runId: 'run-1', run: { workspaceId: 'workspace-1' } }, orderBy: { seq: 'asc' } });
+    expect(prisma.evaluationResult.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ passed: present, evidence: expect.objectContaining({ samples: [expect.objectContaining({ assertions: expect.arrayContaining([expect.objectContaining({ id: 'model-done', passed: present, evidence: expect.objectContaining(present ? { runId: 'run-1', seq: 4 } : { runId: 'run-1' }) })]) })] }) }) }));
+  });
+
+  it('rejects business evaluator evidence declarations at creation', async () => {
+    const prisma: any = createPrismaMock();
+    await expect(new EvaluationService(prisma, {} as any).createEvaluator('user-a', { key: 'business-checks', name: 'checks', type: 'BUSINESS_ASSERTIONS', config: { ...businessConfig, semanticQuality: 'proven' } })).rejects.toThrow('业务断言无效');
+    expect(prisma.evaluator.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed business Case contracts before persistence, while deferring actual adapter eligibility to preparation', async () => {
+    const prisma: any = createPrismaMock();
+    prisma.evaluationDataset.findFirst.mockResolvedValue({ id: 'dataset-1', frozenAt: null });
+    const service = new EvaluationService(prisma, {} as any);
+    await expect(service.addDatasetCase('user-a', 'dataset-1', { key: 'bad-contract', input: { message: 'test' },
+      expectedOutput: businessExpected([{ id: 'bad-operation', source: 'response-json', path: ['score'], op: 'execute-code' }]),
+    })).rejects.toThrow('业务断言无效');
+    expect(prisma.evaluationCase.create).not.toHaveBeenCalled();
+    await service.addDatasetCase('user-a', 'dataset-1', { key: 'workflow-contract', input: { message: 'test' },
+      expectedOutput: businessExpected([{ id: 'node-present', source: 'trace', op: 'event-exists', eventType: 'workflow.node.end' }]),
+    });
+    expect(prisma.evaluationCase.create).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([1, 2])('bounds every %s-trial evaluation and stops on missing cost', async repeatCount => {
+    const prisma: any = createPrismaMock();
+    setupBusiness(prisma);
+    const runtime = { runAgent: jest.fn().mockResolvedValue({ id: 'run-1', output: { response: '{"score":0.75,"decision":"FOLLOW_UP"}' } }) };
+    await expect(new EvaluationService(prisma, runtime as any).runEvaluation('user-a', 'agent-1', {
+      datasetId: 'dataset-1', evaluatorId: 'evaluator-1', repeatCount, maxEstimatedCostCny: 0.01,
+    })).rejects.toThrow('评测费率证据不可用');
+    expect(runtime.runAgent).toHaveBeenCalledTimes(1);
+    expect(prisma.agentEvaluationRun.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      status: 'FAILED', metrics: expect.objectContaining({ budget: expect.objectContaining({ limitCny: 0.01, costEvidenceStatus: 'unavailable', interruptedRunId: 'run-1' }) }),
+    }) }));
+  });
+
+  it.each([NaN, Infinity, 0, -1])('rejects an invalid explicit budget before runtime: %s', maxEstimatedCostCny => {
+    const prisma: any = createPrismaMock();
+    setupBusiness(prisma);
+    const runtime = { runAgent: jest.fn() };
+    return expect(new EvaluationService(prisma, runtime as any).runEvaluation('user-a', 'agent-1', { datasetId: 'dataset-1', evaluatorId: 'evaluator-1', maxEstimatedCostCny })).rejects.toThrow('maxEstimatedCostCny');
+  });
+
+  it('rejects over 50 enabled Cases before model work and clamps a configured server ceiling to three CNY', async () => {
+    const prisma: any = createPrismaMock();
+    setupBusiness(prisma, Array.from({ length: 51 }, (_, index) => ({ ...businessCase(), key: `case-${index}`, id: `id-${index}` })));
+    const runtime = { runAgent: jest.fn() };
+    const service = new EvaluationService(prisma, runtime as any);
+    await expect(service.runEvaluation('user-a', 'agent-1', { datasetId: 'dataset-1', evaluatorId: 'evaluator-1' })).rejects.toThrow('最多50');
+    expect(runtime.runAgent).not.toHaveBeenCalled();
+    const original = process.env.AGENT_LAB_MAX_EVALUATION_COST_CNY;
+    try {
+      process.env.AGENT_LAB_MAX_EVALUATION_COST_CNY = '100';
+      setupBusiness(prisma);
+      expect((await service.prepareEvaluation('user-a', 'agent-1', { datasetId: 'dataset-1', evaluatorId: 'evaluator-1', maxEstimatedCostCny: 100 })).effectiveBudgetCny).toBe(3);
+    } finally {
+      if (original === undefined) delete process.env.AGENT_LAB_MAX_EVALUATION_COST_CNY;
+      else process.env.AGENT_LAB_MAX_EVALUATION_COST_CNY = original;
+    }
+  });
+
   it('执行已发布版本并持久化通过的关键词断言', async () => {
     const prisma: any = createPrismaMock();
     prepareEvaluation(
@@ -108,6 +222,7 @@ describe('EvaluationService', () => {
     const runtime = {
       runAgent: jest.fn().mockResolvedValue({
         id: 'run-1',
+        estimatedCost: 0.001, // Explicit synthetic fixture cost, not an inference from missing usage.
         latencyMs: 24,
         output: { response: 'NestJS 使用模块组织应用。' },
       }),
@@ -508,6 +623,7 @@ describe('EvaluationService', () => {
     const runtime = {
       runAgent: jest.fn().mockResolvedValue({
         id: 'run-1',
+        estimatedCost: 0.001, // Explicit synthetic fixture cost, not an inference from missing usage.
         latencyMs: 24,
         output: { response: '回答' },
       }),
@@ -531,45 +647,22 @@ describe('EvaluationService', () => {
     );
   });
 
-  it('运行异常后仍保存失败结果并继续完成评测汇总', async () => {
+  it('single-trial runtime failure stops immediately and preserves unknown cost rather than completing a fabricated summary', async () => {
     const prisma: any = createPrismaMock();
-    prepareEvaluation(
-      prisma,
-      { id: 'evaluator-1', type: 'LATENCY', config: { maxLatencyMs: 100 } },
-      [{ id: 'case-1', input: { message: '开始' }, expectedOutput: {} }],
-    );
-    const runError: any = new Error('运行时不可用');
-    runError.agentLabRunId = 'run-1';
-    const runtime = {
-      runAgent: jest.fn().mockRejectedValue(runError),
-    };
-    const service = new EvaluationService(prisma, runtime as any);
-
-    await service.runEvaluation('user-a', 'agent-1', {
-      datasetId: 'dataset-1',
-      evaluatorId: 'evaluator-1',
-    });
-
-    expect(prisma.evaluationResult.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'FAILED',
-          runId: 'run-1',
-          passed: false,
-          failureCategory: 'RUN_FAILED',
-          failureMessage: '运行时不可用',
-        }),
-      }),
-    );
-    expect(prisma.agentEvaluationRun.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'COMPLETED',
-          passedCases: 0,
-          failedCases: 1,
-        }),
-      }),
-    );
+    prepareEvaluation(prisma, { id: 'evaluator-1', type: 'LATENCY', config: { maxLatencyMs: 100 } },
+      [{ id: 'case-1', input: { message: '开始' }, expectedOutput: {} }]);
+    const runtime = { runAgent: jest.fn().mockRejectedValue(Object.assign(new Error('运行时不可用'), { agentLabRunId: 'run-1' })) };
+    await expect(new EvaluationService(prisma, runtime as any).runEvaluation('user-a', 'agent-1', {
+      datasetId: 'dataset-1', evaluatorId: 'evaluator-1',
+    })).rejects.toThrow('费用无法完整核验');
+    expect(runtime.runAgent).toHaveBeenCalledTimes(1);
+    expect(prisma.evaluationResult.create).not.toHaveBeenCalled();
+    expect(prisma.agentEvaluationRun.update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      status: 'FAILED', metrics: expect.objectContaining({ budget: expect.objectContaining({
+        status: 'stopped', limitCny: 3, spentCny: 0, completedSamples: 0,
+        costEvidenceStatus: 'unavailable', interruptedRunId: 'run-1',
+      }) }),
+    }) }));
   });
 
   it('拒绝使用不属于当前 Workspace 的 Dataset', async () => {
@@ -615,7 +708,7 @@ describe('EvaluationService', () => {
     prisma.agentEvaluationRun.create.mockResolvedValue({ id: 'evaluation-1' });
     prisma.agentEvaluationRun.update.mockResolvedValue({ id: 'evaluation-1', status: 'COMPLETED' });
     const runtime = {
-      runAgent: jest.fn().mockResolvedValue({ id: 'run-1', output: {} }),
+      runAgent: jest.fn().mockResolvedValue({ id: 'run-1', estimatedCost: 0.001, output: {} }),
     };
     const service = new EvaluationService(prisma, runtime as any);
 

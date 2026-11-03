@@ -14,7 +14,7 @@ describe('follow-up decisions persist through the current routing rules', () => 
   });
   it('persists low-score evidence and creates a follow-up with its parent task', async () => {
     await service.completeTask('fixture', 'fixture-user', 'task', 'Synthetic answer');
-    expect(prisma.answerHistory.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ questionId: 'question', score: 0.3 }) }));
+    expect(prisma.answerHistory.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ questionId: 'question', score: 0.3, llmEvaluated: true }) }));
     expect(prisma.interviewTask.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: 'FOLLOW_UP', question: 'Explain a constraint' }) }));
     expect(JSON.parse(prisma.interviewTask.create.mock.calls[0][0].data.context).followUpFrom).toBe('task');
   });
@@ -31,5 +31,17 @@ describe('follow-up decisions persist through the current routing rules', () => 
     await service.completeTask('fixture', 'fixture-user', 'task', 'Synthetic explanation with constraints and examples.');
     const data = prisma.answerHistory.create.mock.calls[0][0].data;
     expect(data.score).toBeGreaterThanOrEqual(0); expect(data.score).toBeLessThanOrEqual(1); expect(data.feedback).toBeTruthy();
+    expect(data.llmEvaluated).toBe(false);
   });
+  it.each([
+    'not JSON',
+    JSON.stringify({ score: 0.9 }),
+    JSON.stringify({ score: 2, completeness: 0.8, correctness: 0.8, depth: 0.8, feedback: 'Invalid range', keyPoints: [], missingPoints: [], shouldFollowUp: false, followUpQuestion: null, followUpReason: null, shouldAdvance: false, advancedQuestion: null }),
+  ])('persists explicit non-model provenance for invalid provider output: %s', async content => {
+    llm.chat.mockResolvedValue({ content });
+    await service.completeTask('fixture', 'fixture-user', 'task', 'An answer that is retained despite unavailable model evaluation.');
+    expect(prisma.answerHistory.create.mock.calls[0][0].data.llmEvaluated).toBe(false);
+    expect(llm.chat).toHaveBeenCalledTimes(1);
+  });
+
 });

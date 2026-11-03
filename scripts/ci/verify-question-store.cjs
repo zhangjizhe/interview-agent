@@ -2,7 +2,7 @@ const { createRequire } = require('node:module');
 const assert = require('node:assert/strict');
 const product = createRequire(`${process.cwd()}/package.json`);
 const { ConfigService } = product('@nestjs/config');
-const { QuestionBankService } = product('./dist/modules/interview/services/question-bank.service');
+const { QuestionVectorIndexService: QuestionBankService } = product('./dist/modules/interview/services/question-vector-index.service');
 const { tenantContext } = product('./dist/modules/organizations/tenant-context');
 module.exports = async ({ check }) => {
   const service = new QuestionBankService(new ConfigService({ milvus: { url: process.env.MILVUS_URL }, qwen: { apiKey: 'offline-fixture', baseUrl: 'http://127.0.0.1:1' } }), {});

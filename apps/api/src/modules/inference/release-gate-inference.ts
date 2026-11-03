@@ -6,7 +6,7 @@ import {
   NON_INFERIORITY_MARGIN_POINTS,
 } from './evaluation-statistics';
 
-export const RELEASE_GATE_RULESET_VERSION = 'release-gate/v5';
+export const RELEASE_GATE_RULESET_VERSION = 'release-gate/v6';
 export const MIN_RELEASE_SCORE = 90;
 export const MIN_RELEASE_REPEATS = 3;
 export const MAX_RESOURCE_REGRESSION_RATIO = 1.2;
@@ -14,6 +14,8 @@ export const MAX_RESOURCE_REGRESSION_RATIO = 1.2;
 export type ReleaseGateOutcome = {
   allowed: boolean;
   reason: string;
+  acceptanceScope?: 'deterministic-output-contract';
+  notAssessed?: string[];
 };
 
 export interface ReleaseGateEvaluation {
@@ -75,6 +77,17 @@ export function inferReleaseGate(
   if (!outputContract(evaluation.metrics) || (comparison.baseline && !outputContract(comparison.baseline.metrics))) {
     matchedRules.push('RG-023:final-output-contract-required');
     return denied('发布需要最终输出规则版本一致的评测证据；旧规则记录不可复用，请执行新的有界评测。', matchedRules, { evaluation, baselineEvaluation: comparison.baseline });
+  }
+
+  const candidateQuality = businessEvidence(evaluation.metrics, evaluation.totalCases);
+  const baselineQuality = comparison.baseline ? businessEvidence(comparison.baseline.metrics, comparison.baseline.totalCases) : null;
+  if (!candidateQuality || (comparison.baseline && !baselineQuality)) {
+    matchedRules.push('RG-024:business-contract-evidence-required');
+    return denied('发布需要实际执行的确定性业务合同证据；关键词、结构或延迟冒烟不能单独作为新发布依据。面试语义质量仍未评估。', matchedRules, { evaluation, baselineEvaluation: comparison.baseline });
+  }
+  if (baselineQuality && candidateQuality.contractHash !== baselineQuality.contractHash) {
+    matchedRules.push('RG-025:business-contract-fingerprint-mismatch');
+    return denied('候选与基线的业务断言合同指纹不一致，不能进行等价发布比较。', matchedRules, { evaluation, baselineEvaluation: comparison.baseline });
   }
 
   const evidence = resourceEvidence(evaluation.metrics);
@@ -204,7 +217,7 @@ export function inferReleaseGate(
 
   matchedRules.push('RG-005:release-approved');
   return {
-    outcome: { allowed: true, reason: '评测完成且全部用例通过，允许发布。' },
+    outcome: { allowed: true, reason: '确定性业务合同及资源回归门禁通过，允许按该合同范围发布；面试语义质量未评估。', acceptanceScope: 'deterministic-output-contract', notAssessed: ['interview-semantic-quality', 'training-effectiveness', 'complete-trajectory'] },
     ruleSetVersion: RELEASE_GATE_RULESET_VERSION,
     matchedRules,
     evidence: {
@@ -276,9 +289,25 @@ function denied(
   evidence: Record<string, unknown>,
 ): InferenceDecision<ReleaseGateOutcome> {
   return {
-    outcome: { allowed: false, reason },
+    outcome: { allowed: false, reason, acceptanceScope: 'deterministic-output-contract', notAssessed: ['interview-semantic-quality', 'training-effectiveness', 'complete-trajectory'] },
     ruleSetVersion: RELEASE_GATE_RULESET_VERSION,
     matchedRules,
     evidence,
   };
+}
+
+/** This proves bounded deterministic checks only, never a calibrated semantic judge. */
+function businessEvidence(metrics: unknown, totalCases: number): { contractHash: string } | null {
+  const value = toRecord(metrics);
+  const quality = toRecord(value.qualityEvidence);
+  const repeats = value.repeatCount;
+  if (value.evaluatorType !== 'BUSINESS_ASSERTIONS' || quality.version !== 'evaluation-evidence/v1'
+    || quality.kind !== 'deterministic-business-contract' || quality.scope !== 'output-contract'
+    || quality.contractVersion !== 'business-assertions/v1' || quality.semanticQuality !== 'not-assessed'
+    || typeof quality.contractHash !== 'string' || !/^[0-9a-f]{64}$/.test(quality.contractHash)
+    || typeof repeats !== 'number' || !Number.isSafeInteger(repeats) || repeats < 1
+    || typeof quality.assertionCount !== 'number' || !Number.isSafeInteger(quality.assertionCount)
+    || quality.assertionCount < totalCases * repeats || quality.passed !== quality.assertionCount
+    || quality.failed !== 0 || quality.unavailable !== 0) return null;
+  return { contractHash: quality.contractHash };
 }

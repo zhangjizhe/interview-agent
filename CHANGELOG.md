@@ -1,8 +1,19 @@
 # Changelog
 
+2026-11-03 candidate: public portfolio assistant using a fixed published Lab selector, atomic bounded admission, signed/redacted polling, checked verbatim sources, full historical article chunks and the actual portable site bridge. Default disabled; local tests are engineering evidence, target publication/model/deployment remain unaccepted.
+
+2026-10-29 candidate: bounded BUSINESS_ASSERTIONS and v6 scoped release evidence; shared production scoring request/parser, heuristic source correction, fail-closed Golden/recording, bounded/idempotent evaluation UI. Exact acceptance pending; no semantic quality claim.
+
 按 Keep a Changelog 分类，后续发布采用 Semantic Versioning。仓库当前 package 版本为 0.1.0；未核验到 v1.0.0 标签，因此不倒填发布日期。
 
 ## [Unreleased]
+
+### Architecture candidate — 2026-11-03 (not accepted)
+
+- Interview-owned PostgreSQL question current records and version snapshots, explicit same-organization maintenance adoption preserving legacy Milvus, separate rebuildable vector projection, durable SAVED/PENDING receipts and bounded explicit rebuild. Actual initial selection propagates catalog version/hash; current PG content filters vector hits before rerank. Lab adds the real governance UI. See [catalog migration](docs/architecture/INTERVIEW_QUESTION_CATALOG.md).
+- Runtime prerequisite `57b0ac9` limits the isolated administrator fixture to200 calls while retaining normal Free100 assertions, and removes Lab Run IDs from Interview foreign-key context. Its two CI runs subsequently failed on the assertion textarea's exact accessible-name locator; an explicit aria-label repair has39 local focused UI passes. No complete browser/recovery pass is claimed.
+- Root local catalog verification: API1149 passed/24 skipped, Web328, types/lint/build, Prisma validation and provider-free Golden30 passed. New catalog migration/HTTP/PG/Milvus/browser assets are wired into CI, but the combined new source is not yet pushed or remotely accepted. Local Docker unavailable; no deployment or paid model-quality result.
+- Add [recording readiness](docs/runbook/RECORDING_READINESS.md), separating real product calls from synthetic engineering checks and documenting the Lab-only manual gate. Public bank sharing, human calibration and portfolio assistant delivery are not included.
 
 ### Documentation
 
