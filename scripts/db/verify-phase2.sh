@@ -63,4 +63,4 @@ DO $$ BEGIN
 END $$;
 SQL
 echo 'PASS legacy presentation upgrade preserves tasks/messages without fabricated receipts'
-TENANT_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/phase2_existing" pnpm --filter @interview-agent/api test:jest --runInBand --testPathPatterns='tenant-database|quota-database|evaluation-jobs.database'
+TENANT_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/phase2_existing" pnpm --filter @interview-agent/api test:jest --runInBand --testPathPatterns='tenant-database|quota-database|evaluation-jobs.database|question-bank.catalog.database'

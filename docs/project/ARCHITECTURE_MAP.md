@@ -1,16 +1,24 @@
 # 当前架构地图
 
-更新：2026-10-08。默认产品为模块化单体；详细旧地图[归档](archive/release-readiness-2026-10-08/ARCHITECTURE_MAP.md)，代码优先。
+更新：2026-11-03。默认产品为模块化单体；详细旧地图[归档](archive/release-readiness-2026-10-08/ARCHITECTURE_MAP.md)，代码优先。
+
+## 2026-11-03 题库主数据与录屏候选（待精确CI）
+
+[INTERVIEW_QUESTION_CATALOG](../architecture/INTERVIEW_QUESTION_CATALOG.md)定义当前代码边界。QuestionBankService编排PG业务主数据/历史版本；QuestionVectorIndexService保留旧Milvus能力，QuestionCatalogIndexService维护独立新索引。租户未显式采用时继续LEGACY，维护窗口两次Strong源快照核对后同事务写入目录/版本/采用状态，旧源保留。Lab QuestionCatalogPanel仅调用Interview受ADMIN保护的status/adopt-legacy/rebuild-index API，评测Dataset/Case仍独立冻结。
+
+采用后题目先提交PG再索引，失败为SAVED/PENDING；同内容重试不自动再次付费，显式重建每批最多20。PG直接供首题选择并记录catalogVersionId/contentHash；向量命中先按当前组织/版本/删除状态hydrate，再向rerank发送PG内容。组织状态行锁串行新服务写入；外部旧写入须人为停写，不能把锁称为跨旧系统的无中断迁移。新索引可重建，不代表自动压缩或自动故障探测。
+
+加性迁移20261102000000提供state/entry/version与组织FK/版本UPDATE拒绝。尚未核实目标部署的迁移/采用；旧源不包含采用后的PG新写入，回滚要冻结、导出核对，不直接切旧版。公共题库共享、语义质量、全部历史回填未交付。root本地API1149/24skip、Web328及types/lint/build/Prisma/Golden30通过，后补textarea label39项UI定向通过；实际PG/browser/恢复待未推送新headCI。录屏端口/gate/合成边界见[RECORDING_READINESS](../runbook/RECORDING_READINESS.md)。Portfolio助手当前仅为另行开发目标。
 
 | 层 | 入口 | 当前合同 |
 | --- | --- | --- |
 | Interview | apps/web/src | JWT 会话、候选人导航、岗位/简历/面试/报告与训练入口 |
 | Lab | apps/agent-lab/src | ADMIN 门禁、MCP/题库/录制报告与 ControlledEvolutionWorkspace |
 | 授权 | apps/api/src/modules/auth | 全局 JWT、ADMIN RBAC、用户资源归属与组织范围 |
-| 面试 | apps/api/src/modules/interview | 持久化业务状态、回答/正式证据、手动 SSE、训练关联 |
+| 面试 | apps/api/src/modules/interview | 持久化业务状态、回答/正式证据、SSE、训练关联；候选题库主数据/版本由Interview拥有，非Agent私有资产 |
 | Agent | apps/api/src/agents/multi-agent、modules/agent | LangGraph、checkpoint、受控版本与 Gateway adapter |
 | 模型 | apps/api/src/modules/llm | Qwen/DeepSeek、原子额度、集中费率证据、完整请求答案缓存 |
-| 平台 | apps/api/src/modules/agent-lab | AgentVersion/Application/Run/Trace/Evaluation 与 v5 发布门 |
+| 平台 | apps/api/src/modules/agent-lab | AgentVersion/Application/Run/Trace/Evaluation；当前v6确定性输出合同门禁，不是语义质量认证 |
 | 评测任务 | 同模块 EvaluationJobsService | PostgreSQL PENDING/RUNNING、requestKey、资产指纹、CAS 租约/进度及 CANCELLED；取消在样本边界结算、不重放 |
 | 检索 | modules/knowledge-base、modules/memory | Milvus 混合检索、Qdrant；旧答案相似缓存不再读取 |
 | 数据 | apps/api/prisma | PostgreSQL，租户/额度/冻结证据约束与加性任务迁移 |
@@ -37,7 +45,7 @@ AgentLab扩展ConfiguredRuntimeService与ConfiguredRunJobsService；AgentVersion
 
 ## 2026-10-19 自建可替换架构路线
 
-目标端口与兼容迁移见[REPLACEABLE_AGENT_CONTRACTS](../architecture/REPLACEABLE_AGENT_CONTRACTS.md)。当前AgentRuntimeService仍直接依赖MultiAgentService并按适配器字符串分支；ToolRunner未贯穿所有旧工具路径，配置Agent拒绝非空tool/knowledge/memory绑定。规则评测与发布治理存在，语义Judge/人工校准未交付。不能称为已完成可替换通用Agent平台。
+目标端口与兼容迁移见[REPLACEABLE_AGENT_CONTRACTS](../architecture/REPLACEABLE_AGENT_CONTRACTS.md)。该路线初始审计时AgentRuntimeService直接依赖MultiAgentService并按适配器字符串分支；后续B1a已用Registry接入实际runAgent，见下文；ToolRunner未贯穿所有旧工具路径，配置Agent拒绝非空tool/knowledge/memory绑定。规则评测与发布治理存在，语义Judge/人工校准未交付。不能称为已完成可替换通用Agent平台。
 
 本轮Bridge回合固定一个PUBLISHED快照，并将id传入startExternalRun/核验返回Run，避免并发发布造成记录与policy错配；关联失败尽力终结Run。Interview控制器仍允许Bridge失败后继续原流程，这不是强制已发布策略合同；会话快照与策略/遥测拆分为B3。前端简历确认只有真实成功回执才解锁，并隔离页面/请求生命周期。无新增表、API形状、模型或付费调用。
 

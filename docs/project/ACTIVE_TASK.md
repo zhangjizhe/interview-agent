@@ -1,11 +1,11 @@
 # Active task
 
-2026-10-29. EVALUATION-QUALITY-P0 within PRODUCT-REACCEPTANCE-1 (**NOT_ACCEPTED**). User authorized implementation in priority order and expert review/testing; no repeat permission request.
+2026-11-02 · QUESTION-CATALOG-ARCHITECTURE / recording readiness, within product reacceptance (**NOT_ACCEPTED**). User authorized architecture fixes and continued development; no deployment or paid replay authorization inferred.
 
-Current stage: complete deterministic business assertions in real Lab/API/UI, fail-closed Golden calibration contracts, correct scoring fallback provenance and protect bounded/idempotent evaluation submission. Source baseline main/agent-lab deaf006 (merged PR63), not the obsolete open-PR63 context.
+Baseline: remote agent-lab 57b0ac9a0b6ca72c072b69ea469360bc8a047f4e, main deaf006, PR64 open. The runtime prerequisite fixes the isolated administrator quota (finite 200; production Free remains 100) and stops using a Lab Run identifier as an Interview foreign key. Exact-head CI is running; do not infer full acceptance from local tests.
 
-Local freeze completed: Hono official fix/installed chain, durable receipts and final API1131/21skip, Web324/types/lint/build and independent diff/original-log review passed. Delivery still requires exact new-head CI below. Push agent-lab, require latest exact push/PR checks and isolated HTTP/PG/browser/recovery, then expected-head merge and remote readback. Local Docker unavailable; do not invent local image/browser/recovery results.
+Current work: Interview-owned PostgreSQL canonical question catalog and version snapshots; explicit maintenance-confirmed legacy adoption preserving Milvus source; separate rebuildable vector index; tenant-scoped concurrent-write coordination and honest pending-index receipts; real Lab governance UI and target recording guide. No automatic production adoption, cross-organization sharing, model-quality improvement or human calibration claims.
 
-After this stage: actual Interview semantic Rubrics and independent annotation/calibration, then Case/root-cause and evaluator evolution, snapshots, online inspection. Do not call deterministic output checks a semantic Judge or complete P0/B4.
+Delivery: appropriate local tests/type/lint/build and independent review; exact-source remote upload; latest exact-head HTTP/PG/browser/recovery and migrations CI; only then expected-head merge/readback. Local Docker unavailable. Do not delete assertions or omit failed evidence.
 
-Costs: no paid provider while unknown historical charges remain; <=0.5CNY/call, <=3CNY release. No production deployment authorization implied by a source merge. Historical failed/interrupted attempts remain in archive/evidence.
+Follow-up: actual scorer provenance/Rubrics and independent annotation/calibration, measured regression, case/root-cause loop and controlled telemetry export. Historical external charges remain unknown beyond known0.069285CNY; no paid external calls. Record one stage at a time.

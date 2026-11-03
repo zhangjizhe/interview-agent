@@ -3,8 +3,8 @@ jest.mock('../modules/llm/llm.gateway.service', () => ({ LlmGatewayService: clas
 jest.mock('openai', () => ({ __esModule: true, default: jest.fn(() => ({})) }));
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { QuestionBatchDto, QuestionSearchDto, GenerateQuestionsDto } from '../modules/interview/dto/question-bank.dto';
-import { QuestionBankService } from '../modules/interview/services/question-bank.service';
+import { QuestionCatalogAdoptDto, QuestionIndexRebuildDto, QuestionBatchDto, QuestionSearchDto, GenerateQuestionsDto } from '../modules/interview/dto/question-bank.dto';
+import { QuestionVectorIndexService as QuestionBankService } from '../modules/interview/services/question-vector-index.service';
 import { tenantContext } from '../modules/organizations/tenant-context';
 
 const question = { questionId: 'fixture-one', position: 'Engineering', question: 'Explain one tradeoff', answer: 'Synthetic evidence', tags: [] };
@@ -18,6 +18,17 @@ describe('question input and bounded writes', () => {
     for (const limit of ['NaN', '-1', '0', '101', '1.5']) await expect(valid({ limit }, QuestionSearchDto)).rejects.toMatchObject({ status: 400 });
     await expect(valid({ limit: '20' }, QuestionSearchDto)).resolves.toMatchObject({ limit: 20 });
     await expect(valid({ text: 'fixture '.repeat(10), count: 100000 }, GenerateQuestionsDto)).rejects.toMatchObject({ status: 400 });
+  });
+  it('requires maintenance acknowledgement and bounds explicit index rebuild IDs', async () => {
+    for (const body of [{}, { maintenanceConfirmed: false }, { maintenanceConfirmed: 'true' }]) {
+      await expect(valid(body, QuestionCatalogAdoptDto)).rejects.toMatchObject({ status: 400 });
+    }
+    await expect(valid({ maintenanceConfirmed: true }, QuestionCatalogAdoptDto)).resolves.toMatchObject({ maintenanceConfirmed: true });
+    for (const questionIds of [null, [], ['same', 'same'], Array.from({ length: 21 }, (_, i) => `q-${i}`), [''], [3]]) {
+      await expect(valid({ questionIds }, QuestionIndexRebuildDto)).rejects.toMatchObject({ status: 400 });
+    }
+    await expect(valid({}, QuestionIndexRebuildDto)).resolves.toBeDefined();
+    await expect(valid({ questionIds: ['one'] }, QuestionIndexRebuildDto)).resolves.toMatchObject({ questionIds: ['one'] });
   });
   let service: any, client: any;
   const ok = { status: { error_code: 'Success', code: 0 } };

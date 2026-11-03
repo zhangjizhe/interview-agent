@@ -1,6 +1,6 @@
 # 当前决策索引
 
-更新：2026-10-09。完整 ADR 在 [architecture-decisions.md](../architecture-decisions.md)；旧汇总[归档](archive/release-readiness-2026-10-08/DECISIONS.md)。
+更新：2026-11-03。完整 ADR 在 [architecture-decisions.md](../architecture-decisions.md)；旧汇总[归档](archive/release-readiness-2026-10-08/DECISIONS.md)。
 
 | 决策 | 当前约束 |
 | --- | --- |
@@ -22,6 +22,9 @@
 | 持续验收 | 用户授权每2小时检查；阶段相关测试与最新CI全绿后合并main；仅重要进展/失败/需操作通知；不将源码合并记作整体验收 |
 | 辅助模型计量 | 题库embedding/rerank复用Gateway；调用前组织额度预留、调用后无正文费用凭证，usage缺失保持未知；加性可空metadata，不自动重试 |
 | 分支 | 开发 agent-lab，验证提交推送并核对远端；main 合并与真实 Agent 发布分别核验 |
+| 题库领域与采用 | Interview拥有PG当前题目/历史版本；Lab只提供治理UI，评测集独立。按组织显式维护采用旧Milvus源，原源保留；未采用继续LEGACY，不能自动跨组织复制 |
+| 题库索引一致性 | 向量为可重建投影，PG先提交、索引失败SAVED/PENDING；显式最多20项重建，无自动付费重放；当前PG版本/归属/删除过滤后才rerank，迁移后回旧版非自动无损 |
+| 录屏证据 | 真实Provider与隔离合成分开；现有gate只暂停Lab，固定45→80不是学习提升；最新完整CI和目标机预演未完成不得称可录屏验收完成 |
 | 真实对比 | 失败成本/额度先核验，再批准新的有界预算；不得重置账本、放宽门或自动发布 |
 
 依赖风险豁免尚未批准。当前不声明完整账单对账、训练提升、零漏洞、生产 RTO/RPO 或可直接商用。
@@ -43,3 +46,5 @@ B0策略准入增量（本地限定实链通过）：InterviewFlowController将s
 2026-10-23在验增量：完整模拟的规范题技能归属复用共享job-keywords-v1词典，只将实际题干唯一匹配到当前owned组织/岗位版本的active要求；歧义/未知保持null，记录question-job-lexical/v1依据。受控练习技能取实际Interview，追问父题仅同会话，不回填历史。无schema/模型调用增加；实际新镜像API/浏览器工程链与严格恢复本地通过，待精确CI；首题展示语义仍未验收，见GOLDEN_SKILL_ATTRIBUTION_EVIDENCE.md。
 
 ADR26 (2026-10-29, candidate): distinguish deterministic business contracts from semantic quality; release-gate/v6 refuses smoke-only new releases, requires matching server-produced assertion evidence. Share production Interview decision requests/parser with the calibration runner rather than maintaining a second scoring Prompt. Explicit heuristic source, unknown costs/receipts and missing samples fail closed. Preserve legacy publication compatibility without retroactive certification. See ../harness/BUSINESS_ASSERTIONS.md.
+
+2026-11-03 architecture candidate: [Interview catalog decision and migration](../architecture/INTERVIEW_QUESTION_CATALOG.md) and [recording guide](../runbook/RECORDING_READINESS.md). Preserve modular monolith and existing auth/Gateway; no framework rewrite or shared cross-tenant bank. Runtime57b0ac9's two CI runs failed at the business-assertion textarea locator after the bounded fixture-quota fix; explicit aria-label has39 local focused UI passes only. Catalog/API/UI/migration/helper changes are local candidates with root API1149/24skip, Web328, types/lint/build/Prisma/Golden30 passes; exact new-head migration/HTTP/PG/browser/recovery CI is outstanding. Portfolio assistant is a separate goal, not accepted here.

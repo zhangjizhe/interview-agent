@@ -12,7 +12,7 @@ assert.equal(process.env.MILVUS_URL, 'http://fixture-milvus:19530');
 const deadline = setTimeout(() => { console.error('Synthetic storage fixture deadline exceeded'); process.exit(1); }, 240000);
 const require = createRequire(`${process.cwd()}/package.json`);
 const { ConfigService } = require('@nestjs/config');
-const { QuestionBankService } = require('./dist/modules/interview/services/question-bank.service');
+const { QuestionVectorIndexService: QuestionBankService } = require('./dist/modules/interview/services/question-vector-index.service');
 const { tenantContext } = require('./dist/modules/organizations/tenant-context');
 const { MilvusClient } = require('@zilliz/milvus2-sdk-node');
 const client = new MilvusClient({ address: process.env.MILVUS_URL });

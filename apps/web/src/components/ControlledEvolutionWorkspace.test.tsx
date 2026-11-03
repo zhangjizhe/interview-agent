@@ -116,6 +116,7 @@ describe('Lab evaluation evidence presentation', () => {
   it('rejects malformed case JSON before any request and submits a restored contract with explicit provenance', async () => {
     editableDataset = true;
     mount(); await screen.findByLabelText('业务断言 JSON');
+    expect(screen.getByRole('textbox', { name: '业务断言 JSON', exact: true })).toBeInTheDocument();
     fireEvent.click(screen.getByText('配置评测资产'));
     fireEvent.change(screen.getByLabelText('Case 责任人'), { target: { value: 'synthetic-maintainer' } });
     fireEvent.click(screen.getByRole('checkbox', { name: /我确认该 Case/ }));

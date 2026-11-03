@@ -4,9 +4,9 @@ import { createRequire } from 'node:module';
 // Isolated synthetic fixtures. Configured runs use a deterministic localhost provider; no external models.
 const base = process.env.API_BASE_URL || 'http://127.0.0.1:3001/api';
 let passed = 0;
-async function request(path, { method = 'GET', token, body } = {}) {
+async function request(path, { method = 'GET', token, body, timeoutMs = 5000 } = {}) {
   const response = await fetch(`${base}${path}`, {
-    method, signal: AbortSignal.timeout(5000),
+    method, signal: AbortSignal.timeout(timeoutMs),
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -87,6 +87,7 @@ check('MCP count reflects enabled execution bindings', afterReload.data.runningC
 await request('/admin/mcp-servers/toggle', { method: 'POST', token: admin, body: { toolName: 'knowledge_bank', enabled: true } });
 await (await import('/tmp/verify-configured-runtime.mjs')).verifyConfigured({ request, admin, owner, check });
 await (await import('/tmp/verify-question-gateway.mjs')).verifyQuestionGateway({ request, admin, check });
+await (await import('/tmp/verify-question-catalog.mjs')).verifyQuestionCatalog({ request, admin, owner, check });
 await (await import('/tmp/verify-configured-release.mjs')).verifyConfiguredRelease({ request, admin, check });
 check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: sibling.data.accessToken })).status === 200);
 check('logged out access token rejected', (await request('/auth/profile', { token: sibling.data.accessToken })).status === 401);

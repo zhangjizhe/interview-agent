@@ -22,6 +22,7 @@ import { createRoot } from 'react-dom/client';
 import { useEffect, useRef, useState } from 'react';
 import { api, logoutSession, role, token } from './api';
 import { QuestionBankWorkspace, type QuestionBankItem } from './QuestionBankWorkspace';
+import { QuestionCatalogPanel } from './QuestionCatalogPanel';
 import { questionBankQuery } from './question-bank-query';
 import './styles.css';
 import './lab.css';
@@ -340,7 +341,7 @@ export function ControlCenter() {
         {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} />}
         {view === 'runtime' && <AgentBuilderWorkspace />}
         {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} />}
-        {view === 'question-bank' && <QuestionBankWorkspace
+        {view === 'question-bank' && <><QuestionCatalogPanel /><QuestionBankWorkspace
           questions={questionItems}
           query={questionQuery}
           position={questionPosition}
@@ -355,7 +356,7 @@ export function ControlCenter() {
           onPosition={(value) => { clearQuestionSearch(); setQuestionPosition(value); }}
           onSearch={searchQuestions}
           onClearSearch={clearQuestionSearch}
-        />}
+        /></>}
         {view === 'trace' && <TraceWorkspace runs={labData.runs} />}
         {view === 'evaluation' && <EvaluationWorkspace data={labData} imports={imports} executeImport={executeImport} />}
         {view === 'evolution' && <ControlledEvolutionWorkspace />}

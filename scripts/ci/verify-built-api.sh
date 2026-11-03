@@ -79,6 +79,7 @@ fi
 docker cp scripts/ci/fixture-model-server.mjs "$fixture_api:/tmp/fixture-model-server.mjs"
 docker cp scripts/ci/verify-configured-release.mjs "$fixture_api:/tmp/verify-configured-release.mjs"
 docker cp scripts/ci/verify-question-gateway.mjs "$fixture_api:/tmp/verify-question-gateway.mjs"
+docker cp scripts/ci/verify-question-catalog.mjs "$fixture_api:/tmp/verify-question-catalog.mjs"
 docker cp scripts/ci/verify-configured-runtime.mjs "$fixture_api:/tmp/verify-configured-runtime.mjs"
 docker cp scripts/ci/golden-model-contract.mjs "$fixture_api:/tmp/golden-model-contract.mjs"
 docker exec -d "$fixture_api" node /tmp/fixture-model-server.mjs

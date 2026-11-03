@@ -7,6 +7,7 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { verifyControlRecovery } from './lab-control-recovery.mjs';
 import { verifyQuestionEvidence } from './lab-question-evidence.mjs';
+import { verifyQuestionCatalogEvidence } from './lab-question-catalog-evidence.mjs';
 import { verifySessionRevocation } from './lab-session-revocation-evidence.mjs';
 import { verifyUserPermission } from './lab-user-permission-evidence.mjs';
 import { verifyBuilderSavePending } from './lab-builder-save-pending-evidence.mjs';
@@ -111,6 +112,7 @@ try {
   await textContains('fixture-response:route-yes');
   console.log('PASS browser workflow: saved new fixed-version draft and executed real branching nodes');
   await verifyQuestionEvidence(page, context, url);
+  await verifyQuestionCatalogEvidence(page, context, url);
   await page.getByRole('button', { name: '自进化', exact: true }).click();
   await page.getByRole('combobox', { name: 'Agent', exact: true }).selectOption({ label: 'browser-ci-agent · 无当前版本' });
   await page.getByRole('button', { name: '核验首次发布门禁', exact: true }).click();

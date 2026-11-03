@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsByteLength, IsInt, IsOptional, IsString, IsUrl, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, Equals, IsBoolean, IsArray, IsByteLength, IsInt, IsOptional, IsString, IsUrl, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 export const QUESTION_BATCH_LIMIT = 20;
 export class QuestionDto {
@@ -38,4 +38,13 @@ export class GenerateQuestionsDto {
 export class GenerateDynamicQuestionsDto {
   @IsString() @IsByteLength(20, 20000) resumeText: string;
   @IsOptional() @IsInt() @Min(1) @Max(12) count?: number;
+}
+
+export class QuestionIndexRebuildDto {
+  @ValidateIf((_object, value) => value !== undefined) @IsArray() @ArrayUnique() @ArrayMinSize(1) @ArrayMaxSize(20) @IsString({ each: true }) @IsByteLength(1, 100, { each: true })
+  questionIds?: string[];
+}
+
+export class QuestionCatalogAdoptDto {
+  @IsBoolean() @Equals(true) maintenanceConfirmed: boolean;
 }

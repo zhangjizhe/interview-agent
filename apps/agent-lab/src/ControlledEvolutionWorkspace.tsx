@@ -388,7 +388,7 @@ export function ControlledEvolutionWorkspace() {
         <label>难度标签<input value={caseDifficulty} onChange={(event) => setCaseDifficulty(event.target.value)} placeholder="intermediate" /></label>
       </div>
       {caseType === 'BUSINESS_ASSERTIONS' && <div>
-        <label>业务断言 JSON<textarea rows={12} maxLength={32768} value={caseContract} onChange={event => setCaseContract(event.target.value)} /></label>
+        <label>业务断言 JSON<textarea aria-label="业务断言 JSON" rows={12} maxLength={32768} value={caseContract} onChange={event => setCaseContract(event.target.value)} /></label>
         <p>范例用于检查结构化输出合同，不代表真实面试质量样本。Case 期望格式须与执行时选择的 Evaluator 一致。范例检查 response 中 JSON 的 score 范围和 decision 值；请按输入任务修改期望。逐项断言必须全部通过，不支持任意代码或正则。服务端在运行前核验合同。</p>
         <button disabled={busy} onClick={() => setCaseContract(BUSINESS_CASE_EXAMPLE)}>恢复业务断言范例</button>
       </div>}

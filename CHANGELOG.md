@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+### Architecture candidate — 2026-11-03 (not accepted)
+
+- Interview-owned PostgreSQL question current records and version snapshots, explicit same-organization maintenance adoption preserving legacy Milvus, separate rebuildable vector projection, durable SAVED/PENDING receipts and bounded explicit rebuild. Actual initial selection propagates catalog version/hash; current PG content filters vector hits before rerank. Lab adds the real governance UI. See [catalog migration](docs/architecture/INTERVIEW_QUESTION_CATALOG.md).
+- Runtime prerequisite `57b0ac9` limits the isolated administrator fixture to200 calls while retaining normal Free100 assertions, and removes Lab Run IDs from Interview foreign-key context. Its two CI runs subsequently failed on the assertion textarea's exact accessible-name locator; an explicit aria-label repair has39 local focused UI passes. No complete browser/recovery pass is claimed.
+- Root local catalog verification: API1149 passed/24 skipped, Web328, types/lint/build, Prisma validation and provider-free Golden30 passed. New catalog migration/HTTP/PG/Milvus/browser assets are wired into CI, but the combined new source is not yet pushed or remotely accepted. Local Docker unavailable; no deployment or paid model-quality result.
+- Add [recording readiness](docs/runbook/RECORDING_READINESS.md), separating real product calls from synthetic engineering checks and documenting the Lab-only manual gate. Public bank sharing, human calibration and portfolio assistant delivery are not included.
+
 ### Documentation
 
 - 校准内部预发布仪表、静态清单数量和候选黄金链证据缺口，归档历史上下文并明确训练动作下一验收合同；不新增产品通过结论。

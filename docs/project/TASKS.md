@@ -1,4 +1,11 @@
 # 待办与验收门
+
+2026-11-03 当前候选：QUESTION-CATALOG-ARCHITECTURE与录屏准备，**NOT_ACCEPTED**。原head115b5c6因隔离管理员Free100耗尽失败；runtime57b0ac9只给该fixture有限200并保留普通Free100、移除Run冒用Interview ID。其两组CI又在业务断言textarea精确可访问名匹配超时；root已加aria-label并39项UI定向通过，尚未推送组合新head或重跑完整远端CI。
+
+题库当前本地候选已接通Interview PG主数据/历史版本、显式同组织保源迁移、独立向量索引/有界重建、初始选题版本/hash透传及Lab真实治理UI；见[架构与迁移](../architecture/INTERVIEW_QUESTION_CATALOG.md)和[录屏准备](../runbook/RECORDING_READINESS.md)。root实际本地API1149/24skip、Web328、types/lint/build、Prisma validate、provider-free Golden30通过；后续39项label定向不冒充另一次全量测试。实际HTTP/PG/Milvus/浏览器helper与恢复资产已接CI，本机无Docker，未执行的新远端链路仍待验收。
+
+当前退出门：精确source freeze/上传→最新push/PR全部CI及原始日志→expected-head合并/远端读回→目标电脑录屏预演。不能在失败head合并，不能把编排/合成45→80宣称模型语义或学习提升。公共跨组织题库、历史题目全部迁移、真实人类校准、模型录屏与生产部署仍未验收。Portfolio助手是另行开发目标，本段不记为实现或完成。下文旧阶段保留作历史，不覆盖本段当前状态。
+
 2026-10-24 latest: PR62 foundation candidate5194edcb passed exact six CI jobs plus independent original logs, merged7e29d768fd7fd0a979ff80915d696f02f14035aa; PR/main/agent-lab/local read back. Only persistence foundation accepted; first-question API/UI protocol remains unconnected and NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md.
 
 2026-10-23 · PRODUCT-REACCEPTANCE-1整体NOT_ACCEPTED。PR59候选43b74cc最新push/PR六项CI成功及独立复核后，冻结合并a03ff8afe7f8431ac6d53c9493f8c22077d23aa0，PR/main/agent-lab均读回。当前唯一主题CANDIDATE-GOLDEN-ENGINEERING，首个阻断I06保存回执本地隔离第五链exit0，待最终复核/最新精确CI，未交付。失败与前置见[GET](../acceptance/TRAINING_READS_EVIDENCE.md)/[安全](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。

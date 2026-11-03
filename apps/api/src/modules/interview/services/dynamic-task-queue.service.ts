@@ -133,6 +133,7 @@ export class DynamicTaskQueueService {
         ...selection,
         questionId: q.questionId,
         questionSelectionSource: q.selectionSource,
+        ...(q.catalogVersionId ? { catalogVersionId: q.catalogVersionId, catalogContentHash: q.catalogContentHash } : {}),
         capabilities: capabilitiesForQuestion(q.category, q.question),
       }),
     }));
@@ -140,6 +141,7 @@ export class DynamicTaskQueueService {
 
   async generateInitialQuestions(position: string, level: string): Promise<{
     questionId: string; question: string; category: string; difficulty: string; selectionSource: string;
+    catalogVersionId?: string; catalogContentHash?: string;
   }[]> {
     const difficultyMap: Record<string, string> = {
       'P1': 'easy', 'P2': 'easy', 'P3': 'medium', 'P4': 'medium', 'P5': 'hard', 'P6': 'hard',
@@ -163,6 +165,7 @@ export class DynamicTaskQueueService {
             category: r.category || category,
             difficulty: targetDifficulty,
             selectionSource: 'stored-category-level/v1',
+            ...(r.catalogVersionId ? { catalogVersionId: r.catalogVersionId, catalogContentHash: r.catalogContentHash } : {}),
           }));
         }
       } catch (err: any) {
@@ -396,6 +399,7 @@ export class DynamicTaskQueueService {
           practiceSkillName: context.practiceSkillName || null,
           taskType: task.type,
           questionSelectionSource: context.questionSelectionSource || null,
+          ...(context.catalogVersionId ? { catalogVersionId: context.catalogVersionId, catalogContentHash: context.catalogContentHash } : {}),
           ...mapping.selection,
           ...(mapping.metadata ? { skillMapping: mapping.metadata } : {}),
         },

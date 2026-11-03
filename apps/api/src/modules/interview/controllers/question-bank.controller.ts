@@ -20,7 +20,7 @@ import { ResumeParserService } from '../services/resume-parser.service';
 import { fetchSafeExternalText } from './external-url.util';
 import { Roles } from '../../auth/roles.decorator';
 import { requireOwnedInterview } from '../../../common/ownership.util';
-import { GenerateDynamicQuestionsDto, GenerateQuestionsDto, QuestionBatchDto, QuestionDto, QuestionImportDto, QuestionSearchDto, QuestionUrlDto } from '../dto/question-bank.dto';
+import { QuestionCatalogAdoptDto, QuestionIndexRebuildDto, GenerateDynamicQuestionsDto, GenerateQuestionsDto, QuestionBatchDto, QuestionDto, QuestionImportDto, QuestionSearchDto, QuestionUrlDto } from '../dto/question-bank.dto';
 
 /**
  * 面试题知识库 CRUD + 动态生成
@@ -39,6 +39,18 @@ export class QuestionBankController {
     private resumeParser: ResumeParserService,
     private prisma: PrismaService,
   ) {}
+
+  @Get('question-bank/catalog/status')
+  @Roles('ADMIN')
+  catalogStatus() { return this.questionBank.catalogStatus(); }
+
+  @Post('question-bank/catalog/adopt-legacy')
+  @Roles('ADMIN')
+  adoptLegacy(@Body() dto: QuestionCatalogAdoptDto) { return this.questionBank.adoptLegacy(dto.maintenanceConfirmed); }
+
+  @Post('question-bank/catalog/rebuild-index')
+  @Roles('ADMIN')
+  rebuildIndex(@Body() dto: QuestionIndexRebuildDto) { return this.questionBank.rebuildIndex(dto.questionIds); }
 
   @Post('question-bank')
   @Roles('ADMIN')
