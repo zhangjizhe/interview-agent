@@ -74,3 +74,5 @@ FIRST-QUESTION-PRESENTATION limited local freeze approved independently: source/
 
 
 2026-10-29 EVALUATION-QUALITY-P0 (in progress): user authorized priority implementation. Add bounded business assertions and v6 scoped publication, shared production scorer calibration contract, reject failed/unknown report evidence, correct heuristic provenance, all-trial budgets and durable unknown submission receipts. Necessary Hono audit prerequisite and exact new-head CI pending. Next: independent annotation/adjudication and real Interview quality tasks, Case/evaluator dual evolution and snapshots, then online inspection. No whole-product/model-quality/deployment acceptance. See EVALUATION_QUALITY_GATE_EVIDENCE.md; earlier PR63-open status is obsolete, merged baseline deaf006.
+
+2026-11-03 Portfolio97af5cb六项CI与原始HTTP137/Redis/恢复日志通过；实际浏览器发现HTTP预览WebCrypto缺失已补安全前置提示，站点27测试通过，最终client追加提交待精确CI。历史正文凭据已脱敏，原始未净化中间提交未上传。

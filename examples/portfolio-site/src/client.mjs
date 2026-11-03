@@ -19,6 +19,8 @@ function addMessage(role,text){const m=document.createElement('div');m.className
 function setBusy(value){busy=value;send.textContent=value?'停止等待 ■':'发送 ↑';input.disabled=value;$('chat-reset').disabled=value;feed.setAttribute('aria-busy',String(value))}
 const ADMISSION_KEY='portfolio-lab-admission/v1';
 async function admissionFor(question){
+ if(health?.agentConfigured===false)throw Error('助手尚未启用，请先完成服务端配置；本次未发送。');
+ if(!globalThis.crypto?.subtle||typeof globalThis.crypto.randomUUID!=='function')throw Error('请通过 HTTPS 或 localhost 打开网站，以安全保存请求标识；本次未发送。');
  if(health?.agentMode==='direct')return {requestKey:crypto.randomUUID(),stored:false};
  const questionHash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(question)))].map(b=>b.toString(16).padStart(2,'0')).join('');
  let previous;try{previous=JSON.parse(sessionStorage.getItem(ADMISSION_KEY)||'null')}catch{throw Error('请求状态存储异常，本次未发送。')}
