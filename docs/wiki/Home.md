@@ -1,214 +1,64 @@
-# Wiki · 项目知识库
+# Wiki · Interview Agent / Agent Lab
 
-> 2026-06-26 · 当前架构：**NestJS api (3001) 默认 + py-api (3002) 选配**
+> 代码事实基线：`agent-lab` 分支 `51d5c2b`（2026-11-03）
+> 适用范围：NestJS 主后端（`apps/api`）为默认产品路径；`apps/py-api` 为实验性替代实现，不在本 wiki 的默认路径内。
 >
-> GH Wiki 未启用时，此目录作为项目内 wiki 入口；启用后可用 `gh api import` 同步到 `<owner>/interview-agent.wiki`。
+> 本目录是项目内 wiki 入口。GH Wiki 未启用时以此为准；启用后可用 `gh api import` 同步到 `<owner>/interview-agent.wiki`。
 
 ---
 
-## 目录
+## 这套 wiki 怎么用
 
-- [项目简介](#项目简介)
-- [快速开始](#快速开始)
-- [架构总览](#架构总览)
-- [接口清单](#接口清单)
-- [商用部署](#商用部署)
-- [故障排查](#故障排查)
-- [简历亮点](#简历亮点)
-- [CI 流水线](#ci-流水线)
-- [贡献指南](#贡献指南)
+现有文档已经很密（`README.md`、`docs/*` 下有 30+ 验收报告、`docs/project/TASKS.md` 门禁清单）。本 wiki **不复述它们**，而是做三件事：
 
----
+1. **把代码地图画清楚**：哪个能力在哪个模块、多少文件、入口在哪，改动前能定位；
+2. **把判定标准翻译成工程语言**：证据门、额度、计价这几套机制是怎么落到代码里的；
+3. **给下一步开发一条可执行的路**：尤其 GPT 接入的改动面与验收。
 
-## 项目简介
-
-**interview-agent** —— AI 面试智能体，面向 LLM Agent 工程师求职场景的简历项目。
-
-**核心能力**：
-
-- 多 Agent 编排（LangGraph StateGraph · 6 节点：supervisor / planner / executor / replanner / reviewer / hitl_review）
-- 4 层记忆分层（Postgres + Redis + Qdrant + Milvus）
-- 双 LLM 路由（Qwen / DeepSeek，自动 fallback）
-- 真流式输出（SSE · asyncio.Queue）
-- 4 级水位线上下文压缩
-- 27 个接口（NestJS 默认）+ 24 个接口（py-api 选配）
-- 商用 best practice：结构化日志 / Rate Limit / Metrics / 错误处理 / 真流式 / 双层 fail-fast
-
-**技术栈**：NestJS + Python (FastAPI) + React + LangGraph 1.x + DeepAgents + Mem0 + Qdrant + Milvus + Qwen / DeepSeek + Langfuse + Prisma + Docker
+| 页面 | 内容 | 什么时候读 |
+| --- | --- | --- |
+| [01 架构总览](./01-architecture.md) | 模块化单体、apps 布局、运行时拓扑、模块规模 | 第一次进项目 / 要动跨模块改动 |
+| [02 Interview 业务](./02-interview-domain.md) | 登录 → 岗位 → 简历 → 流式面试 → 报告 → 训练 | 改业务功能 |
+| [03 Agent 运行时](./03-agent-runtime.md) | LangGraph 7 节点图、state、路由、HITL、流式适配 | 改 Agent 行为 |
+| [04 LLM 网关](./04-llm-gateway.md) | Provider 抽象、路由降级、两级缓存、额度、计价证据 | 改模型 / 排模型故障 |
+| [05 数据与存储](./05-data-and-storage.md) | Prisma 40+ 模型分组、Postgres/Redis/Qdrant/Milvus 分工 | 加表 / 排查数据问题 |
+| [06 Agent Lab 与评测](./06-agent-lab.md) | 版本、运行证据、评测任务、发布门、受控进化 | 做评测 / 发布 |
+| [07 开发与运维](./07-dev-and-ops.md) | 启动、分支策略、测试分层、CI、排障 | 每天都要用 |
+| **[08 GPT 接入方案](./08-gpt-integration.md)** | **新增 provider 的完整改动面 + 验收 + 风险** | **下一步开发** |
+| [09 待办与推进顺序](./09-backlog.md) | 与 TASKS.md 门禁对齐的增量任务 | 开工前 |
 
 ---
 
-## 快速开始
+## 一句话定位
 
-### 一键部署（默认 NestJS 后端）
+**Interview** 是面试训练工作台（候选人视角）；**Agent Lab** 是受控评测与版本治理台（管理员视角）。两者共用一套 Agent Runtime 与 LLM 网关，但**证据边界严格分离**：Lab 的人工 APPROVE 只记录决定，Agent 版本能否作用于 Interview 另受真实发布证据门约束。
 
-```bash
-git clone https://github.com/<owner>/interview-agent
-cd interview-agent
-bash deploy.sh
-# → 自动 .env + openssl rand JWT_SECRET
-# → docker compose up -d --build
-# → 等 api healthy
-# → 端到端验证 /api/health + /api/health/ready
+## 当前交付状态（来自 README，2026-10-08）
+
+- 本地工程与浏览器验收通过；**真实业务版本对比尚未通过**；生产部署与商用验收未完成。
+- 测试实数：API Jest 626 通过、DB 专项 17、缓存单测 22、Web/Lab 组件 95；lint / typecheck / build 通过。
+- 受控业务发布集 12 个已审查冻结的合成场景；合成工程基准 30 Cases。
+- 隔离基线在 13/36 成功样本后因额度失败，已核验费用小计 ¥0.069285；正式版本 1.0.0，候选 1.0.1 DRAFT。
+
+> 这些数字是**当前实证**，不是承诺。改代码后必须重跑对应验证，见 [07](./07-dev-and-ops.md)。
+
+## 文档关系
+
+```
+README.md                       对外概览 + 交付状态（事实源）
+docs/project/CURRENT_STATE.md   当前状态
+docs/project/TASKS.md           P0/P1 门禁清单（验收口径）
+docs/DELIVERY-REPORT-*.md       交付证据
+docs/ACCEPTANCE-REPORT-*.md     逐次验收记录（30+）
+docs/wiki/*                     ← 本 wiki：代码地图 + 方案
+WIKI.md                         2026-06-21 工程审计（历史快照，已被本 wiki 与 README 取代）
 ```
 
-### 选配启 py-api（Python 薄壳版）
+`WIKI.md` 里的模块行数、接口数（27 个）、py-api 为默认等描述**已过期**——当前 `apps/api` 有 24 个控制器、137 条路由。保留它是因为其中的审计维度仍有参考价值。
 
-```bash
-bash deploy.sh --py
-# → 8 容器（NestJS 默认）+ 1 容器（py-api profile 选配）
-# → 注意：web 默认反代 api:3001，要用 py-api 需手动改 web/nginx.conf 后重 build
-```
+## 常用链接
 
-### 商用前必做
-
-```bash
-# 1. 编辑 .env 填 QWEN_API_KEY（必须）
-# 2. 重生成 JWT_SECRET
-openssl rand -base64 48  # 替换 .env 的 JWT_SECRET
-# 3. 重启加载新 env
-bash deploy.sh
-```
-
-详见 [deploy.sh 注释](../deploy.sh) + [architecture.md](./architecture.md)。
-
----
-
-## 架构总览
-
-**当前架构（2026-06-26 架构回退后）**：
-
-- **默认后端**：NestJS（apps/api · 端口 3001）
-- **选配后端**：py-api（apps/py-api · 端口 3002，profile 启）
-- **前端**：React + Vite（apps/web · 端口 5173，nginx 反代到 api:3001）
-- **基础设施**：Postgres + Redis + Qdrant + Milvus（双后端共享）
-
-详见 [architecture.md](./architecture.md)（含 Mermaid 架构图 + 选型理由）。
-
----
-
-## 接口清单
-
-### NestJS（apps/api · 27 接口）
-
-| 模块 | 端点数 | 主要路由 |
-|------|------|---------|
-| Auth | 1 | `/api/auth/login` |
-| Health | 2 | `/api/health` · `/api/health/ready` |
-| Interview | 11 | `/api/interview/{start,stream,upload-resume,list,stats,{id},{id}/end,{id}/confirm-resume,{id}/message,empty-rooms}` |
-| Question Bank | 5 | `/api/interview/question-bank/*` |
-| Knowledge Base | 4 | `/api/knowledge-base/*` |
-| Tools | 1 | `/api/tools` |
-| MCP Admin | 4 | `/api/admin/mcp-servers/*` |
-| Metrics | 1 | `/api/metrics/vitals` |
-| HITL | 3 | `/api/hitl/*` |
-
-### py-api（apps/py-api · 24 接口）
-
-按 P0/P1/P2 优先级分（见 [docs/architecture.md](./architecture.md) § py-api 接口清单）。
-
----
-
-## 商用部署
-
-详见 [runbook.md](./runbook.md) + [deploy.sh 注释](../deploy.sh)。
-
-**双层 fail-fast**：
-
-1. docker compose `${VAR:?msg}` 启动前 fail-fast（基础设施起来前）
-2. NestJS ConfigService fail-fast（JWT_SECRET 商用模式必填）
-
----
-
-## 故障排查
-
-[runbook.md](./runbook.md) —— 4 个高频故障场景 + 排查步骤 + 修复命令：
-
-1. JWT_SECRET 报错（启动失败）
-2. Milvus 连接失败（readiness 503）
-3. LLM 5xx（502/503 ExternalServiceError）
-4. Rate Limit 触发（429）
-
----
-
-## 简历亮点
-
-[resume-bullets.md](./resume-bullets.md) —— 给 LLM Agent 工程师面试用的项目亮点段（直接抄 STAR 答案模板）。
-
-**7 个亮点按 STAR + 量化**：
-
-1. 单后端 py-api（商用 best practice 全落地）
-2. 4 级水位线上下文压缩
-3. LLM Gateway 双模型路由 + fallback
-4. 多 Agent 编排（supervisor/planner/executor/replanner/reviewer/hitl）
-5. 4 层记忆分层（Postgres/Redis/Qdrant/Milvus）
-6. 真流式输出（SSE · asyncio.Queue）
-7. 双层 fail-fast 商用部署
-
----
-
-## CI 流水线
-
-两个 workflow + 本地脚本：
-
-| Pipeline | 文件 | 范围 |
-|---------|------|------|
-| CI (api · NestJS) | `.github/workflows/ci-api.yml` | lint-type-test + interface-e2e（9 接口）+ ci-summary |
-| CI (py-api · Python) | `.github/workflows/ci-py-api.yml` | ruff + mypy + pytest + docker build + web-test + ci-summary |
-| 本地 E2E | `scripts/ci-local-test.sh` | 9 接口端到端（act 替代品，5 秒跑完） |
-
-**当前 badge**：
-
-- ![CI api](https://github.com/<owner>/interview-agent/actions/workflows/ci-api.yml/badge.svg)
-- ![CI py-api](https://github.com/<owner>/interview-agent/actions/workflows/ci-py-api.yml/badge.svg)
-
----
-
-## 贡献指南
-
-### 开发流程
-
-1. Fork + 切分支（`fix/<name>` 或 `feat/<name>`）
-2. 改代码 + 改对应测试
-3. 本地跑：
-   ```bash
-   bash scripts/ci-local-test.sh  # 9 接口 E2E（5 秒）
-   cd apps/api && npx jest --ci   # 203 用例
-   cd apps/py-api && pytest       # 74 用例
-   cd apps/web && pnpm exec vitest run  # 59 用例
-   ```
-4. 提 PR → 等 CI 绿 → 合并
-5. 合并后等 GH Actions badge 变绿
-
-### Bug 报告
-
-提 Issue 时附：
-
-- 复现步骤
-- 期望 vs 实际
-- 截图（用 [issue 模板](../../.github/ISSUE_TEMPLATE/bug_report.md)）
-- docker logs interview-api 输出
-- /api/health/ready 输出
-
-### Feature Request
-
-提 Issue 时附：
-
-- 场景描述
-- 期望功能
-- 替代方案对比
-- 实现成本估算
-
-详见 [.github/ISSUE_TEMPLATE/](../../.github/ISSUE_TEMPLATE/)。
-
----
-
-## 链接
-
-- [GitHub Repo](https://github.com/<owner>/interview-agent)
-- [README](../../README.md)
-- [Architecture](./architecture.md)
-- [Runbook](./runbook.md)
-- [Resume Bullets](./resume-bullets.md)
-- [Architecture Decisions](./architecture-decisions.md)
-- [Status Report 2026-06-20](./STATUS-REPORT-2026-06-20.md)
+- [README](../../README.md) · [开发入口 AGENTS.md](../../AGENTS.md) · [产品宪章](../PRODUCT_CONSTITUTION.md)
+- [可替换 Agent 架构合同](../architecture/REPLACEABLE_AGENT_CONTRACTS.md) · [题库目录合同](../architecture/INTERVIEW_QUESTION_CATALOG.md)
+- [Runbook](../runbook.md) · [Testing](../TESTING.md) · [Roadmap](../ROADMAP.md)
+- [Agent Lab 章程](../agent-lab/CHARTER.md) · [能力边界](../agent-lab-status.md)
