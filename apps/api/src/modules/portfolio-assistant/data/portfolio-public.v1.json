@@ -1,0 +1,488 @@
+{
+  "schemaVersion": "portfolio-public/v1",
+  "source": {
+    "title": "张继哲 · AI 应用前端工程师",
+    "revision": "2026-11-03-public-sanitized-v3",
+    "capturedAt": "2026-11-03",
+    "authority": "owner-provided-public-page",
+    "verifiedAgainstRepository": false,
+    "htmlSha256": "f51dc4d61b5cfd198485f8babeaa4fb7256c8d9e5dc7074a620a1678294d5747"
+  },
+  "documents": [
+    {
+      "id": "profile",
+      "title": "个人介绍",
+      "href": "#resume",
+      "text": "10 年前端开发与工程交付经验，经历电商、SaaS 和音视频业务。现在专注 AI 应用交互，将实时通信与复杂状态管理的积累，带到流式对话、会话隔离和异常恢复中。",
+      "topics": [
+        "个人",
+        "介绍",
+        "经历",
+        "经验",
+        "技能",
+        "profile",
+        "experience",
+        "about",
+        "张继哲"
+      ]
+    },
+    {
+      "id": "skills",
+      "title": "技术技能",
+      "href": "#resume",
+      "text": "前端：React、Vue 2/3、TypeScript、Zustand、TanStack Query。",
+      "topics": [
+        "技能",
+        "技术栈",
+        "react",
+        "vue",
+        "typescript",
+        "zustand",
+        "tanstack",
+        "skills",
+        "前端"
+      ]
+    },
+    {
+      "id": "ai-skills",
+      "title": "AI 与实时交互",
+      "href": "#resume",
+      "text": "AI 与实时交互：SSE、WebSocket、请求取消、超时处理、RAG 前端集成；NestJS、LangGraph 项目实践。",
+      "topics": [
+        "ai",
+        "rag",
+        "sse",
+        "websocket",
+        "langgraph",
+        "nestjs",
+        "实时",
+        "流式"
+      ]
+    },
+    {
+      "id": "engineering",
+      "title": "工程交付",
+      "href": "#resume",
+      "text": "工程：Vite / Webpack、Vitest、Playwright、pnpm Monorepo、Docker Compose。",
+      "topics": [
+        "工程",
+        "测试",
+        "vitest",
+        "playwright",
+        "vite",
+        "webpack",
+        "docker",
+        "pnpm"
+      ]
+    },
+    {
+      "id": "jd",
+      "title": "京东项目经历",
+      "href": "#resume",
+      "text": "负责送礼频道页面与业务模块，覆盖商品卡片、SKU 选择、定制贺卡、下单与分享流程。",
+      "topics": [
+        "京东",
+        "电商",
+        "工作",
+        "经历",
+        "送礼",
+        "jd"
+      ]
+    },
+    {
+      "id": "rag-work",
+      "title": "RAG 平台工作",
+      "href": "#resume",
+      "text": "负责内部 RAG 知识库平台前端迭代与维护，覆盖文档上传、解析进度、检索问答、引用溯源和历史会话。",
+      "topics": [
+        "rag",
+        "知识库",
+        "文档",
+        "引用",
+        "工作"
+      ]
+    },
+    {
+      "id": "cti",
+      "title": "CTI 电销管理平台",
+      "href": "#projects",
+      "text": "众安在线／暖哇科技期间的核心项目。从 0 到 1 主导前端架构与核心模块开发，覆盖坐席外呼、通话控制、客户管理和坐席绩效。",
+      "topics": [
+        "cti",
+        "众安",
+        "暖哇",
+        "电销",
+        "坐席",
+        "架构",
+        "项目",
+        "project"
+      ]
+    },
+    {
+      "id": "cti-scale",
+      "title": "CTI 项目规模说明",
+      "href": "#projects",
+      "text": "平台支撑 19 个职场、2700+ 坐席。此为平台业务规模。",
+      "topics": [
+        "cti",
+        "规模",
+        "坐席",
+        "2700",
+        "19",
+        "众安"
+      ]
+    },
+    {
+      "id": "rtc",
+      "title": "音视频与 IM SDK",
+      "href": "#projects",
+      "text": "优刻得期间参与音视频业务 Web 场景及 SDK 实现，独立负责 urtc-im-sdk 开发与优化，处理多端兼容和客户接入问题。",
+      "topics": [
+        "音视频",
+        "优刻得",
+        "urtc",
+        "rtc",
+        "im",
+        "sdk",
+        "实时",
+        "项目"
+      ]
+    },
+    {
+      "id": "interview-agent",
+      "title": "interview-agent 项目",
+      "href": "#projects",
+      "text": "围绕简历输入、面试对话和结构化评价，构建 AI 面试训练应用。以真实的异步流程，实践流式交互、会话状态隔离和异常恢复。",
+      "topics": [
+        "interview-agent",
+        "面试",
+        "agent",
+        "开源",
+        "项目",
+        "project"
+      ]
+    },
+    {
+      "id": "contact",
+      "title": "公开联系方式",
+      "href": "#resume",
+      "text": "上海 · 10 年前端开发经验 · zhangjizhe311@163.com",
+      "topics": [
+        "联系",
+        "邮箱",
+        "contact",
+        "email",
+        "上海"
+      ]
+    },
+    {
+      "id": "github-profile",
+      "title": "GitHub 主页：AI Agent 方向（作者自述）",
+      "href": "https://github.com/zhangjizhe",
+      "text": "LangChain | LangGraph | TS",
+      "topics": [
+        "github",
+        "主页",
+        "langchain",
+        "langgraph",
+        "agent",
+        "方向"
+      ]
+    },
+    {
+      "id": "article-1-1",
+      "title": "webpack基础知识点（2020-12-07 历史笔记 · 1/2）",
+      "href": "#article/1",
+      "text": "webpack\n1.知识点梳理 & 面试题种类\n构建流程与构建方式有哪些\n\nplugins 与 loader 区别\n\n分包策略\n\n性能优化\n\n实现多页面打包\n\n不同模块化打包的区别\n\n实现简单的webpack\n\n\nwebpack基本的模块打包工具（静态模块），几乎成了前端必备的知识，工作原理是处理应用程序时，会生成依赖关系图，然后打包成bundle。\n\n2.关键词 & 编译流程\n模式 mode\n\n入口 entry\n\n出口 output\n\n模块转换器 loader (由于webpack无法处理txt，jpg等，需要loader)\n\n插件 plugins （构建过程中起作用，按照特定逻辑改变结果）\n\n\n这里大概可以了解下webpack工作流水线，大概流程为\n\n\n初始化参数：从配置文件和 Shell 语句中读取与合并参数，得出最终的参数\n\n开始编译：用上一步得到的参数初始化 Compiler 对象，加载所有配置的插件，执行对象的 run 方法开始执行编译\n\n确定入口： 根据配置中的 entry 找出所有的入口文件\n\n编译模块：从入口文件出发，调用所有配置的 Loader 对模块进行翻译，再找出该模块依赖的模块，再递归本步骤直到所有入口依赖的文件都经过了本步骤的处理\n\n完成编译模块：在经过第 4 步使用 Loader 翻译完所有模块后，得到了每个模块被翻译后的最终内容以及它们之间的依赖关系\n\n输出资源：根据入口和模块之间的依赖关系，组装成一个个包含多个模块的 Chunk，再把每个 Chunk 转换成一个单独的文件加入到输出列表，这步是可以修改输出内容的最后机会\n\n输出完成：在确定好输出内容后，根据配置确定输出的路径和文件名，把文件内容写入到文件系统\n\n\n3.名词以及基础知识\nentry \n\n\n入口文件，分为三种形式 （string ｜ object ｜ array），分为一对一，一对多，多对多（入口 对 出口）；\n\n\n\n\noutput \n\n\n打包输出后的文件，可以指定文件名，也可以用 [name] 变量占位符\n\n\n\n\nloader\n\n\nloader 的执行顺序是从右向左执行的，也就是后面的 loader 先执行,例如常见的[‘style-loader’, ‘css-loader’, ‘less-loader’]，先执行less，然后css，然后style，也符合管道的逻辑，本质上是一个函数\n\n\n\n\nplugin\n\n\n为了优化构建结果的，提取公共配置，监控资源，热替换等都是插件模式的，插件可以扩展能力\n\n\n\n\n热更新\n\n\n主要说基于WDS模块热替换，webpack的缩写为HMR，HMR 的核心就是客户端从服务端拉去更新后的文件，准确的说是 chunk diff（chunk 需要更新的部分）。\n实际上 webpack-dev-server（WDS）与浏览器之间维护了一个",
+      "topics": [
+        "webpack基础知识点",
+        "工程化",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "webpack"
+      ]
+    },
+    {
+      "id": "article-1-2",
+      "title": "webpack基础知识点（2020-12-07 历史笔记 · 2/2）",
+      "href": "#article/1",
+      "text": " Websocket，当本地资源发生变化时，WDS 会向浏览器推送更新，并带上构建时的 hash，让客户端与上一次资源进行对比。客户端对比出差异后会向 WDS 发起 Ajax 请求来获取更改内容（文件列表、hash），这样客户端就可以再借助这些信息继续向 WDS 发起 jsonp 请求获取该 chunk 的增量更新。\n后续的部分（拿到增量更新之后如何处理？哪些状态该保留？哪些又需要更新？）由 HotModulePlugin 来完成，提供了相关 API 以供开发者针对自身场景进行处理，像 react-hot-loader 和 vue-loader 都是借助这些 API 实现 HMR。\n\n\n可以在 config里把devServer 的hot 设为 true。对应入口也要修改\nif(module && module.hot) {\nmodule.hot.accept()\n}\n\n\n\n\n\nhash\n\n\n三种hash，hash、chunkhash、contenthash。hash的生效范围为整个项目，相当于一次构建过程，chunkhash则是根据不同入口文件依赖解析，不影响其他入口生成chunkhash。contenthash则是每个文件唯一的hash\n\n\n\n\nsorce map\n\n\n将编译的代码映射回源代码的过程。map文件不打开开发者工具不会加载。hidden-source-map、nosources-source-map、source map。最后一种可以通过nginx配置map文件只对内网开放",
+      "topics": [
+        "webpack基础知识点",
+        "工程化",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "webpack"
+      ]
+    },
+    {
+      "id": "article-2-1",
+      "title": "540（2020-11-20 历史笔记 · 1/2）",
+      "href": "#article/2",
+      "text": "//递归版本\nvar singleNonDuplicate = function (arr) {\n  if (!arr.length) return null;\n  if (arr.length === 1) return arr[0];\n  if (arr.length === 3) {\n    if (arr[0] == arr[1]) {\n      return arr[2];\n    } else {\n      return arr[0];\n    }\n  }\n  let LENGTH = arr.length,\n    left = [],\n    right = [],\n    mid = Math.floor(LENGTH / 2);\n\n  if (arr[mid] == arr[mid - 1]) {\n    left = arr.slice(0, mid - 1);\n    right = arr.slice(mid + 1);\n  } else if (arr[mid] == arr[mid + 1]) {\n    left = arr.slice(0, mid);\n    right = arr.slice(mid + 2);\n    console.log(left, right, mid);\n  } else {\n    return arr[mid];\n  }\n\n  if (left.length % 2 === 0) {\n    return singleNonDuplicate(right);\n  } else {\n    return singleNonDuplicate(left);\n  }\n};\n\n//二分法\nvar singleNonDuplicate1 = function (arr) {\n  if (!arr.length) return null;\n  if (arr.length === 1) return arr[0];\n  let l = 0,\n    h = arr.length - 1,\n    t = -1;\n  //二分法版本\n  while (l <= h) {\n    let m = Math.floor(l + (h - l) / 2);\n    if (arr[m] === arr[m - 1]) {\n      //左边偶\n      (m - 2) % 2 === 0 ? (h = m - 2) : (l = m + 1);\n    } else if (arr[m] === arr[m + 1]) {\n      //m%2 为 （m+1）%2好懂一些，取实际长度，这快绕了一下\n      m % 2 === 0 ? (l = m + 2) : (h = m - 1);\n    }",
+      "topics": [
+        "540",
+        "算法题解",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-2-2",
+      "title": "540（2020-11-20 历史笔记 · 2/2）",
+      "href": "#article/2",
+      "text": " else {\n      return arr[m];\n    }\n  }\n  return t;\n};",
+      "topics": [
+        "540",
+        "算法题解",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-3-1",
+      "title": "34数组排序（2020-11-20 历史笔记 · 1/1）",
+      "href": "#article/3",
+      "text": "//leetcode 版本\n/**\n * @param {number[]} nums\n * @param {number} target\n * @return {number[]}\n */\nvar searchRange = function (nums, target) {\n  let res = [-1, -1];\n  let leftIdx = searchHelp(nums, target, true);\n\n  if (leftIdx == nums.length || nums[leftIdx] != target) {\n    return res;\n  }\n\n  res[0] = leftIdx;\n  res[1] = searchHelp(nums, target, false) - 1;\n  return res;\n};\n\nfunction searchHelp(nums, target, isLeft) {\n  let lo = 0;\n  let hi = nums.length;\n\n  while (lo < hi) {\n    let mid = Math.floor((lo + hi) / 2);\n    if (nums[mid] > target || (isLeft && target == nums[mid])) {\n      hi = mid;\n    } else {\n      lo = mid + 1;\n    }\n  }\n  return lo;\n}",
+      "topics": [
+        "34数组排序",
+        "算法题解",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-4-1",
+      "title": "快排（2020-11-20 历史笔记 · 1/1）",
+      "href": "#article/4",
+      "text": "/**\n * 本质就是设立中间值，然后左右递归，卡在了return那个步骤\n *\n */\n\nlet arr = [85, 24, 63, 45, 17, 31, 96, 50, 2, 5, 22];\n\nfunction qSort(nums) {\n  if (nums.length <= 1) {\n    return nums;\n  }\n  let mid = Math.floor(nums.length / 2);\n  let left = [];\n  let right = [];\n  let pivot = nums.splice(mid, 1)[0];\n  for (let i = 0; i < nums.length; i++) {\n    let item = nums[i];\n    if (item > pivot) {\n      right.push(item);\n    } else {\n      left.push(item);\n    }\n  }\n  console.log(pivot, left, right);\n  return qSort(left).concat([pivot], qSort(right));\n}\n\nlet _a = qSort(arr);\nconsole.log(_a);",
+      "topics": [
+        "快排",
+        "数据结构与算法",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-5-1",
+      "title": "二叉树（2020-11-20 历史笔记 · 1/3）",
+      "href": "#article/5",
+      "text": "算法入门准备从树入手\n\n按照网上读代码理解，目前 remove 还有部分还有不理解\n下一步骤了解排序问题，跟着 ladadong 学习\n\n2020.12.20 ps:最近看了前中后序遍历，本质是根节点的push时机\n\nclass TreeNode {\n\t\tconstructor(data, left, right) {\n\t\t\tthis.data = data;\n\t\t\tthis.right = right;\n\t\t\tthis.left = left;\n\t\t\tthis.count = 1;\n\t\t}\n\t}\n\n\tclass BTree {\n\t\tconstructor() {\n\t\t\tthis.root = null\n\t\t}\n\n\t\t_removeNode(node, data) {\n\t\t\tif (node == null) {\n\t\t\t\treturn null\n\t\t\t}\n\t\t\tif (data == node.data) {\n\t\t\t\t//没有双节点\n\t\t\t\tif (node.left == null && node.right == null) {\n\t\t\t\t\treturn null\n\t\t\t\t}\n\t\t\t\t//没有左节点\n\t\t\t\tif (node.left === null) return node.right;\n\t\t\t\t//没有右节点\n\t\t\t\tif (node.right === null) return node.left;\n\n\t\t\t\t//有两个节点需要特殊处理\n\t\t\t\tlet tempNode = this.getMinNode(node.right);\n\t\t\t\tnode.data = tempNode.data;\n\t\t\t\tnode.right = this._removeNode(node.right, tempNode.data)\n\t\t\t\treturn node;\n\t\t\t} else if (data < node.data) {\n\t\t\t\tnode.left = this._removeNode(node.left, data);\n\t\t\t\treturn node\n\t\t\t} else if (data < node.data) {\n\t\t\t\tnode.right = this._removeNode(node.right, data);\n\t\t\t\treturn node\n\t\t\t}\n\t\t}\n\n\t\tremove(data) {\n\t\t\tthis._removeNode(this.root, data);\n\t\t}\n\n\t\tinsert(data) {\n\t\t\tlet newNode = new TreeNode(data, null, null);\n\t\t\tif (this.root == null) {\n\t\t\t\tthis.root = newNode;\n\t\t\t} else {\n\t\t\t\t",
+      "topics": [
+        "二叉树",
+        "数据结构与算法",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-5-2",
+      "title": "二叉树（2020-11-20 历史笔记 · 2/3）",
+      "href": "#article/5",
+      "text": "let currentNode = this.root;\n\t\t\t\tlet parentNode = null;\n\t\t\t\twhile (currentNode) {\n\t\t\t\t\tparentNode = currentNode;\n\t\t\t\t\tif (newNode.data < currentNode.data) {\n\t\t\t\t\t\tcurrentNode = currentNode.left\n\t\t\t\t\t\tif (!currentNode) {\n\t\t\t\t\t\t\tparentNode.left = newNode;\n\t\t\t\t\t\t\tbreak;\n\t\t\t\t\t\t}\n\t\t\t\t\t} else if (newNode.data > currentNode.data) {\n\t\t\t\t\t\tcurrentNode = currentNode.right\n\t\t\t\t\t\tif (!currentNode) {\n\t\t\t\t\t\t\tparentNode.right = newNode\n\t\t\t\t\t\t\tbreak\n\t\t\t\t\t\t}\n\t\t\t\t\t} else if (newNode.data = currentNode.data) {\n\t\t\t\t\t\tcurrentNode.count++;\n\t\t\t\t\t\tbreak\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\n\t\tgetMinNode(node = this.root) {\n\t\t\tlet currentNode = node\n\t\t\twhile (currentNode.left) {\n\t\t\t\tcurrentNode = currentNode.left\n\t\t\t}\n\t\t\treturn currentNode\n\t\t}\n\n\t\tgetMaxNode(node = this.root) {\n\t\t\tlet currentNode = node\n\t\t\twhile (currentNode.right) {\n\t\t\t\tcurrentNode = currentNode.right\n\t\t\t}\n\t\t\treturn currentNode\n\t\t}\n\n\n\t\tfind(data) {\n\t\t\tlet currentNode = this.root;\n\t\t\twhile (currentNode) {\n\t\t\t\tif (currentNode == data) {\n\t\t\t\t\treturn currentNode\n\t\t\t\t} else if (currentNode.data < data) {\n\t\t\t\t\tcurrentNode = currentNode.left;\n\t\t\t\t} else if (currentNode.data > data) {\n\t\t\t\t\tcurrentNode = currentNode.right;\n\t\t\t\t}\n\t\t\t}\n\t\t\treturn null\n\t\t}\n\n\t\tgetTota",
+      "topics": [
+        "二叉树",
+        "数据结构与算法",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-5-3",
+      "title": "二叉树（2020-11-20 历史笔记 · 3/3）",
+      "href": "#article/5",
+      "text": "lCount(root = this.root) {\n\t\t\tif (root == null) {\n\t\t\t\treturn 0;\n\t\t\t}\n\t\t\t// 先算出左右子树有多少节点\n\t\t\tlet left = this.getTotalCount(root.left);\n\t\t\tlet right = this.getTotalCount(root.right);\n\t\t\t/* 后序遍历代码位置 */\n\t\t\t// 加上自己，就是整棵二叉树的节点数\n\t\t\tlet res = left + right + 1;\n\t\t\treturn res;\n\t\t}\n\n\t}\n\n\tlet myTree = new BTree();\n\tlet myTree2 = new BTree()\n\tmyTree.insert(20);\n\tmyTree.insert(13);\n\tmyTree.insert(7);\n\tmyTree.insert(9);\n\tmyTree.insert(15);\n\tmyTree2.insert(20);\n\tmyTree2.insert(13);\n\tmyTree2.insert(7);\n\tmyTree2.insert(9);\n\tmyTree2.insert(15);\n\tmyTree2.remove(7)\n\tconsole.log(myTree)\n\tconsole.log(myTree2)\n\tconsole.log(myTree.getTotalCount())\n\tconsole.log(myTree2.getTotalCount())",
+      "topics": [
+        "二叉树",
+        "数据结构与算法",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-6-1",
+      "title": "promise实现（2020-11-20 历史笔记 · 1/5）",
+      "href": "#article/6",
+      "text": "第一个需要理解的逻辑，是异步调用\n实质性到 then 时，把执行函数推到数组里，然后延迟调用了函数会取到值，之前一直迷惑是何时塞得，要仔细看代码执行逻辑和顺序，下一步看懂链式调用\n\nES5\n\nvar PENDING = \"pending\";\nvar FULFILLED = \"fulfilled\";\nvar REJECTED = \"rejected\";\n\nfunction Promise(executor) {\n  var self = this;\n  self.status = PENDING;\n  self.value = undefined;\n  self.reason = undefined;\n  self.onResolvedCallbacks = [];\n  self.onRejectedCallbacks = [];\n\n  function resolve(value) {\n    if (self.status === PENDING) {\n      self.value = value;\n      self.status = FULFILLED;\n      self.onResolvedCallbacks.forEach((fn) => fn());\n    }\n  }\n  function reject(reason) {\n    if (self.status === PENDING) {\n      self.reason = reason;\n      self.status = REJECTED;\n      self.onRejectedCallbacks.forEach((fn) => fn());\n    }\n  }\n\n  try {\n    console.log(executor);\n    executor(resolve, reject);\n  } catch (error) {\n    reject(error);\n  }\n}\n\nPromise.prototype.then = function (onFulfilled, onRejected) {\n  let self = this;\n  if (self.status === FULFILLED) {\n    onFulfilled(self.value);\n  }\n  if (self.status === REJECTED) {\n    onRejected(self.reason);\n  }\n  if (this.status === PENDING) {\n    // 如果promise的状态是 pending，需要将 onFulfilled 和 onRejected 函数存放起来，等待状态确定后，再依次将对应的函数执行\n    this.onRe",
+      "topics": [
+        "promise实现",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "promise"
+      ]
+    },
+    {
+      "id": "article-6-2",
+      "title": "promise实现（2020-11-20 历史笔记 · 2/5）",
+      "href": "#article/6",
+      "text": "solvedCallbacks.push(() => {\n      onFulfilled(this.value);\n    });\n    // 如果promise的状态是 pending，需要将 onFulfilled 和 onRejected 函数存放起来，等待状态确定后，再依次将对应的函数执行\n    this.onRejectedCallbacks.push(() => {\n      onRejected(this.reason);\n    });\n  }\n};\nlet p = new Promise((resolve, reject) => {\n  setTimeout(() => {\n    resolve(111);\n  }, 1000);\n});\np.then(\n  (value) => {\n    console.log(value);\n  },\n  (reason) => {\n    console.log(\"err\", reason);\n  }\n);\n\n\nA+版本，还需要梳理下，递归那部分比较难理解\n\nvar PENDING = \"pending\";\nvar FULFILLED = \"fulfilled\";\nvar REJECTED = \"rejected\";\n\nconst resolvePromise = (promise2, x, resolve, reject) => {\n  if (promise2 === x) {\n    return reject(\n      new TypeError(\"Chaining cycle detected for promise #<Promise>\")\n    );\n  }\n  let called;\n  if ((typeof x === \"object\" && x != null) || typeof x === \"function\") {\n    try {\n      let then = x.then;\n      if (typeof then === \"function\") {\n        then.call(\n          (x,\n          (y) => {\n            if (called) return;\n            called = true;\n            resolvePromise(promise2, y, resolve, reject);\n          },\n          (r) => {\n            if (called) return;\n            called = true;\n            reject(r);\n          })\n     ",
+      "topics": [
+        "promise实现",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "promise"
+      ]
+    },
+    {
+      "id": "article-6-3",
+      "title": "promise实现（2020-11-20 历史笔记 · 3/5）",
+      "href": "#article/6",
+      "text": "   );\n      } else {\n        resolve(x);\n      }\n    } catch (e) {\n      resolve(x);\n    }\n  } else {\n    resolve(x);\n  }\n};\n\nfunction Promise(executor) {\n  var self = this;\n  self.status = PENDING;\n  self.value = undefined;\n  self.reason = undefined;\n  self.onResolvedCallbacks = [];\n  self.onRejectedCallbacks = [];\n\n  function resolve(value) {\n    if (self.status === PENDING) {\n      self.value = value;\n      self.status = FULFILLED;\n      self.onResolvedCallbacks.forEach((fn) => fn());\n    }\n  }\n  function reject(reason) {\n    if (self.status === PENDING) {\n      self.reason = reason;\n      self.status = REJECTED;\n      self.onRejectedCallbacks.forEach((fn) => fn());\n    }\n  }\n\n  try {\n    console.log(executor);\n    executor(resolve, reject);\n  } catch (error) {\n    reject(error);\n  }\n}\n\nPromise.prototype.then = function (onFulfilled, onRejected) {\n  onFulfilled = typeof onFulfilled === \"function\" ? onFulfilled : (v) => v;\n  onRejected =\n    typeof onRejected === \"function\"\n      ? onRejected\n      : (error) => {\n          throw error;\n        };\n\n  let self = this;\n  let promise2 = new Promise((resolve, reject) => {\n    if (self.status == FULFILLED) {\n      setTimeout(() => {\n  ",
+      "topics": [
+        "promise实现",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "promise"
+      ]
+    },
+    {
+      "id": "article-6-4",
+      "title": "promise实现（2020-11-20 历史笔记 · 4/5）",
+      "href": "#article/6",
+      "text": "      try {\n          let x = onFulfilled(this.value);\n          resolvePromise(promise2, x, resolve, reject);\n        } catch (error) {\n          reject(error);\n        }\n      }, 0);\n    }\n    if (self.status === REJECTED) {\n      setTimeout(() => {\n        try {\n          let x = onRejected(this.reason);\n          resolvePromise(promise2, x, resolve, reject);\n        } catch (error) {\n          reject(error);\n        }\n      }, 0);\n    }\n\n    if (self.status === PENDING) {\n      // 如果promise的状态是 pending，需要将 onFulfilled 和 onRejected 函数存放起来，等待状态确定后，再依次将对应的函数执行\n      self.onResolvedCallbacks.push(() => {\n        setTimeout(() => {\n          try {\n            let x = onFulfilled(this.value);\n            resolvePromise(promise2, x, resolve, reject);\n          } catch (error) {\n            reject(error);\n          }\n        }, 0);\n      });\n      // 如果promise的状态是 pending，需要将 onFulfilled 和 onRejected 函数存放起来，等待状态确定后，再依次将对应的函数执行\n      self.onRejectedCallbacks.push(() => {\n        setTimeout(() => {\n          try {\n            let x = onRejected(this.reason);\n            resolvePromise(promise2, x, resolve, reject);\n          } catch (error) {\n            reject(error);\n          }\n      ",
+      "topics": [
+        "promise实现",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "promise"
+      ]
+    },
+    {
+      "id": "article-6-5",
+      "title": "promise实现（2020-11-20 历史笔记 · 5/5）",
+      "href": "#article/6",
+      "text": "  }, 0);\n      });\n    }\n  });\n  return promise2;\n};",
+      "topics": [
+        "promise实现",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "promise"
+      ]
+    },
+    {
+      "id": "article-7-1",
+      "title": "flat（2020-11-20 历史笔记 · 1/1）",
+      "href": "#article/7",
+      "text": "let a = [1, 2, 3, [3, 4, [5, 6, [7, 8]]]];\n\nvar myFlat = (arr) => {\n  let result = [];\n  let help = (tempArr) => {\n    for (let index = 0; index < tempArr.length; index++) {\n      const element = tempArr[index];\n      console.log(element);\n      if (Array.isArray(element)) {\n        //这里细节，当时写的 result.push(help(element))\n        help(element);\n      } else {\n        result.push(element);\n      }\n    }\n  };\n  help(arr);\n  return result;\n};\n\nvar flatRe = (arr) => {\n  return arr.reduce((prev, next) => {\n    if (Array.isArray(next)) {\n      return prev.concat(flatRe(next));\n    } else {\n      return prev.concat(next);\n    }\n  }, []);\n};",
+      "topics": [
+        "flat",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-8-1",
+      "title": "手写bind,apply,call（2020-11-20 历史笔记 · 1/2）",
+      "href": "#article/8",
+      "text": "jsliang 的执行有部分问题\n\n参考 https://juejin.im/post/6844903846846676999\n\n/**\n * 使用方式\n * fn.bind(target)\n */\n\nFunction.prototype.myBind = function (context) {\n  if (typeof this !== \"function\") {\n    throw new TypeError(\"Error\");\n  }\n  const _this = this;\n  const args = [...arguments].slice(1);\n  const result = context.fn(...args);\n  return function Fun() {\n    if (this instanceof Fun) {\n      return new _this(...args, ...arguments);\n    } else {\n      return this.apply(context, args.concat(...arguments));\n    }\n  };\n};\n\n\n\n\n/**\n * 使用方式\n * fn.call(target, arg1, arg2, ...)\n * fn.apply(target, [arg1, arg2, ...])\n * 区别主要为后续参数\n */\n\n//删除传入函数，返回新函数,流程一样，区别在于参数\nFunction.prototype.myCall = function (context) {\n  if (typeof this !== \"function\") {\n    throw new TypeError(\"Error\");\n  }\n  context = context || window;\n  context.fn = this;\n  const args = [...arguments].slice(1);\n  const result = context.fn(...args);\n  delete context.fn;\n  return result;\n};\n\nFunction.prototype.myApply = function (context = globalThis) {\n  if (typeof this !== \"function\") {\n    throw new TypeError(\"Error\");\n  }\n  context = context || window;\n  context.fn = this;\n  console.log(context.fn);\n  let result;\n  if (arguments[1]) {\n ",
+      "topics": [
+        "手写bind,apply,call",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "bind",
+        "apply",
+        "call"
+      ]
+    },
+    {
+      "id": "article-8-2",
+      "title": "手写bind,apply,call（2020-11-20 历史笔记 · 2/2）",
+      "href": "#article/8",
+      "text": "   result = context.fn(...arguments[1]);\n  } else {\n    result = context.fn();\n  }\n  delete context.fn;\n  console.log(result);\n  return result;\n};\n\n//test\nfunction Product(name, price) {\n  this.name = name;\n  this.price = price;\n}\n\nfunction Food(name, price) {\n  Product.myCall(this, name, price);\n  this.category = \"food\";\n}\n\nfunction Food1(name, price) {\n  Product.myApply(this, [name, price]);\n  this.category = \"food\";\n}\nconst food = new Food(\"cheese\", 5);\nconsole.log(food);",
+      "topics": [
+        "手写bind,apply,call",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "bind",
+        "apply",
+        "call"
+      ]
+    },
+    {
+      "id": "article-9-1",
+      "title": "订阅发布（2020-11-20 历史笔记 · 1/1）",
+      "href": "#article/9",
+      "text": "class EventEmitter {\n  constructor() {\n    this.events = {};\n  }\n\n  on(eventName, callBack) {\n    if (!this.events[eventName]) {\n      this.events[eventName] = [callBack];\n    } else {\n      this.events[eventName].push(callBack);\n    }\n  }\n\n  emit(eventName) {\n    if (this.events[eventName]) {\n      this.events[eventName].map((fn) => fn());\n    }\n  }\n\n  removeListener(eventName, callback) {\n    if (this.events[eventName]) {\n      this.events[eventName] = this.events[eventName].filter(\n        (cb) => cb != callback\n      );\n    }\n  }\n\n  //执行完就移除，以来removeListener\n  once(eventName, callBack) {\n    let fn = () => {\n      callBack();\n      this.removeListener(eventName, fn);\n    };\n    this.on(eventName, fn);\n  }\n}",
+      "topics": [
+        "订阅发布",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-10-1",
+      "title": "深拷贝（2020-11-20 历史笔记 · 1/1）",
+      "href": "#article/10",
+      "text": "const checkedType = (target) => {\n  let result = Object.prototype.toString.call(target).slice(8, -1);\n  return result;\n};\n\nconst deepClone = (target) => {\n  let result;\n  let type = checkedType(target);\n  if (type === \"Object\") {\n    result = {};\n  } else if (type === \"Array\") {\n    result = [];\n  } else {\n    return target;\n  }\n\n  for (let i in target) {\n    let value = target[i];\n    if (checkedType(value) === \"Array\" || checkedType(value) === \"Object\") {\n      result[i] = deepClone(value);\n    } else {\n      result[i] = value;\n    }\n  }\n  return result;\n};\n\n找了些例子，感觉挺简单，可能会有一些坑没避免过去\n\n粗心了，记得判断 type 的函数大小写",
+      "topics": [
+        "深拷贝",
+        "JavaScript",
+        "文章",
+        "博客",
+        "笔记",
+        "历史"
+      ]
+    },
+    {
+      "id": "article-11-1",
+      "title": "阿里云配置 nginx https 总结（2020-11-20 历史笔记 · 1/1）",
+      "href": "#article/11",
+      "text": "阿里云配置 nginx https 总结\n\n安装位置太多额，导致重新安装\n\n命令不熟悉\nnginx -t 检测配置状况\n\nnginx -s reload 重启\n\n路径 /etc/nginx/\n\n\n\n\nftp 工具 FileZilla\n\n阿里云公网 IP 更换地址，改为安全组查看，入口挺深的\n\n深坑一点就是 1.18 版本的。d 目录 default 80 端口文件配置，会被覆盖，找半天，才自己看代码注释掉就好了，百度一堆不靠谱的答案。..\n\n另一个马虎点，就是配置证书一直以为 ssl 问题，结果是自己注释习惯性用了//, 应该用#\n\napt-get 安装软件\n\n服务器 git 密码 [凭据已脱敏]",
+      "topics": [
+        "阿里云配置 nginx https 总结",
+        "部署与运维",
+        "文章",
+        "博客",
+        "笔记",
+        "历史",
+        "nginx",
+        "https"
+      ]
+    }
+  ]
+}

@@ -1,11 +1,9 @@
 # Active task
 
-2026-11-02 · QUESTION-CATALOG-ARCHITECTURE / recording readiness, within product reacceptance (**NOT_ACCEPTED**). User authorized architecture fixes and continued development; no deployment or paid replay authorization inferred.
+2026-11-03 · PORTFOLIO-ASSISTANT / actual resume-site integration. User explicitly authorized using the local site output, public articles and GitHub as source data. Finish usable code and exact-source validation; no paid calls or deployment implied.
 
-Baseline: remote agent-lab 57b0ac9a0b6ca72c072b69ea469360bc8a047f4e, main deaf006, PR64 open. The runtime prerequisite fixes the isolated administrator quota (finite 200; production Free remains 100) and stops using a Lab Run identifier as an Interview foreign key. Exact-head CI is running; do not infer full acceptance from local tests.
+Current baseline remote agent-lab5403d81 (preserve concurrent Wiki changes); predecessor51d5c2b question-catalog has six successful CI jobs and reviewed original logs. Portfolio module, guarded queue client, real site BFF/client changes and source corpus are implemented locally. Independent reviews drove ticket-redaction, source-change recovery, preflight schema validation, cross-network idempotency and no-false-zero-cost refusal fixes.
 
-Current work: Interview-owned PostgreSQL canonical question catalog and version snapshots; explicit maintenance-confirmed legacy adoption preserving Milvus source; separate rebuildable vector index; tenant-scoped concurrent-write coordination and honest pending-index receipts; real Lab governance UI and target recording guide. No automatic production adoption, cross-organization sharing, model-quality improvement or human calibration claims.
+Next: finish builds, record independent source checks, commit/upload the portable site plus API and helpers, inspect latest exact push/PR CI including real Redis and public HTTP→Lab→PG→synthetic model; fix actual failures, then expected-head merge and remote readback only if green. Default disabled until a target owner/version/secret/origin is configured through normal publication. Do not call final-excerpt SSE transport model token streaming.
 
-Delivery: appropriate local tests/type/lint/build and independent review; exact-source remote upload; latest exact-head HTTP/PG/browser/recovery and migrations CI; only then expected-head merge/readback. Local Docker unavailable. Do not delete assertions or omit failed evidence.
-
-Follow-up: actual scorer provenance/Rubrics and independent annotation/calibration, measured regression, case/root-cause loop and controlled telemetry export. Historical external charges remain unknown beyond known0.069285CNY; no paid external calls. Record one stage at a time.
+Desktop hexo-bolg not visible; no claim to have read it. Current corpus is complete for the eleven already-imported public historical articles. Do not automatically add personal-context memory, drafts or credentials. Historical provider charges remain unknown; no paid replay.

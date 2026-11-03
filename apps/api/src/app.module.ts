@@ -1,3 +1,4 @@
+import { PortfolioAssistantModule } from './modules/portfolio-assistant/portfolio-assistant.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -42,6 +43,7 @@ import { HealthController } from './common/health.controller';
     McpModule, // P1-4 修复：MCP 协议接入
     ReflectionModule, // ADR #10 Phase 1：reviewer 反思日志
     AgentLabModule,
+    PortfolioAssistantModule,
   ],
   controllers: [HealthController],
 })

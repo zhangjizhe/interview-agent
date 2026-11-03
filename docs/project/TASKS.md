@@ -1,5 +1,7 @@
 # 待办与验收门
 
+2026-11-03 当前唯一主题PORTFOLIO-ASSISTANT：固定32公开片段/正常发布selector/Lab持久队列/Redis有界准入与24h跨IP幂等/原文来源输出/实际网站BFF已本地实现；API1199/27skip、Web333、站点24通过，最终构建/精确CI待核。旧题库51d5c2b两run六项CI与原始日志已通过，仅隔离工程阶段；远端Wiki5403d81已保留。目标部署、正常发布版本配置、真实模型/账单和桌面hexo-bolg读取仍无证据。
+
 2026-11-03 当前候选：QUESTION-CATALOG-ARCHITECTURE与录屏准备，**NOT_ACCEPTED**。原head115b5c6因隔离管理员Free100耗尽失败；runtime57b0ac9只给该fixture有限200并保留普通Free100、移除Run冒用Interview ID。其两组CI又在业务断言textarea精确可访问名匹配超时；root已加aria-label并39项UI定向通过，尚未推送组合新head或重跑完整远端CI。
 
 题库当前本地候选已接通Interview PG主数据/历史版本、显式同组织保源迁移、独立向量索引/有界重建、初始选题版本/hash透传及Lab真实治理UI；见[架构与迁移](../architecture/INTERVIEW_QUESTION_CATALOG.md)和[录屏准备](../runbook/RECORDING_READINESS.md)。root实际本地API1149/24skip、Web328、types/lint/build、Prisma validate、provider-free Golden30通过；后续39项label定向不冒充另一次全量测试。实际HTTP/PG/Milvus/浏览器helper与恢复资产已接CI，本机无Docker，未执行的新远端链路仍待验收。

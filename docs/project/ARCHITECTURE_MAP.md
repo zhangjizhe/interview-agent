@@ -18,6 +18,7 @@
 | 面试 | apps/api/src/modules/interview | 持久化业务状态、回答/正式证据、SSE、训练关联；候选题库主数据/版本由Interview拥有，非Agent私有资产 |
 | Agent | apps/api/src/agents/multi-agent、modules/agent | LangGraph、checkpoint、受控版本与 Gateway adapter |
 | 模型 | apps/api/src/modules/llm | Qwen/DeepSeek、原子额度、集中费率证据、完整请求答案缓存 |
+| 作品集助手 | modules/portfolio-assistant + examples/portfolio-site | 默认关闭；固定已发布选择器/公开32片段/正常Lab队列/Redis准入与签名只读票据；仅原文，不读私有题库 |
 | 平台 | apps/api/src/modules/agent-lab | AgentVersion/Application/Run/Trace/Evaluation；当前v6确定性输出合同门禁，不是语义质量认证 |
 | 评测任务 | 同模块 EvaluationJobsService | PostgreSQL PENDING/RUNNING、requestKey、资产指纹、CAS 租约/进度及 CANCELLED；取消在样本边界结算、不重放 |
 | 检索 | modules/knowledge-base、modules/memory | Milvus 混合检索、Qdrant；旧答案相似缓存不再读取 |

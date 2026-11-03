@@ -1,4 +1,4 @@
-import { BadRequestException, Logger } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { GlobalExceptionFilter } from '../common/filters/global-exception.filter';
 
 describe('异常响应脱敏', () => {
@@ -35,4 +35,13 @@ describe('异常响应脱敏', () => {
     expect(Logger.prototype.error).toHaveBeenCalledWith(expect.stringContaining('/api/test'), expect.stringContaining('Error: failure'));
   });
   it('非 Error 抛出值也返回统一错误', () => { const res = run({ internal: 'secret' }); expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Internal server error' })); });
+  it.each([new NotFoundException('回答票据不存在'), new ServiceUnavailableException('助手状态不可用')])('redacts a valid-shaped answer capability from error paths and logs', error => {
+    const ticket = `${'a'.repeat(48)}.${'b'.repeat(43)}`;
+    const res: any = { headersSent: false, status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const host: any = { switchToHttp: () => ({ getResponse: () => res, getRequest: () => ({ method: 'GET', path: `/api/portfolio-assistant/answers/${ticket}` }) }) };
+    new GlobalExceptionFilter().catch(error, host);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ path: '/api/portfolio-assistant/answers/[REDACTED]' }));
+    expect(JSON.stringify(res.json.mock.calls)).not.toContain(ticket);
+    expect(JSON.stringify((Logger.prototype.error as jest.Mock).mock.calls)).not.toContain(ticket);
+  });
 });

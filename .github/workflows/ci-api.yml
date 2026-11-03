@@ -3,7 +3,7 @@ name: Product verification
 'on':
   push:
     branches: [main, agent-lab]
-    paths: ['apps/api/**', 'apps/web/**', 'apps/agent-lab/**', 'packages/**', 'patches/**', 'scripts/db/**', 'scripts/ci/**', 'docker-compose.yml', 'deploy.sh', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'eslint.config.mjs', '.github/workflows/ci-api.yml']
+    paths: ['apps/api/**', 'apps/web/**', 'apps/agent-lab/**', 'examples/portfolio-site/**', 'packages/**', 'patches/**', 'scripts/db/**', 'scripts/ci/**', 'docker-compose.yml', 'deploy.sh', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'eslint.config.mjs', '.github/workflows/ci-api.yml']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -57,6 +57,11 @@ jobs:
           node --test scripts/ci/cache-retention.test.mjs
       - name: Interview and Lab component tests
         run: pnpm --filter web test
+      - name: Portable portfolio site and Lab bridge contracts
+        working-directory: examples/portfolio-site
+        run: |
+          node scripts/build.mjs
+          node --test tests/*.test.mjs
       - name: Offline question transfer preview checks
         run: node --test scripts/question-bank-transfer-*.test.mjs
       - name: Private golden provider contracts

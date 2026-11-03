@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-03 candidate: public portfolio assistant using a fixed published Lab selector, atomic bounded admission, signed/redacted polling, checked verbatim sources, full historical article chunks and the actual portable site bridge. Default disabled; local tests are engineering evidence, target publication/model/deployment remain unaccepted.
+
 2026-10-29 candidate: bounded BUSINESS_ASSERTIONS and v6 scoped release evidence; shared production scoring request/parser, heuristic source correction, fail-closed Golden/recording, bounded/idempotent evaluation UI. Exact acceptance pending; no semantic quality claim.
 
 按 Keep a Changelog 分类，后续发布采用 Semantic Versioning。仓库当前 package 版本为 0.1.0；未核验到 v1.0.0 标签，因此不倒填发布日期。
