@@ -162,6 +162,28 @@ describe('AuthService credentials', () => {
     });
     expect(prisma.user.updateMany.mock.calls[prisma.user.updateMany.mock.calls.length - 1][0].data.passwordHash).not.toBe(passwordHash);
   });
+  it('uses the verified email to recover the same account without needing its username', async () => {
+    const user = { id: 'normal-user', email: 'normal@example.com', emailVerifiedAt: new Date(), passwordHash: 'salt:hash' };
+    prisma.user.findFirst.mockResolvedValue(user);
+    const service = new AuthService(jwtService as any, config as any, prisma as any, sessions as any, emailVerification as any);
+    const requested = await service.requestPasswordReset(' Normal@Example.com ');
+    expect(emailVerification.issue).toHaveBeenCalledWith('password-reset', user.email, user.id);
+    await service.resetPassword('normal@example.com', requested.challengeId, '123456', 'new-long-password');
+    expect(emailVerification.consume).toHaveBeenCalledWith(requested.challengeId, 'password-reset', '123456', user.id);
+    expect(sessions.changePassword).toHaveBeenCalledWith(user.id, expect.any(Function));
+  });
+
+  it('does not issue reset codes or change passwords for an unknown or unverified email', async () => {
+    const service = new AuthService(jwtService as any, config as any, prisma as any, sessions as any, emailVerification as any);
+    prisma.user.findFirst.mockResolvedValue(null);
+    expect(await service.requestPasswordReset('unknown@example.com')).toHaveProperty('accepted', true);
+    prisma.user.findFirst.mockResolvedValue({ id: 'legacy-user', emailVerifiedAt: null });
+    expect(await service.requestPasswordReset('legacy@example.com')).toHaveProperty('accepted', true);
+    await expect(service.resetPassword('legacy@example.com', '11111111-1111-4111-8111-111111111111', '123456', 'new-long-password')).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(emailVerification.issue).not.toHaveBeenCalled();
+    expect(prisma.user.updateMany).not.toHaveBeenCalled();
+  });
+
   it('重置码不能用于错误账号或未验证账号', async () => {
     const service = new AuthService(jwtService as any, config as any, prisma as any, sessions as any, emailVerification as any);
     emailVerification.consume.mockRejectedValueOnce(new UnauthorizedException());

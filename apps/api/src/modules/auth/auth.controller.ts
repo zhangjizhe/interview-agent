@@ -79,16 +79,16 @@ export class AuthController {
   @Post('password-reset/request')
   @Public()
   @HttpCode(HttpStatus.OK)
-  requestPasswordReset(@Body() dto: { userId: string }) {
-    return this.auth.requestPasswordReset(dto?.userId);
+  requestPasswordReset(@Body() dto: { email?: string; userId?: string }) {
+    return this.auth.requestPasswordReset(dto?.email ?? dto?.userId);
   }
 
   @RateLimitPolicy('auth')
   @Post('password-reset/complete')
   @Public()
   @HttpCode(HttpStatus.OK)
-  completePasswordReset(@Body() dto: { userId: string; challengeId: string; code: string; newPassword: string }) {
-    return this.auth.resetPassword(dto?.userId, dto?.challengeId, dto?.code, dto?.newPassword);
+  completePasswordReset(@Body() dto: { email?: string; userId?: string; challengeId: string; code: string; newPassword: string }) {
+    return this.auth.resetPassword(dto?.email ?? dto?.userId, dto?.challengeId, dto?.code, dto?.newPassword);
   }
 
   @Post('refresh')

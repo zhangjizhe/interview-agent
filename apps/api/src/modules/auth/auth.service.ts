@@ -281,30 +281,38 @@ export class AuthService {
     return this.sessions.issue({ ...user, email }, version);
   }
 
-  async requestPasswordReset(userIdInput: string) {
+  private async recoveryUser(identity: string) {
+    if (typeof identity !== 'string') return null;
+    const value = identity.trim().toLowerCase();
+    if (value.includes('@')) {
+      let email: string;
+      try { email = this.emailVerification.normalizeEmail(value); } catch { return null; }
+      return this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
+    }
+    if (!SAFE_USERID_REGEX.test(value)) return null;
+    return this.prisma.user.findUnique({ where: { id: value } });
+  }
+
+  async requestPasswordReset(identity: string) {
     const challengeId = randomUUID();
-    const userId = typeof userIdInput === 'string' ? userIdInput.toLowerCase() : '';
-    if (/^[a-z0-9][a-z0-9_-]{2,31}$/.test(userId)) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (user?.emailVerifiedAt) {
-        try {
-          const challenge = await this.emailVerification.issue('password-reset', user.email, user.id);
-          return { accepted: true, challengeId: challenge.challengeId };
-        } catch {
-          // Keep account existence and delivery configuration out of the public response.
-        }
+    const user = await this.recoveryUser(identity);
+    if (user?.emailVerifiedAt) {
+      try {
+        const challenge = await this.emailVerification.issue('password-reset', user.email, user.id);
+        return { accepted: true, challengeId: challenge.challengeId };
+      } catch {
+        // Keep account existence and delivery configuration out of the public response.
       }
     }
     return { accepted: true, challengeId };
   }
 
-  async resetPassword(userIdInput: string, challengeId: string, code: string, newPassword: string) {
-    this.validateUserId(userIdInput);
+  async resetPassword(identity: string, challengeId: string, code: string, newPassword: string) {
     this.validatePassword(newPassword);
-    const userId = userIdInput.toLowerCase();
-    const challenge = await this.emailVerification.consume(challengeId, 'password-reset', code, userId);
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.recoveryUser(identity);
     if (!user?.emailVerifiedAt || !user.passwordHash) throw new UnauthorizedException('验证码无效或已过期。');
+    const userId = user.id;
+    const challenge = await this.emailVerification.consume(challengeId, 'password-reset', code, userId);
     if (challenge.subject !== this.emailVerification.emailSubject('password-reset', user.email)) {
       throw new UnauthorizedException('验证码无效或已过期。');
     }

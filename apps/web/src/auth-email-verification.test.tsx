@@ -64,11 +64,11 @@ it('only completes password recovery after requesting and entering an email code
     const path = String(input);
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (path === '/api/auth/password-reset/request') {
-      expect(body).toEqual({ userId: 'candidate-one' });
+      expect(body).toEqual({ email: 'candidate@example.test' });
       return response({ accepted: true, challengeId: 'reset-challenge' });
     }
     if (path === '/api/auth/password-reset/complete') {
-      expect(body).toMatchObject({ userId: 'candidate-one', challengeId: 'reset-challenge', code: '456789', newPassword: 'replacement-password-456' });
+      expect(body).toMatchObject({ email: 'candidate@example.test', challengeId: 'reset-challenge', code: '456789', newPassword: 'replacement-password-456' });
       return response({ success: true, mustLoginAgain: true });
     }
     throw new Error(`Unexpected auth request: ${path}`);
@@ -78,6 +78,7 @@ it('only completes password recovery after requesting and entering an email code
 
   fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'candidate-one' } });
   fireEvent.click(screen.getByRole('button', { name: '忘记密码？' }));
+  fireEvent.change(screen.getByLabelText('邮箱'), { target: { value: 'candidate@example.test' } });
   fireEvent.click(screen.getByRole('button', { name: '发送找回验证码' }));
   expect(await screen.findByLabelText('邮箱验证码')).toBeInTheDocument();
   expect(screen.getByLabelText('新密码')).toBeInTheDocument();

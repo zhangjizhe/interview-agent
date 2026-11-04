@@ -104,9 +104,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       } else if (mode === 'claim-code') {
         endpoint = '/api/auth/login/claim-email/verify'; body = { userId, email, challengeId, code };
       } else if (mode === 'forgot') {
-        endpoint = '/api/auth/password-reset/request'; body = { userId };
+        endpoint = '/api/auth/password-reset/request'; body = { email };
       } else {
-        endpoint = '/api/auth/password-reset/complete'; body = { userId, challengeId, code, newPassword };
+        endpoint = '/api/auth/password-reset/complete'; body = { email, challengeId, code, newPassword };
       }
       response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await safeJson(response);
@@ -129,7 +129,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       }
       if (mode === 'forgot') {
         setChallengeId(data.challengeId); setMode('reset');
-        setNotice('若该账号已有已验证邮箱且邮件服务正常，验证码会发送到该邮箱；未绑定邮箱的旧账号需部署者协助恢复。'); return;
+        setNotice('若该邮箱已注册且邮件服务正常，验证码会发送到该邮箱。'); return;
       }
       if (mode === 'reset') {
         setPassword(''); setNewPassword(''); setCode(''); setMode('login'); setNotice('密码已重置；请使用新密码登录。'); return;
@@ -159,7 +159,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           <h1 className="font-semibold text-slate-900">{mode === 'register' ? '创建你的训练空间' : mode === 'login-code' ? '验证登录邮箱' : mode === 'claim' || mode === 'claim-code' ? '绑定并验证旧账号邮箱' : mode === 'forgot' || mode === 'reset' ? '找回密码' : '欢迎回来'}</h1>
           <p className="mt-1 text-sm text-slate-500">{mode === 'register' ? '先验证邮箱，再创建账号' : mode === 'login' ? '使用用户名和密码登录' : '验证码 10 分钟有效且只能使用一次'}</p>
         </div>
-        {mode !== 'login-code' && mode !== 'claim-code' && mode !== 'reset' && <label className="block text-sm text-slate-700">
+        {mode !== 'login-code' && mode !== 'claim-code' && mode !== 'reset' && mode !== 'forgot' && <label className="block text-sm text-slate-700">
           用户名
           <input value={userId} onChange={(e) => setUserId(e.target.value.toLowerCase())} autoComplete="username" required className="mt-1 w-full border border-slate-300 rounded-md px-3 py-2" />
         </label>}
@@ -167,7 +167,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           密码
           <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" minLength={12} maxLength={128} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required className="mt-1 w-full border border-slate-300 rounded-md px-3 py-2" />
         </label>}
-        {(mode === 'register' || mode === 'claim' || mode === 'claim-code') && <label className="block text-sm text-slate-700">邮箱<input value={email} onChange={(e) => { setEmail(e.target.value); setChallengeId(''); setCode(''); }} type="email" autoComplete="email" maxLength={254} required className="mt-1 w-full border border-slate-300 rounded-md px-3 py-2" /></label>}
+        {(mode === 'register' || mode === 'claim' || mode === 'claim-code' || mode === 'forgot') && <label className="block text-sm text-slate-700">邮箱<input value={email} onChange={(e) => { setEmail(e.target.value); setChallengeId(''); setCode(''); }} type="email" autoComplete="email" maxLength={254} required className="mt-1 w-full border border-slate-300 rounded-md px-3 py-2" /></label>}
         {mode === 'register' && <div className="space-y-2"><button type="button" onClick={requestRegistrationCode} disabled={submitting || !email} className="w-full rounded-md border border-blue-600 py-2 text-sm text-blue-700">{submitting ? '正在发送…' : challengeId ? '重新发送验证码' : '发送邮箱验证码'}</button>{challengeId && <label className="block text-sm text-slate-700">邮箱验证码<input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required className="mt-1 w-full border border-slate-300 rounded-md px-3 py-2" /></label>}</div>}
         {(mode === 'login-code' || mode === 'claim-code' || mode === 'reset') && <label className="block text-sm text-slate-700">邮箱验证码<input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required className="mt-1 w-full border border-slate-300 rounded-md px-3 py-2" /></label>}
         {mode === 'reset' && <label className="block text-sm text-slate-700">新密码<input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} type="password" minLength={12} maxLength={128} autoComplete="new-password" required className="mt-1 w-full border border-slate-300 rounded-md px-3 py-2" /></label>}

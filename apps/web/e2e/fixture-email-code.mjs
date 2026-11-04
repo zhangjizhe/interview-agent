@@ -55,7 +55,14 @@ async function submitLoginCode(page, path, buttonName = '验证并登录') {
 export async function completeEmailLogin(page, { userId, password, loginButton = '登录', claimSendButton = '发送验证邮件' }) {
   await page.getByLabel('用户名', { exact: true }).fill(userId);
   await page.getByLabel('密码', { exact: true }).fill(password);
-  const started = await submitLoginCode(page, '/api/auth/login', loginButton);
+  let started;
+  try { started = await submitLoginCode(page, '/api/auth/login', loginButton); } catch (error) {
+    // Only the isolated fixture may retry an observed auth-rate rejection.
+    // Retain the production limiter and wait out its actual minute window.
+    if (process.env.LAB_FIXTURE_SYNTHETIC !== '1' || error.actual !== 429 || error.expected !== 200) throw error;
+    await new Promise(resolve => setTimeout(resolve, 61_000));
+    started = await submitLoginCode(page, '/api/auth/login', loginButton);
+  }
   if (started.accessToken) { assert.ok(started.refreshToken); assert.equal(started.requiresEmailVerification, undefined); return started; }
   if (started.requiresEmailClaim) {
     if (process.env.LAB_FIXTURE_SYNTHETIC === '1') throw new Error('Synthetic login unexpectedly reached the legacy email claim flow.');

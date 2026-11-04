@@ -51,6 +51,7 @@ try {
     const recovery = await recoveryContext.newPage(); await recovery.goto(origin);
     await recovery.getByLabel('用户名', { exact: true }).fill(userId);
     await recovery.getByRole('button', { name: '忘记密码？', exact: true }).click();
+    await recovery.getByLabel('邮箱', { exact: true }).fill(`${userId}@fixture.test`);
     const requesting = postResponse(recovery, 'password-reset/request');
     await recovery.getByRole('button', { name: '发送找回验证码', exact: true }).click();
     const requested = await requesting; assert.equal(requested.status(), 200);

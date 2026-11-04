@@ -662,7 +662,7 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
           : mode === 'login-code' ? { challengeId, code }
             : mode === 'claim' ? { userId, password, email }
               : mode === 'claim-code' ? { userId, email, challengeId, code }
-                : mode === 'forgot' ? { userId } : { userId, challengeId, code, newPassword };
+                : mode === 'forgot' ? { email } : { email, challengeId, code, newPassword };
       const response = await fetch(`/api/auth/${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -678,7 +678,7 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
       if (mode === 'login' && data.requiresEmailClaim) { setMode('claim'); setNotice('这是旧账号，请用原密码绑定并验证可收信邮箱。'); return; }
       if (mode === 'login' && data.requiresEmailVerification) { setChallengeId(data.challengeId); setMode('login-code'); setNotice(`验证码已发送至 ${data.maskedEmail}。`); return; }
       if (mode === 'claim') { setChallengeId(data.challengeId); setMode('claim-code'); setNotice(`验证码已发送至 ${data.maskedEmail}。`); return; }
-      if (mode === 'forgot') { setChallengeId(data.challengeId); setMode('reset'); setNotice('若该账号绑定了已验证邮箱，验证码已发送；旧账号需先由部署者恢复。'); return; }
+      if (mode === 'forgot') { setChallengeId(data.challengeId); setMode('reset'); setNotice('若该邮箱已注册且邮件服务正常，验证码会发送到该邮箱。'); return; }
       if (mode === 'reset') { setPassword(''); setNewPassword(''); setCode(''); setMode('login'); setNotice('密码已重置，请使用新密码登录。'); return; }
       if (data.role !== 'ADMIN') throw new Error('当前账号尚未获得 Agent Lab 管理员权限，请联系部署管理员。');
       localStorage.setItem('ia_access_token', data.accessToken);
@@ -693,9 +693,9 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
   };
   const title = mode === 'register' ? '创建管理员账号' : mode === 'login-code' ? '验证登录邮箱' : mode === 'claim' || mode === 'claim-code' ? '绑定旧账号邮箱' : mode === 'forgot' || mode === 'reset' ? '找回密码' : '进入控制台';
   return <main className="agent-access"><section><div className="agent-access-mark"><Bot size={22}/></div><p className="agent-eyebrow">AGENT LAB / CONTROL PLANE</p><h1>{title}</h1><p>管理员账号由部署允许名单授予。注册时验证邮箱，之后使用用户名和密码登录。</p><form onSubmit={submit}>
-    {mode !== 'login-code' && mode !== 'claim-code' && mode !== 'reset' && <label>用户名<input value={userId} onChange={(event) => setUserId(event.target.value.toLowerCase())} autoComplete="username" required /></label>}
+    {mode !== 'login-code' && mode !== 'claim-code' && mode !== 'reset' && mode !== 'forgot' && <label>用户名<input value={userId} onChange={(event) => setUserId(event.target.value.toLowerCase())} autoComplete="username" required /></label>}
     {(mode === 'login' || mode === 'register' || mode === 'claim') && <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} maxLength={128} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required /></label>}
-    {(mode === 'register' || mode === 'claim' || mode === 'claim-code') && <label>邮箱<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setChallengeId(''); setCode(''); }} maxLength={254} autoComplete="email" required /></label>}
+    {(mode === 'register' || mode === 'claim' || mode === 'claim-code' || mode === 'forgot') && <label>邮箱<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setChallengeId(''); setCode(''); }} maxLength={254} autoComplete="email" required /></label>}
     {mode === 'register' && <><button type="button" className="text-command" onClick={requestRegistrationCode} disabled={pending || !email}>{pending ? '正在发送…' : challengeId ? '重新发送邮箱验证码' : '发送邮箱验证码'}</button>{challengeId && <label>邮箱验证码<input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required /></label>}</>}
     {(mode === 'login-code' || mode === 'claim-code' || mode === 'reset') && <label>邮箱验证码<input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required /></label>}
     {mode === 'reset' && <label>新密码<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={12} maxLength={128} autoComplete="new-password" required /></label>}
