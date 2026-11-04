@@ -20,7 +20,7 @@ import { verifyBuilderCancellation } from './lab-builder-cancel-evidence.mjs';
 // This entry point is restricted to the synthetic Docker fixture, never a business account.
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic fixture authorization required');
 const url = 'http://localhost:5176';
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
 const errors = [];
@@ -130,12 +130,10 @@ await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated
     assert.equal(await nav.getByRole('button', { name: label, exact: true }).isEnabled(), true);
   }
   await page.getByRole('button', { name: '退出控制台', exact: true }).click();
-  await page.getByRole('button', { name: '登录控制台', exact: true }).waitFor();
+  await page.getByRole('button', { name: '继续并发送验证码', exact: true }).waitFor();
   await page.reload();
-  await page.getByRole('button', { name: '登录控制台', exact: true }).waitFor();
-  await page.getByLabel('用户名', { exact: true }).fill('fixture-ci-admin');
-  await page.getByLabel('密码', { exact: true }).fill('isolated-fixture-password');
-  await page.getByRole('button', { name: '登录控制台', exact: true }).click();
+  await page.getByRole('button', { name: '继续并发送验证码', exact: true }).waitFor();
+  await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated-fixture-password' });
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
   console.log('PASS browser first-release denial, eleven navigation headings, logout/reload/new login');
   await verifySessionRevocation(page, context, url);

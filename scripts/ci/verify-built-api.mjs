@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-const { createFixtureUserSession } = await import('/tmp/fixture-auth-http.mjs');
+const { createFixtureUserSession, loginFixtureUser } = await import('/tmp/fixture-auth-http.mjs');
 
 // Isolated synthetic fixtures. Configured runs use a deterministic localhost provider; no external models.
 const base = process.env.API_BASE_URL || 'http://127.0.0.1:3001/api';
@@ -25,6 +25,7 @@ check('liveness', (await request('/health')).status === 200);
 check('readiness includes migrated database and Redis', (await request('/health/ready')).status === 200);
 check('anonymous business access denied', (await request('/interview/list')).status === 401);
 const ownerSession = await login('fixture-ci-owner', 'USER');
+const ownerLoginAt = Date.now();
 const owner = ownerSession.accessToken;
 const foreignSession = await login('fixture-ci-foreign', 'USER');
 const foreign = foreignSession.accessToken;
@@ -90,13 +91,17 @@ await (await import('/tmp/verify-question-gateway.mjs')).verifyQuestionGateway({
 await (await import('/tmp/verify-question-catalog.mjs')).verifyQuestionCatalog({ request, admin, owner, check });
 await (await import('/tmp/verify-portfolio-assistant.mjs')).verifyPortfolioAssistant({ request, check });
 await (await import('/tmp/verify-configured-release.mjs')).verifyConfiguredRelease({ request, admin, check });
-check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: owner })).status === 200);
-check('logged out access token rejected', (await request('/auth/profile', { token: owner })).status === 401);
-check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: ownerSession.refreshToken } })).status === 401);
-check('other verified user remains authenticated', (await request('/auth/profile', { token: foreign })).status === 200);
 const require = createRequire(`${process.cwd()}/package.json`);
 await require('/tmp/verify-external-run-init.cjs')({ request, admin, owner, check });
 await require('/tmp/verify-runtime-adapters.cjs')({ request, admin, check });
 await require('/tmp/verify-training-loop.cjs')({ request, owner, targetJobId: created.data.id, check });
 await require('/tmp/verify-question-store.cjs')({ check });
+// A second device must complete its own mailbox verification. Respect the
+// real send cooldown; do not alter Redis limits or revoke the owner used above.
+await new Promise(resolve => setTimeout(resolve, Math.max(0, 61_000 - (Date.now() - ownerLoginAt))));
+const sibling = await loginFixtureUser(request, 'fixture-ci-owner', 'isolated-fixture-password');
+check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: sibling.accessToken })).status === 200);
+check('logged out access token rejected', (await request('/auth/profile', { token: sibling.accessToken })).status === 401);
+check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: sibling.refreshToken } })).status === 401);
+check('other verified device remains authenticated', (await request('/auth/profile', { token: owner })).status === 200);
 console.log(`Built API smoke: ${passed}/${passed} passed (synthetic local provider, no external model work).`);

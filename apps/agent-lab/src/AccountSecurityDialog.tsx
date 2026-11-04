@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { api } from './api';
 
 export function AccountSecurityDialog({ onClose }: { onClose: () => void }) {
   const [challengeId, setChallengeId] = useState('');
@@ -13,9 +14,7 @@ export function AccountSecurityDialog({ onClose }: { onClose: () => void }) {
   const requestCode = async () => {
     setPending(true); setError(''); setNotice('');
     try {
-      const response = await fetch('/api/auth/change-password/request', { method: 'POST' });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || '验证码发送失败');
+      const data = await api('/auth/change-password/request', { method: 'POST' });
       setChallengeId(data.challengeId); setMaskedEmail(data.maskedEmail);
       setNotice(`验证码已发送至 ${data.maskedEmail}。`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : '验证码发送失败'); }
@@ -25,9 +24,7 @@ export function AccountSecurityDialog({ onClose }: { onClose: () => void }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setPending(true); setError(''); setNotice('');
     try {
-      const response = await fetch('/api/auth/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword, newPassword, challengeId, code }) });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || '密码修改失败');
+      await api('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword, challengeId, code }) });
       sessionStorage.setItem('ia-password-changed', '1');
       localStorage.removeItem('ia_access_token'); localStorage.removeItem('ia_user_role'); localStorage.removeItem('ia_userId');
       window.location.reload();

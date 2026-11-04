@@ -14,7 +14,7 @@ const password = 'isolated-golden-browser-password';
 let browser, context, primary;
 try {
   control('profile-baseline');
-  browser = await chromium.launch({ headless: true }); context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined }); context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage(); const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());

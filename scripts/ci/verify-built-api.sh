@@ -6,6 +6,7 @@ fixture_image="${1:-interview-api:verification}"
 fixture_browser_scope="${FIXTURE_BROWSER_SCOPE:-all}"
 case "$fixture_browser_scope" in
   all) ;;
+  auth) test "${FIXTURE_BROWSER_TEST:-}" = "1"; echo 'Focused auth browser run: API smoke, other browser and recovery suites are not included.' ;;
   golden) test "${FIXTURE_BROWSER_TEST:-}" = "1"; test "${FIXTURE_GOLDEN_PROBE:-}" = "1"; echo 'Focused golden browser run: Lab and candidate-policy browser suites are not included.' ;;
   *) echo 'Invalid FIXTURE_BROWSER_SCOPE' >&2; exit 2 ;;
 esac
@@ -88,7 +89,7 @@ docker run -d --name "$fixture_api" --network "$fixture_network" --network-alias
   -e AUTH_EMAIL_SMTP_HOST=fixture-smtp -e AUTH_EMAIL_SMTP_PORT=2465 -e AUTH_EMAIL_SMTP_SECURE=true \
   -e AUTH_EMAIL_SMTP_USER=fixture-only -e AUTH_EMAIL_SMTP_PASSWORD=fixture-only \
   -e AUTH_EMAIL_FROM=noreply@example.test \
-  -e ADMIN_USER_IDS=fixture-ci-admin -e NODE_ENV=production \
+  -e ADMIN_USER_IDS=fixture-ci-admin,fixture-auth-admin -e NODE_ENV=production \
   -e QWEN_API_KEY=synthetic-fixture -e QWEN_BASE_URL=http://127.0.0.1:3335/v1 -e QWEN_RERANK_URL=http://127.0.0.1:3335/fixture/rerank \
   -e DEEPSEEK_API_KEY=synthetic-fixture -e DEEPSEEK_BASE_URL=http://127.0.0.1:1 \
   -e MILVUS_URL=http://fixture-milvus:19530 -e QDRANT_URL=http://fixture-qdrant:6333 "$fixture_image" >/dev/null
@@ -123,7 +124,9 @@ docker cp scripts/ci/verify-external-run-init.cjs "$fixture_api:/tmp/verify-exte
 docker cp scripts/ci/verify-training-loop.cjs "$fixture_api:/tmp/verify-training-loop.cjs"
 docker cp scripts/ci/verify-question-store.cjs "$fixture_api:/tmp/verify-question-store.cjs"
 docker cp scripts/ci/verify-vector-recovery.cjs "$fixture_api:/tmp/verify-vector-recovery.cjs"
-docker exec -i "$fixture_api" node --input-type=module < scripts/ci/verify-built-api.mjs
+if [[ "$fixture_browser_scope" != "auth" ]]; then
+  docker exec -i "$fixture_api" node --input-type=module < scripts/ci/verify-built-api.mjs
+fi
 if [[ "${FIXTURE_PRESENTATION_STORE:-}" == "1" ]]; then
   docker cp scripts/ci/verify-question-presentation-store.cjs "$fixture_api:/tmp/verify-question-presentation-store.cjs"
   docker exec -e GOLDEN_FIXTURE_SYNTHETIC=1 "$fixture_api" node /tmp/verify-question-presentation-store.cjs
@@ -158,7 +161,11 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
     done
     test "$fixture_browser_ready" = true
   fi
+  if [[ "${FIXTURE_BROWSER_TEST:-}" == "1" && ( "$fixture_browser_scope" == "all" || "$fixture_browser_scope" == "auth" ) ]]; then
+    LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/auth-email-runtime.mjs
+  fi
   docker rm -fv "$fixture_lab" >/dev/null
+  if [[ "$fixture_browser_scope" != "auth" ]]; then
   docker run -d --name "$fixture_web" --network "$fixture_network" -p 127.0.0.1:5177:80 "${FIXTURE_WEB_IMAGE:-interview-web:verification}" >/dev/null
   docker network connect bridge "$fixture_web"
   docker cp scripts/ci/fixture-policy-browser.cjs "$fixture_api:/tmp/fixture-policy-browser.cjs"
@@ -170,6 +177,11 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
     LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/golden-interview-loop.mjs
   fi
   docker rm -fv "$fixture_web" >/dev/null
+  fi
+fi
+if [[ "$fixture_browser_scope" == "auth" ]]; then
+  echo 'PASS focused auth browser scope; full API/browser/recovery gate remains separate'
+  exit 0
 fi
 docker exec "$fixture_api" node /tmp/verify-vector-recovery.cjs seed
 

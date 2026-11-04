@@ -88,7 +88,7 @@ async function runDesktop(browser) {
   await mockApi(page);
   await page.goto(webUrl, { waitUntil: 'networkidle' });
 
-  check('authentication gate visible', await page.getByRole('heading', { name: '小面' }).count() === 1);
+  check('authentication gate visible', await page.getByRole('heading', { name: '欢迎回来', exact: true }).count() === 1);
   check('login form has username/password fields', await page.getByLabel('用户名').count() === 1 && await page.getByLabel('密码').count() === 1);
   await page.screenshot({ path: join(outputDir, '01-auth-login-desktop.png'), fullPage: true });
 
@@ -106,16 +106,14 @@ async function runDesktop(browser) {
   await page.getByRole('button', { name: '验证并创建账号' }).click();
   await page.getByRole('status').getByText('邮箱已验证，账号创建成功。现在登录时还会发送一次验证码。').waitFor({ state: 'visible' });
 
-  const loginToggle = page.getByRole('button', { name: '已有账号，去登录' });
-  await loginToggle.click();
   await page.getByLabel('用户名').fill('acceptance-user');
   await page.getByLabel('密码').fill('acceptance-password-123');
   await page.getByRole('button', { name: '继续并发送验证码' }).click();
   await page.getByText('验证码已发送至 a***@example.test。').waitFor({ state: 'visible' });
   await page.getByLabel('邮箱验证码').fill('654321');
   await page.getByRole('button', { name: '验证并登录' }).click();
-  await page.getByRole('link', { name: '题库' }).waitFor({ state: 'visible' });
-  check('successful authenticated navigation reaches home', await page.getByRole('link', { name: '题库' }).count() === 1);
+  await page.getByRole('link', { name: '首页', exact: true }).waitFor({ state: 'visible' });
+  check('successful authenticated navigation reaches home', await page.getByRole('link', { name: '首页', exact: true }).count() === 1);
   await page.screenshot({ path: join(outputDir, '03-authenticated-home-desktop.png'), fullPage: true });
 
   await page.goto(`${webUrl}/admin/mcp`, { waitUntil: 'networkidle' });

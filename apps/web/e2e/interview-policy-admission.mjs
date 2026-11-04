@@ -22,7 +22,7 @@ const origin = 'http://localhost:5177';
 let browser, prepared = false, firstError;
 try {
   prepared = true; const data = JSON.parse(control('prepare'));
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());

@@ -1,5 +1,7 @@
 # Current state
 
+2026-11-04 runtime follow-up: approved Docker access works. The isolated API suite passed 136/136 with strict PostgreSQL/vector recovery. Focused Chrome + real Docker API + TLS synthetic SMTP passed registration, three code logins, change/reset, active-session revocation and OTP replay rejection. The real Lab dialog missing-bearer 401 is fixed through the existing api transport; strengthened UI tests, types/lint and the rebuilt Lab image passed. PR65 initial Docker CI failed on the fixture logging out a token later reused; that fixture and stale auth browser steps are corrected. Complete CI for this revision remains pending. Live SMTP authentication/delivery still needs the private application password; original services/database are not migrated. See [auth evidence](../acceptance/AUTH_EMAIL_VERIFICATION_EVIDENCE.md).
+
 2026-11-04 · Active theme: `AUTH-EMAIL-VERIFICATION`. Whole-product and production acceptance remain **NOT_ACCEPTED**.
 
 ## Active auth work — source reviewed, local verification partial
@@ -12,9 +14,9 @@
 
 **Executed locally:** focused API auth suites `auth.service.spec`, `auth-email.service.spec`, auth-module integration, auth session security and JWT guard passed **5 suites /35 tests**. API typecheck and emit-to-temporary-directory compilation passed. Web and Agent Lab typechecks passed. Three targeted Web Vitest files passed **4 tests** across two runs: candidate auth registration/login/recovery contract (2), Agent Lab password change (1), and evaluation trace UI (1). ESLint passed for touched API/Web/Agent Lab TypeScript; after the last UI adjustment, Web typecheck, candidate auth + Agent Lab password tests, and `App.tsx` plus the new auth test ESLint passed again. The Web production bundle rebuilt successfully into `/private/tmp`; direct in-repo Vite builds cannot write their temporary config beside the repository. Changed shell/JS scripts, including the updated mocked auth browser acceptance script, passed syntax checks. Final scoped diff and whitespace checks passed before the review commit.
 
-The mocked browser acceptance script was updated to exercise the new UI contract (registration code, account creation, password login, then login code). Its runtime did **not** execute: the local static server could not bind a loopback socket in this environment, and a subsequent attempt with the installed Chrome Canary exited with `SIGABRT` before creating a page. Thus this is not browser acceptance evidence. The Playwright-managed browser cache is empty.
+The standalone mocked auth browser scenario passed 7/7 in installed Chrome after correcting old page locators. Earlier loopback/Chrome launch restrictions were resolved with approved execution permissions. The dedicated auth browser scenario also passed against real isolated API/DB/Redis and TLS synthetic SMTP; real mailbox delivery is not verified.
 
-**Blocked/unverified:** local Docker access returns permission denied; do not bypass socket permissions. Therefore PostgreSQL migration, built API + synthetic SMTP, API/browser E2E, and exact-head CI are unverified. Live SMTP credentials and a designated owner mailbox are absent. No real message, database migration, user mutation, deployment, or paid model call occurred. Whole-product acceptance remains **NOT_ACCEPTED**.
+**Blocked/unverified:** live SMTP authentication and delivery await the private application password. Original target migration and the trusted recovery procedure for a forgotten-password, unverified legacy owner are still pending. General full-browser acceptance and CI for the corrected revision remain pending. No external model call or original account mutation occurred; whole-product acceptance remains **NOT_ACCEPTED**.
 
 ## Retained prior context (historical; does not describe this auth revision)
 
