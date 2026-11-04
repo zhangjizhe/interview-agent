@@ -6,7 +6,17 @@ const cert = readFileSync(process.env.FIXTURE_SMTP_CERT || '/tmp/fixture-auth-ma
 const outbox = process.env.FIXTURE_SMTP_OUTBOX || '/tmp/fixture-auth-mail/outbox.jsonl';
 try { chmodSync(outbox, 0o600); } catch { appendFileSync(outbox, '', { mode: 0o600 }); chmodSync(outbox, 0o600); }
 
+let connectionCount = 0;
 const server = tls.createServer({ key, cert }, socket => {
+  socket.on('error', () => {});
+  connectionCount += 1;
+  if (process.env.FIXTURE_SMTP_STALL_FIRST_GREETING === '1' && connectionCount === 1) {
+    // Synthetic-only fault: TLS succeeds with the hostname certificate, but no
+    // SMTP command or message is accepted before the bounded fallback.
+    socket.setTimeout(20000, () => socket.destroy());
+    console.log('Synthetic SMTP first greeting stalled before any message.');
+    return;
+  }
   socket.setEncoding('utf8');
   socket.write('220 fixture SMTP ready\r\n');
   let buffer = '';

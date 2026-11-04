@@ -1,8 +1,12 @@
 # 待办与验收门
 
-2026-11-04 runtime follow-up: approved Docker access works. The isolated API suite passed 136/136 with strict PostgreSQL/vector recovery. Focused Chrome + real Docker API + TLS synthetic SMTP passed registration, three code logins, change/reset, active-session revocation and OTP replay rejection. The real Lab dialog missing-bearer 401 is fixed through the existing api transport; strengthened UI tests, types/lint and the rebuilt Lab image passed. PR65 initial Docker CI failed on the fixture logging out a token later reused; that fixture and stale auth browser steps are corrected. Complete CI for this revision remains pending. Live SMTP authentication/delivery still needs the private application password; original services/database are not migrated. See [auth evidence](../acceptance/AUTH_EMAIL_VERIFICATION_EVIDENCE.md).
+2026-11-04 唯一主题 `AUTH-EMAIL-VERIFICATION`，真实邮件阶段仍 **NOT_ACCEPTED**。原库备份已在隔离库恢复并核对用户/Run/组织数量；原卷保留且加性迁移完成。用户明确授权的原账号本机管理员恢复已通过真实邮箱OTP完成，身份/组织不变、旧会话撤销。
 
-2026-11-04 当前唯一主题：`AUTH-EMAIL-VERIFICATION` 标准邮箱验证：注册、每次登录、改密、已验证邮箱找回；包括旧账号门禁、会话撤销、迁移和合成 TLS SMTP fixture。**进行中，未验收。** 当前 API focused auth 5 suites / 35 tests、Web 3 targeted files / 4 tests、相关 lint/typecheck/temp builds 和 Prisma schema validation 已通过；更新后的 mocked auth browser script 通过语法检查，但未能启动浏览器（loopback bind 权限受限，Chrome Canary 在启动阶段 SIGABRT）。Docker socket denied、无真实 SMTP credentials；迁移运行、真实 API/browser E2E、live mail、exact-head CI 未核验。迁移遇到大小写重复邮箱会 preflight fail-fast；旧账号忘记密码且邮箱未验证时禁止用用户自选邮箱接管，恢复路径仍缺部署支持流程。详见 `CURRENT_STATE.md` / `ACTIVE_TASK.md` / `THREAD_HANDOFF.md`。
+源码侧有界SMTP连接备用、严格TLS/脱敏日志、默认8次且可配置1-20的发送限制、标题修复已完成；本机私有验收配置20次，未清计数，60秒冷却不变。45项认证测试（含15邮件测试）、lint/typecheck/build及真实API/DB/Redis/Chrome/合成TLS首欢迎故障验收通过。基线51e795e对应CI41772980806三项绿；新head需独立核对。
+
+真实网易部分注册/登录/改密、原账号Lab登录与重启读取已通过，但候选人页面及原账号完整找回/最终双入口登录仍超时失败。已请用户检查网易安全/第三方客户端提醒；条件未变化不重放。当前仍为钥匙串临时恢复密码，生成的新重置密码未应用。秘密仅本机加密/运行内存，私有配置不提交。详见 CURRENT_STATE、ACTIVE_TASK 和邮箱验收证据。
+
+`PORTFOLIO-ASSISTANT` 暂停保留，仍 NOT_ACCEPTED；正常发布、真实来源问答、正式评测报告和公开接入待独立阶段。本主题未发起外部模型调用。以下历史记录不代表当前状态。
 
 2026-11-03 当前唯一主题PORTFOLIO-ASSISTANT：固定32公开片段/正常发布selector/Lab持久队列/Redis有界准入与24h跨IP幂等/原文来源输出/实际网站BFF已本地实现；API1199/27skip、Web333、站点24通过，最终构建/精确CI待核。旧题库51d5c2b两run六项CI与原始日志已通过，仅隔离工程阶段；远端Wiki5403d81已保留。目标部署、正常发布版本配置、真实模型/账单和桌面hexo-bolg读取仍无证据。
 

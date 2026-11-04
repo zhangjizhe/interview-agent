@@ -51,6 +51,7 @@ chmod 600 "$fixture_backup/smtp/key.pem" "$fixture_backup/smtp/cert.pem"
 docker create --name "$fixture_smtp" --network "$fixture_network" --network-alias fixture-smtp \
   -e FIXTURE_SMTP_KEY=/tmp/fixture-auth-mail-key.pem -e FIXTURE_SMTP_CERT=/tmp/fixture-auth-mail-cert.pem \
   -e FIXTURE_SMTP_OUTBOX=/tmp/fixture-auth-mail-outbox/outbox.jsonl \
+  -e FIXTURE_SMTP_STALL_FIRST_GREETING=1 \
   -v "$fixture_backup/smtp/key.pem:/tmp/fixture-auth-mail-key.pem:ro" \
   -v "$fixture_backup/smtp/cert.pem:/tmp/fixture-auth-mail-cert.pem:ro" \
   -v "$fixture_backup/auth-mail:/tmp/fixture-auth-mail-outbox" \
@@ -179,6 +180,13 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
   docker rm -fv "$fixture_web" >/dev/null
   fi
 fi
+# The first verified TLS connection intentionally received no greeting. Normal
+# code registration/login must complete through a resolved-IP connection while
+# still verifying the original hostname certificate; no OTP bypass is used.
+docker logs "$fixture_smtp" 2>&1 | grep -F 'Synthetic SMTP first greeting stalled before any message.' >/dev/null
+docker logs "$fixture_api" 2>&1 | grep -F 'SMTP setup timed out; trying bounded resolved addresses before message delivery.' >/dev/null
+echo 'PASS synthetic SMTP pre-message fallback with original-hostname TLS verification'
+
 if [[ "$fixture_browser_scope" == "auth" ]]; then
   echo 'PASS focused auth browser scope; full API/browser/recovery gate remains separate'
   exit 0

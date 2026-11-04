@@ -79,6 +79,7 @@ export interface AppConfig {
     jwtExpiresIn: string;
     adminUserIds: string[];
     emailOtpSecret: string;
+    emailDailyLimit: number;
     emailSmtpHost: string;
     emailSmtpPort: number;
     emailSmtpSecure: boolean;
@@ -263,6 +264,7 @@ export const configuration = (): AppConfig => {
       .map((userId) => userId.trim().toLowerCase())
       .filter(Boolean),
     emailOtpSecret: process.env.AUTH_EMAIL_OTP_SECRET || '',
+    emailDailyLimit: parseSafeInt(process.env.AUTH_EMAIL_DAILY_LIMIT, 8),
     emailSmtpHost: process.env.AUTH_EMAIL_SMTP_HOST || '',
     emailSmtpPort: parseSafeInt(process.env.AUTH_EMAIL_SMTP_PORT, 587),
     emailSmtpSecure: process.env.AUTH_EMAIL_SMTP_SECURE === 'true',
