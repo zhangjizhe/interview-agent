@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { questionInputSnapshot } from './lab-question-input-snapshot.mjs';
+import { completeEmailLogin } from './fixture-email-code.mjs';
 
 /** Real Redis session revocation; no browser response injection. */
 export async function verifySessionRevocation(page, context, origin) {
@@ -26,13 +27,7 @@ export async function verifySessionRevocation(page, context, origin) {
   assert.equal((await context.request.post(`${origin}/api/admin/mcp-servers/reload`, { headers })).status(), 401);
   assert.deepEqual(await questionInputSnapshot(), before);
   await page.reload();
-  await page.getByRole('button', { name: '登录控制台', exact: true }).waitFor();
-  await page.getByLabel('用户名', { exact: true }).fill('fixture-ci-admin');
-  await page.getByLabel('密码', { exact: true }).fill('isolated-fixture-password');
-  const loggedIn = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/login' && response.request().method() === 'POST');
-  void loggedIn.catch(() => {});
-  await page.getByRole('button', { name: '登录控制台', exact: true }).click();
-  assert.equal((await loggedIn).status(), 200);
+  await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated-fixture-password' });
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
   const newToken = await page.evaluate(() => localStorage.getItem('ia_access_token'));
   assert.ok(newToken);

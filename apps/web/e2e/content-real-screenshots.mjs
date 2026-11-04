@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { completeEmailLogin, loginThroughEmailApi, registerThroughEmailApi } from './fixture-email-code.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const api = process.env.API_URL || 'http://localhost:3001';
@@ -11,6 +12,9 @@ const outputDir = join(__dirname, 'screenshots', 'acceptance-2026-08-12');
 mkdirSync(outputDir, { recursive: true });
 
 const password = 'acceptance-password-123';
+const emailTemplate = process.env.AUTH_ACCEPTANCE_EMAIL_TEMPLATE || '';
+if (!emailTemplate.includes('{userId}')) throw new Error('Set AUTH_ACCEPTANCE_EMAIL_TEMPLATE to an unused, owner-controlled address pattern containing {userId}.');
+const emailFor = id => emailTemplate.replaceAll('{userId}', id);
 const checks = [];
 function check(name, passed, detail = '') {
   checks.push({ name, passed, detail });
@@ -27,23 +31,14 @@ async function request(path, options) {
 
 async function login(page, id) {
   await page.goto(web, { waitUntil: 'networkidle' });
-  await page.getByLabel('用户名').fill(id);
-  await page.getByLabel('密码').fill(password);
-  await page.getByRole('button', { name: '登录' }).click();
+  await completeEmailLogin(page, { userId: id, password });
   await page.getByRole('link', { name: '题库' }).waitFor({ state: 'visible' });
 }
 
 const userId = `content-shot-${Date.now()}`;
-const register = await request('/api/auth/register', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ userId, password }),
-});
-const userLogin = await request('/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ userId, password }),
-});
+const apiBase = `${api.replace(/\/$/, '')}/api`;
+const register = await registerThroughEmailApi(apiBase, { userId, password, email: emailFor(userId) });
+const userLogin = await loginThroughEmailApi(apiBase, { userId, password });
 const resumeForm = new FormData();
 resumeForm.append(
   'file',

@@ -2,6 +2,7 @@
 // The PUBLISHED selector below is an explicit isolated fixture seed, NOT production release-gate evidence.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+const { registerFixtureUser } = await import('/tmp/fixture-auth-http.mjs');
 const require = createRequire(`${process.cwd()}/package.json`);
 const { PrismaClient } = require('@prisma/client');
 const { PORTFOLIO_SELECTOR_PROMPT, portfolioSource } = require('./dist/modules/portfolio-assistant/portfolio.contract');
@@ -14,8 +15,8 @@ export async function verifyPortfolioAssistant({ request, check }) {
     || process.env.PORTFOLIO_ASSISTANT_TICKET_SECRET !== 'isolated_portfolio_ticket_secret_at_least_32_chars') throw new Error('Exact isolated portfolio fixture configuration required');
   const prisma = new PrismaClient();
   const ownerId = 'fixture-portfolio-admin';
-  const registered = await request('/auth/register', { method: 'POST', body: { userId: ownerId, password: 'isolated-fixture-portfolio-password' } });
-  assert.equal(registered.status, 200);
+  const registered = await registerFixtureUser(request, ownerId, 'isolated-fixture-portfolio-password');
+  assert.equal(registered.userId, ownerId);
   const user = await prisma.user.update({ where: { id: ownerId }, data: { role: 'ADMIN' } });
   const workspace = await prisma.workspace.create({ data: { organizationId: user.organizationId, slug: `personal-${ownerId}`, ownerId, name: 'Synthetic public assistant fixture' } });
   const agent = await prisma.agent.create({ data: { organizationId: user.organizationId, workspaceId: workspace.id, key: 'portfolio-selector', name: 'Synthetic portfolio selector', type: 'CUSTOM', status: 'ACTIVE' } });

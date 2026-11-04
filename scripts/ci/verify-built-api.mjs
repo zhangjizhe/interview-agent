@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+const { createFixtureUserSession } = await import('/tmp/fixture-auth-http.mjs');
 
 // Isolated synthetic fixtures. Configured runs use a deterministic localhost provider; no external models.
 const base = process.env.API_BASE_URL || 'http://127.0.0.1:3001/api';
@@ -16,20 +17,19 @@ async function request(path, { method = 'GET', token, body, timeoutMs = 5000, he
 function check(name, condition) { assert.ok(condition, name); passed += 1; console.log(`PASS ${name}`); }
 async function login(userId, role) {
   const password = 'isolated-fixture-password';
-  const registered = await request('/auth/register', { method: 'POST', body: { userId, password } });
-  assert.equal(registered.status, 200, 'fixture registration');
-  const session = await request('/auth/login', { method: 'POST', body: { userId, password } });
-  check(`${role} session is issued with expected role`, session.status === 200 && session.data.role === role && typeof session.data.accessToken === 'string');
-  return session.data.accessToken;
+  const session = await createFixtureUserSession(request, userId, password);
+  check(`${role} session is issued only after fixture email verification`, session.role === role && typeof session.accessToken === 'string');
+  return session;
 }
 check('liveness', (await request('/health')).status === 200);
 check('readiness includes migrated database and Redis', (await request('/health/ready')).status === 200);
 check('anonymous business access denied', (await request('/interview/list')).status === 401);
-const owner = await login('fixture-ci-owner', 'USER');
-const foreign = await login('fixture-ci-foreign', 'USER');
-const admin = await login('fixture-ci-admin', 'ADMIN');
-const sibling = await request('/auth/login', { method: 'POST', body: { userId: 'fixture-ci-owner', password: 'isolated-fixture-password' } });
-check('parallel session login', sibling.status === 200);
+const ownerSession = await login('fixture-ci-owner', 'USER');
+const owner = ownerSession.accessToken;
+const foreignSession = await login('fixture-ci-foreign', 'USER');
+const foreign = foreignSession.accessToken;
+const adminSession = await login('fixture-ci-admin', 'ADMIN');
+const admin = adminSession.accessToken;
 const created = await request('/interview/target-jobs', { method: 'POST', token: owner, body: { title: 'Synthetic CI Role', level: 'P5' } });
 check('owned target job creation', created.status === 201 && created.data.isActive === true && created.data.profileVersion === 1);
 const jobs = await request('/interview/target-jobs', { token: owner });
@@ -55,8 +55,8 @@ try {
   const ordinary = await fixturePrisma.user.findUniqueOrThrow({ where: { id: 'fixture-ci-owner' }, include: { organization: { include: { plan: true } } } });
   check('synthetic administrator has a finite isolated allowance without changing Free users', ordinary.organization.planId === 'free' && ordinary.organization.plan.monthlyLlmCalls === 100 && (await fixturePrisma.plan.findUniqueOrThrow({ where: { id: 'isolated-ci-admin' } })).monthlyLlmCalls === 200);
   await fixturePrisma.user.update({ where: { id: 'fixture-ci-foreign' }, data: { role: 'ADMIN' } });
-  const promoted = await request('/auth/login', { method: 'POST', body: { userId: 'fixture-ci-foreign', password: 'isolated-fixture-password' } });
-  check('promoted USER re-login issues ADMIN session', promoted.status === 200 && promoted.data.role === 'ADMIN');
+  const promoted = await request('/auth/refresh', { method: 'POST', body: { refreshToken: foreignSession.refreshToken } });
+  check('promoted USER refreshes a verified-email session with current ADMIN role', promoted.status === 200 && promoted.data.role === 'ADMIN');
   const dashboards = await Promise.all(Array.from({ length: 2 }, () => request('/agent-lab/dashboard', { token: promoted.data.accessToken })));
   const original = await request('/agent-lab/dashboard', { token: admin });
   check('second organization concurrent first dashboard succeeds', dashboards.every(r => r.status === 200));
@@ -90,10 +90,10 @@ await (await import('/tmp/verify-question-gateway.mjs')).verifyQuestionGateway({
 await (await import('/tmp/verify-question-catalog.mjs')).verifyQuestionCatalog({ request, admin, owner, check });
 await (await import('/tmp/verify-portfolio-assistant.mjs')).verifyPortfolioAssistant({ request, check });
 await (await import('/tmp/verify-configured-release.mjs')).verifyConfiguredRelease({ request, admin, check });
-check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: sibling.data.accessToken })).status === 200);
-check('logged out access token rejected', (await request('/auth/profile', { token: sibling.data.accessToken })).status === 401);
-check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: sibling.data.refreshToken } })).status === 401);
-check('other device remains authenticated', (await request('/auth/profile', { token: owner })).status === 200);
+check('server logout acknowledged', (await request('/auth/logout', { method: 'POST', token: owner })).status === 200);
+check('logged out access token rejected', (await request('/auth/profile', { token: owner })).status === 401);
+check('logged out refresh token rejected', (await request('/auth/refresh', { method: 'POST', body: { refreshToken: ownerSession.refreshToken } })).status === 401);
+check('other verified user remains authenticated', (await request('/auth/profile', { token: foreign })).status === 200);
 const require = createRequire(`${process.cwd()}/package.json`);
 await require('/tmp/verify-external-run-init.cjs')({ request, admin, owner, check });
 await require('/tmp/verify-runtime-adapters.cjs')({ request, admin, check });

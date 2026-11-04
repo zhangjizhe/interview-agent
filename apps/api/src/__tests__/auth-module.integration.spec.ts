@@ -6,9 +6,10 @@ import { AuthService } from '../modules/auth/auth.service';
 import { AuthSessionService } from '../modules/auth/auth-session.service';
 import { JwtAuthGuard } from '../modules/auth/jwt-auth.guard';
 import { PrismaService } from '../infra/prisma/prisma.service';
+import { RedisService } from '../infra/redis/redis.service';
 
 @Global()
-@Module({ providers: [{ provide: PrismaService, useValue: {} }], exports: [PrismaService] })
+@Module({ providers: [{ provide: PrismaService, useValue: {} }, { provide: RedisService, useValue: {} }], exports: [PrismaService, RedisService] })
 class FixtureInfrastructure {}
 @Controller('fixture')
 class FixtureController {

@@ -9,12 +9,17 @@
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loginThroughEmailApi, registerThroughEmailApi } from './fixture-email-code.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..', '..', '..');
 const api = process.env.API_URL || 'http://localhost:3001';
+const apiBase = `${api.replace(/\/$/, '')}/api`;
 const rounds = Number.parseInt(process.env.BENCH_ROUNDS || '10', 10);
 const password = 'benchmark-password-123';
+const emailTemplate = process.env.AUTH_ACCEPTANCE_EMAIL_TEMPLATE || '';
+if (!emailTemplate.includes('{userId}')) throw new Error('Set AUTH_ACCEPTANCE_EMAIL_TEMPLATE to an unused, owner-controlled address pattern containing {userId}.');
+const emailFor = id => emailTemplate.replaceAll('{userId}', id);
 const startedAt = new Date();
 const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
 const outputDir = join(__dirname, 'screenshots', 'acceptance-2026-08-12', 'benchmarks');
@@ -141,18 +146,9 @@ const health = await request('/api/health');
 assert(health.status === 'ok', 'API health check did not return ok');
 
 const userId = `benchmark-${Date.now()}`;
-const register = await request('/api/auth/register', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ userId, password }),
-});
+const register = await registerThroughEmailApi(apiBase, { userId, password, email: emailFor(userId) });
 assert(register.role === 'USER', 'benchmark account is not a USER');
-
-const login = await request('/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ userId, password }),
-});
+const login = await loginThroughEmailApi(apiBase, { userId, password });
 const token = login.accessToken;
 
 const resumeForm = new FormData();

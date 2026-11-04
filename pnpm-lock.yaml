@@ -148,6 +148,9 @@ importers:
       multer:
         specifier: 2.5.0
         version: 2.5.0
+      nodemailer:
+        specifier: ^10.3.1
+        version: 10.3.1
       openai:
         specifier: ^4.20.0
         version: 4.104.0(ws@5.2.5)(zod@3.25.76(patch_hash=lz6vf2stnp5pbmbzaxrjzti7hq))
@@ -4691,6 +4694,10 @@ packages:
   node-releases@2.0.48:
     resolution: {integrity: sha512-1uz8041X6LoI6ZSdZacM9lVY28vuzDlSKitnpbSNK0RfKoIJkX29NBPVEFXhnuSuEOA9Ww0xnPJ+ILWbGAv8DA==}
     engines: {node: '>=18'}
+
+  nodemailer@10.3.1:
+    resolution: {integrity: sha512-uF0AFsJC07Y1vdW7p580DKAnh7rAO+4UPSSB3mDCPNDufoiaOebV6JmrzpxB14OjEEEiBsNdYoM2Y+fN8M7BBA==}
+    engines: {node: '>=20.0.0'}
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -11187,6 +11194,8 @@ snapshots:
   node-int64@0.4.0: {}
 
   node-releases@2.0.48: {}
+
+  nodemailer@10.3.1: {}
 
   normalize-path@3.0.0: {}
 

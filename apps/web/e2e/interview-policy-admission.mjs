@@ -13,6 +13,7 @@ import { verifyStreamSessionBoundary } from './interview-stream-session-evidence
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+import { completeEmailLogin } from './fixture-email-code.mjs';
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
 const container = process.env.LAB_FIXTURE_API_CONTAINER;
 assert.match(container || '', /^interview-built-check-\d+-api$/);
@@ -26,9 +27,7 @@ try {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
   await page.goto(`${origin}/interview/${data.interviewId}`);
-  await page.getByLabel('用户名', { exact: true }).fill('fixture-ci-owner');
-  await page.getByLabel('密码', { exact: true }).fill('isolated-fixture-password');
-  await page.getByRole('button', { name: '登录', exact: true }).click();
+  await completeEmailLogin(page, { userId: 'fixture-ci-owner', password: 'isolated-fixture-password' });
   const confirmation = page.waitForResponse(r => r.url() === `${origin}/api/interview/${data.interviewId}/confirm-resume` && r.request().method() === 'POST'); confirmation.catch(() => undefined);
   await page.getByRole('button', { name: '核验题目状态', exact: true }).click();
   const confirmedResponse = await confirmation; assert.equal(confirmedResponse.status(), 201);

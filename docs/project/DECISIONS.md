@@ -1,5 +1,7 @@
 # 当前决策索引
 
+2026-11-04 auth decision: keep existing JWT/session revocation and Prisma/Redis architecture; require verified mailbox codes for registration, each password login, password change and recovery. Codes have separate purposes, HMAC-only storage and send/guess limits. Legacy unverified owners must prove their current password before claiming a mailbox; forgotten-password recovery cannot target an arbitrary new mailbox. TLS SMTP is required and unavailable mail fails closed. Nullable migration intentionally leaves legacy users unverified. Synthetic CI mail does not establish real delivery.
+
 更新：2026-11-03。完整 ADR 在 [architecture-decisions.md](../architecture-decisions.md)；旧汇总[归档](archive/release-readiness-2026-10-08/DECISIONS.md)。
 
 | 决策 | 当前约束 |

@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-04 auth candidate: email-code registration and password login, current-password plus mailbox-code password changes, verified-mailbox recovery and session revocation in candidate Web and Agent Lab. Add email verification timestamp, duplicate preflight and case-insensitive email uniqueness. Synthetic SMTP fixtures and focused tests added; real mail, migration and browser acceptance remain pending.
+
 2026-11-03 candidate: public portfolio assistant using a fixed published Lab selector, atomic bounded admission, signed/redacted polling, checked verbatim sources, full historical article chunks and the actual portable site bridge. Default disabled; local tests are engineering evidence, target publication/model/deployment remain unaccepted.
 
 2026-10-29 candidate: bounded BUSINESS_ASSERTIONS and v6 scoped release evidence; shared production scoring request/parser, heuristic source correction, fail-closed Golden/recording, bounded/idempotent evaluation UI. Exact acceptance pending; no semantic quality claim.

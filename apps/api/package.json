@@ -45,6 +45,7 @@
     "langchain": "^1.4.4",
     "langfuse": "^3.0.0",
     "multer": "2.5.0",
+    "nodemailer": "^10.3.1",
     "openai": "^4.20.0",
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^4.0.0",

@@ -1,10 +1,15 @@
 import { createRequire } from 'node:module';
 const require = createRequire(new URL('../../web/package.json', import.meta.url));
 const { chromium } = require('playwright');
+import { completeEmailLogin, registerThroughEmailUI } from '../../web/e2e/fixture-email-code.mjs';
 
 const baseUrl = process.env.AGENT_LAB_URL || 'http://localhost:5175';
 const chromePath = process.env.CHROME_PATH;
-const password = 'acceptance-password-123';
+const password = process.env.AGENT_LAB_ACCEPTANCE_PASSWORD || 'acceptance-password-123';
+const adminUserId = process.env.AGENT_LAB_ACCEPTANCE_USER_ID || 'admin-acceptance';
+const emailTemplate = process.env.AUTH_ACCEPTANCE_EMAIL_TEMPLATE || '';
+if (!emailTemplate.includes('{userId}')) throw new Error('Set AUTH_ACCEPTANCE_EMAIL_TEMPLATE to an unused, owner-controlled address pattern containing {userId}.');
+const emailFor = userId => emailTemplate.replaceAll('{userId}', userId);
 
 const browser = await chromium.launch({ headless: true, executablePath: chromePath || undefined });
 try {
@@ -14,9 +19,7 @@ try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   if (await page.getByRole('heading', { name: '进入控制台' }).count() !== 1) throw new Error('admin login gate missing');
 
-  await page.getByLabel('用户名').fill('admin-acceptance');
-  await page.getByLabel('密码').fill(password);
-  await page.getByRole('button', { name: '登录控制台' }).click();
+  await completeEmailLogin(page, { userId: adminUserId, password, loginButton: '继续并发送验证码', claimSendButton: '发送绑定验证码' });
   console.log('checking admin control plane');
   await page.getByRole('heading', { name: '控制中心' }).waitFor({ state: 'visible' });
   if (await page.getByRole('button', { name: '重新加载 MCP' }).count() !== 1) throw new Error('MCP control action missing');
@@ -116,18 +119,11 @@ try {
   console.log('checking ordinary-user rejection');
   await userPage.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   const ordinaryUserId = `agent-lab-user-${Date.now()}`;
-  await userPage.getByRole('button', { name: '创建管理员账号' }).click();
-  await userPage.getByLabel('用户名').fill(ordinaryUserId);
-  await userPage.getByLabel('密码').fill(password);
-  await userPage.getByRole('button', { name: '创建并验证权限' }).click();
-  await userPage.getByText('账号已创建，但 Agent Lab 仅允许管理员进入。请联系部署管理员授权后再登录。').waitFor({ state: 'visible' });
-  const userControlPlaneStatus = await userPage.evaluate(async ({ ordinaryUserId, password }) => {
-    const login = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: ordinaryUserId, password }),
-    }).then((response) => response.json());
-    const headers = { Authorization: `Bearer ${login.accessToken}` };
+  await registerThroughEmailUI(userPage, { userId: ordinaryUserId, password, email: emailFor(ordinaryUserId), registerEntryButton: '创建管理员账号' });
+  const ordinarySession = await completeEmailLogin(userPage, { userId: ordinaryUserId, password, loginButton: '继续并发送验证码' });
+  await userPage.getByText('当前账号尚未获得 Agent Lab 管理员权限，请联系部署管理员。', { exact: true }).waitFor({ state: 'visible' });
+  const userControlPlaneStatus = await userPage.evaluate(async ({ accessToken }) => {
+    const headers = { Authorization: `Bearer ${accessToken}` };
     const [audit, operations] = await Promise.all([
       fetch('/api/agent-lab/audit?kind=RUN', { headers }),
       fetch('/api/agent-lab/operation-logs', { headers }),
@@ -136,7 +132,7 @@ try {
       audit: audit.status,
       operations: operations.status,
     };
-  }, { ordinaryUserId, password });
+  }, { accessToken: ordinarySession.accessToken });
   if (userControlPlaneStatus.audit !== 403 || userControlPlaneStatus.operations !== 403) {
     throw new Error(`ordinary user control-plane API was not rejected: ${JSON.stringify(userControlPlaneStatus)}`);
   }

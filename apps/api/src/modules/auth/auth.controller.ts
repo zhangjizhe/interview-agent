@@ -14,11 +14,19 @@ export class AuthController {
    * 格式不合法 / 保留名 → 400 Bad Request
    */
   @RateLimitPolicy('auth')
+  @Post('registration-code')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async requestRegistrationCode(@Body() dto: { email: string }) {
+    return this.auth.requestRegistrationCode(dto?.email);
+  }
+
+  @RateLimitPolicy('auth')
   @Post('register')
   @Public()
   @HttpCode(HttpStatus.OK)
-  async register(@Body() dto: LoginDto) {
-    return this.auth.register(dto.userId, dto.password);
+  async register(@Body() dto: { userId: string; email: string; password: string; challengeId: string; code: string }) {
+    return this.auth.register(dto?.userId, dto?.password, dto?.email, dto?.challengeId, dto?.code);
   }
 
   /**
@@ -43,6 +51,46 @@ export class AuthController {
     return this.auth.login(dto);
   }
 
+  @RateLimitPolicy('auth')
+  @Post('login/verify-email')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  verifyLogin(@Body() dto: { challengeId: string; code: string }) {
+    return this.auth.verifyLogin(dto?.challengeId, dto?.code);
+  }
+
+  @RateLimitPolicy('auth')
+  @Post('login/claim-email')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  claimEmail(@Body() dto: { userId: string; password: string; email: string }) {
+    return this.auth.requestLegacyEmailClaim(dto?.userId, dto?.password, dto?.email);
+  }
+
+  @RateLimitPolicy('auth')
+  @Post('login/claim-email/verify')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  verifyClaimEmail(@Body() dto: { userId: string; email: string; challengeId: string; code: string }) {
+    return this.auth.verifyLegacyEmailClaim(dto?.userId, dto?.email, dto?.challengeId, dto?.code);
+  }
+
+  @RateLimitPolicy('auth')
+  @Post('password-reset/request')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  requestPasswordReset(@Body() dto: { userId: string }) {
+    return this.auth.requestPasswordReset(dto?.userId);
+  }
+
+  @RateLimitPolicy('auth')
+  @Post('password-reset/complete')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  completePasswordReset(@Body() dto: { userId: string; challengeId: string; code: string; newPassword: string }) {
+    return this.auth.resetPassword(dto?.userId, dto?.challengeId, dto?.code, dto?.newPassword);
+  }
+
   @Post('refresh')
   @Public()
   @RateLimitPolicy('auth')
@@ -60,8 +108,15 @@ export class AuthController {
   @Post('change-password')
   @RateLimitPolicy('auth')
   @HttpCode(HttpStatus.OK)
-  changePassword(@Req() req: any, @Body() dto: { currentPassword: string; newPassword: string }) {
-    return this.auth.changePassword(req.user.userId, dto?.currentPassword, dto?.newPassword);
+  changePassword(@Req() req: any, @Body() dto: { currentPassword: string; newPassword: string; challengeId: string; code: string }) {
+    return this.auth.changePassword(req.user.userId, dto?.currentPassword, dto?.newPassword, dto?.challengeId, dto?.code);
+  }
+
+  @Post('change-password/request')
+  @RateLimitPolicy('auth')
+  @HttpCode(HttpStatus.OK)
+  requestPasswordChange(@Req() req: any) {
+    return this.auth.requestPasswordChange(req.user.userId);
   }
 
   /**

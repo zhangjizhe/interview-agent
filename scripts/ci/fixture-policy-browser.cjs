@@ -41,7 +41,7 @@ async function resumeUploadControl(mode) {
     fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });
     await prisma.$transaction(async tx => {
       await tx.organization.create({ data: { id: organizationId, name: 'Synthetic resume upload', planId: 'free' } });
-      await tx.user.create({ data: { id: userId, email: `${userId}@example.invalid`, organizationId, passwordHash: owner.passwordHash, role: 'USER' } });
+      await tx.user.create({ data: { id: userId, email: `${userId}@example.invalid`, emailVerifiedAt: new Date(), organizationId, passwordHash: owner.passwordHash, role: 'USER' } });
       await tx.targetJob.create({ data: { id: jobId, organizationId, userId, title: 'Synthetic Resume Engineer', level: 'P5', isActive: true } });
     });
     return { userId, jobId, position: 'Synthetic Resume Engineer' };

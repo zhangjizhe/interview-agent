@@ -45,8 +45,8 @@ export class JwtAuthGuard implements CanActivate {
         algorithms: ['HS256'],
       });
       await this.sessions.assertActive(payload, token);
-      const identity = await this.prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, email: true, role: true, organizationId: true } });
-      if (!identity) throw new UnauthorizedException('Invalid identity');
+      const identity = await this.prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, email: true, emailVerifiedAt: true, role: true, organizationId: true } });
+      if (!identity?.emailVerifiedAt) throw new UnauthorizedException('邮箱尚未验证，请重新登录并完成验证。');
       (request as any).authPayload = payload;
       (request as any).authToken = token;
       (request as any).user = {

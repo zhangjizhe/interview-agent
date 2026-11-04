@@ -1,5 +1,7 @@
 # 当前架构地图
 
+Auth candidate (2026-11-04): NestJS AuthEmailService uses TLS SMTP and purpose/address/user-bound one-use HMAC challenges in Redis. Prisma adds nullable emailVerifiedAt plus a case-insensitive unique email index with duplicate preflight. Registration, password login, password change and recovery require mailbox verification; old unverified tokens are rejected. Candidate Web and Agent Lab share these API contracts. Runtime migration/mail/browser acceptance pending. See CURRENT_STATE.md and ../runbook.md.
+
 更新：2026-11-03。默认产品为模块化单体；详细旧地图[归档](archive/release-readiness-2026-10-08/ARCHITECTURE_MAP.md)，代码优先。
 
 ## 2026-11-03 题库主数据与录屏候选（待精确CI）
