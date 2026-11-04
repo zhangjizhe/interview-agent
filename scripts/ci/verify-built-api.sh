@@ -163,6 +163,7 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
     test "$fixture_browser_ready" = true
   fi
   if [[ "${FIXTURE_BROWSER_TEST:-}" == "1" && ( "$fixture_browser_scope" == "all" || "$fixture_browser_scope" == "auth" ) ]]; then
+    pnpm --filter @interview-agent/web exec node e2e/fixture-login-helper-contract.mjs
     LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/auth-email-runtime.mjs
   fi
   docker rm -fv "$fixture_lab" >/dev/null

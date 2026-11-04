@@ -1,5 +1,13 @@
 # Current state
 
+Auth harness follow-up (2026-11-04): exact00dddd0 PR41843410434 passed all3 jobs, but push41843400029 timed out/cancelled in the auth-browser stage and its summary failed. Original logs stop after Lab acceptance and before auth-runtime completion; this is not all-green evidence. No merge.
+
+Source review found an unbounded captured-login-response promise. A standalone real-browser synthetic helper contract reproduced a registration-to-login transition clearing a prefilled password, so native validation prevented any POST (red exit1). The helper now waits for the visible login form before filling, and bounds capture/click/HTTP response waits. Contract green verifies both successful transition and bounded missing-POST failure. This proves the helper defect, not the exact unobserved CI browser state. Fixed stage labels improve diagnosis. The contract is part of the normal isolated runner; test scope, auth limiter, TLS and all response/revocation assertions remain intact.
+
+Local focused Chrome + real isolated API/PG/Redis/TLS synthetic mail passed again with the new helper and registration/password-login/change/email-reset/revocation/replay plus greeting fallback. Product code and images were unchanged, so passed type/lint/build checks were not repeated without cause. JS/shell syntax and diff passed. New candidate exact push/PR CI must be inspected; full real mailbox journey and whole product remain NOT_ACCEPTED. No real mail or model calls were requested by this harness work.
+
+## Earlier snapshot
+
 2026-11-04 follow-up: after local API DNS correction, the user's current password-reset email was verified in the actual NetEase inbox by exact live challenge. At the read-only check it had369 seconds remaining and0 attempts; no code was displayed or consumed. The user reported a timeout, and the exact visible stage remains awaiting clarification. Do not label this particular delivery as missing or the code as expired without new evidence.
 
 Found/fixed a separate real UX defect: requestPasswordReset swallowed email429 and returned a dummy challenge, advancing the UI despite quota rejection. Recovery now propagates429. Unknown/unverified email requests undergo identical address admission with suppressed delivery and no stored usable code, preserving the account-existence boundary. API46 tests in4 suites, Web5, API types/lint and frozen API build pass. Actual local HTTP: exhausted original address429; unknown first request200, second cooldown429; zero real mail sent. API-only deployment retained volumes, current challenges and scoped DNS.

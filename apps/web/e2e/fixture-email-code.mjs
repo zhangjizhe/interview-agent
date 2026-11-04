@@ -24,7 +24,7 @@ export async function readEmailCode(challengeId) {
   } finally { terminal.close(); }
 }
 
-async function submitLoginCode(page, path, buttonName = '验证并登录') {
+async function submitLoginCode(page, path, buttonName = '验证并登录', responseTimeoutMs = 30000) {
   // Lab reloads immediately on success. Buffer the real server response before
   // forwarding it unchanged so Chromium navigation cannot discard its body.
   const url = new URL(path, page.url()).href;
@@ -33,7 +33,7 @@ async function submitLoginCode(page, path, buttonName = '验证并登录') {
   void reply.catch(() => {});
   const capture = async route => {
     try {
-      const response = await route.fetch({ maxRedirects: 0 });
+      const response = await route.fetch({ maxRedirects: 0, timeout: responseTimeoutMs });
       const data = await response.json();
       const status = response.status();
       await route.fulfill({ response });
@@ -44,24 +44,32 @@ async function submitLoginCode(page, path, buttonName = '验证并登录') {
     }
   };
   await page.route(url, capture);
+  let timer;
+  const deadline = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`No authentication response for ${path} within the bounded wait`)), responseTimeoutMs);
+  });
+  void deadline.catch(() => {});
   try {
-    await page.getByRole('button', { name: buttonName, exact: true }).click();
-    const result = await reply;
+    await page.getByRole('button', { name: buttonName, exact: true }).click({ timeout: responseTimeoutMs });
+    const result = await Promise.race([reply, deadline]);
     assert.equal(result.status, 200);
     return result.data;
-  } finally { await page.unroute(url, capture); }
+  } finally { clearTimeout(timer); await page.unroute(url, capture); }
 }
 
-export async function completeEmailLogin(page, { userId, password, loginButton = '登录', claimSendButton = '发送验证邮件' }) {
+export async function completeEmailLogin(page, { userId, password, loginButton = '登录', claimSendButton = '发送验证邮件', responseTimeoutMs = 30000 }) {
+  // Registration clears its password while switching to login. Wait for that
+  // visible transition before filling, or native validation can block the POST.
+  await page.getByRole('button', { name: loginButton, exact: true }).waitFor({ state: 'visible', timeout: responseTimeoutMs });
   await page.getByLabel('用户名', { exact: true }).fill(userId);
   await page.getByLabel('密码', { exact: true }).fill(password);
   let started;
-  try { started = await submitLoginCode(page, '/api/auth/login', loginButton); } catch (error) {
+  try { started = await submitLoginCode(page, '/api/auth/login', loginButton, responseTimeoutMs); } catch (error) {
     // Only the isolated fixture may retry an observed auth-rate rejection.
     // Retain the production limiter and wait out its actual minute window.
     if (process.env.LAB_FIXTURE_SYNTHETIC !== '1' || error.actual !== 429 || error.expected !== 200) throw error;
     await new Promise(resolve => setTimeout(resolve, 61_000));
-    started = await submitLoginCode(page, '/api/auth/login', loginButton);
+    started = await submitLoginCode(page, '/api/auth/login', loginButton, responseTimeoutMs);
   }
   if (started.accessToken) { assert.ok(started.refreshToken); assert.equal(started.requiresEmailVerification, undefined); return started; }
   if (started.requiresEmailClaim) {

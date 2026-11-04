@@ -18,14 +18,17 @@ async function revoked(session) {
   assert.equal((await context.request.post(`${origin}/api/auth/refresh`, { data: { refreshToken: session.refreshToken } })).status(), 401);
 }
 try {
+  console.log('Auth fixture stage: registration');
   await page.goto(origin);
   const registered = await registerThroughEmailUI(page, { userId, password: originalPassword, email: `${userId}@fixture.test`, registerEntryButton: '创建管理员账号' });
   assert.equal(registered.created, true); assert.equal(registered.role, 'ADMIN');
   assert.equal(await page.evaluate(() => localStorage.getItem('ia_access_token')), null);
+  console.log('Auth fixture stage: first password login');
   const first = await completeEmailLogin(page, { userId, password: originalPassword });
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
   assert.equal((await profile(first)).status(), 200);
 
+  console.log('Auth fixture stage: authenticated password change');
   await page.getByRole('button', { name: '修改密码', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '修改密码' });
   const sending = postResponse(page, 'change-password/request');
@@ -46,6 +49,7 @@ try {
 
   // A separate signed-out device recovers the account while device two stays
   // authenticated, so reset must actually revoke a currently active session.
+  console.log('Auth fixture stage: email recovery');
   const recoveryContext = await browser.newContext();
   try {
     const recovery = await recoveryContext.newPage(); await recovery.goto(origin);
