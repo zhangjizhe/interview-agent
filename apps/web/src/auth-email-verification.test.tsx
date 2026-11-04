@@ -122,3 +122,16 @@ it('keeps registration uncreated when actual mail delivery is unavailable', asyn
   expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
   expect(localStorage.getItem('ia_access_token')).toBeNull();
 });
+
+
+it('keeps recovery on the email step when the server rejects the send limit', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message: '验证码请求过于频繁，请稍后再试。' }), { status: 429 })));
+  render(<AuthGate><div data-testid="protected-content">protected</div></AuthGate>);
+  fireEvent.click(screen.getByRole('button', { name: '忘记密码？' }));
+  fireEvent.change(screen.getByLabelText('邮箱'), { target: { value: 'candidate@example.test' } });
+  fireEvent.click(screen.getByRole('button', { name: '发送找回验证码' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('过于频繁');
+  expect(screen.queryByLabelText('邮箱验证码')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('新密码')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '发送找回验证码' })).toBeEnabled();
+});

@@ -1,5 +1,13 @@
 # Email verification acceptance evidence
 
+2026-11-04 follow-up: after local API DNS correction, the user's current password-reset email was verified in the actual NetEase inbox by exact live challenge. At the read-only check it had369 seconds remaining and0 attempts; no code was displayed or consumed. The user reported a timeout, and the exact visible stage remains awaiting clarification. Do not label this particular delivery as missing or the code as expired without new evidence.
+
+Found/fixed a separate real UX defect: requestPasswordReset swallowed email429 and returned a dummy challenge, advancing the UI despite quota rejection. Recovery now propagates429. Unknown/unverified email requests undergo identical address admission with suppressed delivery and no stored usable code, preserving the account-existence boundary. API46 tests in4 suites, Web5, API types/lint and frozen API build pass. Actual local HTTP: exhausted original address429; unknown first request200, second cooldown429; zero real mail sent. API-only deployment retained volumes, current challenges and scoped DNS.
+
+Today's configured local20-send quota is now exhausted after the user's final request; no failures were removed and the single unused test reservation alone was reconciled earlier. Stop real sends and do not change the quota to manufacture acceptance. Latest real complete isolated registration journey still failed before DNS correction; user-assisted email recovery completion and exact new CI remain required. Main is not merged, no full auth/product pass.
+
+## Earlier snapshot
+
 2026-11-04 latest AUTH-EMAIL-VERIFICATION: user requires the complete registration-code -> password-login -> email-code recovery -> new-password-login journey. Added email input to both recovery pages and email lookup to reset request/completion; legacy userId API callers remain compatible. Codes still bind verified email, purpose and user; unknown/unverified emails do not get reset codes or account existence disclosure.
 
 Verified new scope: API auth/session/integration28, Web auth4, all three app types, relevant lint, three frozen-source Docker builds, syntax/diff; isolated real API/PG/Redis/TLS synthetic browser passed registration, password logins, email-input reset, revocation, replay/old-password denial and greeting fallback. Original local images updated; both password logins/profile/ADMIN and email-only recovery form passed without mail requests. Schema and volumes retained.

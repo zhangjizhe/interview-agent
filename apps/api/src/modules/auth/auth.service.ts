@@ -1,5 +1,5 @@
 import { AuthSessionService } from './auth-session.service';
-import { Injectable, BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, UnauthorizedException, HttpException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../infra/prisma/prisma.service';
@@ -296,13 +296,19 @@ export class AuthService {
   async requestPasswordReset(identity: string) {
     const challengeId = randomUUID();
     const user = await this.recoveryUser(identity);
-    if (user?.emailVerifiedAt) {
-      try {
+    try {
+      if (user?.emailVerifiedAt) {
         const challenge = await this.emailVerification.issue('password-reset', user.email, user.id);
         return { accepted: true, challengeId: challenge.challengeId };
-      } catch {
-        // Keep account existence and delivery configuration out of the public response.
       }
+      if (typeof identity === 'string' && identity.includes('@')) {
+        await this.emailVerification.issue('password-reset', identity, undefined, { delivery: 'suppress' });
+      }
+    } catch (error) {
+      // Apply the same address limits to existing and unknown mailboxes. Never
+      // advance the UI to a fake challenge when admission has rejected it.
+      if (error instanceof HttpException && error.getStatus() === 429) throw error;
+      // Other outcomes remain generic to protect account existence.
     }
     return { accepted: true, challengeId };
   }

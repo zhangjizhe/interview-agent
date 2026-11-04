@@ -115,7 +115,7 @@ export class AuthEmailService implements OnModuleDestroy {
     }
   }
 
-  async issue(purpose: EmailChallengePurpose, emailInput: string, userId?: string): Promise<{ challengeId: string }> {
+  async issue(purpose: EmailChallengePurpose, emailInput: string, userId?: string, options?: { delivery: 'suppress' }): Promise<{ challengeId: string }> {
     const email = this.normalizeEmail(emailInput);
     const dailyLimit = this.config.get<number>('auth.emailDailyLimit') ?? 8;
     if (!Number.isSafeInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 20) {
@@ -139,6 +139,9 @@ export class AuthEmailService implements OnModuleDestroy {
     if (accepted !== 1) throw new HttpException('验证码请求过于频繁，请稍后再试。', HttpStatus.TOO_MANY_REQUESTS);
 
     const challengeId = randomUUID();
+    // Unknown recovery addresses share the same send limits without mail or
+    // a usable challenge, so HTTP429 does not reveal account existence.
+    if (options?.delivery === 'suppress') return { challengeId };
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const value: StoredChallenge = {
       purpose,

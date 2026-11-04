@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException, HttpException } from '@nestjs/common';
 import { AuthService } from '../modules/auth/auth.service';
 
 describe('AuthService credentials', () => {
@@ -180,8 +180,15 @@ describe('AuthService credentials', () => {
     prisma.user.findFirst.mockResolvedValue({ id: 'legacy-user', emailVerifiedAt: null });
     expect(await service.requestPasswordReset('legacy@example.com')).toHaveProperty('accepted', true);
     await expect(service.resetPassword('legacy@example.com', '11111111-1111-4111-8111-111111111111', '123456', 'new-long-password')).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(emailVerification.issue).not.toHaveBeenCalled();
+    expect(emailVerification.issue.mock.calls.every(call => call[3]?.delivery === 'suppress')).toBe(true);
     expect(prisma.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('reports the same recovery429 for known and unknown emails (%s)', async known => {
+    prisma.user.findFirst.mockResolvedValue(known ? { id: 'normal-user', email: 'normal@example.com', emailVerifiedAt: new Date() } : null);
+    emailVerification.issue.mockRejectedValueOnce(new HttpException('验证码请求过于频繁，请稍后再试。', 429));
+    const service = new AuthService(jwtService as any, config as any, prisma as any, sessions as any, emailVerification as any);
+    await expect(service.requestPasswordReset('normal@example.com')).rejects.toMatchObject({ status: 429 });
   });
 
   it('重置码不能用于错误账号或未验证账号', async () => {

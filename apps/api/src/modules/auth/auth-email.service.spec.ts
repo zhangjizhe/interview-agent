@@ -62,6 +62,16 @@ describe('AuthEmailService one-time email challenges', () => {
     service = new AuthEmailService(redis, config as any);
   });
 
+  it('applies address limits to decoy recovery without sending or storing a usable code', async () => {
+    const result = await service.issue('password-reset', 'unknown@example.com', undefined, { delivery: 'suppress' });
+    expect(result.challengeId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(createTransport).not.toHaveBeenCalled();
+    expect([...values.keys()].some(key => key.startsWith('auth:email-challenge:'))).toBe(false);
+    expect([...values.entries()].filter(([key]) => key.startsWith('auth:email-daily:')).map(([, value]) => value)).toEqual(['1']);
+    await expect(service.issue('password-reset', 'unknown@example.com', undefined, { delivery: 'suppress' })).rejects.toMatchObject({ status: 429 });
+  });
+
   it('normalizes address, binds the code to purpose and consumes it exactly once', async () => {
     const { challengeId } = await service.issue('registration', ' Person@Example.com ');
     const code = sent.match(/\b\d{6}\b/)?.[0];
