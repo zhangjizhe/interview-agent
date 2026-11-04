@@ -37,7 +37,8 @@ async function mockApi(page) {
     let body = {};
     let status = 200;
 
-    if (path === '/api/auth/registration-code') {
+    if (path.startsWith('/api/auth/check/')) { body = { available: true };
+    } else if (path === '/api/auth/registration-code') {
       const challengeId = `registration-challenge-${++challengeNumber}`;
       codes.set(challengeId, '123456');
       body = { challengeId };
@@ -49,14 +50,6 @@ async function mockApi(page) {
     } else if (path === '/api/auth/login') {
       const request = route.request().postDataJSON();
       if (!created || request.userId !== session.userId || request.password !== 'acceptance-password-123') status = 401;
-      else {
-        const challengeId = `login-challenge-${++challengeNumber}`;
-        codes.set(challengeId, '654321');
-        body = { requiresEmailVerification: true, challengeId, maskedEmail: 'a***@example.test' };
-      }
-    } else if (path === '/api/auth/login/verify-email') {
-      const request = route.request().postDataJSON();
-      if (codes.get(request.challengeId) !== request.code) status = 401;
       else body = session;
     } else if (path === '/api/interview/stats') {
       body = { totalTokens: 0, totalPrompt: 0, totalCompletion: 0, totalInterviews: 0, completedInterviews: 0 };
@@ -104,14 +97,11 @@ async function runDesktop(browser) {
   await page.getByRole('button', { name: '发送邮箱验证码' }).click();
   await page.getByLabel('邮箱验证码').fill('123456');
   await page.getByRole('button', { name: '验证并创建账号' }).click();
-  await page.getByRole('status').getByText('邮箱已验证，账号创建成功。现在登录时还会发送一次验证码。').waitFor({ state: 'visible' });
+  await page.getByRole('status').getByText('邮箱已验证，账号创建成功。请使用用户名和密码登录。').waitFor({ state: 'visible' });
 
   await page.getByLabel('用户名').fill('acceptance-user');
   await page.getByLabel('密码').fill('acceptance-password-123');
-  await page.getByRole('button', { name: '继续并发送验证码' }).click();
-  await page.getByText('验证码已发送至 a***@example.test。').waitFor({ state: 'visible' });
-  await page.getByLabel('邮箱验证码').fill('654321');
-  await page.getByRole('button', { name: '验证并登录' }).click();
+  await page.getByRole('button', { name: '登录' }).click();
   await page.getByRole('link', { name: '首页', exact: true }).waitFor({ state: 'visible' });
   check('successful authenticated navigation reaches home', await page.getByRole('link', { name: '首页', exact: true }).count() === 1);
   await page.screenshot({ path: join(outputDir, '03-authenticated-home-desktop.png'), fullPage: true });
@@ -126,7 +116,7 @@ async function runMobile(browser) {
   const page = await context.newPage();
   await mockApi(page);
   await page.goto(webUrl, { waitUntil: 'networkidle' });
-  check('mobile authentication gate renders with email verification', await page.getByRole('button', { name: '继续并发送验证码' }).count() === 1);
+  check('mobile authentication gate renders with email verification', await page.getByRole('button', { name: '登录' }).count() === 1);
   await page.screenshot({ path: join(outputDir, '04-auth-login-mobile.png'), fullPage: true });
   await context.close();
 }

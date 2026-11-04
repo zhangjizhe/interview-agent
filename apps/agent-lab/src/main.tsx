@@ -641,10 +641,13 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
   const requestRegistrationCode = async () => {
     setPending(true); setError(''); setNotice('');
     try {
+      const availability = await fetch(`/api/auth/check/${encodeURIComponent(userId)}`);
+      const checked = await availability.json();
+      if (!availability.ok || checked.available !== true) throw new Error(checked.reason || '用户名不可用，请使用已有账号登录或找回密码。');
       const response = await fetch('/api/auth/registration-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || '验证码发送失败');
-      setChallengeId(data.challengeId); setNotice('如果邮箱可用于注册，验证码已发送，请查收邮箱。');
+      setChallengeId(data.challengeId); setNotice('如果邮箱可用于注册，验证码已发送，请查收邮箱。如已注册，请返回登录或找回密码。');
     } catch (reason) { setError(reason instanceof Error ? reason.message : '验证码发送失败'); }
     finally { setPending(false); }
   };
@@ -676,7 +679,7 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
       if (mode === 'login' && data.requiresEmailVerification) { setChallengeId(data.challengeId); setMode('login-code'); setNotice(`验证码已发送至 ${data.maskedEmail}。`); return; }
       if (mode === 'claim') { setChallengeId(data.challengeId); setMode('claim-code'); setNotice(`验证码已发送至 ${data.maskedEmail}。`); return; }
       if (mode === 'forgot') { setChallengeId(data.challengeId); setMode('reset'); setNotice('若该账号绑定了已验证邮箱，验证码已发送；旧账号需先由部署者恢复。'); return; }
-      if (mode === 'reset') { setPassword(''); setNewPassword(''); setCode(''); setMode('login'); setNotice('密码已重置，请使用新密码登录并完成邮箱验证。'); return; }
+      if (mode === 'reset') { setPassword(''); setNewPassword(''); setCode(''); setMode('login'); setNotice('密码已重置，请使用新密码登录。'); return; }
       if (data.role !== 'ADMIN') throw new Error('当前账号尚未获得 Agent Lab 管理员权限，请联系部署管理员。');
       localStorage.setItem('ia_access_token', data.accessToken);
       localStorage.setItem('ia_user_role', data.role);
@@ -689,7 +692,7 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
     }
   };
   const title = mode === 'register' ? '创建管理员账号' : mode === 'login-code' ? '验证登录邮箱' : mode === 'claim' || mode === 'claim-code' ? '绑定旧账号邮箱' : mode === 'forgot' || mode === 'reset' ? '找回密码' : '进入控制台';
-  return <main className="agent-access"><section><div className="agent-access-mark"><Bot size={22}/></div><p className="agent-eyebrow">AGENT LAB / CONTROL PLANE</p><h1>{title}</h1><p>管理员账号由部署允许名单授予。注册和每次登录都要验证邮箱。</p><form onSubmit={submit}>
+  return <main className="agent-access"><section><div className="agent-access-mark"><Bot size={22}/></div><p className="agent-eyebrow">AGENT LAB / CONTROL PLANE</p><h1>{title}</h1><p>管理员账号由部署允许名单授予。注册时验证邮箱，之后使用用户名和密码登录。</p><form onSubmit={submit}>
     {mode !== 'login-code' && mode !== 'claim-code' && mode !== 'reset' && <label>用户名<input value={userId} onChange={(event) => setUserId(event.target.value.toLowerCase())} autoComplete="username" required /></label>}
     {(mode === 'login' || mode === 'register' || mode === 'claim') && <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} maxLength={128} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required /></label>}
     {(mode === 'register' || mode === 'claim' || mode === 'claim-code') && <label>邮箱<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setChallengeId(''); setCode(''); }} maxLength={254} autoComplete="email" required /></label>}
@@ -699,7 +702,7 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
     {(mode === 'login-code' || mode === 'claim-code') && <button type="button" className="text-command" onClick={() => { setMode(mode === 'login-code' ? 'login' : 'claim'); setChallengeId(''); setCode(''); setError(''); setNotice('请再次提交账号密码以发送新验证码。'); }}>重新发送验证码</button>}
     {mode === 'reset' && <button type="button" className="text-command" onClick={() => { setMode('forgot'); setChallengeId(''); setCode(''); setNewPassword(''); setError(''); setNotice('请重新请求找回验证码。'); }}>重新发送验证码</button>}
     {notice && <p role="status">{notice}</p>}{error && <p className="agent-error" role="alert">{error}</p>}
-    {(mode !== 'register' || challengeId) && <button disabled={pending}>{pending ? '处理中' : mode === 'register' ? '验证并创建账号' : mode === 'login' ? '继续并发送验证码' : mode === 'login-code' || mode === 'claim-code' ? '验证并登录' : mode === 'claim' ? '发送绑定验证码' : mode === 'forgot' ? '发送找回验证码' : '重置密码'}</button>}
+    {(mode !== 'register' || challengeId) && <button disabled={pending}>{pending ? '处理中' : mode === 'register' ? '验证并创建账号' : mode === 'login' ? '登录' : mode === 'login-code' || mode === 'claim-code' ? '验证并登录' : mode === 'claim' ? '发送绑定验证码' : mode === 'forgot' ? '发送找回验证码' : '重置密码'}</button>}
     {mode === 'login' && <button type="button" className="text-command" onClick={() => { setMode('forgot'); setError(''); }}>忘记密码？</button>}
     {(mode === 'login' || mode === 'register') && <button type="button" className="text-command" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setNotice(''); setChallengeId(''); setCode(''); }}>{mode === 'register' ? '已有账号，返回登录' : '创建管理员账号'}</button>}
     {mode !== 'login' && mode !== 'register' && <button type="button" className="text-command" onClick={() => { setMode('login'); setError(''); setNotice(''); setChallengeId(''); setCode(''); }}>返回登录</button>}

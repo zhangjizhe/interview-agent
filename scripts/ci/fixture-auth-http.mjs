@@ -17,8 +17,8 @@ export async function registerFixtureUser(request, userId, password) {
 export async function loginFixtureUser(request, userId, password) {
   const started = expectSuccess(await request('/auth/login', { method: 'POST', timeoutMs: 90000, body: { userId, password } }), 'password login');
   if (started.requiresEmailClaim) throw new Error('Synthetic fixture account unexpectedly needs legacy email claim.');
-  if (!started.requiresEmailVerification || !started.challengeId) throw new Error('Password login did not require fixture email verification.');
-  return expectSuccess(await request('/auth/login/verify-email', { method: 'POST', body: { challengeId: started.challengeId, code: readFixtureAuthCode(started.challengeId) } }), 'email login verification');
+  if (!started.accessToken || !started.refreshToken || started.requiresEmailVerification) throw new Error('Password login must issue a session without sending email.');
+  return started;
 }
 
 export async function createFixtureUserSession(request, userId, password) {

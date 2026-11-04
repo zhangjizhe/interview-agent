@@ -1,5 +1,11 @@
 # 待办与验收门
 
+2026-11-04 user correction: ordinary verified-account login now uses username/password directly, without SMTP or a new OTP. Registration, reset/change and first-time legacy claim retain mailbox verification. The previous every-login-code policy below is superseded. Registration checks username availability before mail; occupied IDs and mail503 never create accounts.
+
+Actual new evidence: API auth/session/integration26 and Web auth4 pass; API/Web/Lab types, relevant lint, three frozen-source Docker images and syntax/diff checks pass. Isolated real API/PG/Redis/TLS synthetic browser passed registration, three password-only logins, change/reset/revocation/replay refusal and greeting-fault fallback. Original local Web AND Lab password login passed with ADMIN/profile readback and zero mail requests; occupied registration ID refused before mail. Local images updated, passwords/schema/volumes retained. Full real NetEase registration/recovery remains NOT_ACCEPTED. Previous bf9cf6c six green CI jobs do not certify this new diff; scoped new commit/CI next, PR65 stays draft and main unchanged. No unchanged-condition SMTP retry, OTP bypass or model-quality claim.
+
+## Previous snapshot (login policy superseded above)
+
 2026-11-04 唯一主题 `AUTH-EMAIL-VERIFICATION`，真实邮件阶段仍 **NOT_ACCEPTED**。原库备份已在隔离库恢复并核对用户/Run/组织数量；原卷保留且加性迁移完成。用户明确授权的原账号本机管理员恢复已通过真实邮箱OTP完成，身份/组织不变、旧会话撤销。
 
 源码侧有界SMTP连接备用、严格TLS/脱敏日志、默认8次且可配置1-20的发送限制、标题修复已完成；本机私有验收配置20次，未清计数，60秒冷却不变。45项认证测试（含15邮件测试）、lint/typecheck/build及真实API/DB/Redis/Chrome/合成TLS首欢迎故障验收通过。基线51e795e对应CI41772980806三项绿；新head需独立核对。

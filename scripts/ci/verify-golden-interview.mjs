@@ -38,8 +38,8 @@ try {
   const email = `${userId}@fixture.test`;
   const registration = await request('/auth/registration-code', { email });
   await request('/auth/register', { userId, password, email, challengeId: registration.challengeId, code: readFixtureAuthCode(registration.challengeId) });
-  const loginStart = await request('/auth/login', { userId, password }); assert.equal(loginStart.requiresEmailVerification, true);
-  token = (await request('/auth/login/verify-email', { challengeId: loginStart.challengeId, code: readFixtureAuthCode(loginStart.challengeId) })).accessToken; assert.ok(token);
+  const loginStart = await request('/auth/login', { userId, password }); assert.ok(loginStart.accessToken);
+  token = (loginStart).accessToken; assert.ok(token);
   const job = await request('/interview/target-jobs', { title: 'Synthetic Frontend Engineer', level: 'P5', jobDescription: 'React TypeScript frontend testing' }, 201);
   assert.ok(job.id);
   const form = new FormData(); form.set('file', new Blob(['Synthetic Golden Candidate\nReact TypeScript\nSynthetic frontend project'], { type: 'text/plain' }), 'synthetic-golden.txt'); form.set('position', job.title);

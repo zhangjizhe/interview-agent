@@ -26,8 +26,8 @@ try {
   const registration = await request('/auth/registration-code', { email });
   await request('/auth/register', { userId, password, email, challengeId: registration.challengeId, code: readFixtureAuthCode(registration.challengeId) });
   const loginStart = await request('/auth/login', { userId, password });
-  assert.equal(loginStart.requiresEmailVerification, true);
-  const session = await request('/auth/login/verify-email', { challengeId: loginStart.challengeId, code: readFixtureAuthCode(loginStart.challengeId) });
+  assert.ok(loginStart.accessToken);
+  const session = loginStart;
   token = session.accessToken; refreshToken = session.refreshToken; assert.ok(token);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { id: true, organizationId: true } });
   const job = await request('/interview/target-jobs', { title: 'Synthetic Frontend Engineer', level: 'P5', jobDescription: 'React TypeScript frontend testing' }, 201);

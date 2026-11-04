@@ -19,7 +19,7 @@ export async function verifySessionRevocation(page, context, origin) {
   await page.getByLabel('岗位', { exact: true }).fill('Synthetic revoked session');
   await denied;
   await page.getByText('登录已过期，请重新登录。', { exact: true }).waitFor();
-  await page.getByRole('button', { name: '继续并发送验证码', exact: true }).waitFor();
+  await page.getByRole('button', { name: '登录', exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => ['ia_access_token', 'ia_user_role', 'ia_userId'].map(key => localStorage.getItem(key))), [null, null, null]);
   assert.equal(await page.getByRole('navigation', { name: 'Agent Lab 导航', exact: true }).count(), 0);
   assert.equal(await page.locator('article.question-bank-row').count(), 0);

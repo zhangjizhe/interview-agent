@@ -1,5 +1,11 @@
 # 当前架构地图
 
+2026-11-04 user correction: ordinary verified-account login now uses username/password directly, without SMTP or a new OTP. Registration, reset/change and first-time legacy claim retain mailbox verification. The previous every-login-code policy below is superseded. Registration checks username availability before mail; occupied IDs and mail503 never create accounts.
+
+Actual new evidence: API auth/session/integration26 and Web auth4 pass; API/Web/Lab types, relevant lint, three frozen-source Docker images and syntax/diff checks pass. Isolated real API/PG/Redis/TLS synthetic browser passed registration, three password-only logins, change/reset/revocation/replay refusal and greeting-fault fallback. Original local Web AND Lab password login passed with ADMIN/profile readback and zero mail requests; occupied registration ID refused before mail. Local images updated, passwords/schema/volumes retained. Full real NetEase registration/recovery remains NOT_ACCEPTED. Previous bf9cf6c six green CI jobs do not certify this new diff; scoped new commit/CI next, PR65 stays draft and main unchanged. No unchanged-condition SMTP retry, OTP bypass or model-quality claim.
+
+## Previous snapshot (login policy superseded above)
+
 Auth (2026-11-04): Candidate Web and Agent Lab share the NestJS Auth API/user table. AuthEmailService uses TLS SMTP and purpose/address/user-bound, one-use HMAC challenges in Redis. Prisma adds nullable emailVerifiedAt and a preflighted lower-email unique index. All registration/login/change/reset paths require mailbox proof; changes revoke sessions. The original local stack has applied the additive migration and retained its volumes. Local SMTP credentials use encrypted macOS Keychain plus tmpfs/runtime injection; no cloud secret-store claim. Acceptance and SMTP timeout history: CURRENT_STATE.md and ../acceptance/AUTH_EMAIL_VERIFICATION_EVIDENCE.md. SMTP setup retries are limited to two freshly resolved addresses before message transmission, with the same code/counter and original-hostname TLS checks; ambiguous/later failures are not resent. Daily attempts are validated deployment configuration (default8, range1-20). Real NetEase delivery remains unaccepted; failed sends are preserved.
 
 更新：2026-11-03。默认产品为模块化单体；详细旧地图[归档](archive/release-readiness-2026-10-08/ARCHITECTURE_MAP.md)，代码优先。

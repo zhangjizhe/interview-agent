@@ -130,9 +130,9 @@ await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated
     assert.equal(await nav.getByRole('button', { name: label, exact: true }).isEnabled(), true);
   }
   await page.getByRole('button', { name: '退出控制台', exact: true }).click();
-  await page.getByRole('button', { name: '继续并发送验证码', exact: true }).waitFor();
+  await page.getByRole('button', { name: '登录', exact: true }).waitFor();
   await page.reload();
-  await page.getByRole('button', { name: '继续并发送验证码', exact: true }).waitFor();
+  await page.getByRole('button', { name: '登录', exact: true }).waitFor();
   await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated-fixture-password' });
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
   console.log('PASS browser first-release denial, eleven navigation headings, logout/reload/new login');

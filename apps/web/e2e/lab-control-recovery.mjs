@@ -14,7 +14,7 @@ export async function verifyControlRecovery(page, context, origin) {
   await page.route(dashboardPattern, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'synthetic-control-plane-unavailable' }) }));
   await page.reload();
   await page.getByRole('heading', { name: '无法读取控制面', exact: true }).waitFor({ timeout: 30000 });
-  assert.equal(await page.getByRole('button', { name: '继续并发送验证码', exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: '登录', exact: true }).count(), 0);
   assert.deepEqual(await page.evaluate(() => ({ token: localStorage.getItem('ia_access_token'), role: localStorage.getItem('ia_user_role') })), originalSession);
   const profile = await context.request.get(`${origin}/api/auth/profile`, { headers: { Authorization: `Bearer ${originalSession.token}` } });
   assert.equal(profile.status(), 200);

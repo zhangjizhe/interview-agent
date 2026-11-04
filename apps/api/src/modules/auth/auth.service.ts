@@ -224,8 +224,8 @@ export class AuthService {
       throw new UnauthorizedException('用户名或密码错误');
     }
     if (!user.emailVerifiedAt) return { requiresEmailClaim: true, userId: user.id };
-    const { challengeId } = await this.emailVerification.issue('login', user.email, user.id);
-    return { requiresEmailVerification: true, challengeId, maskedEmail: this.maskEmail(user.email) };
+    const version = await this.sessions.version(user.id);
+    return this.sessions.issue(user, version);
   }
 
   private maskEmail(email: string): string {

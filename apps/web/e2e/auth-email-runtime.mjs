@@ -38,7 +38,7 @@ try {
   const changing = postResponse(page, 'change-password');
   await dialog.getByRole('button', { name: '验证并修改密码', exact: true }).click();
   assert.equal((await changing).status(), 200);
-  await page.getByRole('button', { name: '继续并发送验证码', exact: true }).waitFor();
+  await page.getByRole('button', { name: '登录', exact: true }).waitFor();
   await revoked(first);
   const second = await completeEmailLogin(page, { userId, password: changedPassword });
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
@@ -60,7 +60,7 @@ try {
     const resetting = postResponse(recovery, 'password-reset/complete');
     await recovery.getByRole('button', { name: '重置密码', exact: true }).click();
     assert.equal((await resetting).status(), 200);
-    await recovery.getByRole('button', { name: '继续并发送验证码', exact: true }).waitFor();
+    await recovery.getByRole('button', { name: '登录', exact: true }).waitFor();
     await revoked(second);
     const replay = await context.request.post(`${origin}/api/auth/password-reset/complete`, { data: { userId, challengeId: resetChallenge.challengeId, code: readFixtureEmailCode(resetChallenge.challengeId), newPassword: originalPassword } });
     assert.equal(replay.status(), 401);
@@ -72,5 +72,5 @@ try {
   for (const password of [originalPassword, changedPassword]) {
     assert.equal((await context.request.post(`${origin}/api/auth/login`, { data: { userId, password } })).status(), 401);
   }
-  console.log('PASS auth browser + real Docker API/TLS synthetic SMTP: registration, three code-verified logins, password change, active-session reset/revocation, one-use reset and rejected old passwords; not live mailbox delivery');
+  console.log('PASS auth browser + real Docker API/TLS synthetic SMTP: registration, three password-only logins, password change, active-session reset/revocation, one-use reset and rejected old passwords; not live mailbox delivery');
 } finally { await context.close(); await browser.close(); }

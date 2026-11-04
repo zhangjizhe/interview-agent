@@ -3,13 +3,6 @@ import { execFileSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 
-const syntheticLoginTimes = new Map();
-async function respectSyntheticLoginCooldown(userId) {
-  if (process.env.LAB_FIXTURE_SYNTHETIC !== '1') return;
-  const remaining = 61_000 - (Date.now() - (syntheticLoginTimes.get(userId) || 0));
-  if (remaining > 0) await new Promise(resolve => setTimeout(resolve, remaining));
-}
-
 export function readFixtureEmailCode(challengeId) {
   assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic SMTP inbox is only available in the isolated fixture.');
   const container = process.env.LAB_FIXTURE_API_CONTAINER;
@@ -31,7 +24,7 @@ export async function readEmailCode(challengeId) {
   } finally { terminal.close(); }
 }
 
-async function submitLoginCode(page, path) {
+async function submitLoginCode(page, path, buttonName = '验证并登录') {
   // Lab reloads immediately on success. Buffer the real server response before
   // forwarding it unchanged so Chromium navigation cannot discard its body.
   const url = new URL(path, page.url()).href;
@@ -52,30 +45,18 @@ async function submitLoginCode(page, path) {
   };
   await page.route(url, capture);
   try {
-    await page.getByRole('button', { name: '验证并登录', exact: true }).click();
+    await page.getByRole('button', { name: buttonName, exact: true }).click();
     const result = await reply;
     assert.equal(result.status, 200);
     return result.data;
   } finally { await page.unroute(url, capture); }
 }
 
-export async function completeEmailLogin(page, { userId, password, loginButton = '继续并发送验证码', claimSendButton = '发送验证邮件' }) {
-  await respectSyntheticLoginCooldown(userId);
+export async function completeEmailLogin(page, { userId, password, loginButton = '登录', claimSendButton = '发送验证邮件' }) {
   await page.getByLabel('用户名', { exact: true }).fill(userId);
   await page.getByLabel('密码', { exact: true }).fill(password);
-  const loginResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/login' && response.request().method() === 'POST');
-  await page.getByRole('button', { name: loginButton, exact: true }).click();
-  let response = await loginResponse;
-  // Separate browser processes cannot share the in-memory timestamp. A live
-  // synthetic 429 may therefore need one cooldown before an explicit retry.
-  if (response.status() === 429 && process.env.LAB_FIXTURE_SYNTHETIC === '1') {
-    await new Promise(resolve => setTimeout(resolve, 61_000));
-    const retried = page.waitForResponse(item => new URL(item.url()).pathname === '/api/auth/login' && item.request().method() === 'POST');
-    await page.getByRole('button', { name: loginButton, exact: true }).click();
-    response = await retried;
-  }
-  assert.equal(response.status(), 200);
-  const started = await response.json();
+  const started = await submitLoginCode(page, '/api/auth/login', loginButton);
+  if (started.accessToken) { assert.ok(started.refreshToken); assert.equal(started.requiresEmailVerification, undefined); return started; }
   if (started.requiresEmailClaim) {
     if (process.env.LAB_FIXTURE_SYNTHETIC === '1') throw new Error('Synthetic login unexpectedly reached the legacy email claim flow.');
     const email = process.env.AUTH_ACCEPTANCE_LEGACY_EMAIL;
@@ -90,7 +71,6 @@ export async function completeEmailLogin(page, { userId, password, loginButton =
     return submitLoginCode(page, '/api/auth/login/claim-email/verify');
   }
   assert.equal(started.requiresEmailVerification, true);
-  if (process.env.LAB_FIXTURE_SYNTHETIC === '1') syntheticLoginTimes.set(userId, Date.now());
   const code = await readEmailCode(started.challengeId);
   await page.getByLabel('邮箱验证码', { exact: true }).fill(code);
   return submitLoginCode(page, '/api/auth/login/verify-email');
@@ -137,8 +117,7 @@ export async function loginThroughEmailApi(apiBase, { userId, password }) {
     assert.equal(verifyClaim.status, 200);
     return verifyClaim.json();
   }
-  assert.equal(started.requiresEmailVerification, true);
-  const response = await fetch(`${apiBase}/auth/login/verify-email`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challengeId: started.challengeId, code: await readEmailCode(started.challengeId) }) });
-  assert.equal(response.status, 200);
-  return response.json();
+  assert.ok(started.accessToken); assert.ok(started.refreshToken);
+  assert.equal(started.requiresEmailVerification, undefined);
+  return started;
 }

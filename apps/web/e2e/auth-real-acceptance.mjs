@@ -83,7 +83,7 @@ try {
   const userContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
   const userPage = await userContext.newPage();
   await userPage.goto(webUrl, { waitUntil: 'networkidle' });
-  check('login gate is visible before session', await userPage.getByRole('button', { name: '继续并发送验证码' }).count() === 1);
+  check('login gate is visible before session', await userPage.getByRole('button', { name: '登录' }).count() === 1);
   await userPage.screenshot({ path: join(outputDir, '05-real-login-desktop.png'), fullPage: true });
 
   await registerAndLogin(userPage, userId, 'USER');
@@ -183,7 +183,7 @@ try {
     localStorage.setItem('ia_user_role', 'USER');
   });
   await expiredPage.goto(`${webUrl}/settings`, { waitUntil: 'networkidle' });
-  await expiredPage.getByRole('button', { name: '继续并发送验证码' }).waitFor({ state: 'visible' });
+  await expiredPage.getByRole('button', { name: '登录' }).waitFor({ state: 'visible' });
   check('expired JWT returns candidate to the login gate', await expiredPage.getByText('登录已过期，请重新登录。').count() === 1);
   await expiredContext.close();
 
@@ -215,7 +215,7 @@ try {
   const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const mobilePage = await mobileContext.newPage();
   await mobilePage.goto(webUrl, { waitUntil: 'networkidle' });
-  check('mobile login gate renders against real API', await mobilePage.getByRole('button', { name: '继续并发送验证码' }).count() === 1);
+  check('mobile login gate renders against real API', await mobilePage.getByRole('button', { name: '登录' }).count() === 1);
   await completeEmailLogin(mobilePage, { userId, password });
   await mobilePage.getByRole('heading', { name: '为目标岗位做准备' }).waitFor({ state: 'visible' });
   await mobilePage.goto(`${webUrl}/training`, { waitUntil: 'networkidle' });

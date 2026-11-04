@@ -69,12 +69,15 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const requestRegistrationCode = async () => {
     setError(''); setNotice(''); setSubmitting(true);
     try {
+      const availability = await fetch(`/api/auth/check/${encodeURIComponent(userId)}`);
+      const checked = await availability.json();
+      if (!availability.ok || checked.available !== true) throw new Error(checked.reason || '用户名不可用，请使用已有账号登录或找回密码。');
       const response = await fetch('/api/auth/registration-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
       const data = await safeJson(response);
       if (!response.ok || data?._error) {
         throw new Error(data?.message || '验证码发送失败');
       }
-      setChallengeId(data.challengeId); setNotice('若邮箱可用于注册且邮件服务正常，验证码会发送到该邮箱。');
+      setChallengeId(data.challengeId); setNotice('若邮箱可用于注册且邮件服务正常，验证码会发送到该邮箱。如已注册，请返回登录或找回密码。');
     } catch (err: any) { setError(err.message || '验证码发送失败'); }
     finally { setSubmitting(false); }
   };
@@ -112,7 +115,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       if (mode === 'register') {
         setPassword('');
         setMode('login'); setChallengeId(''); setCode('');
-        setNotice('邮箱已验证，账号创建成功。现在登录时还会发送一次验证码。');
+        setNotice('邮箱已验证，账号创建成功。请使用用户名和密码登录。');
         return;
       }
       if (mode === 'login' && data.requiresEmailClaim) {
@@ -129,7 +132,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         setNotice('若该账号已有已验证邮箱且邮件服务正常，验证码会发送到该邮箱；未绑定邮箱的旧账号需部署者协助恢复。'); return;
       }
       if (mode === 'reset') {
-        setPassword(''); setNewPassword(''); setCode(''); setMode('login'); setNotice('密码已重置；请使用新密码登录并完成邮箱验证码验证。'); return;
+        setPassword(''); setNewPassword(''); setCode(''); setMode('login'); setNotice('密码已重置；请使用新密码登录。'); return;
       }
       acceptSession(data);
     } catch (err: any) {
@@ -154,7 +157,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         <div>
           <p className="mb-3 text-xs font-semibold tracking-wider text-blue-700">INTERVIEW STUDIO</p>
           <h1 className="font-semibold text-slate-900">{mode === 'register' ? '创建你的训练空间' : mode === 'login-code' ? '验证登录邮箱' : mode === 'claim' || mode === 'claim-code' ? '绑定并验证旧账号邮箱' : mode === 'forgot' || mode === 'reset' ? '找回密码' : '欢迎回来'}</h1>
-          <p className="mt-1 text-sm text-slate-500">{mode === 'register' ? '先验证邮箱，再创建账号' : mode === 'login' ? '登录需要密码和邮箱验证码' : '验证码 10 分钟有效且只能使用一次'}</p>
+          <p className="mt-1 text-sm text-slate-500">{mode === 'register' ? '先验证邮箱，再创建账号' : mode === 'login' ? '使用用户名和密码登录' : '验证码 10 分钟有效且只能使用一次'}</p>
         </div>
         {mode !== 'login-code' && mode !== 'claim-code' && mode !== 'reset' && <label className="block text-sm text-slate-700">
           用户名
@@ -172,8 +175,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         {mode === 'reset' && <button type="button" onClick={() => { setMode('forgot'); setChallengeId(''); setCode(''); setNewPassword(''); setError(''); setNotice('请重新请求找回验证码。'); }} className="w-full text-sm text-blue-700">重新发送验证码</button>}
         {mode === 'forgot' && <p className="text-sm text-slate-600">将验证码发送到该账号已验证的邮箱。</p>}
         {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {mode !== 'register' || challengeId ? <button disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-md py-2 text-sm font-medium">{submitting ? '处理中...' : mode === 'register' ? '验证并创建账号' : mode === 'login' ? '继续并发送验证码' : mode === 'login-code' || mode === 'claim-code' ? '验证并登录' : mode === 'claim' ? '发送验证邮件' : mode === 'forgot' ? '发送找回验证码' : '重置密码'}</button> : null}
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+        {mode !== 'register' || challengeId ? <button disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-md py-2 text-sm font-medium">{submitting ? '处理中...' : mode === 'register' ? '验证并创建账号' : mode === 'login' ? '登录' : mode === 'login-code' || mode === 'claim-code' ? '验证并登录' : mode === 'claim' ? '发送验证邮件' : mode === 'forgot' ? '发送找回验证码' : '重置密码'}</button> : null}
         {mode === 'login' && <button type="button" onClick={() => { setMode('forgot'); setError(''); setNotice(''); }} className="w-full text-sm text-blue-700">忘记密码？</button>}
         {(mode === 'login' || mode === 'register') && <button type="button" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setNotice(''); setChallengeId(''); setCode(''); }} className="w-full text-sm text-blue-700">{mode === 'register' ? '已有账号，去登录' : '没有账号，创建账号'}</button>}
         {mode !== 'login' && mode !== 'register' && <button type="button" onClick={() => { setMode('login'); setError(''); setNotice(''); setChallengeId(''); setCode(''); }} className="w-full text-sm text-blue-700">返回登录</button>}

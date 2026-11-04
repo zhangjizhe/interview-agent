@@ -32,7 +32,7 @@ describe('AuthService credentials', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     prisma.user.findFirst.mockResolvedValue(null);
-    emailVerification.issue.mockResolvedValue({ challengeId: '11111111-1111-4111-8111-111111111111' });
+    emailVerification.issue.mockReset().mockResolvedValue({ challengeId: '11111111-1111-4111-8111-111111111111' });
     emailVerification.consume.mockResolvedValue({ userId: 'normal-user', subject: 'email-subject' });
     emailVerification.emailSubject.mockReturnValue('email-subject');
   });
@@ -64,11 +64,13 @@ describe('AuthService credentials', () => {
     const created = prisma.user.create.mock.calls[0][0].data;
     prisma.user.findUnique.mockResolvedValue({ ...created, role: 'USER', emailVerifiedAt: new Date() });
 
-    const loginStart = await service.login({ userId: 'normal-user', password: 'long-enough-password' });
-    expect(loginStart).toMatchObject({ requiresEmailVerification: true });
-    const result = await service.verifyLogin((loginStart as any).challengeId, '123456');
+    emailVerification.issue.mockRejectedValueOnce(new Error('SMTP unavailable'));
+    const result = await service.login({ userId: 'normal-user', password: 'long-enough-password' });
+    expect(emailVerification.issue).not.toHaveBeenCalled();
+    expect(emailVerification.consume).toHaveBeenCalledTimes(1); // registration proof only
+    expect(result).not.toHaveProperty('challengeId');
 
-    expect(result.accessToken).toBe('signed-jwt');
+    expect((result as any).accessToken).toBe('signed-jwt');
     expect(jwtService.signAsync).toHaveBeenCalledWith(
       expect.objectContaining({ sub: 'normal-user', role: 'USER' }),
       expect.any(Object),
