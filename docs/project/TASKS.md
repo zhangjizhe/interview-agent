@@ -1,92 +1,11 @@
-# 待办与验收门
+# Tasks
 
-2026-11-05 · Sole active theme AUTH-EMAIL-VERIFICATION. The bounded **isolated real-mail registration → password login → email recovery → new-password login** journey now passed in Chrome against real API/PostgreSQL/Redis and NetEase. Exactly two new messages were matched to their challenge IDs; API restart preserved account/session access; reset rejected old password and code replay and revoked access/refresh sessions. Original account/password/database were not changed by that isolated test. Two planned attempts were reserved against the original durable daily counter only after its natural reset; failures were not cleared and limits were not raised. This proves this local bounded journey, not sustained mail reliability, the owner's latest manual recovery, model quality or whole-product acceptance.
+2026-11-05 · One active topic: PORTFOLIO-LIVE-CONNECTION. User explicitly prioritized the hosted portfolio connection, chose local deployment and authorized Sites/Cloudflare dedicated server-only authentication.
 
-New code: AuthEmailService returns EMAIL_DAILY_LIMIT with a human-readable recovery date/time explicitly labeled Beijing time. Both existing clients display that public message and remain on the email step for429. Default8/range1–20, cooldown, purpose/user/email binding, one-use OTP and account-existence privacy remain enforced. No schema change. A red regression reproduced the missing daily hint, then the final four auth/session/DI suites passed48 tests (18 mail-service tests). Web auth6, API typecheck, scoped lint, frozen API build and diff checks passed. Focused synthetic Docker/browser registration/login/change/reset/revocation/replay plus strict-TLS greeting fallback passed; final real-mail journey ran the final API candidate. A local UI probe initially over-required an unexposed field; the field was removed rather than widening the global exception response, and both pages passed an explicitly synthetic429 response check. These scopes must remain distinct.
+- Completed locally: normal administrator login; dedicated Agent normal gate/publish; frozen neutral contract dataset;30 real Qwen evaluation samples; authenticated report and30 Run/Trace readback; one real local public-corpus answer with citation; independent restricted gateway and external404/401/403 boundaries; Site version5/source/runtime-secret deployment; official Site service-access cited answer and refusal with original request mapping; user-confirmed page answer/source links; report persistence after actual API recreation.
+- Pending: protected report→Trace UI inspection; bounded conversational context; exact new repository CI/PR/main synchronization.
+- Deployment limit: temporary tunnel/current computer only. No sustained uptime, reboot recovery or spare-PC migration claim. Automatic Keychain background access was not approved or installed. Use manual secret reinjection after Docker restart.
+- Quality/billing limit: deterministic synthetic-document contracts executed on real Qwen are not product-wide or semantic acceptance. Known new estimate34 calls/0.0058692CNY; historical unknown4 retained. New test reservations never exceed3CNY, each planned call≤0.03CNY; unknown/pending is not zero. Do not rerun passed or failed calls without a new justified path/budget.
+- Deferred: portable bounded conversation context and Lab report→Trace UI WIP; generic article/document/question collection governance WIP and its remaining database test fixture-scope issue; permanent ingress/host migration; existing experimental Python CI failure; explicitly opted-in legacy direct-provider Worker compatibility (not part of the default Lab path). Do not commit/deploy these with the gateway.
 
-Git baseline is agent-lab1c6fa3891aec3b19df286579d85a1ad1419140bb. Its exact push41850620405 / PR41850628688 passed all6 jobs with original logs reviewed. Those results do not certify the new candidate. PR65 remains draft while the new scoped source and its exact CI are reviewed; main remains f0c17cf. No merge until current corresponding checks are green. Source/runtime fingerprints and private receipts bind the successful real-mail test to this candidate; no credentials, mailbox contents or raw local logs are committed.
-
-Local only: final API image uses protected runtime secret injection and scoped DNS with original-hostname certificate checks; existing data volumes and user-selected passwords are retained. SMTP credentials remain in encrypted local storage/runtime memory. No external model call was initiated and no unknown historical fee is treated as zero. Portfolio conversations, normal Agent publication, formal evaluation/report tracing and public deployment remain NOT_ACCEPTED and outside this auth increment. Do not replay old password helpers or mail failures under unchanged conditions.
-
-Next: review/push the scoped candidate, inspect its latest push/PR jobs and original logs, then merge only that expected head if green. Record remote results and stop at the auth phase boundary. The owner can then perform a fresh manual email reset in the existing local entry; do not set or reveal a password in chat. Retain the suspended portfolio work for the next authorized phase.
-
-Previous failures and superseded evidence: [auth history](archive/auth-email-2026-11-05/PREVIOUS_STATE.md).
-
-`PORTFOLIO-ASSISTANT` 暂停保留，仍 NOT_ACCEPTED；正常发布、真实来源问答、正式评测报告和公开接入待独立阶段。本主题未发起外部模型调用。以下历史记录不代表当前状态。
-
-2026-11-03 当前唯一主题PORTFOLIO-ASSISTANT：固定32公开片段/正常发布selector/Lab持久队列/Redis有界准入与24h跨IP幂等/原文来源输出/实际网站BFF已本地实现；API1199/27skip、Web333、站点24通过，最终构建/精确CI待核。旧题库51d5c2b两run六项CI与原始日志已通过，仅隔离工程阶段；远端Wiki5403d81已保留。目标部署、正常发布版本配置、真实模型/账单和桌面hexo-bolg读取仍无证据。
-
-2026-11-03 当前候选：QUESTION-CATALOG-ARCHITECTURE与录屏准备，**NOT_ACCEPTED**。原head115b5c6因隔离管理员Free100耗尽失败；runtime57b0ac9只给该fixture有限200并保留普通Free100、移除Run冒用Interview ID。其两组CI又在业务断言textarea精确可访问名匹配超时；root已加aria-label并39项UI定向通过，尚未推送组合新head或重跑完整远端CI。
-
-题库当前本地候选已接通Interview PG主数据/历史版本、显式同组织保源迁移、独立向量索引/有界重建、初始选题版本/hash透传及Lab真实治理UI；见[架构与迁移](../architecture/INTERVIEW_QUESTION_CATALOG.md)和[录屏准备](../runbook/RECORDING_READINESS.md)。root实际本地API1149/24skip、Web328、types/lint/build、Prisma validate、provider-free Golden30通过；后续39项label定向不冒充另一次全量测试。实际HTTP/PG/Milvus/浏览器helper与恢复资产已接CI，本机无Docker，未执行的新远端链路仍待验收。
-
-当前退出门：精确source freeze/上传→最新push/PR全部CI及原始日志→expected-head合并/远端读回→目标电脑录屏预演。不能在失败head合并，不能把编排/合成45→80宣称模型语义或学习提升。公共跨组织题库、历史题目全部迁移、真实人类校准、模型录屏与生产部署仍未验收。Portfolio助手是另行开发目标，本段不记为实现或完成。下文旧阶段保留作历史，不覆盖本段当前状态。
-
-2026-10-24 latest: PR62 foundation candidate5194edcb passed exact six CI jobs plus independent original logs, merged7e29d768fd7fd0a979ff80915d696f02f14035aa; PR/main/agent-lab/local read back. Only persistence foundation accepted; first-question API/UI protocol remains unconnected and NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md.
-
-2026-10-23 · PRODUCT-REACCEPTANCE-1整体NOT_ACCEPTED。PR59候选43b74cc最新push/PR六项CI成功及独立复核后，冻结合并a03ff8afe7f8431ac6d53c9493f8c22077d23aa0，PR/main/agent-lab均读回。当前唯一主题CANDIDATE-GOLDEN-ENGINEERING，首个阻断I06保存回执本地隔离第五链exit0，待最终复核/最新精确CI，未交付。失败与前置见[GET](../acceptance/TRAINING_READS_EVIDENCE.md)/[安全](../acceptance/IP_ADDRESS_SECURITY_EVIDENCE.md)。
-
-| 优先级 | 范围 | 下一证据/退出门 |
-| --- | --- | --- |
-| 限定完成 | 仪表/覆盖口径对账 | 修正过期PR40/API82/986口径，保留988最终NOT_ACCEPTED与全部失败历史，独立审文档、对应CI |
-| 限定完成 | TRAINING-ACTIONS / I13/I14子集 | PR57六项精确CI通过，冻结合并97e44a2，远端main/agent-lab一致；非I13/I14整行通过 |
-| 当前单主题P0 | I06简历保存回执 | 本地32/API841/Web284/实际上传与严格恢复exit0；四轮失败保留，待最新精确CI及PR冻结合并 |
-| P0 | 完整候选黄金链 | 简历→岗位→成功SSE→报告→训练→复测完整链，合成工程和真实模型质量分别证明 |
-| P0 | 全运行时状态 | 990静态模板逐项展开空/单/多、条件、错误、键盘、1440/768/390；无全分母不报覆盖率 |
-| P0 | Lab剩余业务与完整B1 | 录制/实验/决策/审计/数据集/候选/评测/发布逐状态双证据；信封/事件/能力与替换合同，不以空Registry代替消费 |
-| P0 | 真实质量与账单 | 先核历史未知账单/额度，单次≤0.5及新测试累计≤3CNY有界评测；失败不发布，未知不记零 |
-| P0 | 部署身份与恢复 | 固定SHA/镜像/迁移/配置、当场备份与目标环境恢复，不继承隔离恢复为生产证明 |
-| P1 | 工具/知识/记忆及Bridge恢复 | B2–B5退出门、会话级快照、策略/遥测分离、孤儿Run持久恢复 |
-| P1 | MCP/管理员控制 | 进程外持久化/多实例、逐服务协议与执行、持久授权审计；所有者按SOP逐目标授权 |
-| P1 | 历史16题复用 | 组织/embedding来源确认→保留源迁入/持久收据/读回/浏览器，禁止跨租户fallback |
-| 限定完成 | 训练POST超时/断线 | PR58最新六项CI作业成功，冻结合并e108a68；保留首轮依赖下载慢导致CI期限取消，非全训练操作60秒 |
-| 限定完成 | TRAINING-READS：成功后refetch/初始GET | 13读取红测后最小修复，PR59最终双证据/六项CI与独立复核后合并a03ff8a，非整体训练通过 |
-| 限定完成 | TrainingPage岗位加载错误 | 已复现并修复错误/空状态顺序，仅GET重新加载；随TRAINING-READS限定验收合并 |
-| P1 | 训练读取逐字段合同 | 本轮仅拒绝非数组外层；岗位/推荐条目缺失或错误字段的运行时校验与用户恢复需另立实际失败用例，不推广为完整响应语义通过 |
-| P1 | 其他异步/错误边界 | 简历上传、HITL、多页面实例共享store等按实际源码重现后独立修复；不由已修历史/结束推广全部安全 |
-| P1 | CI运行时维护 | 本轮GitHub注记Actions Node20弃用与ubuntu-latest迁移；独立核升级兼容性，不在训练修复中顺改或弱化检查 |
-| 限定完成 | SECURITY-IPADDRESS | SDK→limiter→ip-address最小pin10.7.4，安装链红绿/审计/最新完整CI与独立复核后随PR59合并，保留原braceshigh与所有失败 |
-| P1 | 安全维护 | 延续审计/补丁完整性，保留high边界，不声明零漏洞 |
-
-已关闭的限定子缺陷：PR49–55的SSE生命周期、历史跨路由/同会话消息/确认并发、结束回执/跨路由/正文超时；不再作为未复现P0重复列出。其他简历/report并发与完整成功黄金链仍待验收。
-
-交付门：匹配主题验证与独立双证据→定向提交推送agent-lab→最新精确push/PR可见CI全绿→冻结head经PR合并→核远端结果。GitHub重置先读状态恢复，未知POST/PUT不盲重放；不重跑已过不变检查。
-
-无关历史费用失败报告、旧截图目录、旧TASK-034保持现场不提交。全部旧阶段失败/合并/历史TODO原文见[快照](archive/reacceptance-2026-10-22/README.md)，更早历史见[旧归档](archive/reacceptance-2026-10-18/TASKS.md)。
-
-当前源码发现、未扩大本轮修复：FULL_SIMULATION原唯一题干skill缺失已复现并本轮修复，完整工程链本地通过待精确CI；无/歧义匹配仍保留null，历史空值不回填；Milvus简历limit先于客户端排序，不能保证全局最新版本；部分调用将简历读取异常吞为[]，需单独失败语义验收。直接embedding未走统一网关/账本，当前合成调用统计不能当完整成本计量。
-
-PR60 limited-complete: frozen79ce42e, latest push/PR six CI success and original-log review, merged2758f718d0de1e2cfb31f912c9e3eef93a72185c; PR/remote main/agent-lab/local readback equal. Supersedes pending-CI wording. Overall NOT_ACCEPTED; next active subtheme is full successful golden-chain contract audit.
-
-源码对账后续：ARCHITECTURE_MAP/DECISIONS仍含旧阶段待CI措辞和Bridge可选失败描述，需按已合并证据逐段校准；本轮不以这些旧段代替现码。当前技能归属红测已补跨会话父题阻断并最小修复，新30+原4=34通过，新镜像待实际复验。
-
-黄金链源码边界：end在复用existing FINAL后仍执行memory.memorize且画像含新endedAt，可能产生额外embedding；正式报告幂等不能宣称所有结束调用零模型/费用，待单独实测与有界幂等修复。
-
-P0首轮问答语义（实际红测exit1已独立复核，持久化基础服务在工作区，尚未接Controller/UI）：start/confirm未初始化并展示真实任务题；processMessage首轮才初始化队列并无条件completeTask(userInput)，因此“开始面试”可能被计作未展示首题的答案。固定答案黄金工程链不能证明首题展示/问答对齐。后续独立产品合同与红测处理，不在技能归属中顺改运行协议。
-
-P0复测展示语义：实际新浏览器新FINAL之后Training仍显示“复测进行中”；当前后端仅RETEST_STARTED关系状态未表达新面试完成。该断言只核当前关联保留，不算该文案产品验收；须定义已创建/进行/完成/失败标签及报告入口，不能将本轮工程循环推广为所有展示正确。
-
-PR61阶段最终已冻结合并55230237f2ab7eeea7c4224577d2aee0dac8ba6d：最新精确push/PR六项success、两组原始日志复核，PR/main/agent-lab/本地均读回。上方待CI措辞由此收据替代，详细见技能报告。唯一下一主题FIRST-QUESTION-PRESENTATION，先真实红测与合同设计，未新实现；整体NOT_ACCEPTED。
-
-PR62 final limited foundation gate: candidate5194edcb passed exact push39974325503/PR39974398837 attempt1 six jobs and independent original-log review; merged7e29d768fd7fd0a979ff80915d696f02f14035aa at2026-10-23T18:32:14Z. PR/main/agent-lab/local read back. API/UI first-question protocol remains unconnected and NOT_ACCEPTED. See QUESTION_PRESENTATION_EVIDENCE.md. Final merge receipt is post-freeze working-tree documentation.
-
-FIRST-QUESTION-PRESENTATION integration prerequisite, source checked only (not a new reproduced concurrency failure): Lifecycle.end uses total message emptiness, which becomes wrong after assistant-only presentation; EvaluationService.beginFinalEvaluation unconditionally sets non-SUCCEEDED/DEGRADED runs RUNNING after upsert, so the current idempotency key alone does not exclude concurrent model dispatch. Reuse EvaluationRun CAS/parent Interview coordination and add actual zero-answer/end/claim race tests. Queue initialization can call embedding/rerank; retain published-policy and quota admission when moving it into confirmation. These caller gaps are not fixed by the merged provider-free presentation store.
-
-Current FIRST-QUESTION-PRESENTATION WIP: protocol integration is written but unaccepted; validate current private run, actual first/subsequent displayed-question API/browser, saved-bank consumption and unknown recovery, then full relevant gates/exact CI before PR. See CURRENT_STATE; no overall acceptance.
-
-Question-bank selection follow-up (not accepted by this phase): initial saved-row reuse currently requires tenant+role-category+level and prefers exact position inside a bounded100-row window. Free-form topic categories, legacy16-question ownership/transfer and broader semantic selection remain unresolved; do not describe the narrow stored-row contract as reuse of every historical question or retrieval-quality acceptance.
-
-FIRST-QUESTION-PRESENTATION limited local freeze approved independently: source/type/build/lint/diff, API883/21+SSE11/Web307, direct-businessPG45 and combined scoped Lab/policy/UNKNOWN+golden/strict restore evidence passed. Exact candidate CI/PR merge remains next; not global acceptance or deployment.
-
-2026-10-24 PR63 release blocker: exact push40048015400/PR40048049704 failed browser dependency install on Ubuntu26.04 and new production advisories. CI prerequisite in progress; no merge/acceptance. Independent Zod installed-chain red72/green28 retained; minimal patches and full new-lock verification pending. See CURRENT_STATE.
-
-2026-10-25 readback: security prerequisite complete default private API93/store45/Lab+policy+golden/strict PG+Milvus+Qdrant runner and separate transfer storage both exited0. New-lock API1011/21skip plus final Zod126, Web307, type/lint/images pass. Final independent review/new frozen-head CI pending; PR63 remains unmerged and whole product NOT_ACCEPTED.
-
-2026-10-25 final PR review found a missed normal branch: fresh confirmation publishes an assistant question but local messages remain empty; the old sidebar abandoned via navigation without POST/end. New component red3/original34 passed, then minimal fix37 passed. Empty-message confirmed exit now uses end with a no-report label; confirming blocks exit. Root added real browser/API/PG cascade and refused/malformed receipt checks (no answer POST). New Web full/image/default browser verification is pending; earlier complete default pass does not cover this new branch. UI inventory only existing exit nodes UI0266/268/269 are source-reconciled; all990 baseline verdicts remain NOT_ACCEPTED and other nodes retain old baseline.
-
-2026-10-25 final local freeze gate achieved: fresh-confirm red3/green37, Web310, durable full default ALL private exit0 with actual new no_answers exit/PG cascade and strict PG+vectors restore; independent original-log review approves related local freeze only. New exact candidate CI/PR merge pending; overall NOT_ACCEPTED.
-
-
-2026-10-29 EVALUATION-QUALITY-P0 (in progress): user authorized priority implementation. Add bounded business assertions and v6 scoped publication, shared production scorer calibration contract, reject failed/unknown report evidence, correct heuristic provenance, all-trial budgets and durable unknown submission receipts. Necessary Hono audit prerequisite and exact new-head CI pending. Next: independent annotation/adjudication and real Interview quality tasks, Case/evaluator dual evolution and snapshots, then online inspection. No whole-product/model-quality/deployment acceptance. See EVALUATION_QUALITY_GATE_EVIDENCE.md; earlier PR63-open status is obsolete, merged baseline deaf006.
-
-2026-11-03 Portfolio97af5cb六项CI与原始HTTP137/Redis/恢复日志通过；实际浏览器发现HTTP预览WebCrypto缺失已补安全前置提示，站点27测试通过，最终client追加提交待精确CI。历史正文凭据已脱敏，原始未净化中间提交未上传。
+Detailed current facts: [CURRENT_STATE.md](CURRENT_STATE.md). Prior task register preserved in [archive](archive/portfolio-connect-2026-11-05/TASKS_BEFORE.md).

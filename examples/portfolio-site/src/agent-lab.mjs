@@ -18,7 +18,9 @@ export function labConfig(env,publicOrigin){
   if((base.protocol!=='https:'&&!(base.protocol==='http:'&&local))||base.username||base.password||base.search||base.hash||!/^\/api\/?$/.test(base.pathname))throw new AppError('Agent Lab 需要 HTTPS /api 地址；仅本机允许 HTTP。',503);
   if(!['https:','http:'].includes(origin.protocol)||origin.origin!==(env.AGENT_LAB_PUBLIC_ORIGIN||publicOrigin))throw new AppError('站点公开来源配置无效。',503);
   if(origin.origin!==publicOrigin)throw new AppError('当前站点来源不匹配配置。',403);
-  return {base:base.href.replace(/\/$/,''),origin:origin.origin};
+  const gatewayKey=env.AGENT_LAB_GATEWAY_KEY;
+  if(gatewayKey!==undefined&&!/^[A-Za-z0-9_-]{32,256}$/.test(gatewayKey))throw new AppError('Agent Lab 接入密钥配置无效。',503);
+  return {base:base.href.replace(/\/$/,''),origin:origin.origin,...(gatewayKey?{gatewayKey}:{})};
 }
 
 export function validateLabRequest(data){
@@ -59,7 +61,7 @@ export async function runLabAgent({request,config,emit,signal,fetcher=fetch,wait
   const read=async(path,init={})=>{
     if(signal?.aborted)throw new DOMException('Aborted','AbortError');
     let response;
-    try{response=await fetcher(config.base+path,{...init,headers:{'Content-Type':'application/json',Origin:config.origin},redirect:'error',signal})}
+    try{response=await fetcher(config.base+path,{...init,headers:{'Content-Type':'application/json',Origin:config.origin,...(config.gatewayKey?{'X-Portfolio-Gateway-Key':config.gatewayKey}:{})},redirect:'manual',signal})}
     catch(e){if(signal?.aborted)throw e;throw new AppError('Agent Lab 连接未确认；可使用原请求标识继续确认。',502)}
     if(!response.ok)throw new AppError(response.status===429?'Agent Lab 已达到访问或预算限制。':response.status===503?'Agent Lab 助手尚未启用或暂不可用。':'Agent Lab 请求未确认，请稍后使用原请求标识继续确认。',response.status===429?429:502);
     const data=await boundedJson(response);

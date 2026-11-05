@@ -1,0 +1,41 @@
+# Separate project: does not rebuild or restart the product API/database.
+name: interview-portfolio-edge
+services:
+  gateway:
+    container_name: interview-portfolio-gateway
+    build: .
+    image: interview-portfolio-edge:local
+    read_only: true
+    user: "1000:1000"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/run/secrets:rw,noexec,nosuid,size=64k,uid=1000,gid=1000,mode=0700"]
+    environment:
+      PORTFOLIO_GATEWAY_PUBLIC_ORIGIN: ${PORTFOLIO_GATEWAY_PUBLIC_ORIGIN:?Set the exact portfolio HTTPS origin}
+      PORTFOLIO_GATEWAY_UPSTREAM: http://api:3001
+    ports: ["127.0.0.1:8791:8080"]
+    networks: [backend, edge]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/auth/login').then(r=>process.exit(r.status===404?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  tunnel:
+    container_name: interview-portfolio-tunnel
+    profiles: [temporary-public-test]
+    image: cloudflare/cloudflared@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba
+    command: ["tunnel", "--no-autoupdate", "--url", "http://gateway:8080", "--protocol", "http2", "--loglevel", "info"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [edge]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: "no"
+networks:
+  backend:
+    external: true
+    name: ${PORTFOLIO_BACKEND_NETWORK:-interview-agent_default}
+  edge: {}

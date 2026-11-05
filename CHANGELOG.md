@@ -169,3 +169,10 @@ Actual new evidence: API auth/session/integration26 and Web auth4 pass; API/Web/
 - Mem0 与其他第三方数据流需要隐私评估；自由文本 PII 和其他日志出口仍需审计。
 - 缓存收益尚无普遍结论，保留历史 0% 命中与后续总 Token 增长的证据。
 - 尚未发布 v1.0.0、在线 Demo 或合并默认分支。完整限制见 docs/ROADMAP.md。
+
+
+## Unreleased — restricted local portfolio ingress
+
+Added an independent two-route authenticated gateway, bounded request/response handling, tmpfs secret consumption, pinned Docker deployment and Node20/22 safety/real-HTTP CI checks. Includes neutral document selector evaluation assets and records actual local real-provider contract/report evidence separately from pending hosted-page acceptance. No general API/schema change or sustained server availability claim.
+
+Fixed the configured portfolio adapter for Workers redirect compatibility: use manual/no-follow handling and reject redirects before releasing an answer. Added server-only dedicated gateway authentication to the repository example; older conversation-context WIP is excluded.
