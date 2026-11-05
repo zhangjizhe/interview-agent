@@ -34,7 +34,7 @@ test('Actual adapter closes submit/poll loop with only checked final excerpts, n
     return ++polls===1?reply({status:'RUNNING'}):reply(result);
   }});
   assert.equal(calls.length,3);assert.equal(calls[1].url,'https://lab.example/api/portfolio-assistant/answers/opaque-ticket');
-  for(const call of calls){assert.equal(call.init.headers.Origin,'https://site.example');assert.equal(call.init.headers.Authorization,undefined);assert.equal(call.init.redirect,'error')}
+  for(const call of calls){assert.equal(call.init.headers.Origin,'https://site.example');assert.equal(call.init.headers.Authorization,undefined);assert.equal(call.init.redirect,'manual')}
   assert.equal(events.filter(e=>e.event==='delta').length,1);assert.equal(events.find(e=>e.event==='delta').data.text,result.answer);
   assert.deepEqual(events.find(e=>e.event==='sources').data.items,[{id:'article-6',title:'Promise历史笔记',url:'#article/6'}]);
   assert.equal(events.at(-1).event,'done');assert.ok(!JSON.stringify(events).includes('opaque-ticket'));

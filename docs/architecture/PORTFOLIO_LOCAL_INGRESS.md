@@ -1,6 +1,6 @@
 # Portfolio local ingress decision
 
-2026-11-05 · Bounded deployment candidate; hosted-page acceptance and exact new CI remain pending. User chose local server now/spare PC later and explicitly authorized Sites server Secret plus Cloudflare transport.
+2026-11-05 · Bounded deployment candidate; bounded hosted-page acceptance passed; exact final CI remains pending. User chose local server now/spare PC later and explicitly authorized Sites server Secret plus Cloudflare transport.
 
 Preserve the accepted NestJS/Prisma/Redis/Run/Trace/Gateway implementation. An independent Node gateway joins the existing API network and a separate ingress network. Only the gateway joins both; the tunnel has no API/database network. It forwards exactly portfolio chat POST and signed-answer GET, with exact Origin and independent constant-time checked server key. All admin/auth/health routes fail404. Strip visitor credentials/forwarded IPs; bound requests/responses/time; no redirects or answer URL logging. No schema, general auth API or model gateway change.
 

@@ -70,7 +70,7 @@ jobs:
       - name: Lint (fail closed)
         run: |
           pnpm lint --max-warnings 0
-          pnpm exec eslint --no-config-lookup --max-warnings 0 --rule 'no-debugger:error' --rule 'no-dupe-args:error' --rule 'no-dupe-else-if:error' --rule 'no-duplicate-case:error' --rule 'no-unreachable:error' --rule 'valid-typeof:error' deploy/portfolio-edge/gateway.mjs deploy/portfolio-edge/gateway.test.mjs
+          pnpm exec eslint --no-config-lookup --max-warnings 0 --rule 'no-debugger:error' --rule 'no-dupe-args:error' --rule 'no-dupe-else-if:error' --rule 'no-duplicate-case:error' --rule 'no-unreachable:error' --rule 'valid-typeof:error' deploy/portfolio-edge/gateway.mjs deploy/portfolio-edge/gateway.test.mjs examples/portfolio-site/src/agent-lab.mjs examples/portfolio-site/tests/agent-lab.test.mjs examples/portfolio-site/tests/worker-redirect.test.mjs
       - name: Typecheck all product applications
         run: pnpm typecheck
       - name: API and real Redis tests (offline model fixtures)
