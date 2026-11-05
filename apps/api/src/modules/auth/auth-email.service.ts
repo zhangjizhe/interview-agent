@@ -126,7 +126,8 @@ export class AuthEmailService implements OnModuleDestroy {
     const now = new Date();
     const utcDay = now.toISOString().slice(0, 10);
     const dailyKey = `auth:email-daily:${this.mac(`daily:${email}:${utcDay}`)}`;
-    const dailyTtlSeconds = Math.max(1, Math.ceil((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) - now.getTime()) / 1000));
+    const dailyReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    const dailyTtlSeconds = Math.max(1, Math.ceil((dailyReset.getTime() - now.getTime()) / 1000));
     const accepted = await this.redis.getClient().eval(`
       if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end
       local count = tonumber(redis.call('GET', KEYS[2]) or '0')
@@ -136,6 +137,14 @@ export class AuthEmailService implements OnModuleDestroy {
       if count == 1 then redis.call('EXPIRE', KEYS[2], tonumber(ARGV[3])) end
       return 1
     `, 2, rateKey, dailyKey, String(dailyLimit), '60', String(dailyTtlSeconds));
+    if (accepted === -1) {
+      const recoveryTime = dailyReset.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+      throw new HttpException({
+        statusCode: HttpStatus.TOO_MANY_REQUESTS,
+        code: 'EMAIL_DAILY_LIMIT',
+        message: `今日验证码发送次数已达上限，请于 ${recoveryTime}（北京时间）后重试。`,
+      }, HttpStatus.TOO_MANY_REQUESTS);
+    }
     if (accepted !== 1) throw new HttpException('验证码请求过于频繁，请稍后再试。', HttpStatus.TOO_MANY_REQUESTS);
 
     const challengeId = randomUUID();

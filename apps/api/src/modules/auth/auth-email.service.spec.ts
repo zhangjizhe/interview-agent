@@ -172,6 +172,23 @@ describe('AuthEmailService one-time email challenges', () => {
     expect([...values.keys()].some(key => key.startsWith('auth:email-challenge:'))).toBe(false);
   });
 
+  it.each([false, true])('reports the same natural daily recovery time for suppressed recovery=%s', async (suppress) => {
+    jest.useFakeTimers({ now: new Date('2030-01-01T23:59:30.000Z') });
+    try {
+      configuredDailyLimit = 1;
+      await service.issue('registration', 'person@example.com');
+      await expect(service.issue('password-reset', 'person@example.com', undefined, suppress ? { delivery: 'suppress' } : undefined)).rejects.toMatchObject({
+        status: 429,
+        response: {
+          code: 'EMAIL_DAILY_LIMIT',
+          message: expect.stringMatching(/2030.*北京时间/),
+        },
+      });
+      expect(sendMail).toHaveBeenCalledTimes(1);
+      expect(dailyTtlSeconds).toBe(30);
+    } finally { jest.useRealTimers(); }
+  });
+
   it('enforces the configured deployment send limit while retaining the daily counter', async () => {
     configuredDailyLimit = 3;
     for (let attempt = 0; attempt < 3; attempt++) {

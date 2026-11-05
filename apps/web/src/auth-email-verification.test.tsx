@@ -135,3 +135,17 @@ it('keeps recovery on the email step when the server rejects the send limit', as
   expect(screen.queryByLabelText('新密码')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '发送找回验证码' })).toBeEnabled();
 });
+
+it('shows the daily recovery time while keeping recovery on the email step', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    code: 'EMAIL_DAILY_LIMIT',
+    message: '今日验证码发送次数已达上限，请于 2030/1/2 08:00:00（北京时间）后重试。',
+  }), { status: 429 })));
+  render(<AuthGate><div>protected</div></AuthGate>);
+  fireEvent.click(screen.getByRole('button', { name: '忘记密码？' }));
+  fireEvent.change(screen.getByLabelText('邮箱'), { target: { value: 'candidate@example.test' } });
+  fireEvent.click(screen.getByRole('button', { name: '发送找回验证码' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('2030/1/2 08:00:00（北京时间）');
+  expect(screen.queryByLabelText('邮箱验证码')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('新密码')).not.toBeInTheDocument();
+});
