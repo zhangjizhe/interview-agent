@@ -5,12 +5,17 @@ import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { completeEmailLogin, loginThroughEmailApi, registerThroughEmailApi, registerThroughEmailUI } from './fixture-email-code.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const outputDir = join(__dirname, 'screenshots', `acceptance-${new Date().toISOString().slice(0, 10)}`);
 const webUrl = process.env.WEB_URL || 'http://localhost:5173';
 const chromePath = process.env.CHROME_PATH;
-const password = 'acceptance-password-123';
+const password = process.env.AUTH_ACCEPTANCE_PASSWORD || 'acceptance-password-123';
+const emailTemplate = process.env.AUTH_ACCEPTANCE_EMAIL_TEMPLATE || '';
+if (!emailTemplate.includes('{userId}')) throw new Error('Set AUTH_ACCEPTANCE_EMAIL_TEMPLATE to an unused, owner-controlled address pattern containing {userId}.');
+const emailFor = id => emailTemplate.replaceAll('{userId}', id);
+const adminUserId = process.env.AUTH_ACCEPTANCE_ADMIN_USER_ID || 'admin-acceptance';
 const suffix = Date.now();
 const userId = `browser-user-${suffix}`;
 
@@ -42,19 +47,10 @@ async function requestJson(path, { method = 'GET', token, body } = {}) {
 }
 
 async function registerAndLogin(page, id, expectedRole) {
-  const registerSwitch = page.getByRole('button', { name: '没有账号，创建账号' });
-  await registerSwitch.click();
-  await page.getByLabel('用户名').fill(id);
-  await page.getByLabel('密码').fill(password);
-  await page.getByRole('button', { name: '创建账号' }).click();
-  await page.getByText('账号已创建，请登录。', { exact: true }).waitFor({ state: 'visible' });
-  const loginButton = page.getByRole('button', { name: '登录' });
-  await loginButton.waitFor({ state: 'visible' });
-  await page.getByLabel('用户名').fill(id);
-  await page.getByLabel('密码').fill(password);
-  check(`${id} login submit is enabled`, await loginButton.isEnabled());
-  await loginButton.click();
-  await page.waitForTimeout(1000);
+  const registration = await registerThroughEmailUI(page, { userId: id, password, email: emailFor(id) });
+  check(`${id} account was created after email verification`, registration.userId === id && registration.created === true);
+  const session = await completeEmailLogin(page, { userId: id, password });
+  check(`${id} login includes a mailbox code`, session.role === expectedRole);
   await page.screenshot({ path: join(outputDir, `debug-after-login-${id}.png`), fullPage: true });
   const homeLink = page.getByRole('link', { name: '首页' });
   const homeLinkCount = await homeLink.count();
@@ -72,11 +68,8 @@ async function registerAndLogin(page, id, expectedRole) {
 }
 
 async function loginExisting(page, id, expectedRole) {
-  await page.getByLabel('用户名').fill(id);
-  await page.getByLabel('密码').fill(password);
-  const loginButton = page.getByRole('button', { name: '登录' });
-  check(`${id} login submit is enabled`, await loginButton.isEnabled());
-  await loginButton.click();
+  const session = await completeEmailLogin(page, { userId: id, password });
+  check(`${id} login includes mailbox verification`, session.role === expectedRole);
   await page.getByRole('link', { name: '首页' }).waitFor({ state: 'visible' });
   const role = await page.evaluate(() => localStorage.getItem('ia_user_role'));
   check(`${id} receives ${expectedRole} session role`, role === expectedRole, role || 'missing');
@@ -195,16 +188,11 @@ try {
   await expiredContext.close();
 
   const foreignUserId = `browser-foreign-${suffix}`;
-  const foreignRegister = await requestJson('/auth/register', {
-    method: 'POST',
-    body: { userId: foreignUserId, password },
-  });
-  check('foreign test user can register', foreignRegister.response.ok);
-  const foreignLogin = await requestJson('/auth/login', {
-    method: 'POST',
-    body: { userId: foreignUserId, password },
-  });
-  const foreignToken = foreignLogin.data?.accessToken;
+  const apiBase = new URL('/api', webUrl).toString();
+  const foreignRegister = await registerThroughEmailApi(apiBase, { userId: foreignUserId, password, email: emailFor(foreignUserId) });
+  check('foreign test user was registered after email verification', foreignRegister.userId === foreignUserId);
+  const foreignLogin = await loginThroughEmailApi(apiBase, { userId: foreignUserId, password });
+  const foreignToken = foreignLogin.accessToken;
   const foreignRead = await requestJson(`/interview/target-jobs/${firstJob.id}/readiness`, { token: foreignToken });
   const foreignActivate = await requestJson(`/interview/target-jobs/${firstJob.id}/activate`, {
     method: 'POST',
@@ -219,7 +207,7 @@ try {
   const adminContext = await browser.newContext({ viewport: { width: 1440, height: 960 } });
   const adminPage = await adminContext.newPage();
   await adminPage.goto(webUrl, { waitUntil: 'networkidle' });
-  await loginExisting(adminPage, 'admin-acceptance', 'ADMIN');
+  await loginExisting(adminPage, adminUserId, 'ADMIN');
   await adminPage.goto(`${webUrl}/admin/mcp`, { waitUntil: 'networkidle' });
   check('candidate application redirects legacy MCP route to the training workspace', new URL(adminPage.url()).pathname === '/');
   await adminPage.screenshot({ path: join(outputDir, '07-legacy-admin-redirect.png'), fullPage: true });
@@ -228,9 +216,7 @@ try {
   const mobilePage = await mobileContext.newPage();
   await mobilePage.goto(webUrl, { waitUntil: 'networkidle' });
   check('mobile login gate renders against real API', await mobilePage.getByRole('button', { name: '登录' }).count() === 1);
-  await mobilePage.getByLabel('用户名').fill(userId);
-  await mobilePage.getByLabel('密码').fill(password);
-  await mobilePage.getByRole('button', { name: '登录' }).click();
+  await completeEmailLogin(mobilePage, { userId, password });
   await mobilePage.getByRole('heading', { name: '为目标岗位做准备' }).waitFor({ state: 'visible' });
   await mobilePage.goto(`${webUrl}/training`, { waitUntil: 'networkidle' });
   const mobileLayout = await mobilePage.evaluate(() => ({

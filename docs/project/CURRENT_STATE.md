@@ -1,5 +1,19 @@
 # Current state
 
+2026-11-05 · Sole active theme AUTH-EMAIL-VERIFICATION. The bounded **isolated real-mail registration → password login → email recovery → new-password login** journey now passed in Chrome against real API/PostgreSQL/Redis and NetEase. Exactly two new messages were matched to their challenge IDs; API restart preserved account/session access; reset rejected old password and code replay and revoked access/refresh sessions. Original account/password/database were not changed by that isolated test. Two planned attempts were reserved against the original durable daily counter only after its natural reset; failures were not cleared and limits were not raised. This proves this local bounded journey, not sustained mail reliability, the owner's latest manual recovery, model quality or whole-product acceptance.
+
+New code: AuthEmailService returns EMAIL_DAILY_LIMIT with a human-readable recovery date/time explicitly labeled Beijing time. Both existing clients display that public message and remain on the email step for429. Default8/range1–20, cooldown, purpose/user/email binding, one-use OTP and account-existence privacy remain enforced. No schema change. A red regression reproduced the missing daily hint, then the final four auth/session/DI suites passed48 tests (18 mail-service tests). Web auth6, API typecheck, scoped lint, frozen API build and diff checks passed. Focused synthetic Docker/browser registration/login/change/reset/revocation/replay plus strict-TLS greeting fallback passed; final real-mail journey ran the final API candidate. A local UI probe initially over-required an unexposed field; the field was removed rather than widening the global exception response, and both pages passed an explicitly synthetic429 response check. These scopes must remain distinct.
+
+Git baseline is agent-lab1c6fa3891aec3b19df286579d85a1ad1419140bb. Its exact push41850620405 / PR41850628688 passed all6 jobs with original logs reviewed. Those results do not certify the new candidate. PR65 remains draft while the new scoped source and its exact CI are reviewed; main remains f0c17cf. No merge until current corresponding checks are green. Source/runtime fingerprints and private receipts bind the successful real-mail test to this candidate; no credentials, mailbox contents or raw local logs are committed.
+
+Local only: final API image uses protected runtime secret injection and scoped DNS with original-hostname certificate checks; existing data volumes and user-selected passwords are retained. SMTP credentials remain in encrypted local storage/runtime memory. No external model call was initiated and no unknown historical fee is treated as zero. Portfolio conversations, normal Agent publication, formal evaluation/report tracing and public deployment remain NOT_ACCEPTED and outside this auth increment. Do not replay old password helpers or mail failures under unchanged conditions.
+
+Next: review/push the scoped candidate, inspect its latest push/PR jobs and original logs, then merge only that expected head if green. Record remote results and stop at the auth phase boundary. The owner can then perform a fresh manual email reset in the existing local entry; do not set or reveal a password in chat. Retain the suspended portfolio work for the next authorized phase.
+
+Previous failures and superseded evidence: [auth history](archive/auth-email-2026-11-05/PREVIOUS_STATE.md).
+
+## Retained prior context (historical; does not describe this auth revision)
+
 2026-11-03 · Active theme: PORTFOLIO-ASSISTANT. User authorized the actual local resume site and public articles/GitHub as data sources. Whole product/production remains **NOT_ACCEPTED**; no external paid model call or deployment has been performed.
 
 ## Current source and candidate

@@ -6,6 +6,7 @@ fixture_image="${1:-interview-api:verification}"
 fixture_browser_scope="${FIXTURE_BROWSER_SCOPE:-all}"
 case "$fixture_browser_scope" in
   all) ;;
+  auth) test "${FIXTURE_BROWSER_TEST:-}" = "1"; echo 'Focused auth browser run: API smoke, other browser and recovery suites are not included.' ;;
   golden) test "${FIXTURE_BROWSER_TEST:-}" = "1"; test "${FIXTURE_GOLDEN_PROBE:-}" = "1"; echo 'Focused golden browser run: Lab and candidate-policy browser suites are not included.' ;;
   *) echo 'Invalid FIXTURE_BROWSER_SCOPE' >&2; exit 2 ;;
 esac
@@ -15,6 +16,7 @@ fixture_redis="$fixture_network-redis"
 fixture_etcd="$fixture_network-etcd"
 fixture_milvus="$fixture_network-milvus"
 fixture_qdrant="$fixture_network-qdrant"
+fixture_smtp="$fixture_network-smtp"
 fixture_api="$fixture_network-api"
 fixture_lab="$fixture_network-lab"
 fixture_web="$fixture_network-web"
@@ -28,7 +30,7 @@ cleanup() {
     docker logs --tail 120 "$fixture_etcd" >&2 2>/dev/null || true
     docker logs --tail 120 "$fixture_qdrant" >&2 2>/dev/null || true
   fi
-  docker rm -fv "$fixture_web" "$fixture_lab" "$fixture_api" "$fixture_pg" "$fixture_redis" "$fixture_milvus" "$fixture_etcd" "$fixture_qdrant" >/dev/null 2>&1 || true
+  docker rm -fv "$fixture_web" "$fixture_lab" "$fixture_api" "$fixture_smtp" "$fixture_pg" "$fixture_redis" "$fixture_milvus" "$fixture_etcd" "$fixture_qdrant" >/dev/null 2>&1 || true
   docker network rm "$fixture_network" >/dev/null 2>&1 || true
   if [[ "$status" -ne 0 && "${FIXTURE_KEEP_FAILURE:-}" == "1" ]]; then
     echo "Synthetic recovery diagnostics retained: $fixture_backup" >&2
@@ -39,6 +41,23 @@ cleanup() {
 trap cleanup EXIT
 # Internal Docker network blocks external providers. No host ports or real .env.
 docker network create --internal "$fixture_network" >/dev/null
+mkdir -m 700 "$fixture_backup/smtp" "$fixture_backup/auth-mail"
+touch "$fixture_backup/auth-mail/outbox.jsonl"
+chmod 600 "$fixture_backup/auth-mail/outbox.jsonl"
+openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 \
+  -keyout "$fixture_backup/smtp/key.pem" -out "$fixture_backup/smtp/cert.pem" \
+  -subj '/CN=fixture-smtp' -addext 'subjectAltName=DNS:fixture-smtp' >/dev/null 2>&1
+chmod 600 "$fixture_backup/smtp/key.pem" "$fixture_backup/smtp/cert.pem"
+docker create --name "$fixture_smtp" --network "$fixture_network" --network-alias fixture-smtp \
+  -e FIXTURE_SMTP_KEY=/tmp/fixture-auth-mail-key.pem -e FIXTURE_SMTP_CERT=/tmp/fixture-auth-mail-cert.pem \
+  -e FIXTURE_SMTP_OUTBOX=/tmp/fixture-auth-mail-outbox/outbox.jsonl \
+  -e FIXTURE_SMTP_STALL_FIRST_GREETING=1 \
+  -v "$fixture_backup/smtp/key.pem:/tmp/fixture-auth-mail-key.pem:ro" \
+  -v "$fixture_backup/smtp/cert.pem:/tmp/fixture-auth-mail-cert.pem:ro" \
+  -v "$fixture_backup/auth-mail:/tmp/fixture-auth-mail-outbox" \
+  --entrypoint node "$fixture_image" /tmp/fixture-auth-smtp.mjs >/dev/null
+docker cp scripts/ci/fixture-auth-smtp.mjs "$fixture_smtp:/tmp/fixture-auth-smtp.mjs"
+docker start "$fixture_smtp" >/dev/null
 docker run -d --name "$fixture_pg" --network "$fixture_network" --network-alias fixture-pg -e POSTGRES_HOST_AUTH_METHOD=trust postgres:16-alpine >/dev/null
 docker run -d --name "$fixture_redis" --network "$fixture_network" --network-alias fixture-redis redis:7-alpine >/dev/null
 docker run -d --name "$fixture_qdrant" --network "$fixture_network" --network-alias fixture-qdrant "$qdrant_image" >/dev/null
@@ -59,12 +78,19 @@ test "$fixture_vector_ready" = true
 docker exec "$fixture_pg" createdb -U postgres fixture
 docker run --rm --network "$fixture_network" -e DATABASE_URL=postgresql://postgres@fixture-pg:5432/fixture --entrypoint /usr/local/bin/migration-entrypoint.sh "$fixture_image" >/dev/null
 docker run -d --name "$fixture_api" --network "$fixture_network" --network-alias api \
+  -v "$fixture_backup/smtp/cert.pem:/tmp/fixture-auth-mail-ca.pem:ro" \
+  -v "$fixture_backup/auth-mail:/tmp/fixture-auth-mail-outbox:ro" \
   -e PORTFOLIO_ASSISTANT_ENABLED=true -e PORTFOLIO_ASSISTANT_OWNER_ID=fixture-portfolio-admin \
   -e PORTFOLIO_ASSISTANT_VERSION_ID=fixture-portfolio-v1 -e PORTFOLIO_ASSISTANT_ORIGINS=http://localhost:5173 \
   -e PORTFOLIO_ASSISTANT_TICKET_SECRET=isolated_portfolio_ticket_secret_at_least_32_chars \
   -e DATABASE_URL=postgresql://postgres@fixture-pg:5432/fixture -e REDIS_URL=redis://fixture-redis:6379 \
   -e JWT_SECRET=isolated_ci_fixture_secret_at_least_32_characters \
-  -e ADMIN_USER_IDS=fixture-ci-admin -e NODE_ENV=production \
+  -e NODE_EXTRA_CA_CERTS=/tmp/fixture-auth-mail-ca.pem \
+  -e AUTH_EMAIL_OTP_SECRET=isolated_synthetic_auth_otp_secret_at_least_32_chars \
+  -e AUTH_EMAIL_SMTP_HOST=fixture-smtp -e AUTH_EMAIL_SMTP_PORT=2465 -e AUTH_EMAIL_SMTP_SECURE=true \
+  -e AUTH_EMAIL_SMTP_USER=fixture-only -e AUTH_EMAIL_SMTP_PASSWORD=fixture-only \
+  -e AUTH_EMAIL_FROM=noreply@example.test \
+  -e ADMIN_USER_IDS=fixture-ci-admin,fixture-auth-admin -e NODE_ENV=production \
   -e QWEN_API_KEY=synthetic-fixture -e QWEN_BASE_URL=http://127.0.0.1:3335/v1 -e QWEN_RERANK_URL=http://127.0.0.1:3335/fixture/rerank \
   -e DEEPSEEK_API_KEY=synthetic-fixture -e DEEPSEEK_BASE_URL=http://127.0.0.1:1 \
   -e MILVUS_URL=http://fixture-milvus:19530 -e QDRANT_URL=http://fixture-qdrant:6333 "$fixture_image" >/dev/null
@@ -80,6 +106,9 @@ if [[ "$fixture_ready" != true ]]; then
   exit 1
 fi
 docker cp scripts/ci/fixture-model-server.mjs "$fixture_api:/tmp/fixture-model-server.mjs"
+docker cp scripts/ci/fixture-auth-email.mjs "$fixture_api:/tmp/fixture-auth-email.mjs"
+docker cp scripts/ci/fixture-auth-http.mjs "$fixture_api:/tmp/fixture-auth-http.mjs"
+docker cp scripts/ci/read-fixture-auth-code.mjs "$fixture_api:/tmp/read-fixture-auth-code.mjs"
 docker cp scripts/ci/verify-configured-release.mjs "$fixture_api:/tmp/verify-configured-release.mjs"
 docker cp scripts/ci/verify-question-gateway.mjs "$fixture_api:/tmp/verify-question-gateway.mjs"
 docker cp scripts/ci/verify-question-catalog.mjs "$fixture_api:/tmp/verify-question-catalog.mjs"
@@ -96,7 +125,9 @@ docker cp scripts/ci/verify-external-run-init.cjs "$fixture_api:/tmp/verify-exte
 docker cp scripts/ci/verify-training-loop.cjs "$fixture_api:/tmp/verify-training-loop.cjs"
 docker cp scripts/ci/verify-question-store.cjs "$fixture_api:/tmp/verify-question-store.cjs"
 docker cp scripts/ci/verify-vector-recovery.cjs "$fixture_api:/tmp/verify-vector-recovery.cjs"
-docker exec -i "$fixture_api" node --input-type=module < scripts/ci/verify-built-api.mjs
+if [[ "$fixture_browser_scope" != "auth" ]]; then
+  docker exec -i "$fixture_api" node --input-type=module < scripts/ci/verify-built-api.mjs
+fi
 if [[ "${FIXTURE_PRESENTATION_STORE:-}" == "1" ]]; then
   docker cp scripts/ci/verify-question-presentation-store.cjs "$fixture_api:/tmp/verify-question-presentation-store.cjs"
   docker exec -e GOLDEN_FIXTURE_SYNTHETIC=1 "$fixture_api" node /tmp/verify-question-presentation-store.cjs
@@ -131,7 +162,12 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
     done
     test "$fixture_browser_ready" = true
   fi
+  if [[ "${FIXTURE_BROWSER_TEST:-}" == "1" && ( "$fixture_browser_scope" == "all" || "$fixture_browser_scope" == "auth" ) ]]; then
+    pnpm --filter @interview-agent/web exec node e2e/fixture-login-helper-contract.mjs
+    LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/auth-email-runtime.mjs
+  fi
   docker rm -fv "$fixture_lab" >/dev/null
+  if [[ "$fixture_browser_scope" != "auth" ]]; then
   docker run -d --name "$fixture_web" --network "$fixture_network" -p 127.0.0.1:5177:80 "${FIXTURE_WEB_IMAGE:-interview-web:verification}" >/dev/null
   docker network connect bridge "$fixture_web"
   docker cp scripts/ci/fixture-policy-browser.cjs "$fixture_api:/tmp/fixture-policy-browser.cjs"
@@ -143,6 +179,18 @@ if [[ "${FIXTURE_BROWSER_GATE:-}" != "" || "${FIXTURE_BROWSER_TEST:-}" == "1" ]]
     LAB_FIXTURE_SYNTHETIC=1 LAB_FIXTURE_API_CONTAINER="$fixture_api" pnpm --filter @interview-agent/web exec node e2e/golden-interview-loop.mjs
   fi
   docker rm -fv "$fixture_web" >/dev/null
+  fi
+fi
+# The first verified TLS connection intentionally received no greeting. Normal
+# code registration/login must complete through a resolved-IP connection while
+# still verifying the original hostname certificate; no OTP bypass is used.
+docker logs "$fixture_smtp" 2>&1 | grep -F 'Synthetic SMTP first greeting stalled before any message.' >/dev/null
+docker logs "$fixture_api" 2>&1 | grep -F 'SMTP setup timed out; trying bounded resolved addresses before message delivery.' >/dev/null
+echo 'PASS synthetic SMTP pre-message fallback with original-hostname TLS verification'
+
+if [[ "$fixture_browser_scope" == "auth" ]]; then
+  echo 'PASS focused auth browser scope; full API/browser/recovery gate remains separate'
+  exit 0
 fi
 docker exec "$fixture_api" node /tmp/verify-vector-recovery.cjs seed
 

@@ -1,5 +1,6 @@
 const ACCESS_TOKEN_KEY = 'ia_access_token';
 const USER_ID_KEY = 'ia_userId';
+const EMAIL_KEY = 'ia_email';
 
 export interface AuthSession {
   accessToken: string;
@@ -15,7 +16,7 @@ export function getSession(): AuthSession | null {
   return {
     accessToken,
     userId,
-    email: `${userId}@local`,
+    email: localStorage.getItem(EMAIL_KEY) || `${userId}@local`,
     role: (localStorage.getItem('ia_user_role') as AuthSession['role']) || 'USER',
   };
 }
@@ -23,12 +24,14 @@ export function getSession(): AuthSession | null {
 export function saveSession(session: AuthSession): void {
   localStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
   localStorage.setItem(USER_ID_KEY, session.userId);
+  localStorage.setItem(EMAIL_KEY, session.email);
   localStorage.setItem('ia_user_role', session.role);
 }
 
 export function clearSession(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(USER_ID_KEY);
+  localStorage.removeItem(EMAIL_KEY);
   localStorage.removeItem('ia_user_role');
 }
 

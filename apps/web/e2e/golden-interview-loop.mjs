@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
+import { completeEmailLogin, registerThroughEmailUI } from './fixture-email-code.mjs';
 
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
 const container = process.env.LAB_FIXTURE_API_CONTAINER;
@@ -13,7 +14,7 @@ const password = 'isolated-golden-browser-password';
 let browser, context, primary;
 try {
   control('profile-baseline');
-  browser = await chromium.launch({ headless: true }); context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined }); context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage(); const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
@@ -32,15 +33,13 @@ try {
   const inspect = () => control('inspect', userId);
   const nav = name => page.getByRole('navigation', { name: '候选人导航', exact: true }).getByRole('link', { name, exact: true });
   const login = async () => {
-    await page.getByLabel('用户名', { exact: true }).fill(userId); await page.getByLabel('密码', { exact: true }).fill(password);
-    await postFromUI('/auth/login', () => page.getByRole('button', { name: '登录', exact: true }).click(), 200);
+    await completeEmailLogin(page, { userId, password });
     await nav('岗位设置').waitFor();
   };
   await page.goto(origin);
-  await page.getByRole('button', { name: '没有账号，创建账号', exact: true }).click();
-  await page.getByLabel('用户名', { exact: true }).fill(userId); await page.getByLabel('密码', { exact: true }).fill(password);
-  const registered = await postFromUI('/auth/register', () => page.getByRole('button', { name: '创建账号', exact: true }).click(), 200);
-  assert.equal(registered.userId, userId); await page.getByRole('button', { name: '登录', exact: true }).waitFor(); await login();
+  const email = `${userId}@fixture.test`;
+  const registration = await registerThroughEmailUI(page, { userId, password, email });
+  assert.equal(registration.userId, userId); await page.getByRole('button', { name: '登录', exact: true }).waitFor(); await login();
   await nav('岗位设置').click(); await page.getByRole('heading', { name: '创建目标岗位', exact: true }).waitFor();
   const form = page.locator('form').filter({ has: page.getByRole('heading', { name: '创建目标岗位', exact: true }) });
   await form.getByPlaceholder('例如：前端开发工程师').fill('Synthetic Frontend Engineer');

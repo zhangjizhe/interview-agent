@@ -1,10 +1,11 @@
 import { AuthSessionService } from './auth-session.service';
-import { Injectable, BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, ConflictException, UnauthorizedException, HttpException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../infra/prisma/prisma.service';
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
+import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
 import { promisify } from 'util';
+import { AuthEmailService } from './auth-email.service';
 
 const scrypt = promisify(scryptCallback);
 
@@ -19,6 +20,10 @@ export interface LoginResult {
   name: string | null;
   role: string;
 }
+
+export type LoginStartResult = LoginResult
+  | { requiresEmailVerification: true; challengeId: string; maskedEmail: string }
+  | { requiresEmailClaim: true; userId: string };
 
 export interface RegisterResult {
   userId: string;
@@ -83,6 +88,7 @@ export class AuthService {
     private config: ConfigService,
     private prisma: PrismaService,
     private sessions: AuthSessionService,
+    private readonly emailVerification: AuthEmailService,
   ) {}
 
   /**
@@ -130,12 +136,24 @@ export class AuthService {
    * - /login 只接受已注册且密码匹配的用户
    * - /register 严格拒绝已存在 ID（返回 409）— 适合"创建新身份"流程
    */
-  async register(userId: string, password: string): Promise<RegisterResult> {
+  async requestRegistrationCode(email: string): Promise<{ challengeId: string }> {
+    const normalizedEmail = this.emailVerification.normalizeEmail(email);
+    const existing = await this.prisma.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    // Keep the public response shape identical without sending mail to an
+    // already-owned address. Registration will still fail after code entry.
+    if (existing) return { challengeId: randomUUID() };
+    return this.emailVerification.issue('registration', normalizedEmail);
+  }
+
+  async register(userId: string, password: string, emailInput: string, challengeId: string, code: string): Promise<RegisterResult> {
     this.validateUserId(userId);
     this.validatePassword(password);
 
     const lowerUserId = userId.toLowerCase();
-    const finalEmail = `${lowerUserId}@local`;
+    const finalEmail = this.emailVerification.normalizeEmail(emailInput);
     const isBootstrapAdmin = (this.config.get<string[]>('auth.adminUserIds') || [])
       .includes(lowerUserId);
 
@@ -143,11 +161,15 @@ export class AuthService {
     if (existing) {
       throw new ConflictException(`ID "${userId}" 已被占用`);
     }
+    await this.emailVerification.consume(challengeId, 'registration', code, undefined, finalEmail);
+    const emailOwner = await this.prisma.user.findFirst({ where: { email: { equals: finalEmail, mode: 'insensitive' } } });
+    if (emailOwner) throw new ConflictException('该邮箱已绑定账号。');
 
     const user = await this.prisma.user.create({
       data: {
         id: lowerUserId,
         email: finalEmail,
+        emailVerifiedAt: new Date(),
         name: userId,  // 默认 name = userId（前端可改）
         passwordHash: await this.hashPassword(password),
         role: isBootstrapAdmin ? 'ADMIN' : 'USER',
@@ -190,26 +212,135 @@ export class AuthService {
   /**
    * 校验已注册用户密码后签发短期 access 与一次性 refresh token。
    */
-  async login(dto: LoginDto): Promise<LoginResult> {
+  async login(dto: LoginDto): Promise<LoginStartResult> {
     this.validateUserId(dto.userId);
     this.validatePassword(dto.password);
 
     const lowerUserId = dto.userId.toLowerCase();
-    const version = await this.sessions.version(lowerUserId);
     const user = await this.prisma.user.findUnique({
       where: { id: lowerUserId },
     });
     if (!user?.passwordHash || !(await this.verifyPassword(dto.password, user.passwordHash))) {
       throw new UnauthorizedException('用户名或密码错误');
     }
-
+    if (!user.emailVerifiedAt) return { requiresEmailClaim: true, userId: user.id };
+    const version = await this.sessions.version(user.id);
     return this.sessions.issue(user, version);
+  }
+
+  private maskEmail(email: string): string {
+    const [name, domain] = email.split('@');
+    if (!name || !domain) return '已绑定邮箱';
+    return `${name.slice(0, 1)}***@${domain}`;
+  }
+
+  async verifyLogin(challengeId: string, code: string): Promise<LoginResult> {
+    const challenge = await this.emailVerification.consume(challengeId, 'login', code);
+    if (!challenge.userId) throw new UnauthorizedException('验证码无效或已过期。');
+    const user = await this.prisma.user.findUnique({ where: { id: challenge.userId } });
+    if (!user?.emailVerifiedAt) throw new UnauthorizedException('验证码无效或已过期。');
+    const currentSubject = this.emailVerification.emailSubject('login', user.email);
+    if (currentSubject !== challenge.subject) throw new UnauthorizedException('验证码无效或已过期。');
+    const version = await this.sessions.version(user.id);
+    return this.sessions.issue(user, version);
+  }
+
+  async requestLegacyEmailClaim(userIdInput: string, password: string, emailInput: string) {
+    this.validateUserId(userIdInput);
+    this.validatePassword(password);
+    const userId = userIdInput.toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.passwordHash || !(await this.verifyPassword(password, user.passwordHash))) {
+      throw new UnauthorizedException('用户名或密码错误。');
+    }
+    if (user.emailVerifiedAt) throw new ConflictException('账号邮箱已验证，请返回登录。');
+    const email = this.emailVerification.normalizeEmail(emailInput);
+    const { challengeId } = await this.emailVerification.issue('email-claim', email, userId);
+    return { challengeId, maskedEmail: this.maskEmail(email) };
+  }
+
+  async verifyLegacyEmailClaim(userIdInput: string, emailInput: string, challengeId: string, code: string): Promise<LoginResult> {
+    const userId = userIdInput.toLowerCase();
+    const email = this.emailVerification.normalizeEmail(emailInput);
+    const challenge = await this.emailVerification.consume(challengeId, 'email-claim', code, userId, email);
+    if (challenge.subject !== this.emailVerification.emailSubject('email-claim', email)) {
+      throw new UnauthorizedException('验证码无效或已过期。');
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.passwordHash || user.emailVerifiedAt) throw new ConflictException('账号状态已变化，请重新登录。');
+    const owner = await this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
+    if (owner && owner.id !== userId) throw new ConflictException('该邮箱已绑定其他账号。');
+    await this.sessions.changePassword(userId, async () => {
+      const update = await this.prisma.user.updateMany({
+        where: { id: userId, email: user.email, emailVerifiedAt: null, passwordHash: user.passwordHash },
+        data: { email, emailVerifiedAt: new Date() },
+      });
+      if (update.count !== 1) throw new ConflictException('账号状态已变化，请重新登录。');
+    });
+    const version = await this.sessions.version(userId);
+    return this.sessions.issue({ ...user, email }, version);
+  }
+
+  private async recoveryUser(identity: string) {
+    if (typeof identity !== 'string') return null;
+    const value = identity.trim().toLowerCase();
+    if (value.includes('@')) {
+      let email: string;
+      try { email = this.emailVerification.normalizeEmail(value); } catch { return null; }
+      return this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
+    }
+    if (!SAFE_USERID_REGEX.test(value)) return null;
+    return this.prisma.user.findUnique({ where: { id: value } });
+  }
+
+  async requestPasswordReset(identity: string) {
+    const challengeId = randomUUID();
+    const user = await this.recoveryUser(identity);
+    try {
+      if (user?.emailVerifiedAt) {
+        const challenge = await this.emailVerification.issue('password-reset', user.email, user.id);
+        return { accepted: true, challengeId: challenge.challengeId };
+      }
+      if (typeof identity === 'string' && identity.includes('@')) {
+        await this.emailVerification.issue('password-reset', identity, undefined, { delivery: 'suppress' });
+      }
+    } catch (error) {
+      // Apply the same address limits to existing and unknown mailboxes. Never
+      // advance the UI to a fake challenge when admission has rejected it.
+      if (error instanceof HttpException && error.getStatus() === 429) throw error;
+      // Other outcomes remain generic to protect account existence.
+    }
+    return { accepted: true, challengeId };
+  }
+
+  async resetPassword(identity: string, challengeId: string, code: string, newPassword: string) {
+    this.validatePassword(newPassword);
+    const user = await this.recoveryUser(identity);
+    if (!user?.emailVerifiedAt || !user.passwordHash) throw new UnauthorizedException('验证码无效或已过期。');
+    const userId = user.id;
+    const challenge = await this.emailVerification.consume(challengeId, 'password-reset', code, userId);
+    if (challenge.subject !== this.emailVerification.emailSubject('password-reset', user.email)) {
+      throw new UnauthorizedException('验证码无效或已过期。');
+    }
+    const passwordHash = await this.hashPassword(newPassword);
+    await this.sessions.changePassword(userId, async () => {
+      const updated = await this.prisma.user.updateMany({ where: { id: userId, email: user.email, emailVerifiedAt: user.emailVerifiedAt, passwordHash: user.passwordHash }, data: { passwordHash } });
+      if (updated.count !== 1) throw new ConflictException('账号状态已变化，请重新发起找回。');
+    });
+    return { success: true, mustLoginAgain: true };
+  }
+
+  async requestPasswordChange(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.emailVerifiedAt) throw new ConflictException('请先完成邮箱验证。');
+    const challenge = await this.emailVerification.issue('password-change', user.email, user.id);
+    return { challengeId: challenge.challengeId, maskedEmail: this.maskEmail(user.email) };
   }
 
   async refresh(refreshToken: string): Promise<LoginResult> {
     const session = await this.sessions.consumeRefresh(refreshToken);
     const user = await this.prisma.user.findUnique({ where: { id: session.userId } });
-    if (!user) throw new UnauthorizedException('用户不存在。');
+    if (!user?.emailVerifiedAt) throw new UnauthorizedException('邮箱尚未验证，请重新登录并完成验证。');
     return this.sessions.issue(user, session.version, session.sid);
   }
 
@@ -218,17 +349,21 @@ export class AuthService {
     return { success: true };
   }
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+  async changePassword(userId: string, currentPassword: string, newPassword: string, challengeId: string, code: string) {
     this.validatePassword(currentPassword);
     this.validatePassword(newPassword);
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user?.passwordHash || !(await this.verifyPassword(currentPassword, user.passwordHash))) {
       throw new UnauthorizedException('当前密码错误。');
     }
+    const challenge = await this.emailVerification.consume(challengeId, 'password-change', code, userId);
+    if (!user.emailVerifiedAt || challenge.subject !== this.emailVerification.emailSubject('password-change', user.email)) {
+      throw new UnauthorizedException('验证码无效或已过期。');
+    }
     const passwordHash = await this.hashPassword(newPassword);
     // 修改期间阻止签发/消费会话；完成后递增用户版本，使全部设备立即下线。
     await this.sessions.changePassword(userId, async () => {
-      const result = await this.prisma.user.updateMany({ where: { id: userId, passwordHash: user.passwordHash }, data: { passwordHash } });
+      const result = await this.prisma.user.updateMany({ where: { id: userId, email: user.email, emailVerifiedAt: user.emailVerifiedAt, passwordHash: user.passwordHash }, data: { passwordHash } });
       if (result.count !== 1) throw new ConflictException('密码已变更，请重新登录。');
     });
     return { success: true };

@@ -632,3 +632,17 @@
     font-size: 21px;
   }
 }
+.agent-security-backdrop {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  padding: 20px; background: rgb(5 10 16 / 76%);
+}
+.agent-security-dialog {
+  width: min(100%, 480px); max-height: min(90vh, 760px); overflow: auto;
+  border: 1px solid #3d5567; background: #151d27; color: #e8edf4; padding: 24px;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 42%);
+}
+.agent-security-dialog h2 { margin: 22px 0 8px; font-size: 22px; }
+.agent-security-dialog p { color: #a8b6c7; line-height: 1.55; }
+.agent-security-form { display: grid; gap: 14px; margin-top: 18px; }
+.agent-security-form label { display: grid; gap: 7px; color: #c9d4df; font-size: 13px; font-weight: 700; }
+.agent-security-form input { border: 1px solid #3c4b5a; background: #101720; color: white; padding: 11px; font: inherit; }

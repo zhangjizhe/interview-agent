@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { completeEmailLogin } from './fixture-email-code.mjs';
 
 export async function verifyResumeUpload(page, control) {
   assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
@@ -20,11 +21,7 @@ export async function verifyResumeUpload(page, control) {
     const candidate = await context.newPage();
     await candidate.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
     const login = async () => {
-      await candidate.getByLabel('用户名', { exact: true }).fill(fixture.userId);
-      await candidate.getByLabel('密码', { exact: true }).fill('isolated-fixture-password');
-      const reply = candidate.waitForResponse(r => r.url() === `${origin}/api/auth/login` && r.request().method() === 'POST'); reply.catch(() => undefined);
-      await candidate.getByRole('button', { name: '登录', exact: true }).click();
-      assert.equal((await reply).status(), 200);
+      await completeEmailLogin(candidate, { userId: fixture.userId, password: 'isolated-fixture-password' });
       await candidate.locator('input[type=file]').waitFor({ state: 'attached' });
     };
     await candidate.goto(origin); await login();

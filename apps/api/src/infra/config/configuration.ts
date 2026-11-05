@@ -78,6 +78,14 @@ export interface AppConfig {
     jwtSecret: string;
     jwtExpiresIn: string;
     adminUserIds: string[];
+    emailOtpSecret: string;
+    emailDailyLimit: number;
+    emailSmtpHost: string;
+    emailSmtpPort: number;
+    emailSmtpSecure: boolean;
+    emailSmtpUser: string;
+    emailSmtpPassword: string;
+    emailFrom: string;
   };
   throttler: {
     ttl: number;
@@ -255,6 +263,14 @@ export const configuration = (): AppConfig => {
       .split(',')
       .map((userId) => userId.trim().toLowerCase())
       .filter(Boolean),
+    emailOtpSecret: process.env.AUTH_EMAIL_OTP_SECRET || '',
+    emailDailyLimit: parseSafeInt(process.env.AUTH_EMAIL_DAILY_LIMIT, 8),
+    emailSmtpHost: process.env.AUTH_EMAIL_SMTP_HOST || '',
+    emailSmtpPort: parseSafeInt(process.env.AUTH_EMAIL_SMTP_PORT, 587),
+    emailSmtpSecure: process.env.AUTH_EMAIL_SMTP_SECURE === 'true',
+    emailSmtpUser: process.env.AUTH_EMAIL_SMTP_USER || '',
+    emailSmtpPassword: process.env.AUTH_EMAIL_SMTP_PASSWORD || '',
+    emailFrom: process.env.AUTH_EMAIL_FROM || '',
   },
   throttler: {
     // 环境变量保持秒单位，throttler v6 接收毫秒。

@@ -1,5 +1,6 @@
 import { toggleMcpServer } from './mcp-controls';
 import { AgentBuilderWorkspace } from './AgentBuilderWorkspace';
+import { AccountSecurityDialog } from './AccountSecurityDialog';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -122,6 +123,7 @@ const CONTROL_NAV: Array<{ id: View; label: string; icon: typeof Gauge; enabled:
 export function ControlCenter() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>('overview');
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [auditKind, setAuditKind] = useState<AuditKind>('RUN');
   const [auditDataset, setAuditDataset] = useState('');
@@ -327,6 +329,7 @@ export function ControlCenter() {
       <main className="agent-workspace">
         <header className="agent-topbar">
           <div><p className="agent-eyebrow">AGENT OPERATIONS</p><h1>{titleFor(view)}</h1></div>
+          <button className="agent-command" onClick={() => setShowPasswordChange(true)}>修改密码</button>
           {view === 'mcp' && <button className="agent-command" onClick={() => readMcpState.mutate()} disabled={readMcpState.isPending || toggle.isPending || reload.isPending}>刷新本进程状态</button>}
           <button className="agent-command" onClick={() => {
             if (window.confirm('仅重新加载当前 API 进程的 MCP 配置；保留运行时开关，不同步其他实例。继续吗？')) reload.mutate();
@@ -334,6 +337,9 @@ export function ControlCenter() {
             <RefreshCw size={16} className={reload.isPending ? 'spin' : ''}/>{reload.isPending ? '重载中' : '重新加载 MCP'}
           </button>
         </header>
+
+        {showPasswordChange && <AccountSecurityDialog onClose={() => setShowPasswordChange(false)} />}
+
 
         {currentMutationError && <p className="agent-error">{(currentMutationError as Error).message}</p>}
         {feedback && <p className="agent-feedback">{feedback}</p>}
@@ -620,29 +626,61 @@ function McpWorkspace({ data, health, toggle }: {
 function AdminAccess({ expired = false }: { expired?: boolean }) {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [challengeId, setChallengeId] = useState('');
   const [error, setError] = useState(expired ? '登录已过期，请重新登录。' : '');
+  const [notice, setNotice] = useState(() => {
+    if (sessionStorage.getItem('ia-password-changed') !== '1') return '';
+    sessionStorage.removeItem('ia-password-changed');
+    return '密码已修改，请使用新密码登录。';
+  });
   const [pending, setPending] = useState(false);
-  const [registering, setRegistering] = useState(false);
+  const [mode, setMode] = useState<'login' | 'register' | 'login-code' | 'claim' | 'claim-code' | 'forgot' | 'reset'>('login');
+  const requestRegistrationCode = async () => {
+    setPending(true); setError(''); setNotice('');
+    try {
+      const availability = await fetch(`/api/auth/check/${encodeURIComponent(userId)}`);
+      const checked = await availability.json();
+      if (!availability.ok || checked.available !== true) throw new Error(checked.reason || '用户名不可用，请使用已有账号登录或找回密码。');
+      const response = await fetch('/api/auth/registration-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || '验证码发送失败');
+      setChallengeId(data.challengeId); setNotice('如果邮箱可用于注册，验证码已发送，请查收邮箱。如已注册，请返回登录或找回密码。');
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '验证码发送失败'); }
+    finally { setPending(false); }
+  };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setPending(true);
-    setError('');
+    setError(''); setNotice('');
     try {
-      const response = await fetch(`/api/auth/${registering ? 'register' : 'login'}`, {
+      const path = mode === 'register' ? 'register' : mode === 'login' ? 'login' : mode === 'login-code' ? 'login/verify-email' : mode === 'claim' ? 'login/claim-email' : mode === 'claim-code' ? 'login/claim-email/verify' : mode === 'forgot' ? 'password-reset/request' : 'password-reset/complete';
+      const body = mode === 'register' ? { userId, email, password, challengeId, code }
+        : mode === 'login' ? { userId, password }
+          : mode === 'login-code' ? { challengeId, code }
+            : mode === 'claim' ? { userId, password, email }
+              : mode === 'claim-code' ? { userId, email, challengeId, code }
+                : mode === 'forgot' ? { email } : { email, challengeId, code, newPassword };
+      const response = await fetch(`/api/auth/${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, password }),
+        body: JSON.stringify(body),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.message || '认证失败');
-      if (registering) {
-        setRegistering(false);
-        setError(data.role === 'ADMIN'
-          ? '管理员账号已创建，请使用相同凭据登录。'
-          : '账号已创建，但 Agent Lab 仅允许管理员进入。请联系部署管理员授权后再登录。');
+      if (mode === 'register') {
+        setMode('login'); setPassword(''); setCode(''); setChallengeId('');
+        setNotice(data.role === 'ADMIN' ? '邮箱已验证，管理员账号已创建，请登录。' : '账号已创建但未获得管理员权限。');
         return;
       }
-      if (data.role !== 'ADMIN') throw new Error('账号登录成功，但当前账号尚未获得 Agent Lab 管理员权限。');
+      if (mode === 'login' && data.requiresEmailClaim) { setMode('claim'); setNotice('这是旧账号，请用原密码绑定并验证可收信邮箱。'); return; }
+      if (mode === 'login' && data.requiresEmailVerification) { setChallengeId(data.challengeId); setMode('login-code'); setNotice(`验证码已发送至 ${data.maskedEmail}。`); return; }
+      if (mode === 'claim') { setChallengeId(data.challengeId); setMode('claim-code'); setNotice(`验证码已发送至 ${data.maskedEmail}。`); return; }
+      if (mode === 'forgot') { setChallengeId(data.challengeId); setMode('reset'); setNotice('若该邮箱已注册且邮件服务正常，验证码会发送到该邮箱。'); return; }
+      if (mode === 'reset') { setPassword(''); setNewPassword(''); setCode(''); setMode('login'); setNotice('密码已重置，请使用新密码登录。'); return; }
+      if (data.role !== 'ADMIN') throw new Error('当前账号尚未获得 Agent Lab 管理员权限，请联系部署管理员。');
       localStorage.setItem('ia_access_token', data.accessToken);
       localStorage.setItem('ia_user_role', data.role);
       localStorage.setItem('ia_userId', data.userId);
@@ -653,7 +691,22 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
       setPending(false);
     }
   };
-  return <main className="agent-access"><section><div className="agent-access-mark"><Bot size={22}/></div><p className="agent-eyebrow">AGENT LAB / CONTROL PLANE</p><h1>{registering ? '创建管理员账号' : '进入控制台'}</h1><p>管理员账号由部署允许名单授予。控制面会话独立于候选人产品。</p><form onSubmit={submit}><label>用户名<input value={userId} onChange={(event) => setUserId(event.target.value)} required /></label><label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} required /></label>{error && <p className="agent-error">{error}</p>}<button disabled={pending}>{pending ? '处理中' : registering ? '创建并验证权限' : '登录控制台'}</button><button type="button" className="text-command" onClick={() => { setRegistering((value) => !value); setError(''); }}>{registering ? '已有账号，返回登录' : '创建管理员账号'}</button></form></section><aside><p>CONTROLLED OPERATIONS</p><strong>运行、MCP、评测与发布。</strong><span>未配置的控制面能力不会显示虚构运行数据。</span></aside></main>;
+  const title = mode === 'register' ? '创建管理员账号' : mode === 'login-code' ? '验证登录邮箱' : mode === 'claim' || mode === 'claim-code' ? '绑定旧账号邮箱' : mode === 'forgot' || mode === 'reset' ? '找回密码' : '进入控制台';
+  return <main className="agent-access"><section><div className="agent-access-mark"><Bot size={22}/></div><p className="agent-eyebrow">AGENT LAB / CONTROL PLANE</p><h1>{title}</h1><p>管理员账号由部署允许名单授予。注册时验证邮箱，之后使用用户名和密码登录。</p><form onSubmit={submit}>
+    {mode !== 'login-code' && mode !== 'claim-code' && mode !== 'reset' && mode !== 'forgot' && <label>用户名<input value={userId} onChange={(event) => setUserId(event.target.value.toLowerCase())} autoComplete="username" required /></label>}
+    {(mode === 'login' || mode === 'register' || mode === 'claim') && <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} maxLength={128} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required /></label>}
+    {(mode === 'register' || mode === 'claim' || mode === 'claim-code' || mode === 'forgot') && <label>邮箱<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setChallengeId(''); setCode(''); }} maxLength={254} autoComplete="email" required /></label>}
+    {mode === 'register' && <><button type="button" className="text-command" onClick={requestRegistrationCode} disabled={pending || !email}>{pending ? '正在发送…' : challengeId ? '重新发送邮箱验证码' : '发送邮箱验证码'}</button>{challengeId && <label>邮箱验证码<input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required /></label>}</>}
+    {(mode === 'login-code' || mode === 'claim-code' || mode === 'reset') && <label>邮箱验证码<input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required /></label>}
+    {mode === 'reset' && <label>新密码<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={12} maxLength={128} autoComplete="new-password" required /></label>}
+    {(mode === 'login-code' || mode === 'claim-code') && <button type="button" className="text-command" onClick={() => { setMode(mode === 'login-code' ? 'login' : 'claim'); setChallengeId(''); setCode(''); setError(''); setNotice('请再次提交账号密码以发送新验证码。'); }}>重新发送验证码</button>}
+    {mode === 'reset' && <button type="button" className="text-command" onClick={() => { setMode('forgot'); setChallengeId(''); setCode(''); setNewPassword(''); setError(''); setNotice('请重新请求找回验证码。'); }}>重新发送验证码</button>}
+    {notice && <p role="status">{notice}</p>}{error && <p className="agent-error" role="alert">{error}</p>}
+    {(mode !== 'register' || challengeId) && <button disabled={pending}>{pending ? '处理中' : mode === 'register' ? '验证并创建账号' : mode === 'login' ? '登录' : mode === 'login-code' || mode === 'claim-code' ? '验证并登录' : mode === 'claim' ? '发送绑定验证码' : mode === 'forgot' ? '发送找回验证码' : '重置密码'}</button>}
+    {mode === 'login' && <button type="button" className="text-command" onClick={() => { setMode('forgot'); setError(''); }}>忘记密码？</button>}
+    {(mode === 'login' || mode === 'register') && <button type="button" className="text-command" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setNotice(''); setChallengeId(''); setCode(''); }}>{mode === 'register' ? '已有账号，返回登录' : '创建管理员账号'}</button>}
+    {mode !== 'login' && mode !== 'register' && <button type="button" className="text-command" onClick={() => { setMode('login'); setError(''); setNotice(''); setChallengeId(''); setCode(''); }}>返回登录</button>}
+  </form></section><aside><p>CONTROLLED OPERATIONS</p><strong>运行、MCP、评测与发布。</strong><span>未配置的控制面能力不会显示虚构运行数据。</span></aside></main>;
 }
 
 function LabSessionGate() {

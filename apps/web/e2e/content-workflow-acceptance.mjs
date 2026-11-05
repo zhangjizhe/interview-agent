@@ -5,13 +5,18 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loginThroughEmailApi, registerThroughEmailApi } from './fixture-email-code.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..', '..', '..');
 const api = process.env.API_URL || 'http://localhost:3001';
+const apiBase = `${api.replace(/\/$/, '')}/api`;
 const timestamp = Date.now();
 const userId = `content-e2e-${timestamp}`;
 const password = 'acceptance-password-123';
+const emailTemplate = process.env.AUTH_ACCEPTANCE_EMAIL_TEMPLATE || '';
+if (!emailTemplate.includes('{userId}')) throw new Error('Set AUTH_ACCEPTANCE_EMAIL_TEMPLATE to an unused, owner-controlled address pattern containing {userId}.');
+const emailFor = id => emailTemplate.replaceAll('{userId}', id);
 const reportDir = join(__dirname, 'screenshots', 'acceptance-2026-08-12');
 mkdirSync(reportDir, { recursive: true });
 
@@ -32,19 +37,11 @@ async function request(path, options = {}) {
 }
 
 async function auth(id) {
-  const login = await request('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId: id, password }),
-  });
+  const login = await loginThroughEmailApi(apiBase, { userId: id, password });
   return `Bearer ${login.accessToken}`;
 }
 
-await request('/api/auth/register', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ userId, password }),
-});
+await registerThroughEmailApi(apiBase, { userId, password, email: emailFor(userId) });
 const userAuth = await auth(userId);
 const adminAuth = await auth('admin-acceptance');
 

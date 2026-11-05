@@ -1,6 +1,7 @@
 // Real HTTP + PostgreSQL + Milvus with the isolated localhost synthetic provider.
 // This checks persistence/contracts, not model or interview quality.
 import { createRequire } from 'node:module';
+const { registerFixtureUser, loginFixtureUser } = await import('/tmp/fixture-auth-http.mjs');
 import { createHash } from 'node:crypto';
 const require = createRequire(`${process.cwd()}/package.json`);
 const { PrismaClient } = require('@prisma/client');
@@ -13,12 +14,12 @@ export async function verifyQuestionCatalog({ request, admin, owner, check }) {
   const milvus = new MilvusClient({ address: process.env.MILVUS_URL });
   const fixtureUserId = 'fixture-ci-catalog-admin';
   const password = 'isolated-fixture-catalog-password';
-  const registered = await request('/auth/register', { method: 'POST', body: { userId: fixtureUserId, password } });
-  if (registered.status !== 200) throw new Error('Synthetic catalog administrator registration failed');
+  const registered = await registerFixtureUser(request, fixtureUserId, password);
+  if (registered.userId !== fixtureUserId) throw new Error('Synthetic catalog administrator registration failed');
   await prisma.user.update({ where: { id: fixtureUserId }, data: { role: 'ADMIN' } });
-  const session = await request('/auth/login', { method: 'POST', body: { userId: fixtureUserId, password } });
-  if (session.status !== 200 || session.data.role !== 'ADMIN') throw new Error('Synthetic catalog administrator session failed');
-  admin = session.data.accessToken;
+  const session = await loginFixtureUser(request, fixtureUserId, password);
+  if (session.role !== 'ADMIN') throw new Error('Synthetic catalog administrator session failed');
+  admin = session.accessToken;
   const base = '/interview/question-bank';
   const post = (path, body) => request(`${base}/${path}`, { method: 'POST', token: admin, body });
   const stats = () => fetch('http://127.0.0.1:3335/fixture/stats').then(response => response.json());

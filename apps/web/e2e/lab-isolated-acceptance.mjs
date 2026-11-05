@@ -5,6 +5,7 @@ import { verifyOperationLogs } from './lab-operation-log-evidence.mjs';
 import { verifyMcpToggle } from './lab-mcp-toggle-evidence.mjs';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
+import { completeEmailLogin } from './fixture-email-code.mjs';
 import { verifyControlRecovery } from './lab-control-recovery.mjs';
 import { verifyQuestionEvidence } from './lab-question-evidence.mjs';
 import { verifyQuestionCatalogEvidence } from './lab-question-catalog-evidence.mjs';
@@ -19,7 +20,7 @@ import { verifyBuilderCancellation } from './lab-builder-cancel-evidence.mjs';
 // This entry point is restricted to the synthetic Docker fixture, never a business account.
 assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1', 'Synthetic fixture authorization required');
 const url = 'http://localhost:5176';
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
 const errors = [];
@@ -28,11 +29,9 @@ await page.route('**/*', route => new URL(route.request().url()).origin === url 
 async function textContains(text) { await page.getByText(text, { exact: false }).first().waitFor({ timeout: 20000 }); }
 try {
   await page.goto(url);
-  await page.getByLabel('用户名', { exact: true }).fill('fixture-ci-admin');
-  await page.getByLabel('密码', { exact: true }).fill('isolated-fixture-password');
   const dashboardResponse = page.waitForResponse(response => response.url().endsWith('/api/agent-lab/dashboard') && response.ok());
   const mcpResponse = page.waitForResponse(response => response.url().endsWith('/api/admin/mcp-servers') && response.ok());
-  await page.getByRole('button', { name: '登录控制台', exact: true }).click();
+await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated-fixture-password' });
   const dashboard = await (await dashboardResponse).json();
   const mcp = await (await mcpResponse).json();
   await page.getByRole('heading', { name: '控制中心', level: 1, exact: true }).waitFor();
@@ -131,12 +130,10 @@ try {
     assert.equal(await nav.getByRole('button', { name: label, exact: true }).isEnabled(), true);
   }
   await page.getByRole('button', { name: '退出控制台', exact: true }).click();
-  await page.getByRole('button', { name: '登录控制台', exact: true }).waitFor();
+  await page.getByRole('button', { name: '登录', exact: true }).waitFor();
   await page.reload();
-  await page.getByRole('button', { name: '登录控制台', exact: true }).waitFor();
-  await page.getByLabel('用户名', { exact: true }).fill('fixture-ci-admin');
-  await page.getByLabel('密码', { exact: true }).fill('isolated-fixture-password');
-  await page.getByRole('button', { name: '登录控制台', exact: true }).click();
+  await page.getByRole('button', { name: '登录', exact: true }).waitFor();
+  await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated-fixture-password' });
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
   console.log('PASS browser first-release denial, eleven navigation headings, logout/reload/new login');
   await verifySessionRevocation(page, context, url);

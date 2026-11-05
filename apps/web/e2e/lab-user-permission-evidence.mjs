@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { questionInputSnapshot } from './lab-question-input-snapshot.mjs';
+import { completeEmailLogin } from './fixture-email-code.mjs';
 
 export async function verifyUserPermission(browser, origin) {
   assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
@@ -10,16 +11,9 @@ export async function verifyUserPermission(browser, origin) {
   await page.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
   try {
     await page.goto(origin);
-    await page.getByLabel('用户名', { exact: true }).fill('fixture-ci-owner');
-    await page.getByLabel('密码', { exact: true }).fill('isolated-fixture-password');
-    const response = page.waitForResponse(item => new URL(item.url()).pathname === '/api/auth/login' && item.request().method() === 'POST');
-    void response.catch(() => {});
-    await page.getByRole('button', { name: '登录控制台', exact: true }).click();
-    const actual = await response;
-    assert.equal(actual.status(), 200);
-    const receipt = await actual.json();
+    const receipt = await completeEmailLogin(page, { userId: 'fixture-ci-owner', password: 'isolated-fixture-password' });
     assert.equal(receipt.role, 'USER'); assert.ok(receipt.accessToken);
-    await page.getByText('账号登录成功，但当前账号尚未获得 Agent Lab 管理员权限。', { exact: true }).waitFor();
+    await page.getByText('当前账号尚未获得 Agent Lab 管理员权限，请联系部署管理员。', { exact: true }).waitFor();
     assert.deepEqual(await page.evaluate(() => ['ia_access_token', 'ia_user_role', 'ia_userId'].map(key => localStorage.getItem(key))), [null, null, null]);
     assert.equal(await page.getByRole('navigation', { name: 'Agent Lab 导航', exact: true }).count(), 0);
     const headers = { Authorization: `Bearer ${receipt.accessToken}` };

@@ -16,6 +16,7 @@ import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { SecurityThrottlerGuard } from './security-throttler.guard';
 import { RolesGuard } from './roles.guard';
+import { AuthEmailService } from './auth-email.service';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { RolesGuard } from './roles.guard';
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthEmailService,
     AuthSessionService,
     JwtAuthGuard,
     RolesGuard,

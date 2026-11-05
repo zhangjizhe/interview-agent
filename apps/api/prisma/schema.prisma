@@ -83,7 +83,9 @@ model User {
   @@index([organizationId])
   @@unique([id, organizationId])
   id        String   @id @default(cuid())
+  /// A companion expression index enforces uniqueness independent of email casing.
   email     String   @unique
+  emailVerifiedAt DateTime?
   name      String?
   passwordHash String?
   role      UserRole @default(USER)

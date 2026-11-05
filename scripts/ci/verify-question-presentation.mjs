@@ -6,11 +6,12 @@ assert.equal(process.env.GOLDEN_FIXTURE_SYNTHETIC, '1');
 assert.equal(process.env.NODE_ENV, 'production');
 assert.equal(process.env.DATABASE_URL, 'postgresql://postgres@fixture-pg:5432/fixture');
 const base = 'http://127.0.0.1:3001/api';
+const { readFixtureAuthCode } = await import('/tmp/fixture-auth-email.mjs');
 const userId = `synthetic-presentation-${randomBytes(4).toString('hex')}`;
 const password = 'isolated-presentation-fixture-password';
 const product = createRequire(`${process.cwd()}/package.json`);
 const { PrismaClient } = product('@prisma/client'); const prisma = new PrismaClient();
-let token, primary;
+let token, primary, refreshToken;
 const profile = async stage => {
   const response = await fetch('http://127.0.0.1:3335/fixture/golden-profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stage }), signal: AbortSignal.timeout(3000) });
   assert.equal(response.status, 200); assert.deepEqual(await response.json(), { stage });
@@ -21,8 +22,13 @@ const request = async (path, body, expected = 200) => {
 };
 try {
   await profile('baseline');
-  await request('/auth/register', { userId, password });
-  const session = await request('/auth/login', { userId, password }); token = session.accessToken; assert.ok(token);
+  const email = `${userId}@fixture.test`;
+  const registration = await request('/auth/registration-code', { email });
+  await request('/auth/register', { userId, password, email, challengeId: registration.challengeId, code: readFixtureAuthCode(registration.challengeId) });
+  const loginStart = await request('/auth/login', { userId, password });
+  assert.ok(loginStart.accessToken);
+  const session = loginStart;
+  token = session.accessToken; refreshToken = session.refreshToken; assert.ok(token);
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { id: true, organizationId: true } });
   const job = await request('/interview/target-jobs', { title: 'Synthetic Frontend Engineer', level: 'P5', jobDescription: 'React TypeScript frontend testing' }, 201);
   const form = new FormData();
@@ -32,7 +38,7 @@ try {
   // Only this synthetic fixture owner is promoted. Saved questions enter through
   // the real administrator API; preparation must consume them without embedding.
   await prisma.user.update({ where: { id: userId }, data: { role: 'ADMIN' } });
-  token = (await request('/auth/login', { userId, password })).accessToken;
+  token = (await request('/auth/refresh', { refreshToken })).accessToken;
   const bankQuestionId = `synthetic-saved-${randomBytes(6).toString('hex')}`;
   const bankQuestion = 'Explain the saved synthetic frontend constraint and its verification.';
   const saved = await request('/interview/question-bank', { questionId: bankQuestionId, position: job.title, level: 'P5', category: 'frontend', question: bankQuestion, answer: 'Synthetic reference constraint', tags: ['synthetic'] }, 201);
