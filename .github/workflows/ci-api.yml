@@ -3,7 +3,7 @@ name: Product verification
 'on':
   push:
     branches: [main, agent-lab]
-    paths: ['apps/api/**', 'apps/web/**', 'apps/agent-lab/**', 'examples/portfolio-site/**', 'packages/**', 'patches/**', 'scripts/db/**', 'scripts/ci/**', 'docker-compose.yml', 'deploy.sh', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'eslint.config.mjs', '.github/workflows/ci-api.yml']
+    paths: ['apps/api/**', 'apps/web/**', 'apps/agent-lab/**', 'examples/portfolio-site/**', 'deploy/portfolio-edge/**', 'packages/**', 'patches/**', 'scripts/db/**', 'scripts/ci/**', 'docker-compose.yml', 'deploy.sh', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', '.npmrc', 'eslint.config.mjs', '.github/workflows/ci-api.yml']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -16,6 +16,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  portfolio-edge-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      matrix:
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Restricted gateway and real HTTP startup contracts
+        run: |
+          node --check deploy/portfolio-edge/gateway.mjs
+          node --test deploy/portfolio-edge/gateway.test.mjs
+          python3 -c "import ast; from pathlib import Path; ast.parse(Path('deploy/portfolio-edge/inject-secret.py').read_text())"
+      - name: Build pinned restricted gateway container
+        if: matrix.node == '20'
+        run: docker build -t portfolio-edge:verification deploy/portfolio-edge
+      - name: Validate independent deployment configuration
+        env:
+          PORTFOLIO_GATEWAY_PUBLIC_ORIGIN: https://portfolio.example.test
+        run: docker compose -f deploy/portfolio-edge/compose.yml config --quiet
+
   lint-type-test:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -44,7 +68,9 @@ jobs:
           node --test scripts/ci/security-audit-policy.test.mjs
           node scripts/ci/security-audit.mjs
       - name: Lint (fail closed)
-        run: pnpm lint --max-warnings 0
+        run: |
+          pnpm lint --max-warnings 0
+          pnpm exec eslint --no-config-lookup --max-warnings 0 --rule 'no-debugger:error' --rule 'no-dupe-args:error' --rule 'no-dupe-else-if:error' --rule 'no-duplicate-case:error' --rule 'no-unreachable:error' --rule 'valid-typeof:error' deploy/portfolio-edge/gateway.mjs deploy/portfolio-edge/gateway.test.mjs
       - name: Typecheck all product applications
         run: pnpm typecheck
       - name: API and real Redis tests (offline model fixtures)
