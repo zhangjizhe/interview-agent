@@ -14,7 +14,27 @@ export const technicalReferences = [
   { id: 'tech-promise', title: 'MDN：Promise', href: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise',
     quote: 'The Promise object represents the eventual completion (or failure) of an asynchronous operation and its resulting value.', text: 'Promise 表示异步操作最终完成或失败及其结果，具有等待、兑现、拒绝状态，并通过处理函数衔接后续操作。历史手写笔记可用于讨论异步控制思路，不代表现行标准的完整实现。', documentIds: ['article-6-1', 'article-6-2', 'article-6-3', 'article-6-4', 'article-6-5'] },
 ] as const;
-export function technicalReferencesFor(documents: Array<{ id?: string }>) {
-  return technicalReferences.filter(reference => documents.some(document => (reference.documentIds as readonly string[]).includes(document.id))).slice(0, 2)
-    .map(({ id, title, href, quote, text }) => ({ id, title, href, quote, text }));
+type DocumentId = { id?: string };
+const applicable = (document: DocumentId) => technicalReferences.filter(reference => (reference.documentIds as readonly string[]).includes(document.id));
+const publicReference = ({ id, title, href, quote, text }: typeof technicalReferences[number]) => ({ id, title, href, quote, text });
+export function technicalReferencesFor(documents: DocumentId[]) {
+  const ranked = documents.map(applicable), selected: typeof technicalReferences[number][] = [];
+  const add = (reference: typeof technicalReferences[number] | undefined) => {
+    if (reference && selected.length < 2 && !selected.some(item => item.id === reference.id)) selected.push(reference);
+  };
+  // Cover the highest-ranked evidence first, then diversify before adding secondary references.
+  ranked.forEach(references => add(references[0]));
+  ranked.forEach(references => references.forEach(add));
+  return selected.map(publicReference);
+}
+export function validateTechnicalReferenceSnapshot(value: unknown, documents: DocumentId[]) {
+  const current = technicalReferencesFor(documents);
+  // Retained paid Runs used this earlier deterministic policy. Validate their exact
+  // original snapshot rather than replacing it with newly selected context.
+  const legacy = technicalReferences.filter(reference => documents.some(document => (reference.documentIds as readonly string[]).includes(document.id)))
+    .slice(0, 2).map(publicReference);
+  const serialized = JSON.stringify(value);
+  if (serialized === JSON.stringify(current)) return current;
+  if (serialized === JSON.stringify(legacy)) return legacy;
+  throw new Error('Technical context mismatch');
 }

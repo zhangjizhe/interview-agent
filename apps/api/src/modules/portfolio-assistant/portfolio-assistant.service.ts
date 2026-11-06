@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { PrismaService } from '../../infra/prisma/prisma.service';
@@ -8,8 +8,8 @@ import { assertSchema, validateConfiguredVersion } from '../agent-lab/configured
 import { tenantContext } from '../organizations/tenant-context';
 import { parsePortfolioRequest, PORTFOLIO_CONTRACT, PORTFOLIO_SELECTOR_PROMPT, PortfolioDocument, portfolioSource, portfolioSourceHash, portfolioDocumentSchema, publicDocumentsFor, selectPublicQuotes } from './portfolio.contract';
 
-import { PORTFOLIO_GUIDE_MODE, PORTFOLIO_GUIDE_PROMPT, renderProfessionalAnswer } from './portfolio-guide.contract';
-import { technicalReferencesFor } from './portfolio-technical-context';
+import { PORTFOLIO_GUIDE_MODE, PORTFOLIO_GUIDE_PROMPT, renderPortfolioDelivery } from './portfolio-guide.contract';
+import { technicalReferencesFor, validateTechnicalReferenceSnapshot } from './portfolio-technical-context';
 import { PORTFOLIO_ADMIT_SCRIPT, PORTFOLIO_RELEASE_SCRIPT } from './portfolio-admission';
 export { PORTFOLIO_ADMIT_SCRIPT } from './portfolio-admission';
 type Binding = { ownerId: string; secret: string; origins: string[]; versionId: string; daily: number };
@@ -22,6 +22,7 @@ const refused = (reason = 'OUT_OF_SCOPE') => ({ contractVersion: PORTFOLIO_CONTR
 
 @Injectable()
 export class PortfolioAssistantService {
+  private readonly logger = new Logger(PortfolioAssistantService.name);
   constructor(private readonly config: ConfigService, private readonly prisma: PrismaService, private readonly redis: RedisService,
     private readonly jobs: ConfiguredRunJobsService) {}
 
@@ -93,8 +94,7 @@ export class PortfolioAssistantService {
       if (input.contractVersion !== PORTFOLIO_CONTRACT || typeof input.question !== 'string' || !input.question.trim() || input.question.length > 500
         || digest(input.documents) !== digest(value.documents.map(({ id, text }) => ({ id, text })))) throw new Error('Input snapshot mismatch');
       if (input.answerMode !== undefined && input.answerMode !== PORTFOLIO_GUIDE_MODE) throw new Error('Unknown answer mode');
-      if (value.sourceHash === portfolioSourceHash && input.answerMode === PORTFOLIO_GUIDE_MODE
-        && digest(input.technicalReferences) !== digest(technicalReferencesFor(value.documents))) throw new Error('Technical context mismatch');
+      if (value.sourceHash === portfolioSourceHash && input.answerMode === PORTFOLIO_GUIDE_MODE) validateTechnicalReferenceSnapshot(input.technicalReferences, value.documents);
       return value;
     } catch { throw new ServiceUnavailableException('助手请求记录未确认；请稍后核对'); }
   }
@@ -183,8 +183,9 @@ export class PortfolioAssistantService {
       if (entry.sourceHash !== portfolioSourceHash) return refused('SOURCE_CHANGED');
       try {
         if (JSON.parse(entry.message).answerMode === PORTFOLIO_GUIDE_MODE) {
-          const result = renderProfessionalAnswer((run.output as any)?.response, entry.documents);
+          const result = renderPortfolioDelivery((run.output as any)?.response, entry.documents, JSON.parse(entry.message).technicalReferences);
           if (!result.sources.length) return refused('NO_PUBLIC_EVIDENCE');
+          if (result.evidenceMode === 'verbatim-public-excerpts') this.logger.warn({ event: 'portfolio_technical_context_missing', runId: run.id, agentVersionId: entry.versionId, evidenceMode: result.evidenceMode });
           return { contractVersion: PORTFOLIO_CONTRACT, status: 'COMPLETED', ...result, sourceRevision: entry.sourceRevision };
         }
         const sources = selectPublicQuotes((run.output as any)?.response, entry.documents);

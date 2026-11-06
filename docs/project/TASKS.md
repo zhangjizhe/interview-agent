@@ -1,11 +1,11 @@
 # Tasks
 
-2026-11-06 · One active phase: PORTFOLIO-ANSWER-QUALITY.
+2026-11-06 · One active phase: PORTFOLIO-DELIVERY-FAILURE.
 
-- Locally/live complete: source enrichment and owner responsibility boundaries; separate bounded Chinese technical guide; JSON transport/validation; fixed official citations; two prior user-question follow-up; normal30-sample evaluation/publish; three actual hosted questions, idempotent repeat and real no-Run refusal; private report/Run/Trace persistence and cost readback.
-- Delivery finalization: scoped source diff and exact corresponding green CI, PR merge/main-agent-lab remote readback. Previous ac5 CI does not certify this source; prior main GET429 is documented and fixed with read-only polling backoff.
-- Remains incomplete: human/automated visual review of new answers, broader semantic quality and long-running acceptance, true token streaming, protected report→Trace UI, stable hostname/spare-PC migration, restart recovery.
-- Paused/excluded: generic collection/record/grant isolation WIP and database fixture-scope issue; other old auth/report UI changes. Never deploy its schema or publish private knowledge bindings with this task. Existing experimental Python workflow failure remains separate.
-- Cost/deployment: private ledger and four historical unknowns preserved; each planned call0.03CNY, total effective new spent/outstanding≤3. Daily cap10 unchanged; no volume reset, auth bypass, hidden output repair, automatic failed-run replay or unauthorized background Keychain access.
+- Complete locally/live: actual failure diagnosis; ranked fixed references; exact legacy/current paid-input snapshots; strict-quality/facts-only-delivery separation;1264 API tests/27 skipped plus type/build/lint; clean Docker deployment/backup; actual original-request zero-call recovery; one new real hosted professional project answer and cost reconciliation.
+- Pending delivery: scoped source commit/push, exact corresponding green Product CI, PR merge and main/agent-lab remote readback. Prior PR67/68 greens do not certify this new diff.
+- Retain: original production failures, strict quality missing-note failures, old failed/30-sample reports and unknown historical costs. No new publication or paid evaluation is planned.
+- Future after continuation: broader semantic/career-quality review, visual browser inspection, true token streaming, protected report→Trace UI, permanent/spare-PC hosting and restart recovery.
+- Excluded/preserved: generic collection/record/grant isolation WIP, private knowledge bindings, database fixture-scope issue and unrelated auth/history/UI changes. Never deploy the dirty root schema or bypass publication/authentication.
 
-Detailed evidence and limits: CURRENT_STATE.md and acceptance/PORTFOLIO_ANSWER_QUALITY.md. Finish this phase and await continuation before another topic.
+Evidence: acceptance/PORTFOLIO_DELIVERY_RECOVERY.md. Effective private test caps1.7191044≤3CNY; known estimates0.0578616; historical unknown4 remain unknown. Original caps/failures retained. No unchanged-condition failed-model replay or unauthorized background secret access.
