@@ -784,3 +784,16 @@ and restore. Full product and real model quality remain NOT_ACCEPTED.
 决定：复用现有模块化单体、评测任务和发布事务，增加有界BUSINESS_ASSERTIONS/v1及加性EvaluatorType枚举。v6新发布要求服务端实际断言证据/合同指纹和既有门禁，并明确限定验收范围。未知Trace不当作无工具；仅支持已记录的正向必要事件，不执行自定义代码。共享生产决策请求/解析；显式fallback来源，缺/坏样本及未知资源证据拒绝升级。所有trial有样本/预算上限，未知提交用原key核验。
 
 影响：新枚举先迁移，API/Web/Lab一起更新。旧规则仍可探索运行但不能独立满足新发布；既有bootstrap和PUBLISHED兼容路径未追认质量。无需重写框架或引入另一个平台。回滚保留历史/枚举，不能将旧规则结果冒充新证据。真正语义任务、专家校准、Case归因与评测标准迭代另行实施验收。
+
+
+## ADR — Public portfolio facts and professional context (2026-11-05)
+
+The old portfolio role selects source IDs and displays exact public excerpts. It cannot supply technical explanation. Introduce a distinct, normally evaluated/published evidence-guide role with selected personal IDs plus bounded Chinese technical notes referencing a fixed primary-source registry. Retain the original selector and private binding for rollback. This is a new output contract, not a same-contract optimization; the first-release gate must not be represented as non-inferiority to the selector or semantic certification. Existing release-gate rules are unchanged.
+
+The server still renders personal facts verbatim. Owner-confirmed IM initial-version ownership, later integration work and industry/classroom demos are explicitly author-provided; UCloud documentation establishes SDK context, not authorship. General notes are labeled separately; source IDs, bounds, Chinese content, markup and obvious personal/numerical attribution are checked, with invalid output withheld. These rules cannot prove every generated technical sentence true. Primary references are fixed local public summaries, not live browsing or private knowledge access. Source snapshots include the registry hash.
+
+Opt-in modelConfig.responseFormat=json_object is validated and forwarded through the existing configured runtime/Gateway to registered Qwen/DeepSeek providers. It guarantees neither structure nor factuality; strict server validation remains. Formatted requests bypass answer caching for explicit actual-call accounting. No hidden repair call, retry, fallback, tool, memory, data grant, schema or migration is added. Positive model-start/end and usage remain tenant-scoped Run/Trace evidence.
+
+Website v6 cache/optional stream support is retained; follow-ups send at most two previous user questions as bounded untrusted context within the same 500-character/1500-byte contract. Assistant text is excluded. Completed answers are emitted once after checks; this deployment does not claim live token streaming. Fixed primary links extend existing URL allowlists; arbitrary external sources remain rejected.
+
+A failed prior main CI run was caused by a rate-limited GET poll, not evidence of completed evaluation failure. A bounded GET-only poll helper waits on429 and never repeats POST, preserving limits and all publication assertions.

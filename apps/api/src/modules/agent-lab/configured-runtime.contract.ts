@@ -21,9 +21,10 @@ export function validateConfiguredVersion(version: any): RuntimeDefinition {
   if (runtime.adapter === 'single-agent-v1') {
     if (runtime.nodes !== undefined) reject('单Agent不能包含工作流节点');
     if (typeof version.systemPrompt !== 'string' || !version.systemPrompt.trim() || version.systemPrompt.length > 20000) reject('系统提示须为1至20000字符');
-    keys(version.modelConfig, ['provider', 'maxTokens', 'temperature']);
+    keys(version.modelConfig, ['provider', 'maxTokens', 'temperature', 'responseFormat']);
     if (!['qwen', 'deepseek'].includes(version.modelConfig.provider)) reject('模型Provider必须来自已注册网关');
     if (!Number.isInteger(version.modelConfig.maxTokens) || version.modelConfig.maxTokens < 1 || version.modelConfig.maxTokens > 4096) reject('输出Token上限须为1至4096');
+    if (version.modelConfig.responseFormat !== undefined && (version.modelConfig.responseFormat !== 'json_object' || !/json/i.test(version.systemPrompt))) reject('JSON模式须使用json_object并在提示中声明JSON');
     if (!Number.isFinite(version.modelConfig.temperature) || version.modelConfig.temperature < 0 || version.modelConfig.temperature > 2) reject('temperature须在0至2之间');
   } else {
     if (version.modelConfig && Object.keys(version.modelConfig).length) reject('工作流模型由固定子版本配置');

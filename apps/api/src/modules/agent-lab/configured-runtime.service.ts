@@ -71,7 +71,7 @@ export class ConfiguredRuntimeService {
       const callStarted = Date.now();
       const result = await this.gateway.chat({ messages: [
         { role: 'system', content: target.systemPrompt }, { role: 'user', content: message },
-      ], maxTokens: config.maxTokens, temperature: config.temperature, userId,
+      ], maxTokens: config.maxTokens, temperature: config.temperature, ...(config.responseFormat ? { responseFormat: config.responseFormat } : {}), userId,
       // A Lab Run is not an Interview. Quota remains tenant-scoped in Gateway;
       // actual Lab usage/cost is persisted below on Run and Trace, never on the
       // Interview-only SessionCost relation using an unrelated Run identifier.

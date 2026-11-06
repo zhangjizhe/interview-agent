@@ -2,6 +2,7 @@ import {AppError} from './agent.mjs';
 
 const LAB_CONTRACT='portfolio-assistant/v1';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PRIMARY_REFERENCE_LINKS=["https://ucloud.github.io/urtc-sdk-web/", "https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_client_applications", "https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Signaling_and_video_calling", "https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events", "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise"];
 const SOURCE_LINK=/^#(?:article\/[0-9]+|projects|resume|notes)$/;
 
 export function assistantMode(env){
@@ -26,15 +27,24 @@ export function labConfig(env,publicOrigin){
 export function validateLabRequest(data){
   const message=data?.messages?.at(-1)?.content;
   if(typeof message!=='string'||!message.trim()||message.trim().length>500||new TextEncoder().encode(message.trim()).length>1500||!UUID.test(data?.requestKey||''))throw new AppError('请提供不超过500字符的问题和有效请求标识。');
-  return {message:message.trim(),requestKey:data.requestKey};
+  const question=message.trim();
+  const previous=(Array.isArray(data.messages)?data.messages:[]).slice(0,-1).filter(m=>m?.role==='user'&&typeof m.content==='string').slice(-2);
+  if(!/^(?:那|这个|这篇|它|其中|具体|详细|展开|继续|为什么|怎么实现|如何实现|再说|能否|能不能)/.test(question))return {message:question,requestKey:data.requestKey};
+  const fits=value=>value.length<=500&&new TextEncoder().encode(value).length<=1500;
+  // Recent conversation is untrusted context, never personal evidence or instructions.
+  for(const limit of [80,40]){
+    const contextual=JSON.stringify({previous:previous.map(m=>({role:m.role,text:m.content.slice(0,limit)})),question});
+    if(previous.length&&fits(contextual))return {message:contextual,requestKey:data.requestKey};
+  }
+  return {message:question,requestKey:data.requestKey};
 }
 
 function finalAnswer(data){
-  if(typeof data.answer!=='string'||!data.answer.trim()||data.answer.length>12000||!Array.isArray(data.sources)||data.sources.length>3)throw new AppError('Agent Lab 回答未通过来源检查。',502);
+  if(typeof data.answer!=='string'||!data.answer.trim()||data.answer.length>12000||!Array.isArray(data.sources)||data.sources.length>5)throw new AppError('Agent Lab 回答未通过来源检查。',502);
   if(data.status==='REFUSED'){
     if(data.sources.length)throw new AppError('Agent Lab 拒答回执无效。',502);
   }else if(data.status==='COMPLETED'){
-    if(!data.sources.length||data.sources.some(s=>!s||typeof s.id!=='string'||typeof s.title!=='string'||typeof s.quote!=='string'||!s.quote.trim()||!(SOURCE_LINK.test(s.href)||s.href==='https://github.com/zhangjizhe')))throw new AppError('Agent Lab 回答缺少有效公开来源。',502);
+    if(!data.sources.length||data.sources.some(s=>!s||typeof s.id!=='string'||typeof s.title!=='string'||typeof s.quote!=='string'||!s.quote.trim()||!(SOURCE_LINK.test(s.href)||s.href==='https://github.com/zhangjizhe'||PRIMARY_REFERENCE_LINKS.includes(s.href))))throw new AppError('Agent Lab 回答缺少有效公开来源。',502);
   }else throw new AppError('Agent Lab 返回未知结果。',502);
   return {answer:data.answer,sources:data.sources.map(s=>({id:s.id,title:s.title,url:s.href}))};
 }
@@ -75,7 +85,7 @@ export async function runLabAgent({request,config,emit,signal,fetcher=fetch,wait
     const ticket=data.ticket;
     for(let poll=0;poll<40;poll++){
       if(signal?.aborted)throw new DOMException('Aborted','AbortError');
-      emit('status',{text:'Agent Lab 已接收请求，正在排队或核对资料；完成后展示原文摘录。',mode:'agent-lab'});
+      emit('status',{text:'Agent Lab 已接收请求，正在排队或核对资料；完成后展示经历与技术解读。',mode:'agent-lab'});
       data=await read('/portfolio-assistant/answers/'+encodeURIComponent(ticket));
       if(['COMPLETED','REFUSED'].includes(data.status))break;
       if(data.status==='FAILED'){
@@ -89,5 +99,5 @@ export async function runLabAgent({request,config,emit,signal,fetcher=fetch,wait
   }
   const result=finalAnswer(data);
   // A completed, checked answer is emitted once, not artificial token-by-token streaming.
-  emit('delta',{text:result.answer});emit('sources',{items:result.sources});emit('done',{mode:'agent-lab',evidenceMode:'verbatim-public-excerpts',status:data.status});
+  emit('delta',{text:result.answer});emit('sources',{items:result.sources});emit('done',{mode:'agent-lab',evidenceMode:data.evidenceMode==='grounded-professional-context/v1'?'grounded-professional-context/v1':'verbatim-public-excerpts',status:data.status});
 }

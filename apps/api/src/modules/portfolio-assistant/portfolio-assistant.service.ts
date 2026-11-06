@@ -8,6 +8,8 @@ import { assertSchema, validateConfiguredVersion } from '../agent-lab/configured
 import { tenantContext } from '../organizations/tenant-context';
 import { parsePortfolioRequest, PORTFOLIO_CONTRACT, PORTFOLIO_SELECTOR_PROMPT, PortfolioDocument, portfolioSource, portfolioSourceHash, portfolioDocumentSchema, publicDocumentsFor, selectPublicQuotes } from './portfolio.contract';
 
+import { PORTFOLIO_GUIDE_MODE, PORTFOLIO_GUIDE_PROMPT, renderProfessionalAnswer } from './portfolio-guide.contract';
+import { technicalReferencesFor } from './portfolio-technical-context';
 import { PORTFOLIO_ADMIT_SCRIPT, PORTFOLIO_RELEASE_SCRIPT } from './portfolio-admission';
 export { PORTFOLIO_ADMIT_SCRIPT } from './portfolio-admission';
 type Binding = { ownerId: string; secret: string; origins: string[]; versionId: string; daily: number };
@@ -49,13 +51,14 @@ export class PortfolioAssistantService {
     if (!version) throw new ServiceUnavailableException('作品集助手未绑定可用的已发布版本');
     const runtime = validateConfiguredVersion(version);
     const model = version.modelConfig as any;
+    const guide = version.systemPrompt === PORTFOLIO_GUIDE_PROMPT;
     if (runtime.adapter !== 'single-agent-v1' || runtime.maxEstimatedCostCny > 0.05 || runtime.maxDurationMs > 30000
-      || model.maxTokens > 512 || model.temperature > 0.3 || version.systemPrompt !== PORTFOLIO_SELECTOR_PROMPT) {
-      throw new ServiceUnavailableException('作品集助手版本不符合只读选择器合同');
+      || (guide && model.responseFormat !== 'json_object') || model.maxTokens > (guide ? 1536 : 512) || model.temperature > 0.3 || (!guide && version.systemPrompt !== PORTFOLIO_SELECTOR_PROMPT)) {
+      throw new ServiceUnavailableException('作品集助手版本不符合只读公开资料合同');
     }
     try { assertSchema(version.outputSchema, { response: '{"selectedIds":[]}' }); }
     catch { throw new ServiceUnavailableException('作品集助手输出合同未就绪'); }
-    return { version, hash: digest({ prompt: version.systemPrompt, model: version.modelConfig, runtime: version.runtimeConfig,
+    return { version, guide, hash: digest({ prompt: version.systemPrompt, model: version.modelConfig, runtime: version.runtimeConfig,
       input: version.inputSchema, output: version.outputSchema, tools: version.toolBindings, knowledge: version.knowledgeBindings, memory: version.memoryBindings }) };
   }
   private activeKey(binding: Binding) { return `portfolio:v1:active:${digest(binding.ownerId)}`; }
@@ -89,6 +92,9 @@ export class PortfolioAssistantService {
       const input = JSON.parse(value.message);
       if (input.contractVersion !== PORTFOLIO_CONTRACT || typeof input.question !== 'string' || !input.question.trim() || input.question.length > 500
         || digest(input.documents) !== digest(value.documents.map(({ id, text }) => ({ id, text })))) throw new Error('Input snapshot mismatch');
+      if (input.answerMode !== undefined && input.answerMode !== PORTFOLIO_GUIDE_MODE) throw new Error('Unknown answer mode');
+      if (value.sourceHash === portfolioSourceHash && input.answerMode === PORTFOLIO_GUIDE_MODE
+        && digest(input.technicalReferences) !== digest(technicalReferencesFor(value.documents))) throw new Error('Technical context mismatch');
       return value;
     } catch { throw new ServiceUnavailableException('助手请求记录未确认；请稍后核对'); }
   }
@@ -139,7 +145,8 @@ export class PortfolioAssistantService {
     return this.scoped(actor, () => this.redisWork(async () => {
       const resolved = await this.version(actor, binding.versionId);
       const message = JSON.stringify({ contractVersion: PORTFOLIO_CONTRACT, question: dto.message,
-        documents: selection.documents.map(({ id, text }) => ({ id, text })) });
+        documents: selection.documents.map(({ id, text }) => ({ id, text })),
+        ...(resolved.guide ? { answerMode: PORTFOLIO_GUIDE_MODE, technicalReferences: technicalReferencesFor(selection.documents) } : {}) });
       if (message.length > 10000) throw new BadRequestException('公开资料上下文超长');
       try { assertSchema(resolved.version.inputSchema, { message }); }
       catch { throw new ServiceUnavailableException('作品集助手输入合同未就绪；未创建运行'); }
@@ -175,6 +182,11 @@ export class PortfolioAssistantService {
       if (run.status !== 'COMPLETED') return { contractVersion: PORTFOLIO_CONTRACT, status: 'FAILED', answer: '本次回答未成功，请稍后查看；不会自动重放模型请求。', sources: [] };
       if (entry.sourceHash !== portfolioSourceHash) return refused('SOURCE_CHANGED');
       try {
+        if (JSON.parse(entry.message).answerMode === PORTFOLIO_GUIDE_MODE) {
+          const result = renderProfessionalAnswer((run.output as any)?.response, entry.documents);
+          if (!result.sources.length) return refused('NO_PUBLIC_EVIDENCE');
+          return { contractVersion: PORTFOLIO_CONTRACT, status: 'COMPLETED', ...result, sourceRevision: entry.sourceRevision };
+        }
         const sources = selectPublicQuotes((run.output as any)?.response, entry.documents);
         if (!sources.length) return refused('NO_PUBLIC_EVIDENCE');
         return { contractVersion: PORTFOLIO_CONTRACT, status: 'COMPLETED', answer: `以下摘录来自作者公开页面，未独立核验其履历或项目效果：\n\n${sources.map(source => source.quote).join('\n\n')}`,

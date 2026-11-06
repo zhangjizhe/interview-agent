@@ -176,3 +176,8 @@ Actual new evidence: API auth/session/integration26 and Web auth4 pass; API/Web/
 Added an independent two-route authenticated gateway, bounded request/response handling, tmpfs secret consumption, pinned Docker deployment and Node20/22 safety/real-HTTP CI checks. Includes neutral document selector evaluation assets and records actual local real-provider contract/report evidence separately from pending hosted-page acceptance. No general API/schema change or sustained server availability claim.
 
 Fixed the configured portfolio adapter for Workers redirect compatibility: use manual/no-follow handling and reject redirects before releasing an answer. Added server-only dedicated gateway authentication to the repository example; older conversation-context WIP is excluded.
+
+
+## Unreleased — portfolio evidence and professional explanation
+
+Complete owner-confirmed IM SDK initial-version and integration responsibilities, prison/hospital/education demos and classroom cases; restore omitted public CTI adapter, state and weak-network details. A separate evidence-guide role adds bounded, cited Chinese technical interpretation while personal facts remain verbatim. Optional JSON-object provider mode, fail-closed validation, fixed primary links and bounded follow-up context reuse the existing configured runtime, quotas and Run/Trace. No schema or deployment permanence claim. Repair CI GET polling after an observed429 without repeating evaluation POSTs. Failed real canaries/evaluation remain recorded; synthetic contract success is not semantic or full product acceptance.

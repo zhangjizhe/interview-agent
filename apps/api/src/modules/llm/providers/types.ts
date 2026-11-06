@@ -19,6 +19,8 @@ export interface ChatParams {
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
+  /** Explicit provider JSON-object mode; callers still validate structure and factual grounding. */
+  responseFormat?: 'json_object';
   tools?: ToolDefinition[];
   toolChoice?: 'auto' | 'none' | 'required';
   traceId?: string;  // Langfuse trace ID

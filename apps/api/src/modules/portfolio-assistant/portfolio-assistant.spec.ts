@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PortfolioAssistantService } from './portfolio-assistant.service';
 import { PORTFOLIO_ADMIT_SCRIPT } from './portfolio-assistant.service';
 import { parsePortfolioRequest, PORTFOLIO_SELECTOR_PROMPT, publicDocumentsFor, selectPublicQuotes } from './portfolio.contract';
+import { PORTFOLIO_GUIDE_PROMPT } from './portfolio-guide.contract';
 import { tenantContext } from '../organizations/tenant-context';
 const body = (message = '介绍一下你的项目经历', requestKey = '615cb67f-15ae-4372-a848-13914964126b') => ({ message, requestKey });
 function harness() {
@@ -173,5 +174,29 @@ describe('Portfolio Lab binding and capability boundary', () => {
     await expect(h.service.submit(body(), origin, 'ip')).rejects.toMatchObject({ status: 503 }); expect(h.jobs.enqueue).not.toHaveBeenCalled();
     const next = harness(); next.raw.eval.mockResolvedValue([-1, 'daily']);
     await expect(next.service.submit(body(), origin, 'ip')).rejects.toMatchObject({ status: 429 }); expect(next.jobs.enqueue).not.toHaveBeenCalled();
+  });
+});
+
+describe('normally published professional guide binding', () => {
+  it('uses the same tenant, idempotent queue and trace path with bounded fixed technical context', async () => {
+    const h = harness(); h.version.systemPrompt = PORTFOLIO_GUIDE_PROMPT; h.version.modelConfig.responseFormat = 'json_object'; h.version.modelConfig.maxTokens = 1536;
+    const receipt: any = await h.service.submit(body('张继哲有哪些实时通信项目经验？'), origin, 'ip');
+    const sent = JSON.parse(h.jobs.enqueue.mock.calls[0][2].input.message);
+    expect(sent.answerMode).toBe('grounded-professional-context/v1'); expect(sent.technicalReferences.length).toBeLessThanOrEqual(2);
+    expect(sent.documents.some(document => document.id === 'cti')).toBe(true);
+    const run = [...h.runs.values()][0]; run.status = 'COMPLETED';
+    const explanation = '房间、媒体流与状态事件可形成清晰的接入层次。初始化客户端后加入房间，按事件处理流与连接变化，退出页面时释放资源。此类接入需要区分业务状态与网络连接状态，检查异常与关闭流程，避免异步事件到达顺序造成界面不一致。';
+    run.output = { response: JSON.stringify({ selectedIds: ['rtc', 'cti'], technicalNotes: [{ title: '接入流程', body: explanation, sourceIds: ['tech-urtc'] }] }) };
+    const result: any = await h.service.answer(receipt.ticket);
+    expect(result).toMatchObject({ status: 'COMPLETED', evidenceMode: 'grounded-professional-context/v1' });
+    expect(result.sources).toHaveLength(3); expect(JSON.stringify(result)).not.toContain('private-run'); expect(h.jobs.enqueue).toHaveBeenCalledTimes(1);
+    const recordKey = [...h.records.keys()].find(value => value.startsWith('portfolio:v1:ticket:'))!;
+    const record = JSON.parse(h.records.get(recordKey)!); const message = JSON.parse(record.message);
+    message.technicalReferences[0].text = 'tampered context'; record.message = JSON.stringify(message); h.records.set(recordKey, JSON.stringify(record));
+    await expect(h.service.answer(receipt.ticket)).rejects.toMatchObject({ status: 503 });
+  });
+  it('does not extend the token allowance of the original selector or admit an oversized guide', async () => {
+    const h = harness(); h.version.systemPrompt = PORTFOLIO_GUIDE_PROMPT; h.version.modelConfig.responseFormat = 'json_object'; h.version.modelConfig.maxTokens = 1537;
+    await expect(h.service.submit(body(), origin, 'ip')).rejects.toMatchObject({ status: 503 }); expect(h.jobs.enqueue).not.toHaveBeenCalled();
   });
 });
