@@ -5,6 +5,7 @@ import { PortfolioAssistantService } from './portfolio-assistant.service';
 import { PORTFOLIO_ADMIT_SCRIPT } from './portfolio-assistant.service';
 import { parsePortfolioRequest, PORTFOLIO_SELECTOR_PROMPT, publicDocumentsFor, selectPublicQuotes } from './portfolio.contract';
 import { PORTFOLIO_GUIDE_PROMPT } from './portfolio-guide.contract';
+import { technicalReferences } from './portfolio-technical-context';
 import { tenantContext } from '../organizations/tenant-context';
 const body = (message = '介绍一下你的项目经历', requestKey = '615cb67f-15ae-4372-a848-13914964126b') => ({ message, requestKey });
 function harness() {
@@ -198,5 +199,32 @@ describe('normally published professional guide binding', () => {
   it('does not extend the token allowance of the original selector or admit an oversized guide', async () => {
     const h = harness(); h.version.systemPrompt = PORTFOLIO_GUIDE_PROMPT; h.version.modelConfig.responseFormat = 'json_object'; h.version.modelConfig.maxTokens = 1537;
     await expect(h.service.submit(body(), origin, 'ip')).rejects.toMatchObject({ status: 503 }); expect(h.jobs.enqueue).not.toHaveBeenCalled();
+  });
+});
+
+describe('retained paid guide request recovery', () => {
+  it('serves validated legacy facts twice without another enqueue and rejects altered context', async () => {
+    const h = harness(); h.version.systemPrompt = PORTFOLIO_GUIDE_PROMPT; h.version.modelConfig.responseFormat = 'json_object';
+    const request = body('介绍 interview-agent 项目');
+    const receipt: any = await h.service.submit(request, origin, 'ip');
+    const key = [...h.records.keys()].find(value => value.startsWith('portfolio:v1:ticket:'))!;
+    const record = JSON.parse(h.records.get(key)!); const message = JSON.parse(record.message);
+    expect(message.technicalReferences[0].id).toBe('tech-sse');
+    // Actual legacy retrieval shape from the reported failure, using public registry values.
+    message.technicalReferences = technicalReferences.filter(reference => ['tech-websocket', 'tech-webrtc'].includes(reference.id))
+      .map(({ id, title, href, quote, text }) => ({ id, title, href, quote, text }));
+    record.message = JSON.stringify(message); h.records.set(key, JSON.stringify(record));
+    const run = [...h.runs.values()][0]; run.status = 'COMPLETED';
+    run.output = { response: JSON.stringify({ selectedIds: ['interview-agent'], technicalNotes: [] }) };
+    expect(await h.service.submit(request, origin, 'ip')).toMatchObject({ reused: true, ticket: receipt.ticket });
+    for (let read = 0; read < 2; read++) {
+      const answer: any = await h.service.answer(receipt.ticket);
+      expect(answer).toMatchObject({ status: 'COMPLETED', evidenceMode: 'verbatim-public-excerpts' });
+      expect(answer.sources.map(source => source.id)).toEqual(['interview-agent']);
+    }
+    expect(h.runs.size).toBe(1); expect(h.jobs.enqueue).toHaveBeenCalledTimes(1);
+    message.technicalReferences[0].href = 'https://attacker.invalid'; record.message = JSON.stringify(message); h.records.set(key, JSON.stringify(record));
+    await expect(h.service.answer(receipt.ticket)).rejects.toMatchObject({ status: 503 });
+    expect(h.jobs.enqueue).toHaveBeenCalledTimes(1);
   });
 });

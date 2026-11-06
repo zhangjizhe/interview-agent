@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-06 portfolio delivery recovery candidate: prioritize technical references by retrieved evidence; preserve exact legacy paid-input snapshots; deliver validated facts only when optional technical notes are absent while strict quality still fails. No model replay, prompt/model/schema or Site protocol change. Actual deployment/CI acceptance is tracked in docs/acceptance/PORTFOLIO_DELIVERY_RECOVERY.md.
+
 2026-11-05 auth: daily email-send rejection now states the natural recovery date/time (Beijing time) through the existing public error contract. Limits, persisted failure counts and OTP protections are retained. The isolated real NetEase registration/password-login/email-reset flow passed with two messages, API-restart persistence, old-password/code replay denial and session revocation. This is bounded local evidence; owner manual recovery, sustained delivery, portfolio integration and whole-product quality remain outside this acceptance. Latest candidate CI/remote merge is a separate gate.
 
 2026-11-04 latest AUTH-EMAIL-VERIFICATION: user requires the complete registration-code -> password-login -> email-code recovery -> new-password-login journey. Added email input to both recovery pages and email lookup to reset request/completion; legacy userId API callers remain compatible. Codes still bind verified email, purpose and user; unknown/unverified emails do not get reset codes or account existence disclosure.

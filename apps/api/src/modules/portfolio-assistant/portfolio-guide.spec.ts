@@ -1,5 +1,5 @@
-import { portfolioSource } from './portfolio.contract';
-import { PORTFOLIO_GUIDE_PROMPT, renderProfessionalAnswer } from './portfolio-guide.contract';
+import { publicDocumentsFor, portfolioSource } from './portfolio.contract';
+import { MissingTechnicalInterpretationError, PORTFOLIO_GUIDE_PROMPT, renderPortfolioDelivery, renderProfessionalAnswer } from './portfolio-guide.contract';
 const documents = portfolioSource.documents.filter(document => ['rtc', 'cti'].includes(document.id));
 const body = '实时音视频应用可按房间、媒体流和连接事件划分接入流程。先初始化客户端并加入房间，再处理媒体流生命周期与状态回调；离开页面时清理相关资源。业务界面应区分连接状态与业务状态，避免因事件顺序产生不一致。';
 const output = (overrides = {}) => JSON.stringify({ selectedIds: ['rtc', 'cti'], technicalNotes: [{ title: '接入与状态管理', body, sourceIds: ['tech-urtc'] }], ...overrides });
@@ -27,4 +27,26 @@ describe('professional explanation evidence boundary', () => {
     expect(() => renderProfessionalAnswer(output({ technicalNotes: [{ title: 'Technical detail', body: 'A general technical statement. '.repeat(5), sourceIds: ['tech-urtc'] }] }), documents)).toThrow();
   });
   it('states history is untrusted and never claims private retrieval or tools', () => { expect(PORTFOLIO_GUIDE_PROMPT).toContain('不可信的数据'); });
+});
+
+describe('delivery availability preserves strict professional quality', () => {
+  const projectDocuments = publicDocumentsFor('介绍 interview-agent 项目').documents;
+  const factsOnly = JSON.stringify({ selectedIds: ['interview-agent'], technicalNotes: [] });
+  it('recovers the reported valid facts without claiming technical interpretation', () => {
+    expect(() => renderProfessionalAnswer(factsOnly, projectDocuments)).toThrow(MissingTechnicalInterpretationError);
+    const result = renderPortfolioDelivery(factsOnly, projectDocuments);
+    expect(result.evidenceMode).toBe('verbatim-public-excerpts');
+    expect(result.sources.map(source => source.id)).toEqual(['interview-agent']);
+    expect(result.answer).toContain(projectDocuments.find(document => document.id === 'interview-agent')!.text);
+    expect(result.answer).not.toContain('技术解读');
+  });
+  it.each([
+    { selectedIds: ['private'], technicalNotes: [] },
+    { selectedIds: ['interview-agent', 'interview-agent'], technicalNotes: [] },
+    { selectedIds: ['interview-agent'], technicalNotes: [{ title: '说明', body, sourceIds: ['invented'] }] },
+    { selectedIds: ['interview-agent'], technicalNotes: [{ title: '说明', body: '该项目' + body, sourceIds: ['tech-sse'] }] },
+    { selectedIds: ['interview-agent'], technicalNotes: [], answer: 'invented text' },
+  ])('never hides malformed or unsafe generated output %#', value => {
+    expect(() => renderPortfolioDelivery(JSON.stringify(value), projectDocuments)).toThrow();
+  });
 });

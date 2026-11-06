@@ -1,5 +1,7 @@
 # 当前架构地图
 
+2026-11-06 portfolio presentation repair: rank fixed technical references by retrieved evidence; retain exact validated legacy inputs for paid Run reconciliation. Strict professional renderer still fails missing notes; delivery catches only that typed condition to return verbatim public facts, with facts-only evidence mode and a text-free operator diagnostic. No new model call, schema, public protocol or publication path.
+
 2026-11-05: portfolio-assistant → fixed public profile + technical registry → normally published configured guide → existing Gateway/Run/Trace. JSON-object transport is explicit opt-in; server validates all output before public display. No new database/schema/tool/private retrieval. Site v7 preserves v6 cache/optional stream adapter and sends bounded prior user questions on follow-ups.
 
 2026-11-04 user correction: ordinary verified-account login now uses username/password directly, without SMTP or a new OTP. Registration, reset/change and first-time legacy claim retain mailbox verification. The previous every-login-code policy below is superseded. Registration checks username availability before mail; occupied IDs and mail503 never create accounts.
