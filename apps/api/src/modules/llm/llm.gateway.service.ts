@@ -405,7 +405,7 @@ export class LlmGatewayService {
   ): Promise<{ fingerprint: string; maxTokens: number } | undefined> {
     const scope = requireTenant();
     // Never accept a caller-supplied identity as the cache security boundary.
-    if (!scope.userId || scope.quotaFailure || params.tools?.length) return;
+    if (!scope.userId || scope.quotaFailure || params.tools?.length || params.responseFormat) return;
     try {
       const limits = await this.quota.getAnswerCacheLimits();
       const fingerprint = answerCacheFingerprint(params,

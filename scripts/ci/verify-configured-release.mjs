@@ -1,3 +1,4 @@
+import { pollEvaluation } from './poll-evaluation.mjs';
 // Actual HTTP/PG/evaluation jobs with a localhost synthetic provider; never model quality.
 export async function verifyConfiguredRelease({ request, admin, check }) {
   const call = async (path, body) => request(path, { method: 'POST', token: admin, body });
@@ -50,14 +51,9 @@ export async function verifyConfiguredRelease({ request, admin, check }) {
   async function evaluate(target, data, rule, requestKey) {
     const started = await call(`/agent-lab/agents/${target.id}/evaluations`, { datasetId: data.id, evaluatorId: rule.id, agentVersionId: target.versions[0].id, repeatCount: 3, maxEstimatedCostCny: 0.01, requestKey });
     if (started.status !== 202) throw new Error(`evaluation refused: ${JSON.stringify(started.data)}`);
-    let result;
-    for (let attempt = 0; attempt < 120; attempt++) {
-      result = await request(`/agent-lab/evaluations/${started.data.id}`, { token: admin });
-      if (!['PENDING', 'RUNNING'].includes(result.data.status)) break;
-      await new Promise(resolve => setTimeout(resolve, 250));
-    }
-    if (result.data.status !== 'COMPLETED') throw new Error(`evaluation not completed: ${JSON.stringify(result.data)}`);
-    return result.data;
+    const result = await pollEvaluation(() => request(`/agent-lab/evaluations/${started.data.id}`, { token: admin }));
+    if (result.status !== 'COMPLETED') throw new Error(`evaluation not completed: ${JSON.stringify(result)}`);
+    return result;
   }
   const versionId = agent.data.versions[0].id;
   const before = await request(`/agent-lab/agents/${agent.data.id}/versions/${versionId}/release-gate`, { token: admin });

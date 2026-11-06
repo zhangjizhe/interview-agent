@@ -110,6 +110,7 @@ docker cp scripts/ci/fixture-auth-email.mjs "$fixture_api:/tmp/fixture-auth-emai
 docker cp scripts/ci/fixture-auth-http.mjs "$fixture_api:/tmp/fixture-auth-http.mjs"
 docker cp scripts/ci/read-fixture-auth-code.mjs "$fixture_api:/tmp/read-fixture-auth-code.mjs"
 docker cp scripts/ci/verify-configured-release.mjs "$fixture_api:/tmp/verify-configured-release.mjs"
+docker cp scripts/ci/poll-evaluation.mjs "$fixture_api:/tmp/poll-evaluation.mjs"
 docker cp scripts/ci/verify-question-gateway.mjs "$fixture_api:/tmp/verify-question-gateway.mjs"
 docker cp scripts/ci/verify-question-catalog.mjs "$fixture_api:/tmp/verify-question-catalog.mjs"
 docker cp scripts/ci/verify-portfolio-assistant.mjs "$fixture_api:/tmp/verify-portfolio-assistant.mjs"

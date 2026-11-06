@@ -80,7 +80,7 @@ jobs:
       - name: Cache tests
         run: |
           pnpm --filter api test:unit
-          node --test scripts/ci/cache-retention.test.mjs
+          node --test scripts/ci/cache-retention.test.mjs scripts/ci/poll-evaluation.test.mjs
       - name: Interview and Lab component tests
         run: pnpm --filter web test
       - name: Portable portfolio site and Lab bridge contracts

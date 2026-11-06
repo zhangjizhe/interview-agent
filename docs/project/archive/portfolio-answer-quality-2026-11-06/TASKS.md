@@ -1,0 +1,20 @@
+Archived pre-task snapshot. The formerly pending main run41978781268 was subsequently verified FAILED on429; current facts are in the live context.
+
+# Tasks
+
+Final post-freeze receipt · bounded portfolio connection phase complete. PR66 merged as `ac5a77b27b89361cc404aa9ba8b71040177dd44c`; local main/agent-lab and both remote refs synchronized/read back. Merge tree exactly equals verified source `3ccad27de4a1195fd592be681dc42555b710d172`. Exact push41975970753 and PR41975977072 both SUCCESS, all five jobs each including summaries; original lint and Docker logs from both runs reviewed. API1234 passed/22 skipped, Web340, portable31, gateway8 on Node20/22, all product types/lint/build, isolated synthetic API/browser and strict PostgreSQL schema/row/sequence plus Milvus/Qdrant recovery passed. These CI fixtures do not replace the separate real Qwen/Site evidence below.
+
+Main post-merge automatic Product run41978781268 is in progress; no main-post-merge/all-workflow-green claim. Previous experimental Python failure remains separate. Do not rerun unchanged checks or paid calls. Wait for user continuation before beginning another phase.
+
+Cost receipt after the controlled34 calls: three additional public visits were observed (actor not attributed), all completed with known costs and separately retained in the private ledger. Known total37 calls/0.0065252CNY estimate at that read, not a bill or future-usage guarantee; historical unknown4 remain unknown. Daily public cap10 and version cap0.03 unchanged; no Redis reset. The ephemeral native-password administrator control session was closed after reads; no password saved. Actual product API/gateway/tunnel remain running. Automatic background Keychain access was not approved/installed; restart requires manual recovery. Overall product, protected UI drill-through, multi-turn context and spare-PC/permanent service remain NOT_ACCEPTED.
+
+
+2026-11-05 · One active topic: PORTFOLIO-LIVE-CONNECTION. User explicitly prioritized the hosted portfolio connection, chose local deployment and authorized Sites/Cloudflare dedicated server-only authentication.
+
+- Completed locally: normal administrator login; dedicated Agent normal gate/publish; frozen neutral contract dataset;30 real Qwen evaluation samples; authenticated report and30 Run/Trace readback; one real local public-corpus answer with citation; independent restricted gateway and external404/401/403 boundaries; Site version5/source/runtime-secret deployment; official Site service-access cited answer and refusal with original request mapping; user-confirmed page answer/source links; report persistence after actual API recreation.
+- Pending: protected report→Trace UI inspection; bounded conversational context; the main automatic post-merge result (source checks passed and refs are already synchronized).
+- Deployment limit: temporary tunnel/current computer only. No sustained uptime, reboot recovery or spare-PC migration claim. Automatic Keychain background access was not approved or installed. Use manual secret reinjection after Docker restart.
+- Quality/billing limit: deterministic synthetic-document contracts executed on real Qwen are not product-wide or semantic acceptance. Known new estimate34 calls/0.0058692CNY; historical unknown4 retained. New test reservations never exceed3CNY, each planned call≤0.03CNY; unknown/pending is not zero. Do not rerun passed or failed calls without a new justified path/budget.
+- Deferred: portable bounded conversation context and Lab report→Trace UI WIP; generic article/document/question collection governance WIP and its remaining database test fixture-scope issue; permanent ingress/host migration; existing experimental Python CI failure; explicitly opted-in legacy direct-provider Worker compatibility (not part of the default Lab path). Do not commit/deploy these with the gateway.
+
+Detailed current facts: [CURRENT_STATE.md](CURRENT_STATE.md). Prior task register preserved in [archive](archive/portfolio-connect-2026-11-05/TASKS_BEFORE.md).

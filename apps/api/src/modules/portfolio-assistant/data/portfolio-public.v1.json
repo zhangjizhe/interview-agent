@@ -2,11 +2,11 @@
   "schemaVersion": "portfolio-public/v1",
   "source": {
     "title": "张继哲 · AI 应用前端工程师",
-    "revision": "2026-11-03-public-sanitized-v3",
-    "capturedAt": "2026-11-03",
-    "authority": "owner-provided-public-page",
+    "revision": "2026-11-05-owner-confirmed-rtc-v4",
+    "capturedAt": "2026-11-05",
+    "authority": "owner-authorized-public-profile",
     "verifiedAgainstRepository": false,
-    "htmlSha256": "f51dc4d61b5cfd198485f8babeaa4fb7256c8d9e5dc7074a620a1678294d5747"
+    "htmlSha256": "7696556ec1ded073ff22b4b590802629f858577a6f9c73549ae2739a72ec1e68"
   },
   "documents": [
     {
@@ -106,7 +106,7 @@
       "id": "cti",
       "title": "CTI 电销管理平台",
       "href": "#projects",
-      "text": "众安在线／暖哇科技期间的核心项目。从 0 到 1 主导前端架构与核心模块开发，覆盖坐席外呼、通话控制、客户管理和坐席绩效。",
+      "text": "众安在线／暖哇科技期间的核心项目。从 0 到 1 主导前端架构与核心模块开发，覆盖坐席外呼、通话控制、客户管理和坐席绩效。 抽象呼叫控制层与服务商适配层，处理不同 CTI 协议与事件模型；结合长连接与本地状态处理通话状态同步和弱网异常；参与多租户配置、权限模型及多个 CTI 服务商接入。",
       "topics": [
         "cti",
         "众安",
@@ -115,7 +115,14 @@
         "坐席",
         "架构",
         "项目",
-        "project"
+        "project",
+        "实时通信",
+        "通信",
+        "长连接",
+        "弱网",
+        "状态同步",
+        "协议",
+        "接入"
       ]
     },
     {
@@ -136,7 +143,7 @@
       "id": "rtc",
       "title": "音视频与 IM SDK",
       "href": "#projects",
-      "text": "优刻得期间参与音视频业务 Web 场景及 SDK 实现，独立负责 urtc-im-sdk 开发与优化，处理多端兼容和客户接入问题。",
+      "text": "在优刻得 URtc 业务中协作开发 IM 聊天 SDK，其中初版由本人负责；后期主要负责用户案例与接入支持。参与监狱、医院、教育等领域的案例及 Demo 项目，包含大班课、小班课教学演示。工作涉及 Web 场景、多端兼容、SDK 接入、使用示例与客户问题处理。这里的职责为 IM SDK 初版和应用接入，不等同于独立实现音视频底层引擎。",
       "topics": [
         "音视频",
         "优刻得",
@@ -145,21 +152,36 @@
         "im",
         "sdk",
         "实时",
-        "项目"
+        "项目",
+        "实时通信",
+        "聊天",
+        "大班课",
+        "小班课",
+        "教育",
+        "医院",
+        "监狱",
+        "初版",
+        "接入"
       ]
     },
     {
       "id": "interview-agent",
       "title": "interview-agent 项目",
       "href": "#projects",
-      "text": "围绕简历输入、面试对话和结构化评价，构建 AI 面试训练应用。以真实的异步流程，实践流式交互、会话状态隔离和异常恢复。",
+      "text": "围绕简历输入、面试对话和结构化评价，构建 AI 面试训练应用。以真实的异步流程，实践流式交互、会话状态隔离和异常恢复。 通过 SSE Hook 处理心跳、取消及请求生命周期，隔离迟到响应，在流结束后核验服务端业务状态，并实践结构化评价、题库和浏览器流程验证。",
       "topics": [
         "interview-agent",
         "面试",
         "agent",
         "开源",
         "项目",
-        "project"
+        "project",
+        "流式",
+        "会话",
+        "sse",
+        "取消",
+        "状态",
+        "实时交互"
       ]
     },
     {

@@ -1,11 +1,11 @@
 # Tasks
 
-2026-11-05 · One active topic: PORTFOLIO-LIVE-CONNECTION. User explicitly prioritized the hosted portfolio connection, chose local deployment and authorized Sites/Cloudflare dedicated server-only authentication.
+2026-11-06 · One active phase: PORTFOLIO-ANSWER-QUALITY.
 
-- Completed locally: normal administrator login; dedicated Agent normal gate/publish; frozen neutral contract dataset;30 real Qwen evaluation samples; authenticated report and30 Run/Trace readback; one real local public-corpus answer with citation; independent restricted gateway and external404/401/403 boundaries; Site version5/source/runtime-secret deployment; official Site service-access cited answer and refusal with original request mapping; user-confirmed page answer/source links; report persistence after actual API recreation.
-- Pending: protected report→Trace UI inspection; bounded conversational context; exact new repository CI/PR/main synchronization.
-- Deployment limit: temporary tunnel/current computer only. No sustained uptime, reboot recovery or spare-PC migration claim. Automatic Keychain background access was not approved or installed. Use manual secret reinjection after Docker restart.
-- Quality/billing limit: deterministic synthetic-document contracts executed on real Qwen are not product-wide or semantic acceptance. Known new estimate34 calls/0.0058692CNY; historical unknown4 retained. New test reservations never exceed3CNY, each planned call≤0.03CNY; unknown/pending is not zero. Do not rerun passed or failed calls without a new justified path/budget.
-- Deferred: portable bounded conversation context and Lab report→Trace UI WIP; generic article/document/question collection governance WIP and its remaining database test fixture-scope issue; permanent ingress/host migration; existing experimental Python CI failure; explicitly opted-in legacy direct-provider Worker compatibility (not part of the default Lab path). Do not commit/deploy these with the gateway.
+- Locally/live complete: source enrichment and owner responsibility boundaries; separate bounded Chinese technical guide; JSON transport/validation; fixed official citations; two prior user-question follow-up; normal30-sample evaluation/publish; three actual hosted questions, idempotent repeat and real no-Run refusal; private report/Run/Trace persistence and cost readback.
+- Delivery finalization: scoped source diff and exact corresponding green CI, PR merge/main-agent-lab remote readback. Previous ac5 CI does not certify this source; prior main GET429 is documented and fixed with read-only polling backoff.
+- Remains incomplete: human/automated visual review of new answers, broader semantic quality and long-running acceptance, true token streaming, protected report→Trace UI, stable hostname/spare-PC migration, restart recovery.
+- Paused/excluded: generic collection/record/grant isolation WIP and database fixture-scope issue; other old auth/report UI changes. Never deploy its schema or publish private knowledge bindings with this task. Existing experimental Python workflow failure remains separate.
+- Cost/deployment: private ledger and four historical unknowns preserved; each planned call0.03CNY, total effective new spent/outstanding≤3. Daily cap10 unchanged; no volume reset, auth bypass, hidden output repair, automatic failed-run replay or unauthorized background Keychain access.
 
-Detailed current facts: [CURRENT_STATE.md](CURRENT_STATE.md). Prior task register preserved in [archive](archive/portfolio-connect-2026-11-05/TASKS_BEFORE.md).
+Detailed evidence and limits: CURRENT_STATE.md and acceptance/PORTFOLIO_ANSWER_QUALITY.md. Finish this phase and await continuation before another topic.
