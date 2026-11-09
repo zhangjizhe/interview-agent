@@ -1,5 +1,7 @@
 # 当前架构地图
 
+2026-11-09 recording candidate: ControlledEvolutionWorkspace → EvaluationRunLinks → existing ADMIN/workspace-scoped GET Run/Trace. Panel checks report Agent/version identity, hides private payloads and has no execution mutations.
+
 2026-11-06 portfolio presentation repair: rank fixed technical references by retrieved evidence; retain exact validated legacy inputs for paid Run reconciliation. Strict professional renderer still fails missing notes; delivery catches only that typed condition to return verbatim public facts, with facts-only evidence mode and a text-free operator diagnostic. No new model call, schema, public protocol or publication path.
 
 2026-11-05: portfolio-assistant → fixed public profile + technical registry → normally published configured guide → existing Gateway/Run/Trace. JSON-object transport is explicit opt-in; server validates all output before public display. No new database/schema/tool/private retrieval. Site v7 preserves v6 cache/optional stream adapter and sends bounded prior user questions on follow-ups.
