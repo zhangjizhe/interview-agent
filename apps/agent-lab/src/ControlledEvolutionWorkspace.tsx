@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import './controlled-evolution.css';
 import { api } from './api';
+import { EvaluationRunLinks } from './EvaluationRunLinks';
 import { acquireEvaluationRequest, confirmEvaluationRequest, requireEvaluationReceipt } from './evaluation-receipt';
 
 type AgentVersion = {
@@ -82,7 +83,7 @@ type Evaluation = {
   error?: string;
   metrics?: { repeatCount?: number; totalSamples?: number; cachePolicy?: string;
     budget?: { completedSamples?: number; spentCny?: number; costEvidenceStatus?: string }; qualityEvidence?: QualityEvidence };
-  results?: Array<{ id: string; passed: boolean; failureMessage?: string; datasetCase?: { key: string }; metrics?: unknown; evidence?: { samples?: Array<{ assertions?: AssertionResult[] }> } }>;
+  results?: Array<{ id: string; runId?: string | null; run?: { id?: string }; passed: boolean; failureMessage?: string; datasetCase?: { key: string }; metrics?: unknown; evidence?: { runIds?: string[]; samples?: Array<{ assertions?: AssertionResult[] }> } }>;
 };
 
 export function ControlledEvolutionWorkspace() {
@@ -479,6 +480,7 @@ export function ControlledEvolutionWorkspace() {
         {evaluationDetails.data.results?.map(result => <article key={result.id}>
           <h4>{result.datasetCase?.key || result.id} · {result.passed ? '通过' : '未通过'}</h4>
           {result.failureMessage && <p className="evolution-rejection">{result.failureMessage}</p>}
+          <EvaluationRunLinks key={`${agentId}:${selectedEvaluationId}:${result.id}`} result={result} agentId={agentId} versionId={evaluationDetails.data!.agentVersion.id} />
           {result.evidence?.samples?.map((sample, index) => <section key={index} aria-label={`样本 ${index + 1} 断言`}>
             <h5>样本 {index + 1}</h5>
             {!sample.assertions?.length && <p>该样本未记录业务断言，不表示通过。</p>}

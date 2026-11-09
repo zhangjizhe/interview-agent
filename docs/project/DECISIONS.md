@@ -1,5 +1,7 @@
 # 当前决策索引
 
+2026-11-09: keep report drill-through read-only inside the report; do not switch into an editable Agent builder merely to inspect a historical sample. Reuse existing ownership-enforced APIs; show unknown cost/empty Trace/denial explicitly, with raw payloads excluded from recording summaries.
+
 2026-11-06: separate strict professional-quality evaluation from presentation availability. Only typed absent technical notes may yield exact verified facts under the existing verbatim evidence mode; unsafe or malformed output still fails closed. Rank fixed references by retrieved evidence; accept exact deterministic legacy/current snapshots to reconcile paid Runs without replay. No new prompt/model/schema or release-gate bypass.
 
 2026-11-05: add a distinct evidence-guide output role, fixed primary technical references and opt-in JSON transport; keep career facts verbatim, normal release gates and old selector rollback. See ADR in architecture-decisions.md. New contracts do not prove semantic or whole-product quality.

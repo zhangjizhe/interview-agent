@@ -1,11 +1,8 @@
 # Tasks
 
-2026-11-06 · One active phase: PORTFOLIO-DELIVERY-FAILURE.
+2026-11-09 RECORDING-TRACE-DELIVERY. Baseline acfd2a8/PR69. New bounded UI adds report sample→read-only exact Run/Trace panel, keeps ADMIN/workspace API enforcement and checks Agent/version provenance. No API/schema/model/prompt/publication changes or new paid calls. Full Web348 and8 focused tests, Lab type/build/scoped lint/diff pass; clean Lab Docker image built/deployed with original ports/mounts and rollback image retained. Actual normal browser session opened guide1.0.3 report and historical sample: COMPLETED/version1.0.3/one historical call/estimate0.000616/four ordered events; raw payloads hidden. CI/PR/main synchronization pending for this new source; old PR69 greens do not certify it. Whole product remains NOT_ACCEPTED.
 
-- Complete locally/live: actual failure diagnosis; ranked fixed references; exact legacy/current paid-input snapshots; strict-quality/facts-only-delivery separation;1264 API tests/27 skipped plus type/build/lint; clean Docker deployment/backup; actual original-request zero-call recovery; one new real hosted professional project answer and cost reconciliation.
-- Pending delivery: scoped source commit/push, exact corresponding green Product CI, PR merge and main/agent-lab remote readback. Prior PR67/68 greens do not certify this new diff.
-- Retain: original production failures, strict quality missing-note failures, old failed/30-sample reports and unknown historical costs. No new publication or paid evaluation is planned.
-- Future after continuation: broader semantic/career-quality review, visual browser inspection, true token streaming, protected report→Trace UI, permanent/spare-PC hosting and restart recovery.
-- Excluded/preserved: generic collection/record/grant isolation WIP, private knowledge bindings, database fixture-scope issue and unrelated auth/history/UI changes. Never deploy the dirty root schema or bypass publication/authentication.
-
-Evidence: acceptance/PORTFOLIO_DELIVERY_RECOVERY.md. Effective private test caps1.7191044≤3CNY; known estimates0.0578616; historical unknown4 remain unknown. Original caps/failures retained. No unchanged-condition failed-model replay or unauthorized background secret access.
+- Complete locally/live:8 focused regressions, full Web348, Lab types/build/lint, clean front-end deployment and real report→Run/Trace browser preflight;4-minute recording script.
+- Pending: precise GitHub CI/PR/main readback.
+- Excluded: data governance WIP, old Mac migration, stable ingress, broader semantic evaluation and full-product acceptance.
+- No new paid model tests planned; unknown costs remain unknown; do not expose secrets or delete data for recording.
