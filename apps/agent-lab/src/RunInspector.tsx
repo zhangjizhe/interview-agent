@@ -52,16 +52,16 @@ function Inspector({ runId, agentId, versionId, close }: { runId: string; agentI
     <header className="trace-heading"><div><p className="trace-eyebrow">RUN INSPECTOR · 只读排障</p><h2>运行详情</h2><code>{runId}</code></div>
       <div className="trace-actions"><button type="button" disabled={run.isFetching || trace.isFetching} onClick={refresh}>重新读取</button>{close && <button type="button" onClick={close}>关闭运行详情</button>}</div></header>
     {run.isPending && <p role="status">正在读取受保护运行…</p>}
-    {run.isError && <p role="alert">{run.error.message}</p>}
+    {run.isError && <p role="alert" aria-label="运行读取失败">{run.error.message}</p>}
     {data && <>
       <p className={`trace-status ${data.status === 'FAILED' ? 'is-failure' : ''}`}>状态：{data.status} · 版本：{data.agentVersion?.version ?? '未记录'}</p>
       <div className="trace-metrics"><div><span>模型调用</span><strong>{data.tokenUsage?.calls ?? '未知'}</strong></div><div><span>估算费用</span><strong>{costLabel(data.estimatedCost)}</strong></div><div><span>总耗时</span><strong>{durationLabel(data.latencyMs)}</strong></div><div><span>输入 / 输出 Token</span><strong>{data.tokenUsage?.promptTokens ?? '未知'} / {data.tokenUsage?.completionTokens ?? '未知'}</strong></div></div>
       <dl className="trace-properties"><div><dt>Agent</dt><dd>{data.agent?.name ?? data.agentId}</dd></div><div><dt>应用</dt><dd>{data.application ?? '未记录'}</dd></div><div><dt>开始 / 完成</dt><dd>{dateLabel(data.startedAt)} / {dateLabel(data.completedAt)}</dd></div>{data.parentRunId && <div><dt>父运行</dt><dd><code>{data.parentRunId}</code></dd></div>}</dl>
-      {data.error && <div className="trace-error-summary"><strong>运行失败原因</strong><p>{diagnosticText(data.error)}</p><small>凭据与邮箱已过滤；完整原始记录不在此页面导出。</small></div>}
+      {data.error && <div role="alert" aria-label="运行失败原因" className="trace-error-summary"><strong>运行失败原因</strong><p>{diagnosticText(data.error)}</p><small>凭据与邮箱已过滤；完整原始记录不在此页面导出。</small></div>}
       <div className="trace-toolbar"><h3>事件时间线 <small>{events.length} 条 · {failures.length} 条异常事件</small></h3><button type="button" disabled={!failures.length} onClick={() => { setGroup('all'); setSearch(''); setSelected(failures[0].id); setShowContent(false); }}>定位首个异常</button></div>
       <div className="trace-filters"><label>事件类型<select value={group} onChange={event => { setGroup(event.target.value); setShowContent(false); }}><option value="all">全部事件</option><option value="errors">仅异常</option><option value="model">模型调用</option><option value="tool">工具与审批</option><option value="workflow">工作流与子 Agent</option><option value="retrieval">检索与数据读取</option><option value="runtime">运行生命周期</option></select></label><label>搜索事件<input value={search} onChange={event => { setSearch(event.target.value); setShowContent(false); }} placeholder="类型、节点、调用 ID 或序号" /></label></div>
       {trace.isPending && <p role="status">正在读取 Trace…</p>}
-      {trace.isError && <p role="alert">Trace 读取失败：{trace.error.message}</p>}
+      {trace.isError && <p role="alert" aria-label="Trace 读取失败">Trace 读取失败：{trace.error.message}</p>}
       {!trace.isPending && !trace.isError && !events.length && <p>未记录 Trace 事件；不代表运行已通过评测。</p>}
       {!trace.isPending && !trace.isError && Boolean(events.length) && <div className="trace-split"><div className="trace-timeline" aria-label="事件列表">{visible.length ? visible.map(event => <button key={event.id} type="button" className={`trace-event ${isFailure(event) ? 'is-failure' : ''}`} aria-pressed={current?.id === event.id} onClick={() => { setSelected(event.id); setShowContent(false); }}>
         <span className="trace-event-title">{event.seq} · {event.type}{event.step ? ` · ${event.step}` : ''}</span><span>{event.name ?? event.type}{isFailure(event) ? ' · 事件失败' : ''}</span><small>{dateLabel(event.createdAt)}{numeric(event.latencyMs) ? ` · ${durationLabel(event.latencyMs)}` : ''}</small>

@@ -85,7 +85,7 @@ it.each([403, 404])('keeps denied/missing runtime %s distinct from an empty work
 it.each([null, [{ ...events[0], runId: 'foreign-run' }], [events[0], events[0]]])('rejects malformed or mixed-run Trace %# without inventing events', async trace => {
   setup(url => url.endsWith('/trace') ? trace : run());
   view(<RunInspector runId="run-1" />);
-  expect(await screen.findByRole('alert')).toHaveTextContent(/Trace 读取失败/);
+  expect(await screen.findByRole('alert', { name: 'Trace 读取失败' })).toHaveTextContent(/Trace 读取失败/);
   expect(screen.queryByLabelText('事件列表')).not.toBeInTheDocument();
 });
 it('shows list failure rather than no-data and supports GET retry', async () => {
@@ -106,7 +106,7 @@ it('hides stale Run/Trace on failed reread and resets revealed content when Run 
   fireEvent.click(screen.getByRole('button', { name: /查看运行输入与最终输出/ }));
   expect(screen.getByText(/question-private/)).toBeInTheDocument();
   fail = true; fireEvent.click(screen.getByRole('button', { name: '重新读取' }));
-  await screen.findByRole('alert');
+  await screen.findByRole('alert', { name: '运行读取失败' });
   expect(screen.queryByLabelText('事件列表')).not.toBeInTheDocument();
   expect(screen.queryByText(/question-private/)).not.toBeInTheDocument();
   rendered.rerender(<QueryClientProvider client={clients[0]}><RunInspector runId="another-run" /></QueryClientProvider>);
@@ -132,4 +132,14 @@ it('times out a stalled read, exposes a retry, and never sends a model mutation'
   expect(screen.getByRole('button', { name: '重新读取' })).toBeEnabled();
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(fetch.mock.calls[0][1]?.method).toBeUndefined();
+});
+
+it('preserves the accessible failed-Run alert used by the real external-init browser regression', async () => {
+  setup(url => url.endsWith('/trace') ? [] : run());
+  view(<RunInspector runId="run-1" />);
+  const alert = await screen.findByRole('alert', { name: '运行失败原因' });
+  expect(alert).toHaveTextContent('Output validation failed');
+  expect(alert).not.toHaveTextContent('secret-error');
+  expect(alert).not.toHaveTextContent('user@example.com');
+  expect(alert).toHaveTextContent('[已隐藏]');
 });
