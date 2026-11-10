@@ -1,5 +1,9 @@
 # Changelog
 
+2026-11-10 question UX: restore Lab file/URL import through existing APIs with explicit submission, real drag/drop, supported-format/size checks, distinct job/topic/level fields, pending locks, honest save/index receipts and retained drafts. Refine scoped buttons/forms/list details and move storage maintenance below everyday actions. Local frontend verified; model import quality and backend503 deployment remain separate acceptance.
+
+2026-11-10 uncommitted read-recovery candidate: separate read-only historical RAG library from editable business questions; bounded existing authenticated list, local filters, explicit text and honest loaded counts. Knowledge list storage failures return503 rather than successful empty arrays. Original local storage services recovered; new source deployment/CI remain pending. No schema, grant, import or model-call change.
+
 2026-11-09 recording candidate: read-only evaluation sample → exact owned Run/Trace panel, deduplicated repeat references, provenance checks and private-content-free metadata. No model/schema/API/publication changes. Recording script distinguishes historical paid samples, synthetic checks and live browser evidence.
 
 2026-11-06 portfolio delivery recovery candidate: prioritize technical references by retrieved evidence; preserve exact legacy paid-input snapshots; deliver validated facts only when optional technical notes are absent while strict quality still fails. No model replay, prompt/model/schema or Site protocol change. Actual deployment/CI acceptance is tracked in docs/acceptance/PORTFOLIO_DELIVERY_RECOVERY.md.

@@ -1,5 +1,9 @@
 # 当前架构地图
 
+2026-11-10 题库UX：Lab QuestionImportPanel复用原Interview import-file/import-url，文件选择不自动提交，岗位/category/level显式归类，严格回执与PENDING显示，错误后保留页面草稿且不自动付费重放。高级维护下移折叠。无schema/API/权限变化；本机只替换前端，真实导入效果与后台任务/幂等仍未验收。见[UX证据](QUESTION_BANK_UX.md)。
+
+2026-11-10 读取恢复候选：Lab题库页新增独立KnowledgeLibraryPanel → 既有知识list GET → 可信组织Qdrant历史集合；与Interview业务题库（LEGACY Milvus或已采用PG）及评测数据分开。只读200条上限/本地筛选/纯文本展开；service存储失败改503。无新schema/授权/模型调用，未部署验收。原存储已启动且读到16业务题/约142RAG记录，完整历史对账未完成。见[读取恢复证据](QUESTION_BANK_READ_RECOVERY.md)。
+
 2026-11-09 recording candidate: ControlledEvolutionWorkspace → EvaluationRunLinks → existing ADMIN/workspace-scoped GET Run/Trace. Panel checks report Agent/version identity, hides private payloads and has no execution mutations.
 
 2026-11-06 portfolio presentation repair: rank fixed technical references by retrieved evidence; retain exact validated legacy inputs for paid Run reconciliation. Strict professional renderer still fails missing notes; delivery catches only that typed condition to return verbatim public facts, with facts-only evidence mode and a text-free operator diagnostic. No new model call, schema, public protocol or publication path.

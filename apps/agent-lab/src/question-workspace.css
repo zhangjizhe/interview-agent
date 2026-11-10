@@ -1,0 +1,48 @@
+/* Scoped to question management; does not restyle other workspaces. */
+.qb-workspace { --qb-border:var(--lab-border,#dfe3eb); --qb-text:var(--lab-text,#202938); --qb-muted:var(--lab-muted,#68727d); --qb-primary:var(--lab-primary,#4f46c8); color:var(--qb-text); }
+.qb-toolbar, .qb-import { background:#fff; border:1px solid var(--qb-border); border-radius:10px; padding:24px; min-width:0; }
+.qb-section-head { display:flex; gap:20px; justify-content:space-between; align-items:flex-start; margin-bottom:22px; }
+.qb-section-head h2, .qb-list-heading h2 { margin:0; font-size:18px; font-weight:650; letter-spacing:normal; }
+.qb-section-head p, .qb-help, .qb-form-footer p { margin:7px 0 0; color:var(--qb-muted); font-size:12px; line-height:1.7; }
+.qb-header-actions { display:flex; gap:8px; flex-shrink:0; }
+.qb-workspace .qb-button, .qb-workspace .qb-methods button { min-height:38px; display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:9px 14px; border:1px solid transparent; border-radius:6px; font-size:12px; font-weight:550; line-height:1.5; white-space:nowrap; }
+.qb-workspace .qb-primary { background:var(--qb-primary); border-color:var(--qb-primary); color:#fff; }
+.qb-workspace .qb-primary:hover:not(:disabled) { background:#4239ae; }
+.qb-workspace .qb-secondary { background:#fff; border-color:#ced4de; color:#374151; }
+.qb-workspace .qb-secondary:hover:not(:disabled), .qb-workspace .qb-quiet:hover:not(:disabled) { background:#f1f3f8; }
+.qb-workspace .qb-quiet { color:#536174; background:transparent; }
+.qb-workspace .qb-button:disabled { cursor:not-allowed; opacity:.55; }
+.qb-workspace button:focus-visible, .qb-workspace summary:focus-visible, .qb-maintenance summary:focus-visible { outline:2px solid var(--qb-primary,#4f46c8); outline-offset:3px; }
+.qb-filterbar { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+.qb-field { display:flex; flex-direction:column; gap:7px; color:#445066; font-size:12px; min-width:0; }
+.qb-filterbar .qb-field { flex:1 1 180px; }.qb-filterbar .qb-search-field { flex:2 1 240px; }
+.qb-workspace .qb-field input, .qb-workspace .qb-field select { width:100%; min-height:40px; border:1px solid #c9d0dc; background:#fff; color:var(--qb-text); border-radius:6px; padding:9px 11px; box-sizing:border-box; }
+.qb-field small, .qb-create small { font-size:11px; line-height:1.6; color:var(--qb-muted); font-weight:400; }
+.qb-help { margin-top:12px; }
+.qb-list-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }.qb-list-heading h2 { display:flex; align-items:center; gap:8px; font-size:14px; }.qb-list-heading span { color:var(--qb-muted); font-size:11px; }
+.qb-workspace .question-bank-row { padding:22px 24px; gap:20px; }.qb-workspace .question-bank-row h2 { font-size:15px; margin:8px 0 14px; overflow-wrap:anywhere; }
+.qb-workspace .question-bank-row details { border:1px solid #e4e8ef; border-radius:6px; background:#fafbfe; padding:10px 12px; margin:12px 0; }
+.qb-workspace .question-bank-row summary { font-size:12px; font-weight:550; cursor:pointer; }.qb-workspace .question-bank-row details p { white-space:pre-wrap; overflow-wrap:anywhere; max-height:420px; overflow:auto; font-size:13px; line-height:1.85; }
+.qb-workspace .qb-icon-button { min-width:34px; min-height:34px; border:1px solid #dce2eb; border-radius:6px; background:#fff; display:inline-flex; align-items:center; justify-content:center; color:#64748b; flex-shrink:0; }
+.qb-workspace .qb-danger { color:#b83b45; }.qb-workspace .qb-danger:hover:not(:disabled) { background:#fff0f1; border-color:#e8bcc1; }
+.qb-import form, .qb-import fieldset { display:grid; gap:20px; }.qb-import fieldset { border:0; padding:0; margin:0; min-width:0; }
+.qb-import fieldset:disabled { opacity:.7; }.qb-step-label { color:var(--qb-muted); font-size:11px; line-height:1.8; white-space:nowrap; }
+.qb-methods { display:flex; gap:6px; padding:4px; background:#f1f3f7; border-radius:8px; width:max-content; margin-bottom:22px; }
+.qb-workspace .qb-methods button { background:transparent; color:#5d697b; border:1px solid transparent; min-height:34px; padding:7px 14px; }.qb-workspace .qb-methods button[aria-pressed=true] { background:#fff; border-color:#dfe3eb; color:var(--qb-primary); box-shadow:0 1px 2px #1720330a; }
+.qb-dropzone { display:flex; flex-direction:column; align-items:center; gap:10px; padding:28px 24px; border:1px dashed #bac5d7; border-radius:8px; background:#fafbfe; text-align:center; min-width:0; }
+.qb-dropzone>svg { color:#7b86a0; }.qb-dropzone>strong { font-size:14px; }.qb-dropzone>p { margin:0; font-size:12px; color:var(--qb-muted); }.qb-dropzone.is-dragging { background:#eef0ff; border-color:var(--qb-primary); }
+.qb-file-input { position:absolute; width:1px!important; height:1px!important; min-height:0!important; padding:0!important; opacity:0; clip-path:inset(50%); }
+.qb-file-receipt { display:flex; gap:12px; align-items:center; padding:14px; margin-top:5px; width:100%; max-width:520px; background:#fff; border:1px solid #dfe3eb; border-radius:6px; text-align:left; box-sizing:border-box; }
+.qb-file-receipt>span { display:grid; gap:4px; flex:1; min-width:0; }.qb-file-receipt strong { overflow-wrap:anywhere; font-size:12px; }.qb-file-receipt small { color:var(--qb-muted); font-size:11px; }
+.qb-metadata { display:grid; grid-template-columns:1fr 1fr .65fr; gap:16px; }.qb-required { font-size:10px; color:#6b7280; }.qb-check { display:flex!important; flex-direction:row!important; align-items:flex-start; gap:9px; font-size:12px; line-height:1.7; color:#4b5563; }
+.qb-workspace .qb-check input { width:16px; height:16px; min-height:16px; margin:3px 0 0; accent-color:var(--qb-primary); flex-shrink:0; }
+.qb-notice { padding:12px 14px; margin:0; background:#f6f7fb; border-left:3px solid #b9c2d5; color:#596579; font-size:12px; line-height:1.8; }
+.qb-workspace .qb-feedback { border:1px solid #dfe3eb; background:#f7f9fc; padding:15px 18px; border-radius:7px; font-size:12px; line-height:1.8; margin:0; overflow-wrap:anywhere; }.qb-feedback p { margin:6px 0; }.qb-feedback.is-error { background:#fff4f4; color:#9e3340; border-color:#edc5ca; }.qb-feedback.is-success { background:#f0f9f4; color:#246347; border-color:#c3e3d0; display:flex; gap:10px; align-items:flex-start; }.qb-feedback.is-success>svg { flex-shrink:0; margin-top:3px; }
+.qb-form-footer { border-top:1px solid #e3e7ee; padding-top:18px; display:flex; align-items:center; justify-content:space-between; gap:16px; }.qb-form-footer p { margin:0; }
+.qb-workspace .qb-create { border-color:var(--qb-border); padding:24px; gap:18px; }.qb-create .qb-section-head { margin:0; }.qb-create textarea { resize:vertical; line-height:1.8; }.qb-create>button { justify-self:start; }
+.qb-maintenance { margin-top:24px; border:1px solid #dfe3eb; background:#fff; border-radius:8px; }.qb-maintenance>summary { cursor:pointer; padding:16px 20px; font-size:12px; color:#5b6474; }.qb-maintenance>summary span { float:right; font-size:11px; color:#7a8392; }.qb-maintenance .lab-command-form { border:0; border-top:1px solid #e5e8ee; border-radius:0; }
+.qb-sr-only { position:absolute; height:1px; width:1px; overflow:hidden; clip-path:inset(50%); }
+@keyframes qb-turn { to { transform:rotate(360deg); } }.qb-spin { animation:qb-turn 1s linear infinite; }@media(prefers-reduced-motion:reduce) { .qb-spin { animation:none; } }
+@media(max-width:800px) { .qb-section-head { flex-wrap:wrap; }.qb-metadata { grid-template-columns:1fr; }.qb-toolbar,.qb-import,.qb-workspace .qb-create { padding:18px; }.qb-header-actions { width:100%; }.qb-header-actions button { flex:1; }.qb-form-footer { flex-direction:column; align-items:stretch; }.qb-list-heading { align-items:flex-start; flex-wrap:wrap; }.qb-workspace .question-bank-row { padding:18px; }.qb-step-label { white-space:normal; } }
+.qb-maintenance .lab-command-form { display:flex; flex-direction:column; align-items:flex-start; gap:12px; }.qb-maintenance .lab-command-form h2 { margin:0; font-size:15px; }.qb-maintenance .lab-command-form p { margin:0; font-size:12px; line-height:1.8; color:#68727d; }.qb-maintenance .lab-command-form label { display:flex; align-items:flex-start; gap:8px; line-height:1.8; }.qb-maintenance input[type=checkbox] { width:16px; height:16px; min-height:16px; padding:0; margin:3px 0 0; flex-shrink:0; }
+.qb-field-title { display:flex; align-items:center; justify-content:space-between; gap:8px; }.qb-workspace [aria-invalid=true] { border-color:#bb4552!important; }.qb-workspace [aria-invalid=true]:focus-visible { outline-color:#bb4552; }
