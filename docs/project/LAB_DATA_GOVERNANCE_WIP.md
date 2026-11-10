@@ -1,6 +1,6 @@
 # LAB-DATA-GOVERNANCE acceptance
 
-2026-11-10 resumed after PR #71. Candidate source is based on agent-lab3c8f089 (same tree as main19e911e); original services/volumes are unchanged. Earlier suspended implementation is reused, not rewritten. Exact final source/CI/PR receipt is pending.
+2026-11-10 resumed after PR #71. Source445d572 was pushed as PR #72 after fast-forwarding the unchanged tree to main19e911e; original services/volumes remain unchanged. Earlier suspended implementation is reused, not rewritten. A final CSS follow-up scopes binding checkbox size/layout so the generic Builder input rules cannot stretch it. Exact latest-source CI/merge receipt is pending.
 
 Implemented candidate: typed private QUESTION/ARTICLE/DOCUMENT collections; owner-only grants/archive/audit; explicit READ/WRITE; same-organization composite references; current authenticated actor; revision conflict and append-only history; logical record deletion; bounded lexical context from explicit AgentVersion bindings; execution reauthorization and data.read references without source bodies. Single-Agent clones clear bindings. Generic data remains separate from existing Interview questions and evaluation held-out datasets.
 
@@ -13,3 +13,5 @@ Actual verification so far:
 No external model requests; synthetic model evidence does not certify semantic quality. Original API auto-import/cost behavior prevents treating a source merge as safe local service upgrade. No original DB migration, API restart, actual new document import, model publication or real-user data migration has occurred.
 
 Remaining gate: final diff/secret and scoped staging, exact-source CI (including automated full Docker recovery), PR merge and remote readback. Resume uploads, URL/file extraction/semantic RAG, broad UI, actual model quality and whole-product acceptance are separate future phases.
+
+Final visual follow-up: isolated fixed-response preview at1100px/390px confirmed16px collection checkboxes and no horizontal overflow. Initial temporary preview entry could not resolve root-level workspace dependencies; moving it under the actual application dependency path fixed the harness. Preview is not a real model or deployment test. No API/DB/runtime change or repeated provider test was introduced by the CSS follow-up.

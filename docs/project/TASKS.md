@@ -2,7 +2,7 @@
 
 2026-11-10。
 
-- 当前：LAB-DATA-GOVERNANCE，资料类型/归属/显式ACL/版本绑定与撤权；隔离PG/HTTP42、API1283（47跳过）、Web385、runtime53及浏览器流程已有证据。专用PG备份恢复通过；完整自动Docker门和精确源码CI、PR合并/远端核对待完成。见LAB_DATA_GOVERNANCE_WIP.md。
+- 当前：LAB-DATA-GOVERNANCE，资料类型/归属/显式ACL/版本绑定与撤权；隔离PG/HTTP42、API1283（47跳过）、Web385、runtime53及浏览器流程已有证据。专用PG备份恢复通过；完整自动Docker门和精确源码CI、PR合并/远端核对待完成。主体445d572已推送PR #72，后补选框样式，最终只认最新对应CI。见LAB_DATA_GOVERNANCE_WIP.md。
 - 已完成前序：PR #71，main19e911e默认Product5绿；题库UX、Trace与历史读取恢复。业务16与RAG142为独立来源，完整历史对账与服务长期稳定性仍待查。原API503候选未部署。
 - 原服务升级：目前5175/API保持旧镜像与全部卷；资料治理候选仅在隔离服务验证。升级须先备份/迁移，并处理原启动自动Embedding的成本门，不能直接重启未核费用。
 - 导入后续：同步提题API缺持久任务、任务ID/可恢复结果/服务端幂等与完整来源Run链；UI防重复不能替代后台能力。真实模型验收先核私有费用账本。

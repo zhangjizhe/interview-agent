@@ -7,3 +7,5 @@
 已核对：DataGovernanceService/Controller/DTO、Prisma迁移、tenant-policy、ConfiguredRuntime/Registry与前端候选。旧DB失败来自夹具返回懒PrismaPromise时退出ALS，修复为在scope内await；拒绝断言保留。下一步独立PG迁移/DB矩阵、真实HTTP鉴权/撤权、持久Trace与克隆回归，再检查UI、相关lint/type/build/diff及最新CI。
 
 当前代码候选尚未交付/部署。原Lab5175仍PR #71镜像；原数据库/服务与卷保留，不触发启动Embedding。最终范围、部署与未核实边界必须逐项记录。资料提取、通用向量RAG、统一简历属于后续阶段。
+
+阶段回执：主体445d572已推送、PR #72已创建；DB/HTTP42、API1283/47skip、Web385、运行时53、隔离浏览器和专用PG恢复通过。后补Builder选框尺寸（固定响应1100/390px预览通过），最终以最新源码CI为准。原部署未更新；完整自动Docker门仍由CI核验，不能将本机手动gate退出记通过。

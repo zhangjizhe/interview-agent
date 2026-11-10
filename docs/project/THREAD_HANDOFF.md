@@ -2,7 +2,7 @@
 
 2026-11-10。用户在PR #71合并后要求继续；当前唯一主题LAB-DATA-GOVERNANCE，原暂停候选已经复核并扩充隔离验收。先读LAB_DATA_GOVERNANCE_WIP.md和docs/architecture/LAB_DATA_GOVERNANCE.md。
 
-当前agent-lab基线3c8f089，与main19e911e同tree；前序PR #71已合并，默认Product各组5绿。新资料治理源码尚未提交/部署，原5175仍题库UX镜像，原API/数据库/全部卷未重启或迁移。
+当前agent-lab基线3c8f089，与main19e911e同tree；前序PR #71已合并，默认Product各组5绿。主体源码445d572已推送PR #72，最后补选框布局，最新CI待核；尚未合并/部署，原5175仍题库UX镜像，原API/数据库/全部卷未重启或迁移。
 
 修改包括typed集合/ACL/复合外键/不可变历史与审计、当前身份/修订冲突、版本绑定/派发前重验授权、data.read实际revision/hash、克隆清空单Agent绑定、Lab资料页与选择器。旧Interview题库、历史RAG、评测Dataset仍独立；不提供任意表读写或通用向量RAG。
 
