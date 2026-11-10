@@ -80,3 +80,5 @@ ADR25 working-tree foundation: InterviewQuestionPresentation binds task and pres
 
 
 2026-11-05 portfolio ingress candidate: hosted Site server/BFF → independent restricted gateway → existing PortfolioAssistant/Redis admission → normally published configured Agent/Gateway → private Run/Trace and separate EvaluationRun report. API/admin/database ports retain loopback bindings. Gateway has only two public fixed routes and an independent server credential; temporary tunnel is not permanent server delivery. No schema/runtime rewrite. See [local ingress decision](../architecture/PORTFOLIO_LOCAL_INGRESS.md); user page confirmation and actual service-access answer/refusal passed; exact final CI remains pending.
+
+2026-11-09 Trace diagnostics candidate: RuntimeTraceWorkspace reads owned runtime Runs; shared RunInspector reads exact Run/Trace in main, builder and evaluation report. Legacy Harness summaries remain separate; no new API/schema or model path.

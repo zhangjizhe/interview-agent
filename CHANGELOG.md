@@ -185,3 +185,5 @@ Fixed the configured portfolio adapter for Workers redirect compatibility: use m
 ## Unreleased — portfolio evidence and professional explanation
 
 Complete owner-confirmed IM SDK initial-version and integration responsibilities, prison/hospital/education demos and classroom cases; restore omitted public CTI adapter, state and weak-network details. A separate evidence-guide role adds bounded, cited Chinese technical interpretation while personal facts remain verbatim. Optional JSON-object provider mode, fail-closed validation, fixed primary links and bounded follow-up context reuse the existing configured runtime, quotas and Run/Trace. No schema or deployment permanence claim. Repair CI GET polling after an observed429 without repeating evaluation POSTs. Failed real canaries/evaluation remain recorded; synthetic contract success is not semantic or full product acceptance.
+
+- 2026-11-10 (local acceptance; final CI pending): add real runtime Trace workbench and shared event inspector with failure navigation, bounded diagnostic filtering, explicit input/output expansion and GET-only recovery. Data/ingestion restoration remains pending.
