@@ -69,6 +69,7 @@ await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated
   await page.locator('.builder-workspace textarea[maxlength="10000"]').fill('browser-ci-check');
   await page.getByLabel('确认按已保存版本启动模型调用及预算').check();
   await page.getByRole('button', { name: '启动草稿测试', exact: true }).click();
+  await page.getByRole('button', { name: '查看运行输入与最终输出（过滤后的业务内容）', exact: true }).click();
   await textContains('fixture-response:browser-ci-check');
   await textContains('model.end');
   assert.match(await page.locator('body').innerText(), /COMPLETED/);
@@ -91,6 +92,7 @@ await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated
   assert.equal(persisted.tokenUsage.calls, 1);
   assert.ok(persisted.estimatedCost > 0);
   await textContains(`${persisted.estimatedCost} CNY`);
+  await page.getByRole('button', { name: '查看运行输入与最终输出（过滤后的业务内容）', exact: true }).click();
   await textContains('fixture-response:browser-ci-check');
   await page.getByRole('button', { name: `${reused.id} · COMPLETED`, exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: / · COMPLETED$/ }).count(), 1, 'repeated submit must share one run');
@@ -108,6 +110,7 @@ await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated
   const workflowRun = await (await workflowResponse).json();
   await page.getByRole('heading', { name: `运行 ${workflowRun.id}`, exact: true }).waitFor();
   await textContains('workflow.node.end');
+  await page.getByRole('button', { name: '查看运行输入与最终输出（过滤后的业务内容）', exact: true }).click();
   await textContains('fixture-response:route-yes');
   console.log('PASS browser workflow: saved new fixed-version draft and executed real branching nodes');
   await verifyQuestionEvidence(page, context, url);

@@ -18,18 +18,22 @@ export async function verifyRuntimeAdapterHistory(page, context, origin) {
     await page.getByRole('button', { name: `${run.id} · ${persisted.status}`, exact: true }).click();
     await page.getByRole('heading', { name: `运行 ${run.id}`, exact: true }).waitFor();
     await page.getByText(`运行 Agent：fixture-runtime-registry · 固定版本：${persisted.agentVersion.version}`, { exact: true }).waitFor();
+    const inspector = page.getByRole('region', { name: `Run ${run.id} 详情`, exact: true });
+    const timeline = inspector.locator('[aria-label="事件列表"]');
     if (persisted.status === 'FAILED') {
       assert.equal(persisted.output, null); assert.equal(persisted.estimatedCost, 0.012); assert.equal(persisted.tokenUsage.calls, 1);
       await page.getByRole('alert').filter({ hasText: '运行适配器最终输出无效' }).waitFor();
       await page.getByText('估算费用：0.012 CNY · 调用次数：1', { exact: true }).waitFor();
-      await page.locator('.builder-workspace li').filter({ hasText: 'run.failed' }).waitFor();
-      assert.equal(await page.locator('.builder-workspace pre').count(), 0);
+      await timeline.getByRole('button').filter({ hasText: 'run.failed' }).waitFor();
+      assert.equal(await inspector.locator('.trace-run-content pre').count(), 0, 'failed output remains collapsed');
     } else {
       assert.match(persisted.output.response, /^synthetic:fixture-adapter-(one|two)$/);
-      await page.locator('.builder-workspace pre').filter({ hasText: persisted.output.response }).waitFor();
-      await page.locator('.builder-workspace li').filter({ hasText: 'turn.end' }).waitFor();
+      assert.equal(await inspector.locator('.trace-run-content pre').count(), 0, 'business content is collapsed until requested');
+      await inspector.getByRole('button', { name: '查看运行输入与最终输出（过滤后的业务内容）', exact: true }).click();
+      await inspector.locator('.trace-run-content pre').filter({ hasText: persisted.output.response }).waitFor();
+      await timeline.getByRole('button').filter({ hasText: 'turn.end' }).waitFor();
     }
-    await page.locator('.builder-workspace li').filter({ hasText: 'turn.start' }).waitFor();
+    await timeline.getByRole('button').filter({ hasText: 'turn.start' }).waitFor();
     assert.equal(await page.getByRole('button', { name: '取消运行', exact: true }).isEnabled(), false);
   }
   assert.deepEqual(await questionInputSnapshot(), before); await select.selectOption('');
