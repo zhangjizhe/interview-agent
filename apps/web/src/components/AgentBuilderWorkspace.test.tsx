@@ -30,6 +30,7 @@ beforeEach(() => {
     if (options?.method === 'POST') return post(path, JSON.parse(options.body ?? '{}'));
     if (path === '/agent-lab/agents') return [agent];
     if (path === '/agent-lab/runtime/models') return [{ provider: 'qwen', model: 'Synthetic', enabled: true }];
+    if (path.startsWith('/agent-lab/data-collections?')) return { items: [], hasMore: false, page: 1 };
     if (path === `/agent-lab/agents/${agent.id}`) return agent;
     if (path === `/agent-lab/agents/${agent.id}/versions`) return [version];
     if (path.startsWith('/agent-lab/runs?')) return [];

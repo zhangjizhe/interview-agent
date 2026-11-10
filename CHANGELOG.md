@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-10 data governance candidate: private typed collections for questions/articles/documents, explicit owner-managed READ/WRITE grants, revision history and append-only audit, bounded authenticated CRUD, Agent-version bindings with current-access rechecks and source-revision Trace. Additive PostgreSQL migration; existing Interview/vector data retained. Isolated verification in progress; original API/Lab deployment and semantic RAG quality are not accepted by this source change.
+
 2026-11-10 question UX: restore Lab file/URL import through existing APIs with explicit submission, real drag/drop, supported-format/size checks, distinct job/topic/level fields, pending locks, honest save/index receipts and retained drafts. Refine scoped buttons/forms/list details and move storage maintenance below everyday actions. Local frontend verified; model import quality and backend503 deployment remain separate acceptance.
 
 2026-11-10 uncommitted read-recovery candidate: separate read-only historical RAG library from editable business questions; bounded existing authenticated list, local filters, explicit text and honest loaded counts. Knowledge list storage failures return503 rather than successful empty arrays. Original local storage services recovered; new source deployment/CI remain pending. No schema, grant, import or model-call change.

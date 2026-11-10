@@ -1,10 +1,11 @@
+import { DataBindingPicker } from './DataBindingPicker';
 import { RunInspector } from './RunInspector';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
 import './agent-builder.css';
 
-type Version = { id: string; version: string; status: string; systemPrompt: string; modelConfig: any; runtimeConfig: any; inputSchema?: any; outputSchema?: any };
+type Version = { id: string; version: string; status: string; systemPrompt: string; modelConfig: any; runtimeConfig: any; knowledgeBindings?: { collectionIds?: string[] }; inputSchema?: any; outputSchema?: any };
 type Agent = { id: string; name: string; key: string; description?: string; type: string; versions?: Version[]; currentVersion?: Version };
 type Node = { id: string; agentVersionId: string; inputFrom: 'input' | 'previous'; next?: string; branch?: { contains: string; then: string; else: string } };
 const inputSchema = { type: 'object', properties: { message: { type: 'string', maxLength: 10000 } }, required: ['message'], additionalProperties: false };
@@ -20,6 +21,7 @@ export function AgentBuilderWorkspace() {
   const [maxTokens, setMaxTokens] = useState(512); const [temperature, setTemperature] = useState(0.3);
   const [budget, setBudget] = useState(0.05); const [duration, setDuration] = useState(120000);
   const [nodes, setNodes] = useState<Node[]>([]);
+  const [collectionIds, setCollectionIds] = useState<string[]>([]);
   const [message, setMessage] = useState(''); const [runId, setRunId] = useState(''); const [confirmed, setConfirmed] = useState(false);
   const [feedback, setFeedback] = useState('');
   const pending = useRef<{ signature: string; key: string }>();
@@ -38,7 +40,7 @@ export function AgentBuilderWorkspace() {
   const refresh = async () => { await Promise.all([cache.invalidateQueries({ queryKey: ['registry-agents'] }), cache.invalidateQueries({ queryKey: ['builder-agent'] }), cache.invalidateQueries({ queryKey: ['builder-node-versions'] })]); };
   const definition = () => ({ version, systemPrompt: adapter === 'single-agent-v1' ? prompt : '',
     modelConfig: adapter === 'single-agent-v1' ? { provider, maxTokens, temperature } : {},
-    runtimeConfig: { adapter, maxEstimatedCostCny: budget, maxDurationMs: duration, ...(adapter === 'finite-workflow-v1' ? { nodes } : {}) }, inputSchema, outputSchema });
+    runtimeConfig: { adapter, maxEstimatedCostCny: budget, maxDurationMs: duration, ...(adapter === 'finite-workflow-v1' ? { nodes } : {}) }, ...(adapter === 'single-agent-v1' && collectionIds.length ? { knowledgeBindings: { collectionIds } } : {}), inputSchema, outputSchema });
   const save = useMutation({ onMutate: () => { setFeedback(''); }, mutationFn: async () => {
     const create = creating;
     const targetAgentId = agentId;
@@ -104,16 +106,17 @@ export function AgentBuilderWorkspace() {
     pending.current = undefined; setVersionId(item.id); setAdapter(item.runtimeConfig?.adapter ?? 'single-agent-v1'); setPrompt(item.systemPrompt);
     setProvider(item.modelConfig?.provider ?? 'qwen'); setMaxTokens(item.modelConfig?.maxTokens ?? 512); setTemperature(item.modelConfig?.temperature ?? 0.3);
     setBudget(item.runtimeConfig?.maxEstimatedCostCny ?? 0.05); setDuration(item.runtimeConfig?.maxDurationMs ?? 120000); setNodes(item.runtimeConfig?.nodes ?? []);
+    setCollectionIds(item.knowledgeBindings?.collectionIds ?? []);
     setVersion(item.version); setConfirmed(false);
   }
   function changeNode(index: number, patch: Partial<Node>) { setNodes(nodes.map((node, i) => i === index ? { ...node, ...patch } : node)); }
   const errors = [agents.error, selected.error, models.error, versions.error, run.error, history.error, save.error, start.error, cancel.error].filter(Boolean);
   return <section className="builder-workspace">
     <div className="builder-heading"><div><h2>Agent 与工作流</h2><p>配置保存为草稿；测试不会发布。工作流引用固定版本，按真实运行记录展示。</p></div>
-      <button disabled={contextLocked} onClick={() => { clearOperationErrors(); setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setCreating(true); setAgentId(''); setVersionId(''); setName(''); setKey(''); setDescription(''); setVersion('1.0.0'); setPrompt(''); setAdapter('single-agent-v1'); setNodes([]); }}>新增 Agent / 工作流</button></div>
+      <button disabled={contextLocked} onClick={() => { clearOperationErrors(); setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setCreating(true); setAgentId(''); setVersionId(''); setName(''); setKey(''); setDescription(''); setVersion('1.0.0'); setPrompt(''); setAdapter('single-agent-v1'); setNodes([]); setCollectionIds([]); }}>新增 Agent / 工作流</button></div>
     {errors.map((error, index) => <p role="alert" className="agent-error" key={index}>{String((error as Error).message)}</p>)}
     {feedback && <p role="status">{feedback}</p>}
-    <label>选择 Agent<select disabled={contextLocked} value={agentId} onChange={event => { clearOperationErrors(); setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setAgentId(event.target.value); setVersionId(''); setCreating(false); }}><option value="">请选择</option>{agents.data?.map(agent => <option value={agent.id} key={agent.id}>{agent.name} · {agent.key}</option>)}</select></label>
+    <label>选择 Agent<select disabled={contextLocked} value={agentId} onChange={event => { clearOperationErrors(); setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setAgentId(event.target.value); setCollectionIds([]); setVersionId(''); setCreating(false); }}><option value="">请选择</option>{agents.data?.map(agent => <option value={agent.id} key={agent.id}>{agent.name} · {agent.key}</option>)}</select></label>
     {!agents.isLoading && !agents.error && !agents.data?.length && <p>尚无自定义 Agent，点击新增并保存初始草稿。</p>}
     {agentId && <div><p>正式版本：{selected.data?.currentVersion?.version ?? '未发布'}</p><label>读取版本<select disabled={contextLocked} value={versionId} onChange={event => { const item = selected.data?.versions?.find(v => v.id === event.target.value); if (item) load(item); }}><option value="">选择版本</option>{selected.data?.versions?.map(item => <option key={item.id} value={item.id}>{item.version} · {item.status} · {item.runtimeConfig?.adapter}</option>)}</select></label></div>}
     {(creating || agentId) && <form onSubmit={event => { event.preventDefault(); if (!contextLocked) save.mutate(); }}><fieldset className="builder-save-fields" disabled={save.isPending}>
@@ -136,6 +139,7 @@ export function AgentBuilderWorkspace() {
           </div><button type="button" onClick={() => setNodes(nodes.filter((_, i) => i !== index))}>移除节点</button></fieldset>)}
           <button type="button" disabled={nodes.length >= 10} onClick={() => setNodes([...nodes, { id: `node-${nodes.length + 1}`, agentVersionId: '', inputFrom: nodes.length ? 'previous' : 'input' }])}>新增节点</button>
         </>}
+      {adapter === 'single-agent-v1' && <DataBindingPicker value={collectionIds} onChange={setCollectionIds} />}
       <p>输入：message 字符串；输出：response 字符串。每节点最多一次模型请求，禁用自动 fallback，工具/记忆绑定尚未开放。</p>
       <button type="submit" disabled={contextLocked}>{save.isPending ? '保存中' : creating ? '创建并保存初始草稿' : '保存新版本草稿'}</button>
     </fieldset></form>}

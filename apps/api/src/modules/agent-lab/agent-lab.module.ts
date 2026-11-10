@@ -1,3 +1,5 @@
+import { DataGovernanceController } from './data-governance.controller';
+import { DataGovernanceService } from './data-governance.service';
 import { RuntimeAdapterRegistry } from './runtime-adapter.registry';
 import { createBuiltinRuntimeAdapters } from './builtin-runtime.adapters';
 import { MultiAgentService } from '../agent/multi-agent.service';
@@ -32,8 +34,9 @@ import { ControlledEvolutionService } from './controlled-evolution.service';
 
 @Module({
   imports: [PrismaModule, AgentModule, InferenceModule, LlmModule],
-  controllers: [AgentLabController, AgentRegistryController, AgentRuntimeController, EvaluationController, ApplicationController, ControlledEvolutionController],
+  controllers: [DataGovernanceController, AgentLabController, AgentRegistryController, AgentRuntimeController, EvaluationController, ApplicationController, ControlledEvolutionController],
   providers: [
+    DataGovernanceService,
     AgentLabService,
     ConfiguredRuntimeService,
     { provide: 'CONFIGURED_RUNTIME', useExisting: ConfiguredRuntimeService },

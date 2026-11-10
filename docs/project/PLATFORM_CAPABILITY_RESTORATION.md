@@ -2,7 +2,7 @@
 
 2026-11-09 建立，2026-11-10 续验。基线 `agent-lab` / `4e33101aca32582caf372690c6fe5f29466d8b3f`。本轮用户要求：改进 Trace 交互，恢复题库分权、简历上传、URL/文件提取与 RAG。按阶段交付，每阶段完成后等待用户继续；不能把第一阶段称为全部恢复。
 
-2026-11-10 优先级调整：用户先要求排查历史题库读取。读取服务恢复后，用户继续要求上传/主题/按钮细节；当前唯一活动为 [QUESTION-BANK-UX](QUESTION_BANK_UX.md)。历史恢复证据保留在 QUESTION_BANK_READ_RECOVERY.md。Phase 1 Trace 的远端CI失败，收尾保留在 [TRACE_DIAGNOSTICS_WIP](TRACE_DIAGNOSTICS_WIP.md)，尚未通过阶段验收。以下为原阶段计划，不能把暂停当完成。
+2026-11-10 当前进度：Trace、历史只读恢复和题库UX已由PR #71合并，main19e911e对应默认Product5绿。用户要求继续后，唯一活动主题切到Phase2资料集合分权，复用暂停候选，补DB/HTTP/运行时撤权与浏览器证据。原服务仍PR #71前端/原API；新资料治理尚未部署。以下源码缺口表保留为计划建立时的基线，不作为当前验收结论。
 
 ## 源码核对与缺口
 
@@ -16,7 +16,7 @@
 
 以上为当前代码核对，不表示真实 API 或运行环境本轮全部通过。历史宪法功能清单和旧验收不用于证明当前可用性。
 
-## Phase 1：Trace 排障工作台（未通过验收，暂停收尾）
+## Phase 1：Trace 排障工作台（已随PR #71合并，默认产品CI通过）
 
 - 列出真实工作区最近 100 个 Run，按状态/Agent/应用/ID 筛选；支持指定 ID 查看更早记录。
 - 共享 RunInspector：版本、应用、输入/输出 Token、调用数、估算费用、耗时、错误原因；可刷新但不重跑。
@@ -26,7 +26,7 @@
 - 文件：RuntimeTraceWorkspace、RunInspector、trace-diagnostics、trace-workbench.css，连接 main、AgentBuilderWorkspace、EvaluationRunLinks；组件回归与实际浏览器检查。
 - 测试：GET-only、精确 Run/版本、403/404/503/超时、筛选/异常定位、迟到响应隔离、凭据过滤、业务内容默认收起、重复/混合归属 Trace 拒绝；相关类型/lint/build/full Web/diff。只读验证不用新模型费用。
 
-## Phase 2：资料入口与分权（待继续）
+## Phase 2：资料入口与分权（当前阶段，隔离验收中）
 
 先完成 `LAB_DATA_GOVERNANCE_WIP.md` 的失败夹具修复和数据库/HTTP/运行时撤权矩阵，再恢复平台资料导航。题目、文章、文档、个人简历独立分类；默认私有；READ/WRITE/授权管理分开；Agent 只消费显式绑定且当前仍可访问的资料。个人简历不自动写进公共题库。保留原题库、用户资料与数据卷，迁移需可回滚并实际验证。
 

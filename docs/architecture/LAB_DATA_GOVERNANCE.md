@@ -1,0 +1,26 @@
+# ADR: typed Agent Lab data collections and explicit access
+
+2026-11-10 · LAB-DATA-GOVERNANCE · implementation candidate; original deployment unchanged, exact-source CI pending.
+
+Current source: Agent Registry uses personal Workspace ownership; tenant middleware scopes Prisma models with organizationId. QuestionCatalog belongs to Interview and Qdrant knowledge is an organization-scoped question channel. Neither is a generic per-Agent data permission boundary. The accepted baseline rejected nonempty configured knowledge bindings; this candidate admits only explicit bounded collection IDs.
+
+Decision: add typed QUESTION/ARTICLE/DOCUMENT collections inside existing Workspaces, default private. Reuse PostgreSQL, authenticated tenant context and Workspace identity. Explicit collection grants separate READ, WRITE and owner-only permission management; ADMIN is platform admission and never a cross-owner data override. Cross-organization grants/references fail closed with composite foreign keys. Every collection query, record mutation/history read and runtime consumption checks effective access. Collection-row locks serialize mutations with grant revocation/archive; records use revision comparison and append-only history. Database triggers reject UPDATE and DELETE of version/audit evidence. Deletes are logical, preserving evidence.
+
+AgentVersion.knowledgeBindings pins an explicit bounded list of collection IDs. Sibling Agents inherit nothing. Registry validates access before saving; queue execution checks again against the persisted version and current rights, including each workflow node. Collections are live resources; actual record IDs/revisions/hashes are recorded in existing private Run/Trace, without record bodies. Revocation blocks subsequent reads. Authorization is rechecked after source/Trace persistence and immediately before dispatch, without holding a database lock over external I/O; it cannot retract already-dispatched model requests. Workflow parents do not implicitly pool node data.
+
+Generic governance stays separate from the legacy Interview question bank and evaluation held-out datasets. Existing bank rows/organizations and vector collections are retained; no unreviewed conversion of shared historical content to private assets. The new API cannot enumerate or modify arbitrary database tables. Source URLs are metadata only and are never fetched here.
+
+Alternatives: organization-wide sharing would repeat the reported boundary; a physical table/database for every Agent would duplicate schema and require unrelated infrastructure. Logical collections plus explicit ACL and immutable Agent-version bindings satisfy this phase using existing infrastructure. Physical tenant isolation/RLS, custom record schemas, full-text/vector search tuning and team-role administration remain separate work; middleware is not claimed to be database RLS.
+
+Cost: metadata CRUD and lexical record filtering make no model calls. Bound runtime context has a UTF-8 cap and enters the existing gateway/pricing calculation; unknown prices remain blocking. Validation uses synthetic providers only. No semantic retrieval or answer-quality claim follows from isolation tests.
+
+Migration/rollback: additive tables and constraints only; original data/volumes and Interview consumers remain unchanged. Disable new bindings/UI on rollback before returning to binaries that reject them. Keep new tables/history rather than dropping evidence. Actual migration, API, browser, recovery and CI receipts are required before acceptance.
+
+
+HTTP contract: `/agent-lab/data-collections` supports bounded typed lists and creation; `/:id/records` supports bounded lexical search/CRUD, explicit optimistic revisions and history; `/:id/grants` supports owner-only READ/WRITE grant/revoke; `/:id/audit` is owner-only, including archived collections. Unauthorized resources return404 without exposing content or existence. DTOs reject ownership/organization overrides. Record receipts include current effective access, so a refreshed READ downgrade removes editor controls. A UI snapshot is never authorization.
+
+Clone policy: configured single-Agent clones clear collection bindings and remain DRAFT. Workflow clones retain explicit pinned node references; each referenced node is independently reauthorized when prepared/executed. Legacy Interview resources and permissions remain application-scoped. Version binding is not a snapshot of all collection content: each Run records the exact live revisions it actually read.
+
+Retrieval boundary: lexical title/body filtering only, at most5 records from at most5 explicitly bound collections, source JSON at most8000 UTF-8 bytes. No semantic/vector index, source URL fetch, file parsing or extraction is added here. Source URLs are validated HTTP(S) metadata. This is not acceptance of document RAG quality or prompt-injection immunity.
+
+Deployment boundary: isolated migration/HTTP/browser/recovery evidence is required before scoped source delivery. Original API startup still auto-imports legacy knowledge and may trigger embeddings; do not restart it merely to expose this page without a separately reviewed startup/cost gate, backup and migration receipt. UI changes are verified in an isolated image and are not evidence that original5175 was upgraded.

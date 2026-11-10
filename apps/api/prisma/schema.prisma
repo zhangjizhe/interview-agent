@@ -73,6 +73,11 @@ model Organization {
   questionCatalogStates QuestionCatalogState[]
   questionCatalogEntries QuestionCatalogEntry[]
   questionCatalogVersions QuestionCatalogVersion[]
+  labDataCollections LabDataCollection[]
+  labDataRecords LabDataRecord[]
+  labDataVersions LabDataRecordVersion[]
+  labDataGrants LabDataGrant[]
+  labDataAudits LabDataAudit[]
   reflectionLogRecords ReflectionLog[]
   @@map("organizations")
 }
@@ -100,6 +105,8 @@ model User {
   trainingRecommendations TrainingRecommendation[]
   trainingAttempts TrainingAttempt[]
   usageLedgerEntries UsageLedger[]
+  ownedDataCollections LabDataCollection[]
+  dataCollectionGrants LabDataGrant[]
   ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
   workspaceMembers WorkspaceMember[]
 
@@ -328,6 +335,8 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  dataCollections LabDataCollection[]
+  @@unique([id, organizationId, ownerId])
   members WorkspaceMember[]
   agents  Agent[]
   runs    Run[]
@@ -1673,4 +1682,107 @@ model QuestionCatalogVersion {
   @@unique([id, organizationId])
   @@index([organizationId, entryId])
   @@map("question_catalog_versions")
+}
+
+
+enum LabDataKind {
+  QUESTION
+  ARTICLE
+  DOCUMENT
+}
+
+enum LabDataAccess {
+  READ
+  WRITE
+}
+
+model LabDataCollection {
+  id String @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  workspaceId String
+  ownerId String
+  workspace Workspace @relation(fields: [workspaceId, organizationId, ownerId], references: [id, organizationId, ownerId], onDelete: Restrict)
+  owner User @relation(fields: [ownerId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  name String
+  kind LabDataKind
+  revision Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  records LabDataRecord[]
+  grants LabDataGrant[]
+  audit LabDataAudit[]
+  @@unique([id, organizationId])
+  @@index([organizationId, ownerId, deletedAt, kind])
+  @@index([workspaceId])
+  @@map("lab_data_collections")
+}
+
+model LabDataRecord {
+  id String @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  collectionId String
+  collection LabDataCollection @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  title String
+  content String @db.Text
+  sourceUrl String?
+  tags String[] @default([])
+  revision Int @default(1)
+  contentHash String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  versions LabDataRecordVersion[]
+  @@unique([id, organizationId])
+  @@index([collectionId, deletedAt, updatedAt])
+  @@map("lab_data_records")
+}
+
+model LabDataRecordVersion {
+  id String @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  recordId String
+  record LabDataRecord @relation(fields: [recordId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  revision Int
+  contentHash String
+  snapshot Json
+  actorId String
+  createdAt DateTime @default(now())
+  @@unique([recordId, revision])
+  @@unique([id, organizationId])
+  @@index([organizationId, recordId])
+  @@map("lab_data_record_versions")
+}
+
+model LabDataGrant {
+  id String @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  collectionId String
+  collection LabDataCollection @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  userId String
+  user User @relation(fields: [userId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  access LabDataAccess
+  createdAt DateTime @default(now())
+  @@unique([collectionId, userId])
+  @@index([organizationId, userId])
+  @@map("lab_data_grants")
+}
+
+model LabDataAudit {
+  id String @id @default(cuid())
+  organizationId String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  collectionId String
+  collection LabDataCollection @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  actorId String
+  action String
+  targetId String
+  createdAt DateTime @default(now())
+  @@unique([id, organizationId])
+  @@index([collectionId, createdAt])
+  @@map("lab_data_audit")
 }

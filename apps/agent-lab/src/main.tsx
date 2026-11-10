@@ -1,4 +1,5 @@
 import { KnowledgeLibraryPanel } from './KnowledgeLibraryPanel';
+import { DataGovernanceWorkspace } from './DataGovernanceWorkspace';
 import { toggleMcpServer } from './mcp-controls';
 import { RuntimeTraceWorkspace } from './RuntimeTraceWorkspace';
 import { AgentBuilderWorkspace } from './AgentBuilderWorkspace';
@@ -32,7 +33,7 @@ import './lab.css';
 import { ControlledEvolutionWorkspace } from './ControlledEvolutionWorkspace';
 import './visual-theme.css';
 
-type View = 'overview' | 'runtime' | 'mcp' | 'question-bank' | 'trace' | 'evaluation' | 'evolution' | 'experiments' | 'release' | 'audit' | 'operations';
+type View = 'data' | 'overview' | 'runtime' | 'mcp' | 'question-bank' | 'trace' | 'evaluation' | 'evolution' | 'experiments' | 'release' | 'audit' | 'operations';
 type Server = {
   name: string;
   displayName?: string;
@@ -112,6 +113,7 @@ const CONTROL_NAV: Array<{ id: View; label: string; icon: typeof Gauge; enabled:
   { id: 'overview', label: '控制中心', icon: Gauge, enabled: true },
   { id: 'runtime', label: '运行编排', icon: Workflow, enabled: true },
   { id: 'mcp', label: 'MCP 与工具', icon: SlidersHorizontal, enabled: true },
+  { id: 'data', label: '数据治理', icon: BookOpen, enabled: true },
   { id: 'question-bank', label: '题库治理', icon: BookOpen, enabled: true },
   { id: 'trace', label: 'Trace', icon: GitBranch, enabled: true },
   { id: 'evaluation', label: '评测', icon: FlaskConical, enabled: true },
@@ -353,6 +355,7 @@ export function ControlCenter() {
         {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} />}
         {view === 'runtime' && <AgentBuilderWorkspace />}
         {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} />}
+        {view === 'data' && <DataGovernanceWorkspace />}
         {view === 'question-bank' && <><div className="question-source-switch" role="group" aria-label="题库资料来源"><button type="button" disabled={questionBusy} aria-pressed={questionSource === 'catalog'} onClick={() => setQuestionSource('catalog')}>业务题库</button><button type="button" disabled={questionBusy} aria-pressed={questionSource === 'knowledge'} onClick={() => setQuestionSource('knowledge')}>RAG 知识资料（只读）</button></div>{questionSource === 'knowledge' ? <KnowledgeLibraryPanel /> : <><QuestionBankWorkspace
           onBusyChange={setQuestionBusy}
           questions={questionItems}
@@ -406,7 +409,7 @@ export function ControlCenter() {
 }
 
 function titleFor(view: View) {
-  return { overview: '控制中心', runtime: 'Agent 与工作流编排', mcp: 'MCP 与工具治理', 'question-bank': '题库治理', trace: 'Trace 运行记录', evaluation: '评测证据', evolution: '受控自进化', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
+  return { data: '数据治理', overview: '控制中心', runtime: 'Agent 与工作流编排', mcp: 'MCP 与工具治理', 'question-bank': '题库治理', trace: 'Trace 运行记录', evaluation: '评测证据', evolution: '受控自进化', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
 }
 
 function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void }) {

@@ -1,5 +1,7 @@
 # 当前决策索引
 
+2026-11-10 资料分权决策：[LAB_DATA_GOVERNANCE](../architecture/LAB_DATA_GOVERNANCE.md)。沿用Workspace/可信组织与Prisma，采用默认私有的typed逻辑集合、显式READ/WRITE和owner授权管理，不为每个Agent复制数据库/表。记录修订和审计禁止UPDATE/DELETE；绑定属于固定Agent版本，资料内容为每次运行实际读取的当前修订。无数据库RLS、通用向量RAG或真实模型质量承诺。原服务未升级，精确CI/交付回执另核。
+
 2026-11-09: keep report drill-through read-only inside the report; do not switch into an editable Agent builder merely to inspect a historical sample. Reuse existing ownership-enforced APIs; show unknown cost/empty Trace/denial explicitly, with raw payloads excluded from recording summaries.
 
 2026-11-06: separate strict professional-quality evaluation from presentation availability. Only typed absent technical notes may yield exact verified facts under the existing verbatim evidence mode; unsafe or malformed output still fails closed. Rank fixed references by retrieved evidence; accept exact deterministic legacy/current snapshots to reconcile paid Runs without replay. No new prompt/model/schema or release-gate bypass.

@@ -1,3 +1,4 @@
+import { verifyDataGovernance } from './lab-data-governance-evidence.mjs';
 import { verifyBusinessAssertions } from './lab-business-assertions-evidence.mjs';
 import { verifyRuntimeAdapterHistory } from './lab-runtime-adapter-evidence.mjs';
 import { verifyExternalInitialization } from './lab-external-init-evidence.mjs';
@@ -115,6 +116,7 @@ await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated
   console.log('PASS browser workflow: saved new fixed-version draft and executed real branching nodes');
   await verifyQuestionEvidence(page, context, url);
   await verifyQuestionCatalogEvidence(page, context, url);
+  await verifyDataGovernance(page, context, url);
   await page.getByRole('button', { name: '自进化', exact: true }).click();
   await page.getByRole('combobox', { name: 'Agent', exact: true }).selectOption({ label: 'browser-ci-agent · 无当前版本' });
   await page.getByRole('button', { name: '核验首次发布门禁', exact: true }).click();
@@ -122,7 +124,7 @@ await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated
   assert.equal(await page.getByRole('button', { name: '管理员发布', exact: true }).isDisabled(), true);
   await verifyBusinessAssertions(page, context, url);
   const navigation = [['控制中心', '控制中心'], ['运行编排', 'Agent 与工作流编排'], ['MCP 与工具', 'MCP 与工具治理'],
-    ['题库治理', '题库治理'], ['Trace', 'Trace 运行记录'], ['评测', '评测证据'], ['自进化', '受控自进化'],
+    ['数据治理', '数据治理'], ['题库治理', '题库治理'], ['Trace', 'Trace 运行记录'], ['评测', '评测证据'], ['自进化', '受控自进化'],
     ['实验', '实验比较'], ['发布', '发布决策'], ['审计', '审计查询'], ['操作日志', '操作日志']];
   for (const [label, title] of navigation) {
     await page.getByRole('button', { name: label, exact: true }).click();
@@ -138,7 +140,7 @@ await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated
   await page.getByRole('button', { name: '登录', exact: true }).waitFor();
   await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated-fixture-password' });
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
-  console.log('PASS browser first-release denial, eleven navigation headings, logout/reload/new login');
+  console.log('PASS browser first-release denial, twelve navigation headings, logout/reload/new login');
   await verifySessionRevocation(page, context, url);
   await verifyUserPermission(browser, url);
   assert.deepEqual(errors, []);
