@@ -121,7 +121,7 @@ export async function verifyQuestionEvidence(page, context, origin) {
   const observe = request => { if (new URL(request.url()).pathname === deletePath && request.method() === 'DELETE') deletes++; };
   page.on('request', observe);
   try {
-    page.once('dialog', dialog => dialog.dismiss()); await article.getByRole('button', { name: '删除题目', exact: true }).click();
+    page.once('dialog', dialog => dialog.dismiss()); await article.getByRole('button', { name: `删除题目：${saved.question}`, exact: true }).click();
     assert.equal(deletes, 0); assert.ok((await read()).results.some(item => item.questionId === saved.questionId)); await assertDisplay();
     let release; const gate = new Promise(resolve => { release = resolve; });
     const pattern = `${origin}${deletePath}`;
@@ -129,8 +129,8 @@ export async function verifyQuestionEvidence(page, context, origin) {
     try {
       page.once('dialog', dialog => dialog.accept());
       const removed = responseFor(deletePath, 'DELETE');
-      await article.getByRole('button', { name: '删除题目', exact: true }).click();
-      try { await page.waitForFunction(() => document.querySelector('article.question-bank-row button')?.disabled === true); assert.equal(await article.getByRole('button', { name: '删除题目', exact: true }).isDisabled(), true); }
+      await article.getByRole('button', { name: `删除题目：${saved.question}`, exact: true }).click();
+      try { await page.waitForFunction(() => document.querySelector('article.question-bank-row button')?.disabled === true); assert.equal(await article.getByRole('button', { name: `删除题目：${saved.question}`, exact: true }).isDisabled(), true); }
       finally { release(); }
       const deletedResponse = await removed; assert.equal(deletedResponse.ok(), true); assert.equal((await deletedResponse.json()).deleted, true);
       assert.equal(deletes, 1);

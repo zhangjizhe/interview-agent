@@ -96,7 +96,7 @@ export function QuestionBankWorkspace({
   useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   const positionOptions = [...new Set(questions.map(item => item.position).filter(Boolean))];
   return <div className="agent-page-grid qb-workspace">
-    <section className="qb-toolbar">
+    <section className="qb-toolbar question-bank-toolbar">
       <header className="qb-section-head"><div><h2>业务题库</h2><p>按岗位与技术主题维护题目，参考答案默认收起。</p></div><div className="qb-header-actions">
         <button className="qb-button qb-secondary" type="button" disabled={busy} onClick={() => { setShowImport(false); setShowCreate(value => !value); createQuestion.reset(); }}><Plus size={16}/>{showCreate ? '关闭新增' : '新增题目'}</button>
         <button className="qb-button qb-primary" type="button" aria-expanded={showImport} disabled={busy} onClick={() => { setShowCreate(false); setShowImport(value => !value); }}><Upload size={16}/>{showImport ? '收起导入' : '导入题目'}</button>
@@ -105,7 +105,8 @@ export function QuestionBankWorkspace({
         <label className="qb-field">岗位<input value={position} list="qb-filter-positions" onChange={event => onPosition(event.target.value)} placeholder="全部岗位 / 输入岗位" /></label>
         <datalist id="qb-filter-positions">{positionOptions.map(value => <option key={value} value={value}/>)}</datalist>
         <label className="qb-field qb-search-field">搜索题目<input value={query} onChange={event => onQuery(event.target.value)} placeholder="输入问题，进行语义搜索" /></label>
-        <button className="qb-button qb-secondary" type="submit" disabled={!query.trim() || searching}>{searching ? <Loader2 className="qb-spin" size={16}/> : <Search size={16}/>} {searching ? '搜索中' : '搜索'}</button>
+        <button className="qb-button qb-secondary" type="submit" disabled={!query.trim() || searching}>{searching ? <Loader2 className="qb-spin" size={16}/> : <Search size={16}/>}
+          {searching ? '搜索中' : '搜索'}</button>
         {searchResults && <button className="qb-button qb-quiet" type="button" onClick={onClearSearch}>清除</button>}
         {(listError || retrying) && onRetryList && <button className="qb-button qb-secondary" type="button" disabled={retrying} onClick={onRetryList}>{retrying ? '读取中' : '重试读取题库'}</button>}
       </form>

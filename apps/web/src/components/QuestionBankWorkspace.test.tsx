@@ -99,6 +99,7 @@ describe('Question bank pending search and reference answer controls', () => {
   }
   it('disables repeat search while pending and permits a retry after a displayed failure', () => {
     const { search, view, tree } = setup('Synthetic reference');
+    expect(screen.getByRole('button', { name: '搜索', exact: true }).textContent).toBe('搜索');
     fireEvent.click(screen.getByRole('button', { name: '搜索', exact: true }));
     expect(search).toHaveBeenCalledTimes(1);
     view.rerender(tree(true));
