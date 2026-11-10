@@ -1,3 +1,4 @@
+import { dataCollectionIds } from './data-bindings.contract';
 import { BadRequestException } from '@nestjs/common';
 
 export type WorkflowNode = { id: string; agentVersionId: string; versionHash?: string; inputFrom: 'input' | 'previous'; next?: string; branch?: { contains: string; then: string; else: string } };
@@ -13,9 +14,11 @@ export function validateConfiguredVersion(version: any): RuntimeDefinition {
   if (!['single-agent-v1', 'finite-workflow-v1'].includes(runtime.adapter)) reject('不支持的运行适配器');
   if (!Number.isFinite(runtime.maxEstimatedCostCny) || runtime.maxEstimatedCostCny < 0.01 || runtime.maxEstimatedCostCny > 100) reject('预算须在0.01至100 CNY之间');
   if (!Number.isInteger(runtime.maxDurationMs) || runtime.maxDurationMs < 1000 || runtime.maxDurationMs > 600000) reject('运行时限须在1000至600000ms之间');
-  for (const binding of ['toolBindings', 'knowledgeBindings', 'memoryBindings']) {
+  for (const binding of ['toolBindings', 'memoryBindings']) {
     if (version[binding] && Object.keys(version[binding]).length) reject('当前适配器不接受未实现的工具、知识或记忆绑定');
   }
+  const collectionIds = dataCollectionIds(version.knowledgeBindings);
+  if (runtime.adapter === 'finite-workflow-v1' && collectionIds.length) reject('工作流资料由固定节点版本分别绑定');
   validateSchema(version.inputSchema ?? { type: 'object' });
   validateSchema(version.outputSchema ?? { type: 'object' });
   if (runtime.adapter === 'single-agent-v1') {

@@ -1,0 +1,25 @@
+/* Data governance uses the Lab palette and scoped action hierarchy. */
+.data-governance { display:grid; gap:20px; max-width:1120px; color:var(--lab-text,#202938); min-width:0; }
+.data-governance h2,.data-governance h3,.data-governance h4 { letter-spacing:normal; margin:0; overflow-wrap:anywhere; }
+.data-governance>p,.data-detail>p { margin:0; color:var(--lab-muted,#68727d); font-size:12px; line-height:1.8; }
+.data-governance label { display:grid; gap:7px; min-width:0; font-size:12px; color:#445066; }
+.data-governance input,.data-governance select,.data-governance textarea { width:100%; min-height:40px; box-sizing:border-box; font:inherit; color:var(--lab-text,#202938); background:#fff; padding:10px 11px; border:1px solid #c9d0dc; border-radius:6px; max-width:100%; }
+.data-governance textarea { resize:vertical; line-height:1.8; }
+.data-governance button { font:inherit; font-size:12px; font-weight:550; min-height:38px; padding:9px 14px; border:1px solid #ced4de; color:#374151; border-radius:6px; background:#fff; cursor:pointer; }
+.data-governance button:hover:not(:disabled) { background:#f1f3f8; }
+.data-governance button[type=submit] { background:var(--lab-primary,#4f46c8); border-color:var(--lab-primary,#4f46c8); color:#fff; }
+.data-governance button:disabled { opacity:.55; cursor:not-allowed; }
+.data-governance button:focus-visible,.data-governance summary:focus-visible { outline:2px solid var(--lab-primary,#4f46c8); outline-offset:3px; }
+.data-governance [role=alert] { background:#fff4f4; color:#9e3340; border:1px solid #edc5ca; padding:14px 16px; border-radius:7px; line-height:1.8; overflow-wrap:anywhere; }
+.data-governance [role=status] { background:#f0f9f4; color:#246347; padding:12px 16px; border-radius:7px; }
+.data-actions { display:flex; align-items:end; gap:10px; flex-wrap:wrap; min-width:0; }
+.data-governance>form { padding:20px; border:1px solid var(--lab-border,#e2e3df); border-radius:10px; background:#fff; }.data-governance>form>label:first-child { flex:1 1 240px; }
+.data-collection-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr)); gap:12px; min-width:0; }
+.data-collection-list button { display:grid; gap:9px; text-align:left; padding:18px; min-width:0; }.data-collection-list strong { overflow-wrap:anywhere; }.data-collection-list span { color:var(--lab-muted,#68727d); font-size:11px; }
+.data-collection-list button.selected { border-color:var(--lab-primary,#4f46c8); background:#f5f3ff; }
+.data-detail { padding:24px; background:#fff; border:1px solid var(--lab-border,#e2e3df); border-radius:10px; display:grid; gap:18px; min-width:0; }
+.data-record-form { margin:20px 0; }.data-record-form fieldset { display:grid; gap:16px; border:1px solid #e2e8f0; border-radius:7px; padding:18px; min-width:0; }.data-record-form button { justify-self:start; }
+.data-record { padding:20px 0; border-bottom:1px solid #e2e8f0; min-width:0; }.data-record h4 { margin:0 0 8px; font-size:14px; }.data-record>p { font-size:11px; color:var(--lab-muted,#68727d); }
+.data-detail details { background:#fafbfe; border:1px solid #e4e8ef; border-radius:6px; padding:11px 13px; margin:12px 0; }.data-detail summary { cursor:pointer; font-size:12px; font-weight:550; }.data-content { white-space:pre-wrap; overflow-wrap:anywhere; max-height:420px; overflow:auto; font-size:13px; line-height:1.85; }
+.data-binding-options { display:grid; gap:8px; }.data-binding-options label { display:flex; align-items:center; gap:8px; }.data-binding-options input { flex-shrink:0; }
+@media(max-width:600px) { .data-detail,.data-governance>form { padding:16px; }.data-actions>label { width:100%; }.data-detail h3 { font-size:16px; } }

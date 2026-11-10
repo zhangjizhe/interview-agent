@@ -1,5 +1,7 @@
 # 当前架构地图
 
+2026-11-10 资料分权候选：Lab DataGovernanceWorkspace/DataBindingPicker → ADMIN + 可信组织身份 → DataGovernanceService → PostgreSQL typed collection/record/version/grant/audit。默认私有；平台ADMIN不越过资料ACL；AgentVersion显式绑定，ConfiguredRuntime在读取和派发前重新授权，Trace记录实际资料revision/hash而非正文。旧Interview题库与评测集不迁移。加性迁移20261105000000；隔离验收中，原API/5175未更新。见[设计与边界](../architecture/LAB_DATA_GOVERNANCE.md)。
+
 2026-11-10 题库UX：Lab QuestionImportPanel复用原Interview import-file/import-url，文件选择不自动提交，岗位/category/level显式归类，严格回执与PENDING显示，错误后保留页面草稿且不自动付费重放。高级维护下移折叠。无schema/API/权限变化；本机只替换前端，真实导入效果与后台任务/幂等仍未验收。见[UX证据](QUESTION_BANK_UX.md)。
 
 2026-11-10 读取恢复候选：Lab题库页新增独立KnowledgeLibraryPanel → 既有知识list GET → 可信组织Qdrant历史集合；与Interview业务题库（LEGACY Milvus或已采用PG）及评测数据分开。只读200条上限/本地筛选/纯文本展开；service存储失败改503。无新schema/授权/模型调用，未部署验收。原存储已启动且读到16业务题/约142RAG记录，完整历史对账未完成。见[读取恢复证据](QUESTION_BANK_READ_RECOVERY.md)。

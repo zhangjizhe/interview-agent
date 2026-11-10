@@ -1,3 +1,4 @@
+import { getOrCreateOwnedWorkspace } from './workspace-access';
 import type { ConfiguredRuntimeService } from './configured-runtime.service';
 import {
   BadRequestException,
@@ -192,7 +193,7 @@ export class AgentRegistryService {
             systemPrompt: source.currentVersion.systemPrompt,
             runtimeConfig: source.currentVersion.runtimeConfig ?? undefined,
             toolBindings: source.currentVersion.toolBindings ?? undefined,
-            knowledgeBindings: source.currentVersion.knowledgeBindings ?? undefined,
+            knowledgeBindings: ['single-agent-v1', 'finite-workflow-v1'].includes((source.currentVersion.runtimeConfig as any)?.adapter) ? {} : source.currentVersion.knowledgeBindings ?? undefined,
             memoryBindings: source.currentVersion.memoryBindings ?? undefined,
             inputSchema: source.currentVersion.inputSchema ?? undefined,
             outputSchema: source.currentVersion.outputSchema ?? undefined,
@@ -394,21 +395,7 @@ export class AgentRegistryService {
   }
 
   private async getOrCreateDefaultWorkspace(userId: string) {
-    return this.prisma.workspace.upsert({
-      where: { slug: `personal-${userId}` },
-      create: {
-        name: `${userId} 的工作区`,
-        slug: `personal-${userId}`,
-        ownerId: userId,
-        members: {
-          create: {
-            userId,
-            role: 'OWNER',
-          },
-        },
-      },
-      update: {},
-    });
+    return getOrCreateOwnedWorkspace(this.prisma, userId);
   }
 
   private async requireAgent(

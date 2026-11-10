@@ -1,0 +1,82 @@
+import assert from 'node:assert/strict';
+import { questionInputSnapshot } from './lab-question-input-snapshot.mjs';
+
+export async function verifyDataGovernance(page, context, origin) {
+  assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
+  assert.equal(origin, 'http://localhost:5176');
+  const token = await page.evaluate(() => localStorage.getItem('ia_access_token'));
+  const headers = { Authorization: `Bearer ${token}` };
+  const before = await questionInputSnapshot();
+  const collectionName = 'Synthetic private articles ' + crypto.randomUUID().slice(0, 8);
+  await page.getByRole('button', { name: '数据治理', exact: true }).click();
+  await page.getByLabel('集合名称', { exact: true }).fill(collectionName);
+  await page.getByLabel('资料类型', { exact: true }).selectOption('ARTICLE');
+  const creating = page.waitForResponse(r => new URL(r.url()).pathname === '/api/agent-lab/data-collections' && r.request().method() === 'POST');
+  await page.getByRole('button', { name: '创建私有集合', exact: true }).click();
+  const created = await creating; assert.equal(created.status(), 201);
+  const collection = await created.json(); assert.equal(collection.access, 'OWNER'); assert.equal(collection.kind, 'ARTICLE');
+  let panel = page.getByRole('region', { name: `资料集合 ${collectionName}`, exact: true });
+  await panel.getByLabel('资料标题', { exact: true }).fill('ALPHA source');
+  await panel.getByLabel('正文', { exact: true }).fill('ALPHA synthetic private article body');
+  const saving = page.waitForResponse(r => new URL(r.url()).pathname === `/api/agent-lab/data-collections/${collection.id}/records` && r.request().method() === 'POST');
+  await panel.getByRole('button', { name: '保存资料', exact: true }).click();
+  const saved = await saving; assert.equal(saved.status(), 201); const record = await saved.json(); assert.equal(record.revision, 1);
+  await panel.getByRole('heading', { name: record.title, exact: true }).waitFor();
+  await panel.getByRole('button', { name: '编辑资料', exact: true }).click();
+  await panel.getByLabel('正文', { exact: true }).fill('ALPHA synthetic private article revision two');
+  const editing = page.waitForResponse(r => new URL(r.url()).pathname.endsWith(`/records/${record.id}`) && r.request().method() === 'PUT');
+  await panel.getByRole('button', { name: '保存资料', exact: true }).click();
+  const edited = await editing; assert.equal(edited.status(), 200); const retained = await edited.json(); assert.equal(retained.revision, 2);
+  await panel.getByRole('button', { name: '版本历史', exact: true }).click();
+  await panel.getByRole('region', { name: '版本历史', exact: true }).getByText(/^版本 1 ·/).waitFor();
+  await page.reload(); await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
+  await page.getByRole('button', { name: '数据治理', exact: true }).click();
+  await page.getByRole('button', { name: new RegExp(collectionName) }).click();
+  panel = page.getByRole('region', { name: `资料集合 ${collectionName}`, exact: true });
+  await panel.getByText('版本 2', { exact: true }).waitFor();
+  if (process.env.LAB_FIXTURE_SCREENSHOT) await page.screenshot({ path: process.env.LAB_FIXTURE_SCREENSHOT, fullPage: true });
+  assert.deepEqual(await questionInputSnapshot(), before, 'collection CRUD/history/reload must not call providers');
+
+  await page.getByRole('button', { name: '运行编排', exact: true }).click();
+  await page.getByRole('button', { name: '新增 Agent / 工作流', exact: true }).click();
+  await page.getByLabel('名称', { exact: true }).fill('browser-data-agent');
+  await page.getByLabel('唯一 key', { exact: true }).fill('browser-data-agent');
+  await page.getByLabel('系统提示', { exact: true }).fill('Use only explicitly permitted sources.');
+  await page.getByRole('checkbox', { name: new RegExp(collectionName) }).check();
+  const binding = page.waitForResponse(r => new URL(r.url()).pathname === '/api/agent-lab/configured-agents' && r.request().method() === 'POST');
+  await page.getByRole('button', { name: '创建并保存初始草稿', exact: true }).click();
+  const boundResponse = await binding; assert.equal(boundResponse.status(), 201); const agent = await boundResponse.json();
+  const version = agent.versions[0]; assert.deepEqual(version.knowledgeBindings, { collectionIds: [collection.id] });
+  await page.getByRole('heading', { name: '受控测试 · 1.0.0 · DRAFT', exact: true }).waitFor();
+  await page.getByLabel('测试输入', { exact: true }).fill('ALPHA');
+  await page.getByLabel('确认按已保存版本启动模型调用及预算', { exact: true }).check();
+  const running = page.waitForResponse(r => new URL(r.url()).pathname.endsWith('/test-runs') && r.request().method() === 'POST');
+  await page.getByRole('button', { name: '启动草稿测试', exact: true }).click();
+  const started = await running; assert.equal(started.status(), 202); const run = await started.json();
+  await page.getByRole('button', { name: `${run.id} · COMPLETED`, exact: true }).waitFor({ timeout: 30000 });
+  const traceResponse = await context.request.get(`${origin}/api/agent-lab/runs/${run.id}/trace`, { headers });
+  assert.equal(traceResponse.status(), 200); const trace = await traceResponse.json();
+  const read = trace.find(event => event.type === 'data.read'); assert.ok(read);
+  assert.equal(read.modelVisible, false);
+  assert.deepEqual(read.metadata.references.map(({ recordId, versionId, revision, contentHash }) => ({ recordId, versionId, revision, contentHash })),
+    [{ recordId: record.id, versionId: `${record.id}:2`, revision: 2, contentHash: retained.contentHash }]);
+  assert.equal(JSON.stringify(trace).includes(retained.content), false, 'Trace keeps source references rather than source body');
+  const after = await questionInputSnapshot();
+  assert.equal(after.provider.chat - before.provider.chat, 1); assert.equal(after.ledger - before.ledger, 1);
+  assert.equal(after.provider.embedding, before.provider.embedding); assert.equal(after.provider.rerank, before.provider.rerank);
+
+  await page.getByRole('button', { name: '数据治理', exact: true }).click();
+  await page.getByRole('button', { name: new RegExp(collectionName) }).click();
+  panel = page.getByRole('region', { name: `资料集合 ${collectionName}`, exact: true });
+  page.once('dialog', dialog => dialog.accept());
+  const archiving = page.waitForResponse(r => new URL(r.url()).pathname === `/api/agent-lab/data-collections/${collection.id}` && r.request().method() === 'DELETE');
+  await panel.getByRole('button', { name: '归档集合', exact: true }).click();
+  assert.equal((await archiving).status(), 200);
+  const denied = await context.request.post(`${origin}/api/agent-lab/agents/${agent.id}/test-runs`, { headers,
+    data: { input: { message: 'ALPHA' }, agentVersionId: version.id, requestKey: 'data-archived-denial' } });
+  assert.equal(denied.status(), 404);
+  assert.deepEqual(await questionInputSnapshot(), after, 'archived bindings must reject before dispatch/ledger');
+  const audit = await context.request.get(`${origin}/api/agent-lab/data-collections/${collection.id}/audit`, { headers });
+  assert.equal(audit.status(), 200); assert.ok((await audit.json()).items.some(event => event.action === 'COLLECTION_ARCHIVE'));
+  console.log('PASS browser typed private collection: create/edit/history/reload, explicit saved binding, one synthetic call, persisted source revisions/Trace, archive refusal with no provider increment');
+}

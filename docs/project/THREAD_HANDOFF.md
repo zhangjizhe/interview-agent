@@ -1,11 +1,15 @@
 # Thread handoff
 
-2026-11-10。唯一活动为 QUESTION-BANK-UX。先读[本轮事实与边界](QUESTION_BANK_UX.md)；历史资料恢复见[读取记录](QUESTION_BANK_READ_RECOVERY.md)。
+2026-11-10。用户在PR #71合并后要求继续；当前唯一主题LAB-DATA-GOVERNANCE，原暂停候选已经复核并扩充隔离验收。先读LAB_DATA_GOVERNANCE_WIP.md和docs/architecture/LAB_DATA_GOVERNANCE.md。
 
-当前root除明确本主题与前序Trace/读取候选外，仍有大量独立数据治理/schema/runtime/网站历史WIP。禁止全库暂存或用root构建部署。main.tsx须仅取题库增量，保留但不提交DataGovernance导航；Builder原独立修改保留。私有原33文件指纹全部保持。
+当前agent-lab基线3c8f089，与main19e911e同tree；前序PR #71已合并，默认Product各组5绿。新资料治理源码尚未提交/部署，原5175仍题库UX镜像，原API/数据库/全部卷未重启或迁移。
 
-本轮前端已部署本机5175，API/数据库没有重启；原正常会话业务16/RAG142、筛选/正文/新上传入口已确认。合成预览走固定503，不连接真实模型；上传9/题库19等完整Web377与类型/lint/Docker构建通过。影像/端口回滚等精确记录在私有部署回执，不提交敏感配置。
+修改包括typed集合/ACL/复合外键/不可变历史与审计、当前身份/修订冲突、版本绑定/派发前重验授权、data.read实际revision/hash、克隆清空单Agent绑定、Lab资料页与选择器。旧Interview题库、历史RAG、评测Dataset仍独立；不提供任意表读写或通用向量RAG。
 
-Trace原54ef两次CI失败，已加role=alert修复并保留断言；前序报告用例定向8和完整377本轮通过，但不推测历史一次失败根因。新API503候选只有本地12项证据，未部署。审批本轮已可用，不沿用额度阻塞。
+证据：真实PG新装/旧升级及DB/HTTP42；runtime/registry53；完整API1283通过/47跳过（专用DB另跑）；隔离完整Web385；标签后UI8；types/lint/API与Lab Docker构建通过。封闭API136/136通过，浏览器create/edit/history/reload/binding/一合成调用/持久Trace/archive拒绝与无调用增量通过，截图已视觉检查。专用PG备份恢复通过，严格结构/数据/sequence及版本/授权/审计保留。外层Docker手动等待门在回执文件前已退出，后续恢复未跑，不计通过；完整自动门与精确CI/PR/远端待核。
 
-Git交付：在agent-lab把Trace最小回归、知识读取和题库UX按主题隔离提交，推送最终source，最新对应CI全绿才合并PR #71到main，并核对远端。精确状态以PR/checks和本机私有回执为准。尚未结束整个平台/真实导入/分权/RAG验收；本阶段收尾后等待用户继续。
+首次失败保留：旧夹具懒PrismaPromise出ALS已修并保留拒绝断言；首轮全Web的缺新GET夹具已补，旧评测异步用例定向与隔离完整套件通过，根因未知。浏览器先缺捆绑Chrome，后发现select/有值textarea的标签识别问题，已加明确可访问名称。旧失败的合成资料保留，复验用唯一新名称，未删除失败记录制造通过。
+
+候选隔离目录与日志保留本机临时位置；不提交本机绝对路径、私有回执或敏感配置。当前仅资料治理相关WIP纳入候选；认证证据、portfolio三文件、auth档案、旧Mac手册保持原样，禁止全部暂存。无外部模型请求；合成结果非语义质量。
+
+注意原API的KnowledgeBaseBootstrap会启动旧知识导入，可能付费。本轮不可未经成本核验就重启原API或声称本机资料治理已上线。后续原部署需备份/迁移/启动成本门；简历、通用提取RAG、真实质量、全产品NOT_ACCEPTED。当前阶段完成后等待用户继续下一阶段。

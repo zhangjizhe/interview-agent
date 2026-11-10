@@ -63,4 +63,24 @@ DO $$ BEGIN
 END $$;
 SQL
 echo 'PASS legacy presentation upgrade preserves tasks/messages without fabricated receipts'
-TENANT_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/phase2_existing" pnpm --filter @interview-agent/api test:jest --runInBand --testPathPatterns='tenant-database|quota-database|evaluation-jobs.database|question-bank.catalog.database'
+TENANT_TEST_DATABASE_URL="postgresql://postgres@127.0.0.1:$fixture_port/phase2_existing" pnpm --filter @interview-agent/api test:jest --runInBand --testPathPatterns='tenant-database|quota-database|evaluation-jobs.database|question-bank.catalog.database|data-governance.database'
+
+# The HTTP/ACL suites populated real synthetic versions, grants and immutable
+# audit evidence. Restore into another database and compare both data and DDL.
+docker exec "$fixture_container" pg_dump -h 127.0.0.1 -U postgres -Fc phase2_existing > "$fixture_dir/data.dump"
+docker exec "$fixture_container" createdb -h 127.0.0.1 -U postgres phase2_restored
+docker exec -i "$fixture_container" pg_restore -h 127.0.0.1 -U postgres -d phase2_restored < "$fixture_dir/data.dump"
+for database in phase2_existing phase2_restored; do
+  docker exec "$fixture_container" pg_dump -h 127.0.0.1 -U postgres --no-owner --no-privileges "$database" | sed '/^\\restrict /d; /^\\unrestrict /d' > "$fixture_dir/$database.sql"
+done
+node scripts/ci/pg-dump-compare.mjs "$fixture_dir/phase2_existing.sql" "$fixture_dir/phase2_restored.sql"
+docker exec -i "$fixture_container" psql -h 127.0.0.1 -U postgres -d phase2_restored -v ON_ERROR_STOP=1 <<'SQL'
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM lab_data_record_versions)
+    OR NOT EXISTS (SELECT 1 FROM lab_data_grants)
+    OR NOT EXISTS (SELECT 1 FROM lab_data_audit WHERE action='COLLECTION_ARCHIVE') THEN
+    RAISE EXCEPTION 'Restored data governance evidence is incomplete';
+  END IF;
+END $$;
+SQL
+echo 'PASS isolated data governance restore: exact DDL/data, revisions, grants and archive audit retained'
