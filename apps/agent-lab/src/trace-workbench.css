@@ -1,0 +1,49 @@
+.trace-workspace, .trace-inspector { --trace-line:#e1e5ed; --trace-muted:#64748b; color:#172033; min-width:0; display:grid; gap:20px; }
+.trace-workspace h2, .trace-inspector h2 { margin:0; font-size:22px; letter-spacing:-.03em; }
+.trace-workspace h3, .trace-inspector h3 { margin:0; font-size:16px; }
+.trace-workspace p, .trace-inspector p { margin:6px 0; line-height:1.65; }
+.trace-workspace code, .trace-inspector code { font-size:11px; overflow-wrap:anywhere; }
+.trace-heading, .trace-toolbar, .trace-actions { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+.trace-actions { flex-wrap:wrap; justify-content:flex-end; }
+.trace-eyebrow { font-size:10px; font-weight:700; color:#6879a1; letter-spacing:.12em; }
+.trace-workspace button, .trace-inspector button { font:inherit; font-size:12px; border:1px solid #d6ddea; border-radius:8px; background:white; color:#243456; padding:9px 12px; cursor:pointer; }
+.trace-workspace button:disabled, .trace-inspector button:disabled { opacity:.45; cursor:default; }
+.trace-workspace button:focus-visible, .trace-inspector button:focus-visible { outline:3px solid #c7d2fe; outline-offset:2px; }
+.trace-workspace button[aria-pressed=true], .trace-inspector button[aria-pressed=true] { background:#eef2ff; border-color:#7b8bd0; box-shadow:inset 3px 0 #596bc4; }
+.trace-workspace-grid { display:grid; grid-template-columns:minmax(240px, .85fr) minmax(0, 2.4fr); align-items:start; gap:22px; }
+.trace-run-list { display:grid; gap:10px; max-height:1000px; overflow:auto; padding:2px; }
+.trace-workspace .trace-run-card { display:grid; text-align:left; gap:8px; padding:16px; }
+.trace-run-card strong { font-size:14px; }.trace-run-card span, .trace-run-card small { font-size:11px; color:var(--trace-muted); }
+.trace-inspector, .trace-empty { background:#fff; border:1px solid var(--trace-line); border-radius:14px; padding:22px; }
+.trace-empty { padding:40px 28px; color:var(--trace-muted); }
+.trace-status { font-size:12px; font-weight:600; }
+.trace-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid var(--trace-line); border-radius:10px; overflow:hidden; }
+.trace-metrics>div { padding:14px 12px; border-right:1px solid var(--trace-line); display:grid; gap:8px; }
+.trace-metrics>div:last-child { border:0; }.trace-metrics span { font-size:10px; color:var(--trace-muted); }.trace-metrics strong { font-size:15px; overflow-wrap:anywhere; }
+.trace-properties { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:0; }
+.trace-properties div { min-width:0; }.trace-properties dt { color:var(--trace-muted); font-size:11px; margin-bottom:5px; }.trace-properties dd { margin:0; font-size:12px; overflow-wrap:anywhere; }
+.trace-error-summary { background:#fff3f3; border:1px solid #edc9c9; border-radius:8px; padding:12px; font-size:12px; overflow-wrap:anywhere; }
+.trace-error-summary strong, .trace-inspector .is-failure, .trace-workspace .is-failure { color:#a52f3c; }
+.trace-error-summary small { color:#82626a; }.trace-toolbar { align-items:center; }.trace-toolbar small { font-size:11px; font-weight:400; color:var(--trace-muted); }
+.trace-filters { display:flex; gap:12px; flex-wrap:wrap; }.trace-filters label, .trace-lookup label { display:grid; gap:7px; font-size:11px; color:var(--trace-muted); flex:1; min-width:140px; }
+.trace-filters input, .trace-filters select, .trace-lookup input { box-sizing:border-box; width:100%; min-height:36px; padding:8px 10px; border:1px solid #d6ddea; border-radius:7px; font:inherit; color:#172033; background:white; }
+.trace-lookup { display:flex; align-items:end; gap:12px; padding:14px; background:#f7f9fc; border-radius:10px; }
+.trace-split { display:grid; grid-template-columns:minmax(170px,1fr) minmax(0,1.65fr); border:1px solid var(--trace-line); border-radius:10px; overflow:hidden; }
+.trace-timeline { display:grid; align-content:start; gap:8px; padding:12px; background:#f8faff; max-height:650px; overflow:auto; border-right:1px solid var(--trace-line); }
+.trace-inspector .trace-event { display:grid; gap:7px; text-align:left; padding:12px; overflow-wrap:anywhere; }
+.trace-event-title { font-size:12px; font-weight:600; }.trace-event>span:not(.trace-event-title), .trace-event small { font-size:10px; color:var(--trace-muted); }
+.trace-event-detail { min-width:0; padding:18px; max-height:650px; overflow:auto; }.trace-event-detail .trace-properties { margin:18px 0; }
+.trace-inspector h4 { font-size:12px; margin:18px 0 8px; }.trace-inspector pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:300px; overflow:auto; padding:12px; border-radius:8px; background:#f5f7fa; color:#334155; font-size:11px; line-height:1.7; margin:0; }
+.trace-inspector .trace-muted { color:var(--trace-muted); font-size:11px; }.trace-run-content { border-top:1px solid var(--trace-line); padding-top:14px; }.trace-run-content>summary { font-size:12px; cursor:pointer; color:#344b8f; }
+@media(max-width:1100px) { .trace-workspace-grid { grid-template-columns:minmax(200px,.8fr) minmax(0,2fr); }.trace-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }.trace-split { grid-template-columns:1fr; }.trace-timeline { max-height:280px; border-right:0; border-bottom:1px solid var(--trace-line); }.trace-metrics>div { border-bottom:1px solid var(--trace-line); } }
+@media(max-width:760px) { .trace-workspace-grid { grid-template-columns:1fr; }.trace-run-list { max-height:260px; }.trace-heading, .trace-toolbar { flex-wrap:wrap; }.trace-properties { grid-template-columns:1fr; }.trace-inspector { padding:15px; }.trace-actions { justify-content:flex-start; } }
+
+/* Keep lookup and filtering together so the timeline is reachable without a long empty header. */
+.trace-workspace { gap:14px; }
+.trace-controls { display:grid; grid-template-columns:minmax(150px,1.4fr) minmax(110px,.8fr) minmax(150px,1.4fr) auto; gap:12px; align-items:end; padding:14px; margin:0; background:#f7f9fc; border-radius:10px; }
+.trace-controls label { display:grid; gap:7px; font-size:11px; color:var(--trace-muted); min-width:0; }
+.trace-controls input, .trace-controls select { box-sizing:border-box; width:100%; min-height:36px; padding:8px 10px; border:1px solid #d6ddea; border-radius:7px; font:inherit; color:#172033; background:white; }
+.trace-run-list { position:sticky; top:16px; max-height:calc(100vh - 50px); }
+.trace-inspector pre { font-size:12px; line-height:1.6; }
+@media(max-width:1000px) { .trace-controls { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:760px) { .trace-run-list { position:static; max-height:240px; }.trace-controls { grid-template-columns:1fr; } }

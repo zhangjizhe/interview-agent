@@ -1,3 +1,4 @@
+import { RunInspector } from './RunInspector';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
@@ -31,7 +32,6 @@ export function AgentBuilderWorkspace() {
       .filter(item => item.runtimeConfig?.adapter === 'single-agent-v1' && item.status !== 'ARCHIVED') });
   const run = useQuery<any>({ queryKey: ['builder-run', runId], queryFn: () => api(`/agent-lab/runs/${runId}`), enabled: !!runId,
     refetchInterval: query => ['PENDING', 'RUNNING'].includes(query.state.data?.status) ? 1500 : false });
-  const trace = useQuery<any[]>({ queryKey: ['builder-trace', runId, run.data?.status], queryFn: () => api(`/agent-lab/runs/${runId}/trace`), enabled: !!runId });
   const history = useQuery<any[]>({ queryKey: ['builder-history', agentId, run.data?.status], queryFn: () => api(`/agent-lab/runs?agentId=${agentId}`), enabled: !!agentId });
   const busy = ['PENDING', 'RUNNING'].includes(run.data?.status);
   const savedVersion = selected.data?.versions?.find(item => item.id === versionId);
@@ -107,7 +107,7 @@ export function AgentBuilderWorkspace() {
     setVersion(item.version); setConfirmed(false);
   }
   function changeNode(index: number, patch: Partial<Node>) { setNodes(nodes.map((node, i) => i === index ? { ...node, ...patch } : node)); }
-  const errors = [agents.error, selected.error, models.error, versions.error, run.error, trace.error, history.error, save.error, start.error, cancel.error].filter(Boolean);
+  const errors = [agents.error, selected.error, models.error, versions.error, run.error, history.error, save.error, start.error, cancel.error].filter(Boolean);
   return <section className="builder-workspace">
     <div className="builder-heading"><div><h2>Agent 与工作流</h2><p>配置保存为草稿；测试不会发布。工作流引用固定版本，按真实运行记录展示。</p></div>
       <button disabled={contextLocked} onClick={() => { clearOperationErrors(); setFeedback(''); setConfirmed(false); pending.current = undefined; setRunId(''); setCreating(true); setAgentId(''); setVersionId(''); setName(''); setKey(''); setDescription(''); setVersion('1.0.0'); setPrompt(''); setAdapter('single-agent-v1'); setNodes([]); }}>新增 Agent / 工作流</button></div>
@@ -149,9 +149,8 @@ export function AgentBuilderWorkspace() {
     {run.data && <section><h3>运行 {run.data.id}</h3><p>状态：{run.data.status} · {run.data.application}</p>
       <p>运行 Agent：{run.data.agent?.name || '未记录'} · 固定版本：{run.data.agentVersion?.version || '未记录'}</p>
       <p>估算费用：{run.data.estimatedCost === null || run.data.estimatedCost === undefined ? '未知' : `${run.data.estimatedCost} CNY`} · 调用次数：{run.data.tokenUsage?.calls ?? '未知'}</p>
-      {run.data.error && <p role="alert">{run.data.error}</p>}<button disabled={!busy || cancel.isPending} onClick={() => cancel.mutate()}>取消运行</button>
-      {run.data.output?.response && <pre>{run.data.output.response}</pre>}
-      <h4>节点与 Trace</h4><ol>{trace.data?.map(event => <li key={event.id}>{event.seq} · {event.type} · {event.step} {event.error && `· ${event.error}`}</li>)}</ol>
+      <button disabled={!busy || cancel.isPending} onClick={() => cancel.mutate()}>取消运行</button>
+      <RunInspector runId={run.data.id} agentId={run.data.agentId} versionId={run.data.agentVersionId} />
     </section>}
     {agentId && <section><h3>运行记录</h3>{history.isLoading && <p role="status">正在读取运行记录…</p>}{history.isSuccess && Array.isArray(history.data) && history.data.length === 0 && <p>暂无运行</p>}{history.data?.map(item => <button key={item.id} disabled={contextLocked} onClick={() => setRunId(item.id)}>{item.id} · {item.status}</button>)}</section>}
   </section>;

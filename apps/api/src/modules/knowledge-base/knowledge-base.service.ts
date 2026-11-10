@@ -16,7 +16,7 @@ import { DEFAULT_ORGANIZATION_ID, tenantContext, tenantCollection } from '../org
  *  - 启动优先用 knowledge-base-retagged.json（如存在）
  */
 
-import { Injectable, Logger, OnModuleInit, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnApplicationBootstrap, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import * as fs from 'fs';
@@ -351,9 +351,9 @@ export class KnowledgeBaseService implements OnModuleInit {
         preview: p.payload.preview,
         difficulty: p.payload.difficulty,
       }));
-    } catch (err: any) {
-      this.logger.warn(`list failed: ${err.message}`);
-      return [];
+    } catch {
+      this.logger.warn({ event: 'knowledge_read_unavailable', operation: 'list' });
+      throw new ServiceUnavailableException('知识资料读取失败，请核对知识库存储服务后重试。');
     }
   }
 
@@ -381,9 +381,9 @@ export class KnowledgeBaseService implements OnModuleInit {
         preview: p.payload.preview,
         difficulty: p.payload.difficulty,
       }));
-    } catch (err: any) {
-      this.logger.warn(`listByTopic failed: ${err.message}`);
-      return [];
+    } catch {
+      this.logger.warn({ event: 'knowledge_read_unavailable', operation: 'listByTopic' });
+      throw new ServiceUnavailableException('知识资料读取失败，请核对知识库存储服务后重试。');
     }
   }
 

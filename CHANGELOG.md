@@ -1,5 +1,9 @@
 # Changelog
 
+2026-11-10 question UX: restore Lab file/URL import through existing APIs with explicit submission, real drag/drop, supported-format/size checks, distinct job/topic/level fields, pending locks, honest save/index receipts and retained drafts. Refine scoped buttons/forms/list details and move storage maintenance below everyday actions. Local frontend verified; model import quality and backend503 deployment remain separate acceptance.
+
+2026-11-10 uncommitted read-recovery candidate: separate read-only historical RAG library from editable business questions; bounded existing authenticated list, local filters, explicit text and honest loaded counts. Knowledge list storage failures return503 rather than successful empty arrays. Original local storage services recovered; new source deployment/CI remain pending. No schema, grant, import or model-call change.
+
 2026-11-09 recording candidate: read-only evaluation sample → exact owned Run/Trace panel, deduplicated repeat references, provenance checks and private-content-free metadata. No model/schema/API/publication changes. Recording script distinguishes historical paid samples, synthetic checks and live browser evidence.
 
 2026-11-06 portfolio delivery recovery candidate: prioritize technical references by retrieved evidence; preserve exact legacy paid-input snapshots; deliver validated facts only when optional technical notes are absent while strict quality still fails. No model replay, prompt/model/schema or Site protocol change. Actual deployment/CI acceptance is tracked in docs/acceptance/PORTFOLIO_DELIVERY_RECOVERY.md.
@@ -185,3 +189,5 @@ Fixed the configured portfolio adapter for Workers redirect compatibility: use m
 ## Unreleased — portfolio evidence and professional explanation
 
 Complete owner-confirmed IM SDK initial-version and integration responsibilities, prison/hospital/education demos and classroom cases; restore omitted public CTI adapter, state and weak-network details. A separate evidence-guide role adds bounded, cited Chinese technical interpretation while personal facts remain verbatim. Optional JSON-object provider mode, fail-closed validation, fixed primary links and bounded follow-up context reuse the existing configured runtime, quotas and Run/Trace. No schema or deployment permanence claim. Repair CI GET polling after an observed429 without repeating evaluation POSTs. Failed real canaries/evaluation remain recorded; synthetic contract success is not semantic or full product acceptance.
+
+- 2026-11-10 (local acceptance; final CI pending): add real runtime Trace workbench and shared event inspector with failure navigation, bounded diagnostic filtering, explicit input/output expansion and GET-only recovery. Data/ingestion restoration remains pending.

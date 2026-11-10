@@ -134,7 +134,7 @@ export async function verifyBuilderCancellation(page, context, origin, previous)
     let terminal;
     const finish = Date.now() + 30000;
     do { terminal = await read(); if (terminal.status === 'CANCELLED') break; assert.ok(Date.now() < finish, 'Cancelled run did not settle'); await page.waitForTimeout(100); } while (true);
-    await page.getByText(/^状态：CANCELLED ·/).waitFor();
+    await page.getByRole('region', { name: `Run ${terminal.id} 详情`, exact: true }).locator('.trace-status').filter({ hasText: /^状态：CANCELLED ·/ }).waitFor();
     const after = await questionInputSnapshot();
     assert.equal(after.provider.chat, before.provider.chat + 1);
     assert.equal(after.ledger, before.ledger + 1);

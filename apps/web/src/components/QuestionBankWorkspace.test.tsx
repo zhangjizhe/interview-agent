@@ -99,6 +99,7 @@ describe('Question bank pending search and reference answer controls', () => {
   }
   it('disables repeat search while pending and permits a retry after a displayed failure', () => {
     const { search, view, tree } = setup('Synthetic reference');
+    expect(screen.getByRole('button', { name: '搜索', exact: true }).textContent).toBe('搜索');
     fireEvent.click(screen.getByRole('button', { name: '搜索', exact: true }));
     expect(search).toHaveBeenCalledTimes(1);
     view.rerender(tree(true));
@@ -167,5 +168,22 @@ describe('Question creation protects edits during pending requests', () => {
       expect(screen.getByLabelText('标签', { exact: true })).toHaveValue('');
     }
     expect(transport).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('question import draft and entry controls', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('retains selected file and topic when collapsing and reopening import without starting any request', () => {
+    const transport = vi.fn(); vi.stubGlobal('fetch', transport);
+    const client = new QueryClient();
+    render(<QueryClientProvider client={client}><QuestionBankWorkspace questions={[]} searchResults={null} query="" position="" message="" onQuery={vi.fn()} onPosition={vi.fn()} onSearch={vi.fn()} onClearSearch={vi.fn()}/></QueryClientProvider>);
+    fireEvent.click(screen.getByRole('button', { name: '导入题目', exact: true }));
+    fireEvent.change(screen.getByLabelText('选择题库文件'), { target: { files: [new File(['Synthetic'], 'draft.md')] } });
+    fireEvent.change(screen.getByLabelText('题目主题', { exact: true }), { target: { value: 'Draft topic' } });
+    fireEvent.click(screen.getByRole('button', { name: '收起导入', exact: true }));
+    expect(screen.queryByRole('heading', { name: '导入题目' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '导入题目', exact: true }));
+    expect(screen.getByText('draft.md')).toBeInTheDocument(); expect(screen.getByLabelText('题目主题', { exact: true })).toHaveValue('Draft topic');
+    expect(transport).not.toHaveBeenCalled(); client.clear();
   });
 });

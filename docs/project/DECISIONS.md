@@ -67,3 +67,5 @@ ADR26 (2026-10-29, candidate): distinguish deterministic business contracts from
 
 
 2026-11-05 bounded portfolio ingress candidate: preserve original modular monolith/normal release-gate/v6; expose only fixed public portfolio routes through an independent credentialed gateway and a temporary HTTPS ingress, with native Sites server Secrets. User explicitly authorized Sites/Cloudflare secret transport. Keep keys encrypted locally/tmpfs, no public admin API, no background Keychain automation without consent. Normal30-sample real-provider deterministic contract evidence is not semantic or whole-product acceptance. See [decision](../architecture/PORTFOLIO_LOCAL_INGRESS.md).
+
+2026-11-09 PLATFORM-RESTORATION: separate Trace diagnosis from data access and ingestion restoration. Reuse owned runtime GETs; explicit business-content expansion and bounded credential filtering; do not label legacy question-generation imports as generic document RAG. See PLATFORM_CAPABILITY_RESTORATION.md.

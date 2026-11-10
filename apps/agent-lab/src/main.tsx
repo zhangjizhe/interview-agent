@@ -1,4 +1,6 @@
+import { KnowledgeLibraryPanel } from './KnowledgeLibraryPanel';
 import { toggleMcpServer } from './mcp-controls';
+import { RuntimeTraceWorkspace } from './RuntimeTraceWorkspace';
 import { AgentBuilderWorkspace } from './AgentBuilderWorkspace';
 import { AccountSecurityDialog } from './AccountSecurityDialog';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -136,6 +138,8 @@ export function ControlCenter() {
   const [operationOutcome, setOperationOutcome] = useState('');
   const [operationObjectType, setOperationObjectType] = useState('');
   const [operationPage, setOperationPage] = useState(1);
+  const [questionBusy, setQuestionBusy] = useState(false);
+  const [questionSource, setQuestionSource] = useState<'catalog' | 'knowledge'>('catalog');
   const [questionQuery, setQuestionQuery] = useState('');
   const [questionSearching, setQuestionSearching] = useState(false);
   const questionSearchPending = useRef(false);
@@ -190,7 +194,7 @@ export function ControlCenter() {
   const questions = useQuery({
     queryKey: ['agent-lab-question-bank', questionPosition],
     queryFn: () => api(`/interview/question-bank/list?${questionBankQuery(questionPosition, 50)}`),
-    enabled: role() === 'ADMIN',
+    enabled: role() === 'ADMIN' && view === 'question-bank' && questionSource === 'catalog',
   });
 
   const refresh = () => {
@@ -308,8 +312,9 @@ export function ControlCenter() {
               key={id}
               type="button"
               className={`agent-nav-item ${view === id ? 'is-active' : ''}`}
-              disabled={!enabled}
-              onClick={() => enabled && setView(id)}
+              disabled={!enabled || (questionBusy && id !== view)}
+              title={questionBusy && id !== view ? '题目正在处理，请等待结果后切换页面。' : undefined}
+              onClick={() => enabled && !questionBusy && setView(id)}
             >
               <Icon size={16}/><span>{label}</span>{!enabled && <em>未配置</em>}
             </button>
@@ -341,13 +346,15 @@ export function ControlCenter() {
         {showPasswordChange && <AccountSecurityDialog onClose={() => setShowPasswordChange(false)} />}
 
 
+        {questionBusy && <p className="qb-feedback" role="status">题目正在处理，完成后可切换页面；请勿重复提交或刷新。</p>}
         {currentMutationError && <p className="agent-error">{(currentMutationError as Error).message}</p>}
         {feedback && <p className="agent-feedback">{feedback}</p>}
 
         {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} />}
         {view === 'runtime' && <AgentBuilderWorkspace />}
         {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} />}
-        {view === 'question-bank' && <><QuestionCatalogPanel /><QuestionBankWorkspace
+        {view === 'question-bank' && <><div className="question-source-switch" role="group" aria-label="题库资料来源"><button type="button" disabled={questionBusy} aria-pressed={questionSource === 'catalog'} onClick={() => setQuestionSource('catalog')}>业务题库</button><button type="button" disabled={questionBusy} aria-pressed={questionSource === 'knowledge'} onClick={() => setQuestionSource('knowledge')}>RAG 知识资料（只读）</button></div>{questionSource === 'knowledge' ? <KnowledgeLibraryPanel /> : <><QuestionBankWorkspace
+          onBusyChange={setQuestionBusy}
           questions={questionItems}
           query={questionQuery}
           position={questionPosition}
@@ -362,8 +369,8 @@ export function ControlCenter() {
           onPosition={(value) => { clearQuestionSearch(); setQuestionPosition(value); }}
           onSearch={searchQuestions}
           onClearSearch={clearQuestionSearch}
-        /></>}
-        {view === 'trace' && <TraceWorkspace runs={labData.runs} />}
+        /><details className="qb-maintenance"><summary>题库存储与索引维护<span>高级操作</span></summary><QuestionCatalogPanel /></details></>}</>}
+        {view === 'trace' && <RuntimeTraceWorkspace />}
         {view === 'evaluation' && <EvaluationWorkspace data={labData} imports={imports} executeImport={executeImport} />}
         {view === 'evolution' && <ControlledEvolutionWorkspace />}
         {view === 'experiments' && <ExperimentWorkspace runs={labData.runs} experiments={labData.experiments} createExperiment={createExperiment} />}
@@ -425,7 +432,7 @@ function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: numbe
   </div>;
 }
 
-function TraceWorkspace({ runs }: { runs: LabRun[] }) {
+function HarnessRunSummary({ runs }: { runs: LabRun[] }) {
   if (!runs.length) return <EmptyState title="尚无 Trace 运行记录" text="Harness 记录会在完成后显示版本、数据集、阶段摘要、延迟、Token、成本和失败分类。" />;
   return <section className="lab-list">{runs.map((run) => <article className="lab-row" key={run.id}>
     <div><p className="agent-eyebrow">{run.type} / {run.status}</p><h2>{run.agent.agentKey} <span>{run.agent.version}</span></h2><p>{run.datasetVersion} · {new Date(run.startedAt).toLocaleString()}</p></div>
@@ -442,7 +449,7 @@ function EvaluationWorkspace({ data, imports, executeImport }: {
   return <div className="agent-page-grid">
     <section className="lab-thresholds"><h2>发布门阈值</h2><span>质量 {'>='} {Math.round(data.thresholds.qualityScore * 100)}%</span><span>结构化有效 {'>='} {Math.round(data.thresholds.structuredOutputValidRate * 100)}%</span><span>延迟 {'<='} {data.thresholds.latencyMs}ms</span><span>成本 {'<='} {data.thresholds.estimatedCostCny} CNY</span></section>
     <RecordedImports imports={imports} executeImport={executeImport} />
-    <TraceWorkspace runs={data.runs} />
+    <div><h2>旧 Harness 录制报告汇总</h2><p>此处是录制报告摘要，实际 Agent Run 的逐事件排障请使用 Trace 页面。</p><HarnessRunSummary runs={data.runs} /></div>
   </div>;
 }
 

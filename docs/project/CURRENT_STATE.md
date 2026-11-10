@@ -1,7 +1,11 @@
 # Current state
 
-2026-11-09 RECORDING-TRACE-DELIVERY. Baseline acfd2a8/PR69. New bounded UI adds report sample→read-only exact Run/Trace panel, keeps ADMIN/workspace API enforcement and checks Agent/version provenance. No API/schema/model/prompt/publication changes or new paid calls. Full Web348 and8 focused tests, Lab type/build/scoped lint/diff pass; clean Lab Docker image built/deployed with original ports/mounts and rollback image retained. Actual normal browser session opened guide1.0.3 report and historical sample: COMPLETED/version1.0.3/one historical call/estimate0.000616/four ordered events; raw payloads hidden. CI/PR/main synchronization pending for this new source; old PR69 greens do not certify it. Whole product remains NOT_ACCEPTED.
+2026-11-10 — 当前唯一主题 QUESTION-BANK-UX。用户要求完善上传、主题、按钮和日常交互。详细实现/真实与合成证据见[QUESTION_BANK_UX](QUESTION_BANK_UX.md)。前序读取恢复见[QUESTION_BANK_READ_RECOVERY](QUESTION_BANK_READ_RECOVERY.md)。
 
-Recording route: docs/runbook/PORTFOLIO_RECORDING_SCRIPT.md. Existing website Site7/env2 recovered earlier today and had actual browser answer/two sources, one new call0.0009268CNY/four Trace events. Current recording work only reads historical reports; no additional model tests. Private effective caps1.8091044≤3CNY; historical unknown4 unchanged. Temporary ingress, old Mac migration, sustained semantic quality and complete product acceptance remain incomplete.
+本机Lab前端已更新：显式文件/URL导入、岗位/主题/职级归类、表单反馈与防重复、按钮层级、答案折叠；高级维护下移折叠。正常管理员会话已验证入口、真实业务16条与RAG142条、筛选/展开正文。保留原卷、端口和回滚镜像，其余12个容器未换；API/数据库未重启。真实模型导入尚未执行，不宣称提题质量通过。
 
-Adopt only the report-navigation portion of existing WIP, preserve all data-governance/runtime/schema/history changes; isolated source used for build. Target2017 Mac remains unspecified macOS/version/memory/storage. Source checkpoint documentation will predate final CI; read final PR and current local context for completion.
+隔离候选Web377通过（含上传9/题库19/资料7/维护4和Trace报告回归），相关类型/lint/diff、冻结依赖Docker前端构建通过。API读取503候选此前12项通过，未部署。前序Trace可访问alert修复已纳入本地前端，原报告用例本轮定向及完整套件通过；之前失败证据保留，不臆断根因。
+
+Git基线agent-lab54efb535、main4e33101、PR #71；交付状态以精确源码对应检查和PR远端读回为准。旧54ef的两次Product CI失败，不认证新增量；未通过最新检查不得合并。审批额度本轮已可用，先前阻塞不再适用。
+
+独立DataGovernance/schema/runtime WIP保留，未混入镜像；全平台交互、collection ACL、统一简历/URL文件通用RAG、真实模型质量、完整历史对账、稳定入口/旧Mac与全产品仍 NOT_ACCEPTED。无新模型调用，历史未知费用保持未知。
