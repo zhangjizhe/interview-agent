@@ -1,5 +1,7 @@
 # 当前架构地图
 
+2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
+
 2026-11-10 资料分权候选：Lab DataGovernanceWorkspace/DataBindingPicker → ADMIN + 可信组织身份 → DataGovernanceService → PostgreSQL typed collection/record/version/grant/audit。默认私有；平台ADMIN不越过资料ACL；AgentVersion显式绑定，ConfiguredRuntime在读取和派发前重新授权，Trace记录实际资料revision/hash而非正文。旧Interview题库与评测集不迁移。加性迁移20261105000000；隔离验收中，原API/5175未更新。见[设计与边界](../architecture/LAB_DATA_GOVERNANCE.md)。
 
 2026-11-10 题库UX：Lab QuestionImportPanel复用原Interview import-file/import-url，文件选择不自动提交，岗位/category/level显式归类，严格回执与PENDING显示，错误后保留页面草稿且不自动付费重放。高级维护下移折叠。无schema/API/权限变化；本机只替换前端，真实导入效果与后台任务/幂等仍未验收。见[UX证据](QUESTION_BANK_UX.md)。

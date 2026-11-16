@@ -1,5 +1,7 @@
 # Changelog
 
+2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
+
 2026-11-10 data governance candidate: private typed collections for questions/articles/documents, explicit owner-managed READ/WRITE grants, revision history and append-only audit, bounded authenticated CRUD, Agent-version bindings with current-access rechecks and source-revision Trace. Additive PostgreSQL migration; existing Interview/vector data retained. Isolated verification in progress; original API/Lab deployment and semantic RAG quality are not accepted by this source change.
 
 2026-11-10 question UX: restore Lab file/URL import through existing APIs with explicit submission, real drag/drop, supported-format/size checks, distinct job/topic/level fields, pending locks, honest save/index receipts and retained drafts. Refine scoped buttons/forms/list details and move storage maintenance below everyday actions. Local frontend verified; model import quality and backend503 deployment remain separate acceptance.

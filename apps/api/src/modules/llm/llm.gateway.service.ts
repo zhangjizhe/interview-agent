@@ -304,12 +304,16 @@ export class LlmGatewayService {
    */
   async *streamChat(
     params: ChatParams & {
+      allowFallback?: boolean;
       interviewId?: string;
       userId?: string;
       semanticCacheType?: SemanticCacheType;
     },
     preferred?: LLMProviderName,
   ): AsyncGenerator<StreamChunk, void, void> {
+    if (params.allowFallback === false && preferred && !this.providerEnabled.get(preferred)) {
+      throw new ServiceUnavailableException('Configured provider unavailable; fallback disabled');
+    }
     const interviewId = params.interviewId || 'unknown';
     const scope = requireTenant();
     const userId = `${scope.organizationId}:${scope.userId || params.userId || 'anonymous'}`;
@@ -370,7 +374,7 @@ export class LlmGatewayService {
       // 已输出文本、工具调用或终态后不得重放另一模型，避免重复/混合回答。
       if (hasEmitted) throw err;
       const fallbackName = this.fallbackMap.get(primary.name as LLMProviderName);
-      if (fallbackName && this.providerEnabled.get(fallbackName)) {
+      if (params.allowFallback !== false && fallbackName && this.providerEnabled.get(fallbackName)) {
         const fallback = this.providers.get(fallbackName);
         actualProvider = fallback;
         totalContent = '';

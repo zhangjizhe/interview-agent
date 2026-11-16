@@ -1,5 +1,7 @@
 # Tasks
 
+2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
+
 2026-11-10。
 
 - 当前：LAB-DATA-GOVERNANCE，资料类型/归属/显式ACL/版本绑定与撤权；隔离PG/HTTP42、API1283（47跳过）、Web385、runtime53及浏览器流程已有证据。专用PG备份恢复通过；完整自动Docker门和精确源码CI、PR合并/远端核对待完成。主体445d572已推送PR #72，后补选框样式，最终只认最新对应CI。见LAB_DATA_GOVERNANCE_WIP.md。

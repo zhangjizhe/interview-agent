@@ -10,6 +10,7 @@ import { parsePortfolioRequest, PORTFOLIO_CONTRACT, PORTFOLIO_SELECTOR_PROMPT, P
 
 import { PORTFOLIO_GUIDE_MODE, PORTFOLIO_GUIDE_PROMPT, renderPortfolioDelivery } from './portfolio-guide.contract';
 import { technicalReferencesFor, validateTechnicalReferenceSnapshot } from './portfolio-technical-context';
+import { projectPortfolioStream } from './portfolio-stream.contract';
 import { PORTFOLIO_ADMIT_SCRIPT, PORTFOLIO_RELEASE_SCRIPT } from './portfolio-admission';
 export { PORTFOLIO_ADMIT_SCRIPT } from './portfolio-admission';
 type Binding = { ownerId: string; secret: string; origins: string[]; versionId: string; daily: number };
@@ -110,7 +111,7 @@ export class PortfolioAssistantService {
     if (hash !== entry.versionHash || version.agentId !== entry.agentId || entry.sourceHash !== portfolioSourceHash) {
       throw new ServiceUnavailableException('助手绑定已变化，旧请求不能自动执行');
     }
-    await this.jobs.enqueue(actor.id, entry.agentId, { agentVersionId: entry.versionId, requestKey: entry.queueKey, input: { message: entry.message } }, false);
+    await this.jobs.enqueue(actor.id, entry.agentId, { agentVersionId: entry.versionId, requestKey: entry.queueKey, input: { message: entry.message } }, false, { streamOutput: true });
     return this.findRun(entry);
   }
   private async release(entry: Entry, binding: Binding) {
@@ -168,6 +169,22 @@ export class PortfolioAssistantService {
       const run = await this.ensureEnqueued(actual, actor);
       return { contractVersion: PORTFOLIO_CONTRACT, status: run?.status === 'RUNNING' ? 'RUNNING' : 'PENDING',
         ticket: this.ticket(actual.nonce, binding), reused: Number(admission[0]) === 0, pollAfterMs: 1500 };
+    }));
+  }
+
+  async streamSnapshot(ticket: string) {
+    const binding = this.binding(), nonce = this.nonce(ticket, binding), actor = await this.actor(binding);
+    return this.scoped(actor, () => this.redisWork(async () => {
+      const entry = await this.entry(nonce, binding);
+      if (entry.organizationId !== actor.organizationId) throw new NotFoundException('回答票据无效');
+      if (entry.sourceHash !== portfolioSourceHash) return null;
+      const input = JSON.parse(entry.message);
+      if (input.answerMode !== PORTFOLIO_GUIDE_MODE) return null;
+      const run = await this.findRun(entry);
+      if (!run || !['PENDING', 'RUNNING'].includes(run.status)) return null;
+      const checkpoint = await this.prisma.traceEvent.findFirst({ where: { runId: run.id, type: 'model.stream' }, orderBy: { seq: 'desc' }, select: { payload: true } });
+      const content = (checkpoint?.payload as any)?.content;
+      return typeof content === 'string' ? projectPortfolioStream(content, entry.documents, input.technicalReferences) : null;
     }));
   }
 
