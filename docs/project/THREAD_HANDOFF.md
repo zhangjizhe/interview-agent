@@ -1,5 +1,7 @@
 # Thread handoff
 
+2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
+
 2026-11-10。用户在PR #71合并后要求继续；当前唯一主题LAB-DATA-GOVERNANCE，原暂停候选已经复核并扩充隔离验收。先读LAB_DATA_GOVERNANCE_WIP.md和docs/architecture/LAB_DATA_GOVERNANCE.md。
 
 当前agent-lab基线3c8f089，与main19e911e同tree；前序PR #71已合并，默认Product各组5绿。主体源码445d572已推送PR #72，最后补选框布局，最新CI待核；尚未合并/部署，原5175仍题库UX镜像，原API/数据库/全部卷未重启或迁移。

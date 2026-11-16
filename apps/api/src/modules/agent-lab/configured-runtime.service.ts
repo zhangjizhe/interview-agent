@@ -7,6 +7,8 @@ import { PrismaService } from '../../infra/prisma/prisma.service';
 import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { LlmPricingCatalogService } from '../llm/cost/llm-pricing-catalog.service';
 import { TraceEventService } from './trace-event.service';
+import { collectConfiguredStream } from './configured-stream';
+import type { ChatParams } from '../llm/providers/types';
 import { assertSchema, RuntimeDefinition, RuntimeCancelledError, validateConfiguredVersion } from './configured-runtime.contract';
 
 export { RuntimeCancelledError } from './configured-runtime.contract';
@@ -96,14 +98,20 @@ export class ConfiguredRuntimeService {
       // immediately before dispatch, without keeping a DB lock over a model call.
       if (ids.length) await this.data!.validateBindings(run.workspaceId, ids);
       const callStarted = Date.now();
-      const result = await this.gateway.chat({ messages: [
+      const params: ChatParams & { userId: string; allowFallback: boolean } = { messages: [
         { role: 'system', content: systemPrompt },
         ...(sourceText ? [{ role: 'user' as const, content: sourceText }] : []), { role: 'user', content: message },
       ], maxTokens: config.maxTokens, temperature: config.temperature, ...(config.responseFormat ? { responseFormat: config.responseFormat } : {}), userId,
       // A Lab Run is not an Interview. Quota remains tenant-scoped in Gateway;
       // actual Lab usage/cost is persisted below on Run and Trace, never on the
       // Interview-only SessionCost relation using an unrelated Run identifier.
-      allowFallback: false }, config.provider);
+      allowFallback: false };
+      const result = run.budget?.streamOutput === true
+        ? await collectConfiguredStream(this.gateway.streamChat(params, config.provider), model, async content => {
+          await check();
+          await this.trace.append(childRun.id, { type: 'model.stream', step: 'configured-agent', payload: { content } });
+        })
+        : await this.gateway.chat(params, config.provider);
       const cost = result.usage.promptTokens + result.usage.completionTokens > 0
         ? this.pricing.estimateCall({ provider: result.provider, model: result.model, ...result.usage })
         : { status: 'unavailable' as const, reason: 'Provider未返回有效usage，不能将未知费用记零' };
@@ -126,6 +134,7 @@ export class ConfiguredRuntimeService {
         metadata: { provider: result.provider, model: result.model, pricing: cost } });
       if (Date.now() - callStarted > childDefinition.maxDurationMs) throw new ConflictException('节点时限耗尽；在途调用已记账，停止后续节点');
       if (result.finishReason === 'length') throw new ConflictException('模型输出达到Token上限，不能作为完整结果');
+      if (result.finishReason === 'error') throw new ConflictException('模型流未完整结束；保留在途费用证据，不自动重放');
       if (cost.status !== 'available') throw new ConflictException('调用费用未知；停止后续节点');
       assertSchema(target.outputSchema ?? { type: 'object' }, output);
       await check();

@@ -65,6 +65,18 @@ describe('LLM gateway failure boundaries (offline fault injection)', () => {
     expect(chunks.map(c => c.content || '').join('')).toBe('fallback');
     expect(chunks.some(c => c.isFallbackMarker)).toBe(false);
   });
+  it('honors an explicit no-fallback stream before the first provider token', async () => {
+    primary.streamChat.mockImplementation(async function* () { throw new Error('unavailable'); });
+    await expect((async () => { for await (const _chunk of gateway.streamChat({ ...params, allowFallback: false }, 'qwen')) { /* consume */ } })()).rejects.toThrow('unavailable');
+    expect(primary.streamChat).toHaveBeenCalledTimes(1);
+    expect(fallback.streamChat).not.toHaveBeenCalled();
+  });
+  it('never routes a disabled configured streaming provider to another provider', async () => {
+    primary.chat.mockRejectedValue(Object.assign(new Error('disabled'), { status: 401 }));
+    await expect(gateway.chat({ ...params, allowFallback: false }, 'qwen')).rejects.toThrow();
+    await expect((async () => { for await (const _chunk of gateway.streamChat({ ...params, allowFallback: false }, 'qwen')) { /* consume */ } })()).rejects.toThrow('fallback disabled');
+    expect(fallback.streamChat).not.toHaveBeenCalled();
+  });
   it.each([
     { content: 'partial answer' },
     { toolCall: { id: 'call', name: 'tool', arguments: '{}' } },
