@@ -33,6 +33,7 @@ async function mount() {
   return client;
 }
 beforeEach(() => {
+  window.history.replaceState(null, '', '/');
   enabled = true; brokenReceipt = false; failRead = false;
   vi.spyOn(window, 'confirm').mockReturnValue(true);
   transport.mockReset().mockImplementation(async (path: string, options?: RequestInit) => {
@@ -59,6 +60,7 @@ describe('MCP workspace process scope and state recovery', () => {
     await mount();
     expect(screen.getByText(scope)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '本进程关闭', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '确认关闭', exact: true }));
     await screen.findByText('fixture-tool 已在当前 API 进程关闭。');
     await screen.findByRole('button', { name: '本进程启用', exact: true });
     fireEvent.click(screen.getByRole('button', { name: '本进程启用', exact: true }));
@@ -69,6 +71,7 @@ describe('MCP workspace process scope and state recovery', () => {
     await mount(); brokenReceipt = true;
     const before = transport.mock.calls.filter(call => call[0] === '/admin/mcp-servers').length;
     fireEvent.click(screen.getByRole('button', { name: '本进程关闭', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '确认关闭', exact: true }));
     await screen.findByText('MCP 开关结果未确认，请重新读取服务状态后核验。');
     await screen.findByRole('button', { name: '本进程启用', exact: true });
     expect(screen.queryByText('fixture-tool 已在当前 API 进程关闭。')).toBeNull();
@@ -93,6 +96,7 @@ describe('MCP workspace process scope and state recovery', () => {
   it('requires reload confirmation and reports retained runtime switches after the POST', async () => {
     await mount();
     fireEvent.click(screen.getByRole('button', { name: '本进程关闭', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '确认关闭', exact: true }));
     await screen.findByRole('button', { name: '本进程启用', exact: true });
     vi.mocked(window.confirm).mockReturnValueOnce(false);
     fireEvent.click(screen.getByRole('button', { name: '重新加载 MCP', exact: true }));
