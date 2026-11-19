@@ -363,6 +363,7 @@ export class AgentRuntimeService {
     requestedVersionId?: string,
     allowDraftVersion = false,
   ) {
+    if (agent.status === 'ARCHIVED') throw new ConflictException('Agent 已归档停用，禁止启动新运行；历史记录仍可读取');
     const version = requestedVersionId
       ? await this.prisma.agentVersion.findFirst({
           where: { id: requestedVersionId, agentId: agent.id },
