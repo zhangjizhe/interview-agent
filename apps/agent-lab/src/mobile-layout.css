@@ -1,0 +1,133 @@
+/* Last in the stylesheet cascade: shared mobile constraints across Lab workspaces.
+   Keep long content readable; constrain its layout instead of hiding page overflow. */
+.lab-shell .lab-page-content :where(section, article, form, fieldset, label),
+.agent-security-dialog, .agent-security-form, .agent-security-form label {
+  min-width: 0;
+}
+.lab-shell .lab-page-content :where(h2, h3, h4, p, code, a),
+.agent-security-dialog :where(p, label, h2) {
+  overflow-wrap: anywhere;
+}
+.lab-shell .lab-page-content pre { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.lab-shell .lab-row > div, .lab-shell .lab-import-row > div,
+.lab-shell .mcp-card-heading > div, .lab-shell .builder-card-foot > span { min-width: 0; }
+.lab-shell .mcp-properties { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lab-shell .mcp-card-grid { grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
+.lab-shell .builder-catalog-grid { grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
+.lab-shell .lab-form-grid, .lab-shell .lab-command-form, .lab-shell .lab-audit-filters { min-width: 0; }
+.lab-shell .lab-page-content :where(input, select, textarea) { max-width: 100%; }
+
+/* Dialog is outside the shell; use the same surface, input and focus language. */
+.agent-security-backdrop { top: var(--lab-visible-top, 0px); bottom: auto; height: var(--lab-visible-height, 100dvh); padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); overflow: auto; overscroll-behavior: contain; }
+.agent-security-dialog { background: #fff; color: var(--lab-text); border: 1px solid var(--lab-border); border-radius: 12px; max-height: calc(var(--lab-visible-height, 100dvh) - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+.agent-security-dialog p, .agent-security-form label { color: var(--lab-muted); }
+.agent-security-dialog input { width: 100%; min-width: 0; background: #fff; color: var(--lab-text); border: 1px solid #c9d0dc; border-radius: 6px; }
+.agent-security-dialog > .agent-command:first-child { position: sticky; top: 0; z-index: 1; }
+.lab-nav-backdrop { display: none; }
+
+@media (max-width: 900px) {
+  .lab-shell, .agent-access { min-height: 100vh; min-height: 100dvh; }
+  .lab-shell { --lab-mobile-header: 64px; --lab-safe-top: env(safe-area-inset-top, 0px); }
+  .lab-mobile-bar { position: sticky; top: 0; z-index: 52; min-height: calc(var(--lab-mobile-header) + var(--lab-safe-top)); padding: calc(10px + var(--lab-safe-top)) max(14px, env(safe-area-inset-right)) 10px max(14px, env(safe-area-inset-left)); }
+  .lab-shell .agent-workspace { padding: 20px max(14px, env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+  .lab-shell .lab-context-bar { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+  .lab-shell .agent-sidebar { position: fixed; z-index: 51; top: calc(var(--lab-mobile-header) + var(--lab-safe-top)); left: 0; bottom: 0; width: min(360px, 100%); height: auto; max-height: calc(100dvh - var(--lab-mobile-header) - var(--lab-safe-top)); overflow-y: auto; overscroll-behavior: contain; padding: 16px max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); box-shadow: 12px 0 40px #20293820; }
+  .lab-shell .agent-sidebar nav { display: grid; grid-template-columns: 1fr; flex: none; overflow: visible; gap: 18px; }
+  .lab-shell .agent-section-label { display: block; font-size: 12px; }
+  .lab-shell .lab-nav-group { gap: 4px; }
+  .lab-shell .agent-nav-item { white-space: normal; font-size: 14px; }
+  .lab-shell .lab-sidebar-footer { display: grid; gap: 8px; padding-top: 16px; margin-top: 20px; }
+  .lab-shell .lab-account-command, .lab-shell .agent-signout { width: 100%; font-size: 14px; }
+  .lab-shell .lab-account strong, .lab-shell .lab-account small { font-size: 12px; }
+  .lab-shell .lab-nav-backdrop { display: block; position: fixed; z-index: 50; inset: calc(var(--lab-mobile-header) + var(--lab-safe-top)) 0 0; border: 0; border-radius: 0; background: #20293866; width: 100%; padding: 0; }
+  .lab-shell .agent-topbar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .lab-shell .lab-page-actions { width: 100%; }
+  .lab-shell .lab-page-actions > button { flex: 1 1 140px; }
+  .lab-shell .lab-page-content { font-size: 14px; }
+  .lab-shell .agent-workspace :is(input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea),
+  .agent-access input, .agent-security-dialog input { font-size: 16px; line-height: 1.5; min-height: 44px; }
+  .lab-shell .agent-workspace :is(button, summary), .lab-shell .lab-navigation button, .lab-shell .lab-mobile-bar button, .agent-access button, .agent-security-dialog button { min-height: 44px; min-width: 44px; touch-action: manipulation; }
+  .lab-shell .agent-workspace button, .agent-access button, .agent-security-dialog button { font-size: 14px; line-height: 1.5; white-space: normal; }
+  .lab-shell summary { padding-top: 10px; padding-bottom: 10px; line-height: 1.6; }
+  .lab-shell .agent-workspace :is(p, label), .lab-shell .agent-topbar p { font-size: 13px; line-height: 1.75; }
+  .lab-shell .agent-workspace :is(small, .agent-eyebrow, dt) { font-size: 12px; }
+  .lab-shell .agent-workspace :is(input[type=checkbox], input[type=radio]) { min-height: 20px; width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--lab-primary); }
+  .lab-shell .builder-confirm, .lab-shell .qb-check, .lab-shell .evolution-confirm, .lab-shell .data-binding-options label { min-height: 44px; align-items: center; }
+  .lab-shell .lab-section-head, .lab-shell .builder-heading, .lab-shell .knowledge-library header { flex-direction: column; align-items: stretch; }
+  .lab-shell .builder-toolbar { flex-shrink: 1; width: 100%; }
+  .lab-shell .builder-toolbar button { flex: 1 1 120px; }
+  .lab-shell .builder-catalog-filters label { flex: 1 1 160px; min-width: 0; }
+  .lab-shell .builder-card-foot, .lab-shell .runtime-heading, .lab-shell .runtime-foot { flex-wrap: wrap; }
+  .lab-shell .runtime-flow { max-width: 100%; overscroll-behavior-inline: contain; }
+  .lab-shell .trace-inspector-slot { scroll-margin-top: calc(var(--lab-mobile-header) + var(--lab-safe-top) + 12px); }
+  .lab-shell .trace-list-heading, .lab-shell .trace-toolbar { flex-wrap: wrap; }
+  .lab-shell .trace-actions { justify-content: flex-start; }
+  .lab-shell .trace-event-detail { max-height: none; overflow: visible; }
+  .lab-shell .trace-timeline, .lab-shell .trace-run-list { max-height: min(320px, 45dvh); overscroll-behavior-y: contain; }
+  .agent-access section { margin: 0 auto; padding: max(28px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); }
+  .agent-security-backdrop { align-items: start; }
+  .agent-security-dialog { padding: 18px; }
+}
+@media (max-width: 600px) {
+  .lab-shell .agent-hero, .lab-shell .runtime-canvas, .lab-shell .mcp-governance,
+  .lab-shell .builder-workspace section, .lab-shell .builder-workspace form,
+  .lab-shell .qb-toolbar, .lab-shell .qb-import, .lab-shell .data-detail { padding: 16px; }
+  .lab-shell .builder-catalog-grid, .lab-shell .mcp-card-grid { grid-template-columns: minmax(0, 1fr); }
+  .lab-shell .mcp-filterbar label, .lab-shell .qb-local-controls label:first-child { min-width: 0; flex-basis: 100%; }
+  .lab-shell .mcp-card-heading { flex-wrap: wrap; }
+  .lab-shell .mcp-card-heading > div { flex: 1 1 120px; }
+  .lab-shell .mcp-tool-card { padding: 14px; }
+  .lab-shell .mcp-actions, .lab-shell .qb-header-actions { width: 100%; flex-wrap: wrap; }
+  .lab-shell .mcp-actions button, .lab-shell .qb-header-actions button { flex: 1 1 100px; }
+  .lab-shell .qb-methods { display: flex; width: 100%; min-width: 0; flex-wrap: wrap; }
+  .lab-shell .qb-methods button { flex: 1 1 100px; }
+  .lab-shell .qb-dropzone { padding: 20px 12px; }
+  .lab-shell .qb-file-receipt { flex-wrap: wrap; padding: 10px; }
+  .lab-shell .qb-file-receipt > span { flex-basis: 130px; }
+  .lab-shell .qb-list-heading { align-items: flex-start; flex-direction: column; }
+  .lab-shell .qb-pagination > div { width: 100%; }
+  .lab-shell .qb-pagination button { flex: 1; }
+  .lab-shell .question-bank-row { padding: 16px; }
+  .lab-shell .qb-maintenance > summary { gap: 10px; flex-wrap: wrap; }
+  .lab-shell .trace-lookup, .lab-shell .trace-filters { flex-direction: column; align-items: stretch; }
+  .lab-shell .trace-filters label, .lab-shell .trace-lookup label { min-width: 0; }
+  .lab-shell .trace-inspector { padding: 14px; }
+  .lab-shell .trace-heading > div, .lab-shell .trace-card-head > strong { min-width: 0; }
+  .lab-shell .trace-properties, .lab-shell .lab-form-grid, .lab-shell .lab-audit-filters,
+  .lab-shell .lab-command-form, .lab-shell .lab-release-row { grid-template-columns: minmax(0, 1fr); }
+  .lab-shell .lab-form-grid > *, .lab-shell .lab-command-form > * { min-width: 0; }
+  .lab-shell .lab-page-content :is(select, textarea), .lab-shell .lab-audit-filters input { width: 100%; }
+  .lab-shell .data-actions > label { flex: 1 1 100%; min-width: 0; }
+  .lab-shell .knowledge-library-tags span { max-width: 100%; overflow-wrap: anywhere; }
+}
+
+@media (max-width: 900px) { html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; } }
+
+@media (max-width: 900px) {
+  /* A static architecture illustration should reflow rather than zoom the page. */
+  .lab-shell .runtime-flow { flex-direction: column; align-items: stretch; overflow: visible; gap: 8px; }
+  .lab-shell .runtime-step { flex-direction: column; align-items: stretch; gap: 8px; }
+  .lab-shell .runtime-node { width: 100%; min-width: 0; }
+  .lab-shell .runtime-step i { width: 2px; height: 16px; align-self: center; flex-shrink: 0; }
+  .lab-shell .runtime-step i::after { display: none; }
+}
+
+@media (max-width: 900px) {
+  .lab-shell .trace-run-list { grid-template-columns: minmax(0, 1fr); }
+  .lab-shell .trace-run-card { min-width: 0; width: 100%; overflow-wrap: anywhere; }
+  .lab-shell .trace-card-head, .lab-shell .trace-card-context, .lab-shell .trace-card-footer { min-width: 0; flex-wrap: wrap; }
+  .lab-shell .trace-card-head > strong { flex: 1 1 120px; }
+  .lab-shell .trace-card-context { overflow-wrap: anywhere; white-space: normal; }
+}
+/* Dataset hashes, source identifiers and labels must wrap just like prose. */
+.lab-shell .lab-page-content { overflow-wrap: anywhere; }
+@media (max-width: 900px) { .agent-access form button { min-height: 44px; } }
+
+/* Keyboard scroll clearance works without browser-name detection. Chrome may
+   resize the layout viewport; embedded browsers retain the visual-viewport path. */
+@media (max-width: 900px) {
+  html { scroll-padding-block: 80px 24px; }
+  .lab-shell .agent-workspace :is(input, select, textarea), .agent-access input { scroll-margin-block: 84px 24px; }
+  .agent-security-dialog { scroll-padding-block: 64px 24px; }
+  .agent-security-dialog input { scroll-margin-block: 64px 24px; }
+}
