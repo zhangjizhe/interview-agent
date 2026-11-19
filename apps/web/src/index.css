@@ -14,7 +14,7 @@
 
 body {
   font-family: var(--font-ui);
-  background: var(--paper);
+  background: var(--glow), var(--paper);
   color: var(--ink);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: contain;
@@ -68,9 +68,9 @@ button:disabled.hover\:bg-blue-700,
 }
 .brand-mark {
   background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--ink);
-  border-radius: 2px;
+  color: var(--brass);
+  border: 1px solid var(--brass);
+  border-radius: 8px;
   font-family: var(--font-display);
   font-weight: 500;
 }
@@ -80,9 +80,9 @@ button:disabled.hover\:bg-blue-700,
   transition: background-color 160ms var(--ease), color 160ms var(--ease);
 }
 .candidate-sidebar .candidate-nav.is-active {
-  background: transparent;
-  color: var(--ink);
-  box-shadow: inset 2px 0 0 var(--ink);
+  background: var(--brass-soft);
+  color: var(--brass);
+  box-shadow: inset 2px 0 0 var(--brass);
 }
 .candidate-sidebar .candidate-nav:hover { background: var(--paper); color: var(--ink); }
 .candidate-topbar { background: color-mix(in srgb, var(--paper) 88%, transparent); border-color: var(--line); }
@@ -118,9 +118,7 @@ button:disabled.hover\:bg-blue-700,
   min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
-  background:
-    linear-gradient(180deg, rgba(111, 82, 44, 0.06), transparent 280px),
-    var(--paper);
+  background: var(--glow), var(--paper);
 }
 .studio-auth-story {
   padding: clamp(36px, 6vw, 96px);
@@ -189,11 +187,12 @@ button:disabled.hover\:bg-blue-700,
 .studio-auth-form input:focus { outline: none; border-bottom-color: var(--ink); box-shadow: 0 1px 0 var(--ink); }
 .studio-auth-form button.bg-blue-600 {
   min-height: 44px;
-  border-radius: 2px;
-  background: var(--ink);
-  letter-spacing: 0.12em;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--on-primary);
+  letter-spacing: 0.08em;
 }
-.studio-auth-form button.bg-blue-600:hover { background: var(--ink-soft); }
+.studio-auth-form button.bg-blue-600:hover { background: var(--primary-hover); }
 .studio-auth-form button.text-blue-700 { color: var(--muted); }
 .studio-auth-form button.text-blue-700:hover { color: var(--ink); }
 .studio-auth-form button.border { background: transparent; color: var(--ink); border-color: var(--line-strong); border-radius: 2px; min-height: 40px; }

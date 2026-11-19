@@ -1,9 +1,9 @@
 /** @type {import('tailwindcss').Config} */
-const ink = { 50: '#F4F0E8', 100: '#E9E2D6', 200: '#DDD4C6', 300: '#CDBFAE', 400: '#8A8176', 500: '#5E564E', 600: '#1C1915', 700: '#3F3830', 800: '#2A261F', 900: '#141210' };
-const paper = { 50: '#F3F0EA', 100: '#E8E2D8', 200: '#E3DCD2', 300: '#CFC6B8', 400: '#8A8176', 500: '#6F675E', 600: '#5E564E', 700: '#3F3830', 800: '#2A261F', 900: '#1C1915' };
-const pine = { 50: '#E7F0EC', 100: '#D5E4DD', 200: '#C5DDD0', 300: '#9BB8AA', 400: '#4E7A68', 500: '#1E463C', 600: '#1E463C', 700: '#17382F', 800: '#123028', 900: '#0E241E' };
+const ink = { 50: '#F8EFE8', 100: '#F3E4D8', 200: '#E7D3C4', 300: '#D4B8A4', 400: '#A07862', 500: '#8A5340', 600: '#8A5340', 700: '#73432F', 800: '#5C3626', 900: '#3F2C24' };
+const paper = { 50: '#FBF6F1', 100: '#F6EFE8', 200: '#EFE4DA', 300: '#E4D5C8', 400: '#B7A094', 500: '#8A7266', 600: '#7C6458', 700: '#5C453C', 800: '#4A382F', 900: '#3F2C24' };
+const pine = { 50: '#E7F3EC', 100: '#D5E8DC', 200: '#C5DDD0', 300: '#9BB8AA', 400: '#4E7A68', 500: '#3F6B52', 600: '#3F6B52', 700: '#2F5640', 800: '#244433', 900: '#1C3326' };
 const seal = { 50: '#F8EEEB', 100: '#F0DDD7', 200: '#E7D0C9', 300: '#D7B3A9', 400: '#B56A5E', 500: '#8F3A32', 600: '#8F3A32', 700: '#732E28', 800: '#5C261F', 900: '#3E1A16' };
-const brass = { 50: '#F8F1E3', 100: '#F0E4CC', 200: '#E7D7B4', 300: '#D4C093', 400: '#B0894F', 500: '#8A6A3B', 600: '#6F522C', 700: '#7A5410', 800: '#5C3F0C', 900: '#3E2C0C' };
+const brass = { 50: '#F8EFE8', 100: '#F3E4D8', 200: '#E7D3C4', 300: '#D4B8A4', 400: '#A07862', 500: '#8C4F38', 600: '#8A5340', 700: '#73432F', 800: '#5C3626', 900: '#3F2C24' };
 
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
@@ -15,8 +15,8 @@ export default {
         mono: ['"IBM Plex Mono"', '"Noto Sans SC"', 'ui-monospace', 'monospace'],
       },
       colors: {
-        white: '#FBFAF7',
-        black: '#1C1915',
+        white: '#FFFCFA',
+        black: '#3F2C24',
         blue: ink,
         slate: paper,
         zinc: paper,
@@ -41,13 +41,13 @@ export default {
         orange: brass,
       },
       borderRadius: {
-        sm: '2px',
-        DEFAULT: '2px',
-        md: '2px',
-        lg: '2px',
-        xl: '4px',
-        '2xl': '4px',
-        '3xl': '4px',
+        sm: '8px',
+        DEFAULT: '10px',
+        md: '10px',
+        lg: '12px',
+        xl: '16px',
+        '2xl': '18px',
+        '3xl': '22px',
       },
       boxShadow: {
         sm: '0 1px 1px rgba(28, 25, 21, 0.04)',

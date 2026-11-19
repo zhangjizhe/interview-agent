@@ -38,7 +38,7 @@ export function KnowledgeLibraryPanel() {
   const visible = items.filter(item => (!topic || item.topic === topic)
     && `${item.title} ${item.topic} ${item.tags.join(' ')}`.toLowerCase().includes(query));
   return <section className="knowledge-library" aria-label="RAG 历史知识资料">
-    <header><div><p className="agent-eyebrow">KNOWLEDGE LIBRARY</p><h2>RAG 知识资料 · 只读</h2><p>读取当前组织已保存的历史题目和技术资料。此处不会导入、重建索引或自动绑定给 Agent。</p></div>
+    <header><div><p className="agent-eyebrow">资料</p><h2>RAG 知识资料 · 只读</h2><p>读取当前组织已保存的历史题目和技术资料。此处不会导入、重建索引或自动绑定给 Agent。</p></div>
       <button type="button" disabled={library.isFetching} onClick={() => library.refetch()}>{library.isFetching ? '读取中' : '重新读取知识资料'}</button></header>
     <p className="knowledge-library-note">这些资料与“业务题库”的记录、评测用例独立。筛选仅针对已加载的标题、主题和标签，不调用模型。</p>
     {library.isPending && <p role="status">正在读取历史知识资料…</p>}

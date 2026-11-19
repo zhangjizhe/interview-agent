@@ -307,7 +307,7 @@ export function ControlCenter() {
     <div className="agent-shell">
       <aside className="agent-sidebar">
         <div className="agent-brand"><span className="mark" aria-hidden="true">A</span><span>Agent Lab</span></div>
-        <p className="agent-section-label">CONTROL PLANE</p>
+        <p className="agent-section-label">工作台</p>
         <nav aria-label="Agent Lab 导航">
           {CONTROL_NAV.map(({ id, label, icon: Icon, enabled }) => (
             <button
@@ -335,7 +335,7 @@ export function ControlCenter() {
 
       <main className="agent-workspace">
         <header className="agent-topbar">
-          <div><p className="agent-eyebrow">AGENT OPERATIONS</p><h1>{titleFor(view)}</h1></div>
+          <div><p className="agent-eyebrow">今日</p><h1>{titleFor(view)}</h1></div>
           <div className="topbar-actions">
           <button className="agent-command" onClick={() => setShowPasswordChange(true)}>修改密码</button>
           {view === 'mcp' && <button className="agent-command" onClick={() => readMcpState.mutate()} disabled={readMcpState.isPending || toggle.isPending || reload.isPending}>刷新本进程状态</button>}
@@ -418,7 +418,7 @@ function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: numbe
   const latestDecision = lab.decisions[0];
   return <div className="agent-page-grid">
     <section className="agent-hero">
-      <p className="agent-eyebrow">SYSTEM STATUS</p>
+      <p className="agent-eyebrow">现场</p>
       <h2>Agent 的运行与评测工作台</h2>
       <p>合成基准：Golden Dataset {lab.dataset.version}，格式校验覆盖 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。录制指标用于回放与工程验证；当前业务版本的质量结论见受控自进化证据。</p>
       <div className="agent-hero-actions"><button onClick={onRuntime}><Workflow size={16}/>查看编排</button><button className="quiet" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button></div>
@@ -495,7 +495,7 @@ function ExperimentComposer({ runs, createExperiment }: {
   const [treatmentRunId, setTreatmentRunId] = useState('');
   const compatibleTreatmentRuns = runs.filter((run) => !controlRunId || run.datasetVersion === runs.find((item) => item.id === controlRunId)?.datasetVersion);
   return <section className="lab-command-form">
-    <div><p className="agent-eyebrow">EXPERIMENT</p><h2>创建比较</h2></div>
+    <div><p className="agent-eyebrow">实验</p><h2>创建比较</h2></div>
     <label>Control<select aria-label="Control run" value={controlRunId} onChange={(event) => setControlRunId(event.target.value)}><option value="">选择运行</option>{runs.map((run) => <option key={run.id} value={run.id}>{run.agent.agentKey} {run.agent.version} · {run.datasetVersion}</option>)}</select></label>
     <label>Treatment<select aria-label="Treatment run" value={treatmentRunId} onChange={(event) => setTreatmentRunId(event.target.value)}><option value="">选择运行</option>{compatibleTreatmentRuns.map((run) => <option key={run.id} value={run.id} disabled={run.id === controlRunId || run.agent.version === runs.find((item) => item.id === controlRunId)?.agent.version}>{run.agent.agentKey} {run.agent.version} · {run.datasetVersion}</option>)}</select></label>
     <button className="agent-command" onClick={() => createExperiment.mutate({ controlRunId, treatmentRunId })} disabled={!controlRunId || !treatmentRunId || controlRunId === treatmentRunId || createExperiment.isPending}>{createExperiment.isPending ? '创建中' : '创建实验'}</button>
@@ -601,7 +601,7 @@ function EmptyState({ title, text }: { title: string; text: string }) {
 
 function RuntimeCanvas({ compact = false }: { compact?: boolean }) {
   return <section className={`runtime-canvas ${compact ? 'compact' : ''}`}>
-    <div className="runtime-heading"><div><p className="agent-eyebrow">RUNTIME TOPOLOGY</p><h2>受控 Agent 编排</h2></div><span>不展示思维链</span></div>
+    <div className="runtime-heading"><div><p className="agent-eyebrow">编排</p><h2>受控 Agent 编排</h2></div><span>不展示思维链</span></div>
     <div className="runtime-flow">
       {['请求边界', '规划', '执行', '复核', '受控输出'].map((label, index) => (
         <div className="runtime-step" key={label}>
@@ -704,7 +704,7 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
     }
   };
   const title = mode === 'register' ? '创建管理员账号' : mode === 'login-code' ? '验证登录邮箱' : mode === 'claim' || mode === 'claim-code' ? '绑定旧账号邮箱' : mode === 'forgot' || mode === 'reset' ? '找回密码' : '进入控制台';
-  return <main className="agent-access"><section><div className="agent-access-mark" aria-hidden="true">A</div><p className="agent-eyebrow">AGENT LAB / CONTROL PLANE</p><h1>{title}</h1><p>管理员账号由部署允许名单授予。注册时验证邮箱，之后使用用户名和密码登录。</p><form onSubmit={submit}>
+  return <main className="agent-access"><section><div className="agent-access-mark" aria-hidden="true">A</div><p className="agent-eyebrow">工作台</p><h1>{title}</h1><p>管理员账号由部署允许名单授予。注册时验证邮箱，之后使用用户名和密码登录。</p><form onSubmit={submit}>
     {mode !== 'login-code' && mode !== 'claim-code' && mode !== 'reset' && mode !== 'forgot' && <label>用户名<input value={userId} onChange={(event) => setUserId(event.target.value.toLowerCase())} autoComplete="username" required /></label>}
     {(mode === 'login' || mode === 'register' || mode === 'claim') && <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} maxLength={128} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required /></label>}
     {(mode === 'register' || mode === 'claim' || mode === 'claim-code' || mode === 'forgot') && <label>邮箱<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setChallengeId(''); setCode(''); }} maxLength={254} autoComplete="email" required /></label>}

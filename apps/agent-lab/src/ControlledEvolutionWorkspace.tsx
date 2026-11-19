@@ -354,7 +354,7 @@ export function ControlledEvolutionWorkspace() {
 
   return <section className="lab-panel">
     <div className="lab-section-head">
-      <div><p className="agent-eyebrow">CONTROLLED EVOLUTION</p><h2>受控自进化</h2><p>失败证据生成草稿，同集评测确认无回归，管理员发布后才成为所选 Agent 的正式版本。首次发布核验单版本门禁，更新版本须同集对比。</p></div>
+      <div><p className="agent-eyebrow">自进化</p><h2>受控自进化</h2><p>失败证据生成草稿，同集评测确认无回归，管理员发布后才成为所选 Agent 的正式版本。首次发布核验单版本门禁，更新版本须同集对比。</p></div>
       <button onClick={() => bootstrap.mutate()} disabled={busy}>注册 Interview Agent</button>
     </div>
 
@@ -448,7 +448,7 @@ export function ControlledEvolutionWorkspace() {
       <div className="lab-row-metrics"><span>基线 {comparison.baseline.score}</span><span>候选 {comparison.candidate.score}</span><span>变化 {comparison.scoreDelta >= 0 ? '+' : ''}{comparison.scoreDelta}</span><span>发布证据 {comparison.releaseGate.ruleSetVersion}</span><span>发布范围 {comparison.releaseGate.outcome?.acceptanceScope || '未记录'}</span>{comparison.releaseGate.evidence?.statisticalComparison && <span>95% 下界 {comparison.releaseGate.evidence.statisticalComparison.lowerConfidenceBoundPoints ?? '不可用'} · 配对 {comparison.releaseGate.evidence.statisticalComparison.pairedCaseCount}</span>}</div>
     </article>}
     <section className="evolution-jobs" aria-label="评测任务与证据">
-      <div><p className="agent-eyebrow">EVALUATION EVIDENCE</p><h3>评测任务与证据</h3><p>来自当前工作区的持久化运行；确定性业务合同检查字段与必要事件；术语冒烟仅检查关键词。语义质量未评估。</p></div>
+      <div><p className="agent-eyebrow">评测</p><h3>评测任务与证据</h3><p>来自当前工作区的持久化运行；确定性业务合同检查字段与必要事件；术语冒烟仅检查关键词。语义质量未评估。</p></div>
       {evaluations.isError && <p role="alert">评测记录暂不可用，请刷新；不会展示伪造进度。</p>}
       {evaluations.data?.length === 0 && <p>尚无评测记录。提交有界任务后，进度与证据会在这里更新。</p>}
       {evaluations.data?.slice(0, 6).map(item => {
