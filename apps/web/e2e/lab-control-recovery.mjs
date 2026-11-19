@@ -13,16 +13,18 @@ export async function verifyControlRecovery(page, context, origin) {
   const dashboardPattern = '**/api/agent-lab/dashboard';
   await page.route(dashboardPattern, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'synthetic-control-plane-unavailable' }) }));
   await page.reload();
-  await page.getByRole('heading', { name: '无法读取控制面', exact: true }).waitFor({ timeout: 30000 });
+  await page.getByRole('heading', { name: '此页面的数据暂时不可用', exact: true }).waitFor({ timeout: 30000 });
   assert.equal(await page.getByRole('button', { name: '登录', exact: true }).count(), 0);
   assert.deepEqual(await page.evaluate(() => ({ token: localStorage.getItem('ia_access_token'), role: localStorage.getItem('ia_user_role') })), originalSession);
   const profile = await context.request.get(`${origin}/api/auth/profile`, { headers: { Authorization: `Bearer ${originalSession.token}` } });
   assert.equal(profile.status(), 200);
   await page.unroute(dashboardPattern);
   const recovered = page.waitForResponse(response => response.url().endsWith('/api/agent-lab/dashboard') && response.ok());
-  await page.getByRole('button', { name: '重试连接', exact: true }).click();
+  await page.getByRole('button', { name: '重试读取', exact: true }).click();
   await recovered;
   await page.getByRole('heading', { name: '控制中心', level: 1, exact: true }).waitFor();
+  await page.getByRole('button', { name: 'MCP 与工具', exact: true }).click();
+  await page.getByRole('heading', { name: 'MCP 与工具治理', level: 1, exact: true }).waitFor();
   assert.equal(loginCalls, 0);
   page.off('request', observeLogin);
   console.log('PASS control recovery: injected 503 preserves authenticated session, real API retry restores dashboard');
@@ -61,4 +63,6 @@ export async function verifyControlRecovery(page, context, origin) {
   await page.unroute(reloadPattern);
   page.off('request', observeReload);
   console.log('PASS MCP reload: cancel sends no POST, confirm sends one real POST, pending disabled and bindings retained');
+  await page.getByRole('button', { name: '控制中心', exact: true }).click();
+  await page.getByRole('heading', { name: '控制中心', level: 1, exact: true }).waitFor();
 }

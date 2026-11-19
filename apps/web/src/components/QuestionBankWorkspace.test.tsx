@@ -187,3 +187,21 @@ describe('question import draft and entry controls', () => {
     expect(transport).not.toHaveBeenCalled(); client.clear();
   });
 });
+
+describe('loaded question navigation is local and free of model requests', () => {
+  it('filters and pages only loaded rows without claiming whole-library totals or sending requests', async () => {
+    const transport = vi.fn(); vi.stubGlobal('fetch', transport);
+    const questions = Array.from({ length: 12 }, (_, i) => ({ id: `local-${i}`, questionId: `local-${i}`, position: 'Frontend', level: 'P5', category: 'React', question: `Loaded question ${i}`, answer: `Answer ${i}`, tags: [], source: 'fixture' }));
+    const client = new QueryClient();
+    render(<QueryClientProvider client={client}><QuestionBankWorkspace questions={questions} query="" position="" searchResults={null} message="" onQuery={vi.fn()} onPosition={vi.fn()} onSearch={vi.fn()} onClearSearch={vi.fn()}/></QueryClientProvider>);
+    expect(screen.queryByText('Loaded question 11')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    expect(screen.getByText('Loaded question 11')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('筛选已加载题目'), { target: { value: 'Answer 3' } });
+    expect(screen.getByText('Loaded question 3')).toBeInTheDocument();
+    expect(screen.queryByText('Loaded question 11')).not.toBeInTheDocument();
+    expect(screen.getByText(/仅对已加载题目分页/)).toHaveTextContent('第 1 / 1 页');
+    expect(transport).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});

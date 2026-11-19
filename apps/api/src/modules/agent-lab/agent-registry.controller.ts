@@ -58,6 +58,11 @@ export class AgentRegistryController {
     return this.registry.updateAgent(req.user.userId, agentId, dto);
   }
 
+  @Post('agents/:agentId/archive')
+  archiveAgent(@Req() req: any, @Param('agentId') agentId: string) {
+    return this.registry.archiveAgent(req.user.userId, agentId);
+  }
+
   @Delete('agents/:agentId')
   deleteAgent(@Req() req: any, @Param('agentId') agentId: string) {
     return this.registry.deleteAgent(req.user.userId, agentId);

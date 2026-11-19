@@ -17,7 +17,7 @@
     "category": "算法题解",
     "html": "\n      \n        <pre><code>//递归版本\nvar singleNonDuplicate = function (arr) {\n  if (!arr.length) return null;\n  if (arr.length === 1) return arr[0];\n  if (arr.length === 3) {\n    if (arr[0] == arr[1]) {\n      return arr[2];\n    } else {\n      return arr[0];\n    }\n  }\n  let LENGTH = arr.length,\n    left = [],\n    right = [],\n    mid = Math.floor(LENGTH / 2);\n\n  if (arr[mid] == arr[mid - 1]) {\n    left = arr.slice(0, mid - 1);\n    right = arr.slice(mid + 1);\n  } else if (arr[mid] == arr[mid + 1]) {\n    left = arr.slice(0, mid);\n    right = arr.slice(mid + 2);\n    console.log(left, right, mid);\n  } else {\n    return arr[mid];\n  }\n\n  if (left.length % 2 === 0) {\n    return singleNonDuplicate(right);\n  } else {\n    return singleNonDuplicate(left);\n  }\n};\n\n//二分法\nvar singleNonDuplicate1 = function (arr) {\n  if (!arr.length) return null;\n  if (arr.length === 1) return arr[0];\n  let l = 0,\n    h = arr.length - 1,\n    t = -1;\n  //二分法版本\n  while (l &lt;= h) {\n    let m = Math.floor(l + (h - l) / 2);\n    if (arr[m] === arr[m - 1]) {\n      //左边偶\n      (m - 2) % 2 === 0 ? (h = m - 2) : (l = m + 1);\n    } else if (arr[m] === arr[m + 1]) {\n      //m%2 为 （m+1）%2好懂一些，取实际长度，这快绕了一下\n      m % 2 === 0 ? (l = m + 2) : (h = m - 1);\n    } else {\n      return arr[m];\n    }\n  }\n  return t;\n};</code></pre>\n      \n    ",
     "text": "//递归版本\nvar singleNonDuplicate = function (arr) {\n  if (!arr.length) return null;\n  if (arr.length === 1) return arr[0];\n  if (arr.length === 3) {\n    if (arr[0] == arr[1]) {\n      return arr[2];\n    } else {\n      return arr[0];\n    }\n  }\n  let LENGTH = arr.length,\n    left = [],\n    right = [],\n    mid = Math.floor(LENGTH / 2);\n\n  if (arr[mid] == arr[mid - 1]) {\n    left = arr.slice(0, mid - 1);\n    right = arr.slice(mid + 1);\n  } else if (arr[mid] == arr[mid + 1]) {\n    left = arr.slice(0, mid);\n    right = arr.slice(mid + 2);\n    console.log(left, right, mid);\n  } else {\n    return arr[mid];\n  }\n\n  if (left.length % 2 === 0) {\n    return singleNonDuplicate(right);\n  } else {\n    return singleNonDuplicate(left);\n  }\n};\n\n//二分法\nvar singleNonDuplicate1 = function (arr) {\n  if (!arr.length) return null;\n  if (arr.length === 1) return arr[0];\n  let l = 0,\n    h = arr.length - 1,\n    t = -1;\n  //二分法版本\n  while (l <= h) {\n    let m = Math.floor(l + (h - l) / 2);\n    if (arr[m] === arr[m - 1]) {\n      //左边偶\n      (m - 2) % 2 === 0 ? (h = m - 2) : (l = m + 1);\n    } else if (arr[m] === arr[m + 1]) {\n      //m%2 为 （m+1）%2好懂一些，取实际长度，这快绕了一下\n      m % 2 === 0 ? (l = m + 2) : (h = m - 1);\n    } else {\n      return arr[m];\n    }\n  }\n  return t;\n};",
-    "excerpt": "代码实践笔记，保留原始实现与注释，可进入全文查看。",
+    "excerpt": "2020 年对 LeetCode 540（有序数组中的单一元素）的练习，保留当时的递归实现和注释。",
     "minutes": 3,
     "sourcePath": "leetcode/540/index.html"
   },
@@ -28,7 +28,7 @@
     "category": "算法题解",
     "html": "\n      \n        <pre><code>//leetcode 版本\n/**\n * @param {number[]} nums\n * @param {number} target\n * @return {number[]}\n */\nvar searchRange = function (nums, target) {\n  let res = [-1, -1];\n  let leftIdx = searchHelp(nums, target, true);\n\n  if (leftIdx == nums.length || nums[leftIdx] != target) {\n    return res;\n  }\n\n  res[0] = leftIdx;\n  res[1] = searchHelp(nums, target, false) - 1;\n  return res;\n};\n\nfunction searchHelp(nums, target, isLeft) {\n  let lo = 0;\n  let hi = nums.length;\n\n  while (lo &lt; hi) {\n    let mid = Math.floor((lo + hi) / 2);\n    if (nums[mid] &gt; target || (isLeft &amp;&amp; target == nums[mid])) {\n      hi = mid;\n    } else {\n      lo = mid + 1;\n    }\n  }\n  return lo;\n}</code></pre>\n      \n    ",
     "text": "//leetcode 版本\n/**\n * @param {number[]} nums\n * @param {number} target\n * @return {number[]}\n */\nvar searchRange = function (nums, target) {\n  let res = [-1, -1];\n  let leftIdx = searchHelp(nums, target, true);\n\n  if (leftIdx == nums.length || nums[leftIdx] != target) {\n    return res;\n  }\n\n  res[0] = leftIdx;\n  res[1] = searchHelp(nums, target, false) - 1;\n  return res;\n};\n\nfunction searchHelp(nums, target, isLeft) {\n  let lo = 0;\n  let hi = nums.length;\n\n  while (lo < hi) {\n    let mid = Math.floor((lo + hi) / 2);\n    if (nums[mid] > target || (isLeft && target == nums[mid])) {\n      hi = mid;\n    } else {\n      lo = mid + 1;\n    }\n  }\n  return lo;\n}",
-    "excerpt": "代码实践笔记，保留原始实现与注释，可进入全文查看。",
+    "excerpt": "2020 年对 LeetCode 34（在排序数组中查找元素的起止位置）的练习，保留当时的实现。",
     "minutes": 1,
     "sourcePath": "leetcode/34数组排序/index.html"
   },
@@ -39,7 +39,7 @@
     "category": "数据结构与算法",
     "html": "\n      \n        <pre><code>/**\n * 本质就是设立中间值，然后左右递归，卡在了return那个步骤\n *\n */\n\nlet arr = [85, 24, 63, 45, 17, 31, 96, 50, 2, 5, 22];\n\nfunction qSort(nums) {\n  if (nums.length &lt;= 1) {\n    return nums;\n  }\n  let mid = Math.floor(nums.length / 2);\n  let left = [];\n  let right = [];\n  let pivot = nums.splice(mid, 1)[0];\n  for (let i = 0; i &lt; nums.length; i++) {\n    let item = nums[i];\n    if (item &gt; pivot) {\n      right.push(item);\n    } else {\n      left.push(item);\n    }\n  }\n  console.log(pivot, left, right);\n  return qSort(left).concat([pivot], qSort(right));\n}\n\nlet _a = qSort(arr);\nconsole.log(_a);</code></pre>\n      \n    ",
     "text": "/**\n * 本质就是设立中间值，然后左右递归，卡在了return那个步骤\n *\n */\n\nlet arr = [85, 24, 63, 45, 17, 31, 96, 50, 2, 5, 22];\n\nfunction qSort(nums) {\n  if (nums.length <= 1) {\n    return nums;\n  }\n  let mid = Math.floor(nums.length / 2);\n  let left = [];\n  let right = [];\n  let pivot = nums.splice(mid, 1)[0];\n  for (let i = 0; i < nums.length; i++) {\n    let item = nums[i];\n    if (item > pivot) {\n      right.push(item);\n    } else {\n      left.push(item);\n    }\n  }\n  console.log(pivot, left, right);\n  return qSort(left).concat([pivot], qSort(right));\n}\n\nlet _a = qSort(arr);\nconsole.log(_a);",
-    "excerpt": "代码实践笔记，保留原始实现与注释，可进入全文查看。",
+    "excerpt": "2020 年手写快速排序的练习，记录中间值划分，以及递归返回时卡住的地方。",
     "minutes": 1,
     "sourcePath": "算法/快排/index.html"
   },
@@ -72,7 +72,7 @@
     "category": "JavaScript",
     "html": "\n      \n        <pre><code>let a = [1, 2, 3, [3, 4, [5, 6, [7, 8]]]];\n\nvar myFlat = (arr) =&gt; {\n  let result = [];\n  let help = (tempArr) =&gt; {\n    for (let index = 0; index &lt; tempArr.length; index++) {\n      const element = tempArr[index];\n      console.log(element);\n      if (Array.isArray(element)) {\n        //这里细节，当时写的 result.push(help(element))\n        help(element);\n      } else {\n        result.push(element);\n      }\n    }\n  };\n  help(arr);\n  return result;\n};\n\nvar flatRe = (arr) =&gt; {\n  return arr.reduce((prev, next) =&gt; {\n    if (Array.isArray(next)) {\n      return prev.concat(flatRe(next));\n    } else {\n      return prev.concat(next);\n    }\n  }, []);\n};</code></pre>\n      \n    ",
     "text": "let a = [1, 2, 3, [3, 4, [5, 6, [7, 8]]]];\n\nvar myFlat = (arr) => {\n  let result = [];\n  let help = (tempArr) => {\n    for (let index = 0; index < tempArr.length; index++) {\n      const element = tempArr[index];\n      console.log(element);\n      if (Array.isArray(element)) {\n        //这里细节，当时写的 result.push(help(element))\n        help(element);\n      } else {\n        result.push(element);\n      }\n    }\n  };\n  help(arr);\n  return result;\n};\n\nvar flatRe = (arr) => {\n  return arr.reduce((prev, next) => {\n    if (Array.isArray(next)) {\n      return prev.concat(flatRe(next));\n    } else {\n      return prev.concat(next);\n    }\n  }, []);\n};",
-    "excerpt": "代码实践笔记，保留原始实现与注释，可进入全文查看。",
+    "excerpt": "2020 年手写数组扁平化的练习，保留当时的实现和注释。",
     "minutes": 1,
     "sourcePath": "前端/flag/index.html"
   },
@@ -83,7 +83,7 @@
     "category": "JavaScript",
     "html": "\n      \n        <p>jsliang 的执行有部分问题</p>\n<p>参考 <a href=\"https://juejin.im/post/6844903846846676999\" target=\"_blank\" rel=\"noopener noreferrer\">https://juejin.im/post/6844903846846676999</a></p>\n<pre><code>/**\n * 使用方式\n * fn.bind(target)\n */\n\nFunction.prototype.myBind = function (context) {\n  if (typeof this !== &quot;function&quot;) {\n    throw new TypeError(&quot;Error&quot;);\n  }\n  const _this = this;\n  const args = [...arguments].slice(1);\n  const result = context.fn(...args);\n  return function Fun() {\n    if (this instanceof Fun) {\n      return new _this(...args, ...arguments);\n    } else {\n      return this.apply(context, args.concat(...arguments));\n    }\n  };\n};</code></pre>\n\n\n\n<pre><code>/**\n * 使用方式\n * fn.call(target, arg1, arg2, ...)\n * fn.apply(target, [arg1, arg2, ...])\n * 区别主要为后续参数\n */\n\n//删除传入函数，返回新函数,流程一样，区别在于参数\nFunction.prototype.myCall = function (context) {\n  if (typeof this !== &quot;function&quot;) {\n    throw new TypeError(&quot;Error&quot;);\n  }\n  context = context || window;\n  context.fn = this;\n  const args = [...arguments].slice(1);\n  const result = context.fn(...args);\n  delete context.fn;\n  return result;\n};\n\nFunction.prototype.myApply = function (context = globalThis) {\n  if (typeof this !== &quot;function&quot;) {\n    throw new TypeError(&quot;Error&quot;);\n  }\n  context = context || window;\n  context.fn = this;\n  console.log(context.fn);\n  let result;\n  if (arguments[1]) {\n    result = context.fn(...arguments[1]);\n  } else {\n    result = context.fn();\n  }\n  delete context.fn;\n  console.log(result);\n  return result;\n};\n\n//test\nfunction Product(name, price) {\n  this.name = name;\n  this.price = price;\n}\n\nfunction Food(name, price) {\n  Product.myCall(this, name, price);\n  this.category = &quot;food&quot;;\n}\n\nfunction Food1(name, price) {\n  Product.myApply(this, [name, price]);\n  this.category = &quot;food&quot;;\n}\nconst food = new Food(&quot;cheese&quot;, 5);\nconsole.log(food);</code></pre>\n      \n    ",
     "text": "jsliang 的执行有部分问题\n\n参考 https://juejin.im/post/6844903846846676999\n\n/**\n * 使用方式\n * fn.bind(target)\n */\n\nFunction.prototype.myBind = function (context) {\n  if (typeof this !== \"function\") {\n    throw new TypeError(\"Error\");\n  }\n  const _this = this;\n  const args = [...arguments].slice(1);\n  const result = context.fn(...args);\n  return function Fun() {\n    if (this instanceof Fun) {\n      return new _this(...args, ...arguments);\n    } else {\n      return this.apply(context, args.concat(...arguments));\n    }\n  };\n};\n\n\n\n\n/**\n * 使用方式\n * fn.call(target, arg1, arg2, ...)\n * fn.apply(target, [arg1, arg2, ...])\n * 区别主要为后续参数\n */\n\n//删除传入函数，返回新函数,流程一样，区别在于参数\nFunction.prototype.myCall = function (context) {\n  if (typeof this !== \"function\") {\n    throw new TypeError(\"Error\");\n  }\n  context = context || window;\n  context.fn = this;\n  const args = [...arguments].slice(1);\n  const result = context.fn(...args);\n  delete context.fn;\n  return result;\n};\n\nFunction.prototype.myApply = function (context = globalThis) {\n  if (typeof this !== \"function\") {\n    throw new TypeError(\"Error\");\n  }\n  context = context || window;\n  context.fn = this;\n  console.log(context.fn);\n  let result;\n  if (arguments[1]) {\n    result = context.fn(...arguments[1]);\n  } else {\n    result = context.fn();\n  }\n  delete context.fn;\n  console.log(result);\n  return result;\n};\n\n//test\nfunction Product(name, price) {\n  this.name = name;\n  this.price = price;\n}\n\nfunction Food(name, price) {\n  Product.myCall(this, name, price);\n  this.category = \"food\";\n}\n\nfunction Food1(name, price) {\n  Product.myApply(this, [name, price]);\n  this.category = \"food\";\n}\nconst food = new Food(\"cheese\", 5);\nconsole.log(food);",
-    "excerpt": "jsliang 的执行有部分问题 参考 https://juejin.im/post/6844903846846676999",
+    "excerpt": "2020 年手写 bind、apply 与 call 的练习，并注明参考实现里需要留意的问题。",
     "minutes": 3,
     "sourcePath": "前端/手写bind-apply-call/index.html"
   },
@@ -94,7 +94,7 @@
     "category": "JavaScript",
     "html": "\n      \n        <pre><code>class EventEmitter {\n  constructor() {\n    this.events = {};\n  }\n\n  on(eventName, callBack) {\n    if (!this.events[eventName]) {\n      this.events[eventName] = [callBack];\n    } else {\n      this.events[eventName].push(callBack);\n    }\n  }\n\n  emit(eventName) {\n    if (this.events[eventName]) {\n      this.events[eventName].map((fn) =&gt; fn());\n    }\n  }\n\n  removeListener(eventName, callback) {\n    if (this.events[eventName]) {\n      this.events[eventName] = this.events[eventName].filter(\n        (cb) =&gt; cb != callback\n      );\n    }\n  }\n\n  //执行完就移除，以来removeListener\n  once(eventName, callBack) {\n    let fn = () =&gt; {\n      callBack();\n      this.removeListener(eventName, fn);\n    };\n    this.on(eventName, fn);\n  }\n}</code></pre>\n      \n    ",
     "text": "class EventEmitter {\n  constructor() {\n    this.events = {};\n  }\n\n  on(eventName, callBack) {\n    if (!this.events[eventName]) {\n      this.events[eventName] = [callBack];\n    } else {\n      this.events[eventName].push(callBack);\n    }\n  }\n\n  emit(eventName) {\n    if (this.events[eventName]) {\n      this.events[eventName].map((fn) => fn());\n    }\n  }\n\n  removeListener(eventName, callback) {\n    if (this.events[eventName]) {\n      this.events[eventName] = this.events[eventName].filter(\n        (cb) => cb != callback\n      );\n    }\n  }\n\n  //执行完就移除，以来removeListener\n  once(eventName, callBack) {\n    let fn = () => {\n      callBack();\n      this.removeListener(eventName, fn);\n    };\n    this.on(eventName, fn);\n  }\n}",
-    "excerpt": "代码实践笔记，保留原始实现与注释，可进入全文查看。",
+    "excerpt": "2020 年手写发布订阅（EventEmitter）的练习，覆盖事件注册与通知。",
     "minutes": 1,
     "sourcePath": "前端/订阅发布/index.html"
   },
@@ -105,7 +105,7 @@
     "category": "JavaScript",
     "html": "\n      \n        <pre><code>const checkedType = (target) =&gt; {\n  let result = Object.prototype.toString.call(target).slice(8, -1);\n  return result;\n};\n\nconst deepClone = (target) =&gt; {\n  let result;\n  let type = checkedType(target);\n  if (type === &quot;Object&quot;) {\n    result = {};\n  } else if (type === &quot;Array&quot;) {\n    result = [];\n  } else {\n    return target;\n  }\n\n  for (let i in target) {\n    let value = target[i];\n    if (checkedType(value) === &quot;Array&quot; || checkedType(value) === &quot;Object&quot;) {\n      result[i] = deepClone(value);\n    } else {\n      result[i] = value;\n    }\n  }\n  return result;\n};</code></pre>\n<p>找了些例子，感觉挺简单，可能会有一些坑没避免过去</p>\n<p>粗心了，记得判断 type 的函数大小写</p>\n\n      \n    ",
     "text": "const checkedType = (target) => {\n  let result = Object.prototype.toString.call(target).slice(8, -1);\n  return result;\n};\n\nconst deepClone = (target) => {\n  let result;\n  let type = checkedType(target);\n  if (type === \"Object\") {\n    result = {};\n  } else if (type === \"Array\") {\n    result = [];\n  } else {\n    return target;\n  }\n\n  for (let i in target) {\n    let value = target[i];\n    if (checkedType(value) === \"Array\" || checkedType(value) === \"Object\") {\n      result[i] = deepClone(value);\n    } else {\n      result[i] = value;\n    }\n  }\n  return result;\n};\n\n找了些例子，感觉挺简单，可能会有一些坑没避免过去\n\n粗心了，记得判断 type 的函数大小写",
-    "excerpt": "找了些例子，感觉挺简单，可能会有一些坑没避免过去 粗心了，记得判断 type 的函数大小写",
+    "excerpt": "2020 年深拷贝练习，提醒类型判断里容易忽略的细节。",
     "minutes": 1,
     "sourcePath": "前端/深拷贝/index.html"
   },
@@ -116,8 +116,96 @@
     "category": "部署与运维",
     "html": "\n      \n        <h2><a></a>阿里云配置 nginx https 总结</h2><ul>\n<li>安装位置太多额，导致重新安装</li>\n<li>命令不熟悉<ul>\n<li>nginx -t 检测配置状况</li>\n<li>nginx -s reload 重启</li>\n<li>路径 /etc/nginx/</li>\n</ul>\n</li>\n<li>ftp 工具 FileZilla</li>\n<li>阿里云公网 IP 更换地址，改为安全组查看，入口挺深的</li>\n<li>深坑一点就是 1.18 版本的。d 目录 default 80 端口文件配置，会被覆盖，找半天，才自己看代码注释掉就好了，百度一堆不靠谱的答案。..</li>\n<li>另一个马虎点，就是配置证书一直以为 ssl 问题，结果是自己注释习惯性用了//, 应该用#</li>\n<li>apt-get 安装软件</li>\n<li>服务器 git 密码 [凭据已脱敏]</li>\n<li></li>\n</ul>\n\n      \n    ",
     "text": "阿里云配置 nginx https 总结\n\n安装位置太多额，导致重新安装\n\n命令不熟悉\nnginx -t 检测配置状况\n\nnginx -s reload 重启\n\n路径 /etc/nginx/\n\n\n\n\nftp 工具 FileZilla\n\n阿里云公网 IP 更换地址，改为安全组查看，入口挺深的\n\n深坑一点就是 1.18 版本的。d 目录 default 80 端口文件配置，会被覆盖，找半天，才自己看代码注释掉就好了，百度一堆不靠谱的答案。..\n\n另一个马虎点，就是配置证书一直以为 ssl 问题，结果是自己注释习惯性用了//, 应该用#\n\napt-get 安装软件\n\n服务器 git 密码 [凭据已脱敏]",
-    "excerpt": "代码实践笔记，保留原始实现与注释，可进入全文查看。",
+    "excerpt": "2020 年在阿里云配置 Nginx HTTPS 的踩坑记录，包括配置检测、reload，以及默认站点覆盖的问题。",
     "minutes": 1,
     "sourcePath": "笔记/阿里云配置-nginx-https-总结/index.html"
+  },
+  {
+    "id": "12",
+    "title": "流式消息结束，并不等于业务流程结束",
+    "date": "2026-10-21",
+    "category": "工程实践",
+    "html": "\n        <h2>问题从哪来</h2>\n<p>做 AI 面试训练时，很容易把「模型把话说完」当成「这一轮可以结束了」。在 <code>interview-agent</code> 里，这两件事不在同一层：SSE 负责把增量文本送到界面，面试流程能不能继续，取决于服务端的题目状态。</p>\n<p>如果把流结束直接写成「已完成，可以提交下一题」，就会出现一种很具体的错位：字已经显示完了，服务端还没准备好，用户却已经点了下一步。反过来，服务端已经就绪，界面还停在「生成中」，用户也会以为系统卡住了。</p>\n<h2>把两层状态拆开</h2>\n<p>我把流式展示和业务状态分开处理：</p>\n<ul>\n<li>流式通道只负责增量消息、心跳和连接是否还在。</li>\n<li>流结束后，再向服务端核验当前题目或会话状态，再决定输入框能不能用、下一题能不能提交。</li>\n<li>重复提交、评价未完成、异常反馈，都走业务状态，而不是只看最后一块文本有没有到齐。</li>\n</ul>\n<p>这样，界面可以同时说清三件事：连接是否还在、内容是否已经完整展示、流程是否已经允许继续。用户看到的不是一句笼统的「完成」。</p>\n<h2>切会话时，旧请求不能回来改当前页</h2>\n<p>对话应用里还有一类更隐蔽的问题：用户已经换了一场面试，旧请求的增量消息或错误回调却还在回来。如果不给请求加上标识，并在离开会话时清理生命周期，这些迟到的结果就会写进新会话。</p>\n<p>所以 Hook 里除了心跳超时和取消，还要认请求标识：不是当前会话的响应，就不再更新界面。取消也是同一件事的另一面——用户离开后，这条请求就不该再对当前页负责。</p>\n<h2>现在会怎么做</h2>\n<p>这不是对 SSE 协议本身的重新发明，而是把协议能力和产品流程对齐。SSE 本来就是服务器向客户端的单向事件流；流传输结束，只说明这一次传输结束了，并不自动等于业务处理完成。</p>\n<p>公开仓库里配套了超时、取消和会话隔离的测试，也用浏览器流程做验收。目的很明确：正常对话要能走完，一次迟到的响应也不能把当前面试改乱。</p>\n      ",
+    "text": "问题从哪来\n\n做 AI 面试训练时，很容易把「模型把话说完」当成「这一轮可以结束了」。在 interview-agent 里，这两件事不在同一层：SSE 负责把增量文本送到界面，面试流程能不能继续，取决于服务端的题目状态。\n\n如果把流结束直接写成「已完成，可以提交下一题」，就会出现一种很具体的错位：字已经显示完了，服务端还没准备好，用户却已经点了下一步。反过来，服务端已经就绪，界面还停在「生成中」，用户也会以为系统卡住了。\n\n把两层状态拆开\n\n我把流式展示和业务状态分开处理：\n\n流式通道只负责增量消息、心跳和连接是否还在。\n\n流结束后，再向服务端核验当前题目或会话状态，再决定输入框能不能用、下一题能不能提交。\n\n重复提交、评价未完成、异常反馈，都走业务状态，而不是只看最后一块文本有没有到齐。\n\n这样，界面可以同时说清三件事：连接是否还在、内容是否已经完整展示、流程是否已经允许继续。用户看到的不是一句笼统的「完成」。\n\n切会话时，旧请求不能回来改当前页\n\n对话应用里还有一类更隐蔽的问题：用户已经换了一场面试，旧请求的增量消息或错误回调却还在回来。如果不给请求加上标识，并在离开会话时清理生命周期，这些迟到的结果就会写进新会话。\n\n所以 Hook 里除了心跳超时和取消，还要认请求标识：不是当前会话的响应，就不再更新界面。取消也是同一件事的另一面——用户离开后，这条请求就不该再对当前页负责。\n\n现在会怎么做\n\n这不是对 SSE 协议本身的重新发明，而是把协议能力和产品流程对齐。SSE 本来就是服务器向客户端的单向事件流；流传输结束，只说明这一次传输结束了，并不自动等于业务处理完成。\n\n公开仓库里配套了超时、取消和会话隔离的测试，也用浏览器流程做验收。目的很明确：正常对话要能走完，一次迟到的响应也不能把当前面试改乱。\n",
+    "excerpt": "在 interview-agent 里，流式回复展示完成，并不等于用户可以进入下一题。消息层和业务状态要分开处理，还要拦住切会话后才到达的旧响应。",
+    "minutes": 4,
+    "sourcePath": "practice/sse-stream-vs-business-state.md"
+  },
+  {
+    "id": "13",
+    "title": "电销坐席工作台的状态对齐与通话对账",
+    "date": "2023-09-14",
+    "category": "工程实践",
+    "html": "\n        <h2>问题不只是把 SDK 接上</h2>\n<p>电销坐席工作台上，常用动作其实有限：置闲、置忙、小休、外呼、挂断、转接。接入多家 CTI 时，难处不在把某一家的方法铺到页面上，而在事件模型、参数和时序都不一样，本地状态还要在刷新、退出之后仍然可信。</p>\n<p>同一套动作，可能走软电话，也可能走物理话机。登录成功要分成两条提示。厂家事件名对不上，同一功能所需的参数也不一样，所以适配层里不少参数只能先写成 any——不是图省事，是同一件事在不同厂家那里，本来就不是同一组入参。业务代码如果直接依赖某一家的字段名，下一接入户就会整层翻掉。</p>\n        <h2>业务只面对一套动作和状态</h2>\n<p>我把登录、登出、外呼、转接、班长监听和强插收成业务动作，厂家事件在适配层翻译成坐席能理解的状态。状态要比「通话中 / 未通话」细，例如：</p>\n<ul>\n<li>空闲、置忙、小休</li>\n<li>来电振铃、呼叫中、通话中</li>\n<li>转接中、转接成功待确认、话后处理</li>\n<li>被监听、被强插、三方通话、静音</li>\n</ul>\n<p>班长退出监听，前提是当前处于监听或强插；强拆之后，被操作的坐席要从通话中回到空闲或置忙。这些约束如果写在页面里，换一家厂商就要再改一遍按钮是否可点。把可操作性放在状态机上，页面只消费结果。</p>\n        <h2>刷新和退出要分开处理</h2>\n<p>坐席切到小休后刷新页面，如果状态只存在内存里，界面会回到默认值，看起来像「没切成功」。当前状态需要写入 session，进入时再读一次。退出时则必须清掉，否则下一次登录会带上一次的状态。</p>\n<p>从状态栏离线，和从菜单退出登录，不是同一条路径：前者清的是坐席状态，后者还要清布局和菜单侧的会话信息。混在一起，会出现人已经退出、软电话状态还在的情况。</p>\n<p>排障时，本地还需要保留一段时间的事件日志。容量要设上限，避免日志把浏览器存储撑满；我这边把上限放在大约 2MB，够回看一次异常通话的事件序，又不至于无限堆积。</p>\n        <h2>通话记录对不上，通常是编号对不上</h2>\n<p>发起外呼时，工作台会带上自己的通话编号；厂家回传事件里往往是另一套 ID。通话记录要在这一层完成对账，对不上，这场电话在系统里就可能丢失。后来做 AI 外呼转人工时，两边的编号都要带上，少一边，转接结果就落不到人。</p>\n<p>外呼结果也不是成功或失败两种。没有空闲通道、进入企业或系统黑名单、主叫号码受限，都需要把原因展示给坐席，而不是只返回一个失败。</p>\n<p>公开资料里，这个平台后来覆盖 19 个职场、2700 多个坐席。这是平台体量，不是个人绩效。我做的是前端侧的状态、适配，以及这些对不齐的地方怎么收住。</p>\n      ",
+    "text": "问题不只是把 SDK 接上\n\n电销坐席工作台上，常用动作其实有限：置闲、置忙、小休、外呼、挂断、转接。接入多家 CTI 时，难处不在把某一家的方法铺到页面上，而在事件模型、参数和时序都不一样，本地状态还要在刷新、退出之后仍然可信。\n\n同一套动作，可能走软电话，也可能走物理话机。登录成功要分成两条提示。厂家事件名对不上，同一功能所需的参数也不一样，所以适配层里不少参数只能先写成 any——不是图省事，是同一件事在不同厂家那里，本来就不是同一组入参。业务代码如果直接依赖某一家的字段名，下一接入户就会整层翻掉。\n\n业务只面对一套动作和状态\n\n我把登录、登出、外呼、转接、班长监听和强插收成业务动作，厂家事件在适配层翻译成坐席能理解的状态。状态要比「通话中 / 未通话」细，例如：\n\n· 空闲、置忙、小休\n· 来电振铃、呼叫中、通话中\n· 转接中、转接成功待确认、话后处理\n· 被监听、被强插、三方通话、静音\n\n班长退出监听，前提是当前处于监听或强插；强拆之后，被操作的坐席要从通话中回到空闲或置忙。这些约束如果写在页面里，换一家厂商就要再改一遍按钮是否可点。把可操作性放在状态机上，页面只消费结果。\n\n刷新和退出要分开处理\n\n坐席切到小休后刷新页面，如果状态只存在内存里，界面会回到默认值，看起来像「没切成功」。当前状态需要写入 session，进入时再读一次。退出时则必须清掉，否则下一次登录会带上一次的状态。\n\n从状态栏离线，和从菜单退出登录，不是同一条路径：前者清的是坐席状态，后者还要清布局和菜单侧的会话信息。混在一起，会出现人已经退出、软电话状态还在的情况。\n\n排障时，本地还需要保留一段时间的事件日志。容量要设上限，避免日志把浏览器存储撑满；我这边把上限放在大约 2MB，够回看一次异常通话的事件序，又不至于无限堆积。\n\n通话记录对不上，通常是编号对不上\n\n发起外呼时，工作台会带上自己的通话编号；厂家回传事件里往往是另一套 ID。通话记录要在这一层完成对账，对不上，这场电话在系统里就可能丢失。后来做 AI 外呼转人工时，两边的编号都要带上，少一边，转接结果就落不到人。\n\n外呼结果也不是成功或失败两种。没有空闲通道、进入企业或系统黑名单、主叫号码受限，都需要把原因展示给坐席，而不是只返回一个失败。\n\n公开资料里，这个平台后来覆盖 19 个职场、2700 多个坐席。这是平台体量，不是个人绩效。我做的是前端侧的状态、适配，以及这些对不齐的地方怎么收住。\n",
+    "excerpt": "多家 CTI 接入时，工作台要先收一套稳定的控制接口和坐席状态，再处理刷新、退出，以及本地通话编号与厂商回传 ID 的对账。",
+    "minutes": 7,
+    "sourcePath": "practice/cti-seat-state.md"
+  },
+  {
+    "id": "14",
+    "title": "对话应用里，更要测试那些迟到的响应",
+    "date": "2026-10-28",
+    "category": "工程实践",
+    "html": "\n        <h2>正常流程通过，不等于对话是安全的</h2>\n<p>对话应用的主路径看起来简单：提问、等待流式结果、展示评价。真正容易出问题的，是那些不按预期到达的响应。一次请求可能超时，可能被取消，也可能在用户已经进入另一场面试后才返回。</p>\n<p>在 <code>interview-agent</code> 里，我把这些情况当成常规验收，而不是上线前才补的边角。因为对用户来说，它们的结果很具体：当前会话被旧内容改写，或者一次失败之后，输入框再也无法继续。</p>\n<h2>测试真正要问的两句话</h2>\n<ul>\n<li>一次迟到的响应，会不会污染当前会话？</li>\n<li>一次异常之后，用户还能不能继续作答，而不是留在不可恢复的界面？</li>\n</ul>\n<p>围绕这两句话，单元测试覆盖请求超时、取消和旧响应隔离；浏览器流程则验证从简历确认、面试对话到评价展示的完整路径，以及出错后能否回到可继续的状态。工具用的是 Vitest 和浏览器验收，重点不在堆数量，而在这些边界有没有被当成一等公民。</p>\n<h2>为什么要和产品逻辑写在一起</h2>\n<p>如果测试只断言「文本最终出现在页面上」，它无法发现「这段文本属于上一场面试」。要把请求标识、会话切换和界面更新放到一起验证，测试才和实现是同一套规则。</p>\n<p>这也反过来约束实现：流结束后核验服务端状态、离开会话时停止旧请求对当前页的写入，都必须是稳定行为，而不是靠手动刷新补救。对面试这种有步骤的产品，迟到的响应不是日志问题，是会改写当场结果的产品问题。</p>\n      ",
+    "text": "正常流程通过，不等于对话是安全的\n\n对话应用的主路径看起来简单：提问、等待流式结果、展示评价。真正容易出问题的，是那些不按预期到达的响应。一次请求可能超时，可能被取消，也可能在用户已经进入另一场面试后才返回。\n\n在 interview-agent 里，我把这些情况当成常规验收，而不是上线前才补的边角。因为对用户来说，它们的结果很具体：当前会话被旧内容改写，或者一次失败之后，输入框再也无法继续。\n\n测试真正要问的两句话\n\n一次迟到的响应，会不会污染当前会话？\n\n一次异常之后，用户还能不能继续作答，而不是留在不可恢复的界面？\n\n围绕这两句话，单元测试覆盖请求超时、取消和旧响应隔离；浏览器流程则验证从简历确认、面试对话到评价展示的完整路径，以及出错后能否回到可继续的状态。工具用的是 Vitest 和浏览器验收，重点不在堆数量，而在这些边界有没有被当成一等公民。\n\n为什么要和产品逻辑写在一起\n\n如果测试只断言「文本最终出现在页面上」，它无法发现「这段文本属于上一场面试」。要把请求标识、会话切换和界面更新放到一起验证，测试才和实现是同一套规则。\n\n这也反过来约束实现：流结束后核验服务端状态、离开会话时停止旧请求对当前页的写入，都必须是稳定行为，而不是靠手动刷新补救。对面试这种有步骤的产品，迟到的响应不是日志问题，是会改写当场结果的产品问题。\n",
+    "excerpt": "interview-agent 的测试不只覆盖正常问答。请求可能超时、被取消，也可能在用户切换会话之后才返回；这些边界决定了界面会不会写错场、流程会不会卡住。",
+    "minutes": 4,
+    "sourcePath": "practice/late-response-isolation.md"
+  },
+  {
+    "id": "15",
+    "title": "把 RAG 做进产品时，前端真正要讲清楚的是过程",
+    "date": "2026-06-18",
+    "category": "工程实践",
+    "html": "\n        <h2>过程比“已经回答了”更重要</h2>\n<p>在内部知识库的前端里，用户真正要判断的不是模型有没有吐出一段话，而是这份回答是怎么来的。文档要先上传和解析，检索会引用哪些材料，这次问答又属于哪一段历史，这三步如果只剩一个转圈，系统很难被当真使用。</p>\n<p>所以我更关心把过程讲清楚，而不是把生成结果尽快铺满屏幕。</p>\n        <h2>三件必须在界面上成立的事</h2>\n<ul>\n<li>进度可见：上传之后，解析进行到哪一步、是否失败，都应该能在界面上看到，而不是只留下一个转圈。</li>\n<li>引用可回看：回答需要带着出处。用户点开引用，应能回到对应材料，而不是只能看到一段无法核对的总结。</li>\n<li>历史可分离：每次问答要能作为历史会话被找回，也不能把不同问题的上下文混在当前这一轮里。</li>\n</ul>\n<p>尤其是引用溯源。它不是装饰，而是让人判断「这个答案是否站得住」的入口。流式展示可以把文字逐渐显现，但不能代替这三件事。</p>\n        <h2>没有公开核验的数字，就不写成效果</h2>\n<p>检索是否更准、处理是否更快，如果没有可以公开核对的数据和口径，就不应该在介绍里写成确定的提升幅度。我在这里只写自己实际负责、并且可以在工作说明里核对的部分：把上述过程在前端维护完整，让使用的人能跟上系统正在做什么。</p>\n<p>这和流式对话里的判断是一致的。AI 应用的前端价值，常常不在生成速度本身，而在让异步过程保持清晰、可核对，出了问题也能继续。</p>\n      ",
+    "text": "过程比“已经回答了”更重要\n\n在内部知识库的前端里，用户真正要判断的不是模型有没有吐出一段话，而是这份回答是怎么来的。文档要先上传和解析，检索会引用哪些材料，这次问答又属于哪一段历史，这三步如果只剩一个转圈，系统很难被当真使用。\n\n所以我更关心把过程讲清楚，而不是把生成结果尽快铺满屏幕。\n\n三件必须在界面上成立的事\n\n· 进度可见：上传之后，解析进行到哪一步、是否失败，都应该能在界面上看到，而不是只留下一个转圈。\n· 引用可回看：回答需要带着出处。用户点开引用，应能回到对应材料，而不是只能看到一段无法核对的总结。\n· 历史可分离：每次问答要能作为历史会话被找回，也不能把不同问题的上下文混在当前这一轮里。\n\n尤其是引用溯源。它不是装饰，而是让人判断「这个答案是否站得住」的入口。流式展示可以把文字逐渐显现，但不能代替这三件事。\n\n没有公开核验的数字，就不写成效果\n\n检索是否更准、处理是否更快，如果没有可以公开核对的数据和口径，就不应该在介绍里写成确定的提升幅度。我在这里只写自己实际负责、并且可以在工作说明里核对的部分：把上述过程在前端维护完整，让使用的人能跟上系统正在做什么。\n\n这和流式对话里的判断是一致的。AI 应用的前端价值，常常不在生成速度本身，而在让异步过程保持清晰、可核对，出了问题也能继续。\n",
+    "excerpt": "把检索增强生成做进内部知识库时，前端要让人跟上文档从上传、解析到引用回答的过程：进度可见，答案能回到原文，历史会话也不能串场。",
+    "minutes": 6,
+    "sourcePath": "practice/rag-frontend-process.md"
+  },
+  {
+    "id": "16",
+    "title": "标签与客群配置中，规则树如何与血缘图保持一致",
+    "date": "2024-03-21",
+    "category": "工程实践",
+    "excerpt": "客户数据平台里，标签规则、客群预览和血缘图必须来自同一棵规则树。业务对象、计算方式和表单结构一变，图就要按同一份数据重算。",
+    "minutes": 6,
+    "sourcePath": "practice/cdp-tag-rules-bloodline.md",
+    "html": "\n        <h2>血缘图是视图，不是可以随便连线的画布</h2>\n<p>在众安和暖哇参与客户数据平台前端时，标签血缘和客群规则是一起做的。血缘关系用有向图展示表和标签之间的依赖：连线走曲线，节点高度会随字段变多而下移。</p>\n<p>实现上，血缘图画在 AntV X6 上，但交互是收过的：拖拽关掉，也不暴露可手动接线的锚点。它是已有血缘的视图，不是一块可以自由编辑的白板。客群规则的投影图则用 G6。图本身不是难点，难点是它必须和左边的规则树说同一件事。</p>\n        <h2>规则表单里真正容易出错的地方</h2>\n<p>一条规则的结构通常是：满足某个业务对象，再叠加若干条件，条件之间可以切换「且 / 或」。日期可以是绝对区间，也可以是相对今天的天数。计算方式一换，可选字段会变；有的计算方式还要把分组字段隐藏掉，否则用户会配出当前方式并不消费的字段。</p>\n<p>业务对象切换时，下面整组条件都要清空。否则会留下已经不属于当前对象的规则，看起来配置完成了，跑出来却是另一群人。区间条件常被收成一个字段存储，提交前要校验左值小于右值，不能把非法区间交给后端。</p>\n<p>有一次为了结构更整齐，用模板把绝对时间和相对时间包起来，结果表单提交时字段收集乱了——包装层改变了字段路径，Form 收不到原来的值。后来只能把结构写得没那么漂亮，先保证值能被稳定地收到。</p>\n        <h2>图必须按同一棵规则树重算</h2>\n<p>客群图只是规则树的投影，不应该再维护一份独立数据。「且 / 或」、日期模式、业务对象这些决策都发生在树上，图只负责把同一份树画出来。树改了图不刷新，或展开、收起后布局还停在上一拍，使用的人很容易信图不信表。</p>\n<p>所以规则每改一次，图都要按同一份数据重新计算。这里能保证的，是规则、预览和血缘图一致。我不会把它写成提高了多少圈选准确率。</p>\n      ",
+    "text": "血缘图是视图，不是可以随便连线的画布\n\n在众安和暖哇参与客户数据平台前端时，标签血缘和客群规则是一起做的。血缘关系用有向图展示表和标签之间的依赖：连线走曲线，节点高度会随字段变多而下移。\n\n实现上，血缘图画在 AntV X6 上，但交互是收过的：拖拽关掉，也不暴露可手动接线的锚点。它是已有血缘的视图，不是一块可以自由编辑的白板。客群规则的投影图则用 G6。图本身不是难点，难点是它必须和左边的规则树说同一件事。\n\n规则表单里真正容易出错的地方\n\n一条规则的结构通常是：满足某个业务对象，再叠加若干条件，条件之间可以切换「且 / 或」。日期可以是绝对区间，也可以是相对今天的天数。计算方式一换，可选字段会变；有的计算方式还要把分组字段隐藏掉，否则用户会配出当前方式并不消费的字段。\n\n业务对象切换时，下面整组条件都要清空。否则会留下已经不属于当前对象的规则，看起来配置完成了，跑出来却是另一群人。区间条件常被收成一个字段存储，提交前要校验左值小于右值，不能把非法区间交给后端。\n\n有一次为了结构更整齐，用模板把绝对时间和相对时间包起来，结果表单提交时字段收集乱了——包装层改变了字段路径，Form 收不到原来的值。后来只能把结构写得没那么漂亮，先保证值能被稳定地收到。\n\n图必须按同一棵规则树重算\n\n客群图只是规则树的投影，不应该再维护一份独立数据。「且 / 或」、日期模式、业务对象这些决策都发生在树上，图只负责把同一份树画出来。树改了图不刷新，或展开、收起后布局还停在上一拍，使用的人很容易信图不信表。\n\n所以规则每改一次，图都要按同一份数据重新计算。这里能保证的，是规则、预览和血缘图一致。我不会把它写成提高了多少圈选准确率。\n"
+  },
+  {
+    "id": "17",
+    "title": "URTC IM SDK 初版：把房间角色、连麦和禁言从引擎里拆出来",
+    "date": "2019-07-16",
+    "category": "工程实践",
+    "excerpt": "优刻得 URTC 对外是两套 SDK：音视频推拉流在引擎侧；IM SDK 初版负责聊天、连麦、禁言和房间角色。接入时要把两个客户端的房间状态对齐。",
+    "minutes": 7,
+    "sourcePath": "practice/urtc-im-sdk.md",
+    "html": "\n        <h2>URTC 对外是两套 SDK</h2>\n<p>在优刻得做 URTC 时，对外常见的是音视频能力：加入房间、发布和订阅流、播放。开源仓库是 <code>ucloud/urtc-sdk-web</code>。我负责的不是音视频底层引擎，而是旁边那套 IM SDK 的初版，后续转向客户案例、接入 Demo 和问题支持。IM SDK 开源在 <code>ucloud/urtc-im-web</code>，npm 包名是 <code>urtc-im</code>。</p>\n<p>拆成两套，是因为教室或通话要成立，只把流推出去不够。房间里的身份、发言和课堂秩序，并不属于推拉流本身。如果这些都塞进音视频客户端，每个业务场景都要改引擎接口。</p>\n        <h2>IM SDK 初版覆盖的能力</h2>\n<p>初版 IM 客户端把房间通信收成一套接口，大致包括：</p>\n<ul>\n<li><code>joinRoom</code>：按管理员或普通用户角色进房</li>\n<li><code>sendMsg</code>、<code>sendGlobal</code>、<code>sendNotice</code>：房间消息、广播和公告</li>\n<li>自定义消息和点对点消息</li>\n<li><code>applyCall</code>、<code>replyCall</code>、<code>authCall</code>：申请连麦、应答，以及管理员打开或关闭整间房的连麦权限</li>\n<li><code>banRoom</code>：禁言某个用户或整间房</li>\n<li><code>getHistoryChat</code>：迟到用户拉取聊天记录</li>\n<li><code>getWhiteboard</code>：单独获取白板凭证</li>\n<li><code>setServers</code>：配置接入地址</li>\n</ul>\n<p>角色在 IM 这一侧，推流还是拉流在 RTC 那一侧。SDK 只提供能力，不代替业务去决定谁能上台。</p>\n        <h2>接入时要对齐两个客户端</h2>\n<p>实际接入里，IM 和 RTC 是两个客户端，房间身份必须对齐。人已经在聊天室里、音视频还没进房，或反过来，课都上不起来。浏览器还会拦截自动播放；断网重连后，两边的状态也要分别恢复，不能只重连其中一侧。</p>\n<p>测试阶段可以用本地方法签发临时 token；正式环境必须由服务端签发，密钥不能随 SDK 下发到浏览器。</p>\n<p>后期我做过教育和医疗等场景的案例和 Demo，也包括大班课、小班课的教学演示。这些是接入和问题支持，不能理解成我独立实现了整套音视频引擎。引擎是同事的工作；我先把聊天、连麦、禁言和房间角色立住，再把两套 SDK 接到同一间教室里。</p>\n      ",
+    "text": "URTC 对外是两套 SDK\n\n在优刻得做 URTC 时，对外常见的是音视频能力：加入房间、发布和订阅流、播放。开源仓库是 `ucloud/urtc-sdk-web`。我负责的不是音视频底层引擎，而是旁边那套 IM SDK 的初版，后续转向客户案例、接入 Demo 和问题支持。IM SDK 开源在 `ucloud/urtc-im-web`，npm 包名是 `urtc-im`。\n\n拆成两套，是因为教室或通话要成立，只把流推出去不够。房间里的身份、发言和课堂秩序，并不属于推拉流本身。如果这些都塞进音视频客户端，每个业务场景都要改引擎接口。\n\nIM SDK 初版覆盖的能力\n\n初版 IM 客户端把房间通信收成一套接口，大致包括：\n\n· `joinRoom`：按管理员或普通用户角色进房\n· `sendMsg`、`sendGlobal`、`sendNotice`：房间消息、广播和公告\n· 自定义消息和点对点消息\n· `applyCall`、`replyCall`、`authCall`：申请连麦、应答，以及管理员打开或关闭整间房的连麦权限\n· `banRoom`：禁言某个用户或整间房\n· `getHistoryChat`：迟到用户拉取聊天记录\n· `getWhiteboard`：单独获取白板凭证\n· `setServers`：配置接入地址\n\n角色在 IM 这一侧，推流还是拉流在 RTC 那一侧。SDK 只提供能力，不代替业务去决定谁能上台。\n\n接入时要对齐两个客户端\n\n实际接入里，IM 和 RTC 是两个客户端，房间身份必须对齐。人已经在聊天室里、音视频还没进房，或反过来，课都上不起来。浏览器还会拦截自动播放；断网重连后，两边的状态也要分别恢复，不能只重连其中一侧。\n\n测试阶段可以用本地方法签发临时 token；正式环境必须由服务端签发，密钥不能随 SDK 下发到浏览器。\n\n后期我做过教育和医疗等场景的案例和 Demo，也包括大班课、小班课的教学演示。这些是接入和问题支持，不能理解成我独立实现了整套音视频引擎。引擎是同事的工作；我先把聊天、连麦、禁言和房间角色立住，再把两套 SDK 接到同一间教室里。\n"
+  },
+  {
+    "id": "18",
+    "title": "生产环境排障时，Source Map 该怎么生成和上传",
+    "date": "2024-07-03",
+    "category": "工程实践",
+    "minutes": 7,
+    "sourcePath": "practice/sourcemap-sentry-release.md",
+    "excerpt": "生产包被压缩后，报错堆栈很难定位。我对比过几种 Source Map 的产出：源码不要随包发出去，映射文件在构建时上传到错误监控，本地也可以单独导入对照。",
+    "text": "先对比几种打包方式\n\n压缩后的堆栈对不上源码行号，排障会非常慢。我用同一套 Vue CLI 工程，分别打过 `eval-source-map`、`inline-source-map`、`source-map`、`hidden-source-map` 和 `nosources-source-map`，对着产物看它们的差别。\n\n`inline-source-map` 会把映射写进产物，调试方便，但包体会变大，也不适合直接放到生产。`source-map` 生成独立的 `.map` 文件；如果这些文件也被静态服务出去，源码就等于公开了。`hidden-source-map` 生成 map，但不在产物里写引用；`nosources-source-map` 能对到位置，但不带源码内容。生产更应该选用不会把源码交给浏览器的方式。\n\n本地也可以导入 map 来对照\n\n还有一种做法，是把 map 留在本地，用 Chrome 导入，或用 `SourceMapConsumer` 读文件，把压缩后的位置还原回去。这适合临时排查，不能代替构建流水线里的上传。\n\n构建时上传，不要把密钥写进仓库\n\n后来我接过错误监控服务的上传 Demo，走的是云端上报，不是私有化部署。构建使用 `source-map`，在 Webpack 插件里把 map 传到监控服务，页面侧再用 SDK 上报异常。鉴权 token 只应存在构建环境里，不应写进会进仓库的前端配置；浏览器也不应再拿到这些 map。\n\n另外还留过一份带内容哈希文件名的 map，用来核对映射文件和产物是不是同一组构建。\n",
+    "html": "\n        <h2>先对比几种打包方式</h2>\n<p>压缩后的堆栈对不上源码行号，排障会非常慢。我用同一套 Vue CLI 工程，分别打过 <code>eval-source-map</code>、<code>inline-source-map</code>、<code>source-map</code>、<code>hidden-source-map</code> 和 <code>nosources-source-map</code>，对着产物看它们的差别。</p>\n<p><code>inline-source-map</code> 会把映射写进产物，调试方便，但包体会变大，也不适合直接放到生产。<code>source-map</code> 生成独立的 <code>.map</code> 文件；如果这些文件也被静态服务出去，源码就等于公开了。<code>hidden-source-map</code> 生成 map，但不在产物里写引用；<code>nosources-source-map</code> 能对到位置，但不带源码内容。生产更应该选用不会把源码交给浏览器的方式。</p>\n        <h2>本地也可以导入 map 来对照</h2>\n<p>还有一种做法，是把 map 留在本地，用 Chrome 导入，或用 <code>SourceMapConsumer</code> 读文件，把压缩后的位置还原回去。这适合临时排查，不能代替构建流水线里的上传。</p>\n        <h2>构建时上传，不要把密钥写进仓库</h2>\n<p>后来我接过错误监控服务的上传 Demo，走的是云端上报，不是私有化部署。构建使用 <code>source-map</code>，在 Webpack 插件里把 map 传到监控服务，页面侧再用 SDK 上报异常。鉴权 token 只应存在构建环境里，不应写进会进仓库的前端配置；浏览器也不应再拿到这些 map。</p>\n<p>另外还留过一份带内容哈希文件名的 map，用来核对映射文件和产物是不是同一组构建。</p>\n      "
+  },
+  {
+    "id": "19",
+    "title": "活动运营平台中，配置端和投放端如何对齐",
+    "date": "2023-11-16",
+    "category": "工程实践",
+    "minutes": 6,
+    "sourcePath": "practice/activity-config-and-landing.md",
+    "excerpt": "活动运营平台通常会拆成配置端和投放端。落地页、奖品和渠道在配置端维护；参与页按活动标识打开，请求还要带上渠道，两端必须说同一套活动状态。",
+    "text": "两端不是同一套页面\n\n我参与过活动运营平台的迭代。配置端负责落地页编辑、奖品、渠道和数据看板；投放端是给用户打开的手机页面，包括落地页和传播页。两端技术栈不同，但对的是同一场活动。\n\n配置端还要维护奖品、用户和渠道。投放端不负责改这些配置，只按已经发布的活动来渲染和参与。如果把配置逻辑塞进投放页，下一次改奖品或渠道，就要同时改两套页面。\n\n入口要能区分渠道，又不能把活动配乱\n\n参与页的路径里是活动标识，进入时走一次性登录凭证。请求里会带上渠道，这样同一场活动可以从不同渠道打开，统计和限制才对得上。\n\n如果配置改了玩法或奖品，投放端还在用旧页，用户看到的就不是配置里的那一场。两端必须读同一份活动状态，而不是各维护一份。\n\n新增玩法要两边一起改\n\n早期参与页按玩法分子路由，例如大转盘、刮刮卡；后来入口收成落地页和传播页。红包雨这类玩法，是后来加在活动配置里的。无论入口怎么收，新增一种玩法，配置项和参与页都要一起加，否则会出现后台能配、前台打不开，或前台能玩、配置里没有对应项。\n\n这些是参与迭代时看到的结构，不是从零主导整套平台。\n",
+    "html": "\n        <h2>两端不是同一套页面</h2>\n<p>我参与过活动运营平台的迭代。配置端负责落地页编辑、奖品、渠道和数据看板；投放端是给用户打开的手机页面，包括落地页和传播页。两端技术栈不同，但对的是同一场活动。</p>\n<p>配置端还要维护奖品、用户和渠道。投放端不负责改这些配置，只按已经发布的活动来渲染和参与。如果把配置逻辑塞进投放页，下一次改奖品或渠道，就要同时改两套页面。</p>\n        <h2>入口要能区分渠道，又不能把活动配乱</h2>\n<p>参与页的路径里是活动标识，进入时走一次性登录凭证。请求里会带上渠道，这样同一场活动可以从不同渠道打开，统计和限制才对得上。</p>\n<p>如果配置改了玩法或奖品，投放端还在用旧页，用户看到的就不是配置里的那一场。两端必须读同一份活动状态，而不是各维护一份。</p>\n        <h2>新增玩法要两边一起改</h2>\n<p>早期参与页按玩法分子路由，例如大转盘、刮刮卡；后来入口收成落地页和传播页。红包雨这类玩法，是后来加在活动配置里的。无论入口怎么收，新增一种玩法，配置项和参与页都要一起加，否则会出现后台能配、前台打不开，或前台能玩、配置里没有对应项。</p>\n<p>这些是参与迭代时看到的结构，不是从零主导整套平台。</p>\n      "
   }
 ]

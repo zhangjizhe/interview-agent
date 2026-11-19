@@ -22,7 +22,9 @@ try {
   await completeEmailLogin(page, { userId: adminUserId, password, loginButton: '继续并发送验证码', claimSendButton: '发送绑定验证码' });
   console.log('checking admin control plane');
   await page.getByRole('heading', { name: '控制中心' }).waitFor({ state: 'visible' });
+  await page.getByRole('button', { name: 'MCP 与工具', exact: true }).click();
   if (await page.getByRole('button', { name: '重新加载 MCP' }).count() !== 1) throw new Error('MCP control action missing');
+  await page.getByRole('button', { name: '控制中心', exact: true }).click();
   if (await page.getByRole('button', { name: 'Trace' }).count() !== 1) throw new Error('Trace control view missing');
   if (await page.getByRole('button', { name: '评测' }).count() !== 1) throw new Error('Evaluation control view missing');
   console.log('checking recorded report import');

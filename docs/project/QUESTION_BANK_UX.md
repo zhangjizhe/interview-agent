@@ -38,3 +38,13 @@
 浏览器兼容补充：保留原筛选区class及无前导空白的搜索文字；E2E按新版唯一删除按钮名称、显式展开高级维护后执行原迁移/索引/软删除断言。未删改成功、费用、存储、拒绝或防重放断言；新增默认折叠断言。题库19项定向及Docker重建通过。
 
 远端失败事实：d896源的PR Product run42741794043/job129584513536在原runtime-adapter浏览器用例等待旧 `.builder-workspace li` 超时，真实页面日志已有run.failed；此前external-init已通过。后续只调整该测试到精确Run区域的事件按钮、显式展开后的输出，并限定取消状态到同一Run；保留终态/版本/费用/无调用增量/隐藏输出断言。旧失败不能记通过，必须由新source CI重新验证。
+
+## 最终源码与远端回执（2026-11-10，本机交接更新）
+
+- 最终源码/远端agent-lab：`3c8f089e3baeb531da7efe7ba4d7960f93d80c36`。对应推送Product `42743185791` 与PR Product `42743194319` 各5项全部success。已读取两份Docker job日志，确认external-init、adapter history、工作流、search race及题库迁移/索引/软删除浏览器断言通过；这是隔离合成工程验收，不是真实模型质量。
+- 原环境最后镜像为本文件记录的5adb；正常会话另已验证选择合成MD文件不会立即提交，收起再展开后文件名与主题保留。临时合成预览已关闭并停止，仅保留实际Lab页面。
+- 原先PR描述/merge曾被自动审批服务因额度耗尽拒绝且未执行；用户要求自动执行后，同一merge工具于2026-11-10T07:09:07Z成功合并PR #71。旧额度阻塞已解除，未换通道绕过。
+- 最终本地main、origin/main和ls-remote均为 `19e911e0bf06f5a4bd368a2ac69ca37fc852c397`；agent-lab仍为已验收3c8f089。两者tree完全一致：`978fe3d5366e124ee8d34be56f5c1571b1bbd535`。工作区WIP保留。
+- 合并后默认Product `42773289162` 全部5项success：lint-type-test、portfolio-edge-contracts(20/22)、docker-build-test、ci-summary；没有重跑无变化的既有检查。
+- 独立实验Python `42773289262` 的web/type/Docker成功；e2e在浏览器安装阶段失败，日志为Playwright 1.58.2不支持ubuntu26.04-x64，其summary失败。此项未计作通过，留作独立运行环境修复，不声称所有工作流全绿。
+- 本阶段已交付，等待用户继续；整体产品仍未验收。本段为最终CI后的本机上下文回执，尚未单独提交，不为记录结果制造新的产品提交或重复已通过检查。

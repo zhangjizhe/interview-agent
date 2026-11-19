@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ClipboardCheck, Play, RefreshCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { safeJson } from '../utils/safeJson';
 
@@ -38,6 +38,8 @@ export function ReportPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState('');
+  const startPending = useRef(false);
   const detailQuery = useQuery({
     queryKey: ['interview-report', id],
     enabled: Boolean(id),
@@ -45,6 +47,7 @@ export function ReportPage() {
       const response = await fetch(`/api/interview/${id}`);
       const data = await safeJson(response);
       if (!response.ok || data?._error) throw new Error(data?.message || '无法读取面试报告');
+      if (data?.id !== id || !['IN_PROGRESS', 'COMPLETED', 'ABANDONED'].includes(data?.status)) throw new Error('报告响应异常，请重新读取。');
       return data as InterviewDetail;
     },
   });
@@ -57,7 +60,8 @@ export function ReportPage() {
       const response = await fetch(`/api/interview/${id}/evidence`);
       const data = await safeJson(response);
       if (!response.ok || data?._error) throw new Error(data?.message || '无法读取评价证据');
-      return Array.isArray(data) ? data as AssessmentEvidence[] : [];
+      if (!Array.isArray(data)) throw new Error('评价依据响应异常，请重新读取。');
+      return data as AssessmentEvidence[];
     },
   });
   useEffect(() => {
@@ -65,7 +69,8 @@ export function ReportPage() {
   }, [detail?.status, id, navigate]);
 
   const startNewAttempt = async () => {
-    if (!detail) return;
+    if (!detail || startPending.current) return;
+    startPending.current = true; setStartError('');
     setStarting(true);
     try {
       const response = await fetch('/api/interview/start', {
@@ -79,23 +84,23 @@ export function ReportPage() {
         }),
       });
       const data = await safeJson(response);
-      if (!response.ok || data?._error || !data?.interviewId) throw new Error(data?.message || '无法开始新的模拟面试');
+      if (!response.ok || data?._error || typeof data?.interviewId !== 'string' || !data.interviewId.trim()) throw new Error(data?.message || '无法开始新的模拟面试');
       navigate(`/interview/${data.interviewId}`);
-    } catch {
-      setStarting(false);
-    }
+    } catch (reason) {
+      setStartError(`${reason instanceof Error ? reason.message : '新面试创建结果未确认'}。请先查看面试记录核对结果，避免重复创建。`);
+    } finally { startPending.current = false; setStarting(false); }
   };
 
-  if (detailQuery.isLoading) return <main className="mx-auto max-w-5xl px-4 py-16 text-sm text-slate-600">正在加载评价报告...</main>;
-  if (detailQuery.isError || !detail) return <main className="mx-auto max-w-5xl px-4 py-16"><section className="border border-red-200 bg-red-50 p-6 text-sm text-red-800">评价报告暂时无法加载。<Link to="/interviews" className="ml-2 font-medium underline">返回面试记录</Link></section></main>;
+  if (detailQuery.isLoading) return <div className="mx-auto max-w-5xl px-4 py-16 text-sm text-slate-600">正在加载评价报告...</div>;
+  if (detailQuery.isError || !detail) return <div className="mx-auto max-w-5xl px-4 py-16"><section className="border border-red-200 bg-red-50 p-6 text-sm text-red-800">评价报告暂时无法加载。<button type="button" className="mr-3 underline" disabled={detailQuery.isFetching} onClick={() => void detailQuery.refetch()}>重新读取报告</button><Link to="/interviews" className="ml-2 font-medium underline">返回面试记录</Link></section></div>;
   if (detail.status === 'IN_PROGRESS') return null;
   if (!detail.report) {
-    return <main className="mx-auto max-w-5xl px-4 py-16"><section className="border border-amber-200 bg-amber-50 p-6"><ClipboardCheck className="h-5 w-5 text-amber-700" aria-hidden="true" /><h1 className="mt-3 text-lg font-semibold text-amber-900">评价尚未生成</h1><p className="mt-2 text-sm leading-6 text-amber-800">本场面试已结束，但当前没有可展示的正式评价。可以在面试记录中稍后重试。</p><Link to="/interviews" className="mt-4 inline-flex h-10 items-center gap-2 border border-amber-300 px-3 text-sm font-medium text-amber-900 hover:bg-amber-100"><RefreshCw className="h-4 w-4" aria-hidden="true" />返回面试记录</Link></section></main>;
+    return <div className="mx-auto max-w-5xl px-4 py-16"><section className="border border-amber-200 bg-amber-50 p-6"><ClipboardCheck className="h-5 w-5 text-amber-700" aria-hidden="true" /><h1 className="mt-3 text-lg font-semibold text-amber-900">评价尚未生成</h1><p className="mt-2 text-sm leading-6 text-amber-800">本场面试已结束，但当前没有可展示的正式评价。可以在面试记录中稍后重试。</p><Link to="/interviews" className="mt-4 inline-flex h-10 items-center gap-2 border border-amber-300 px-3 text-sm font-medium text-amber-900 hover:bg-amber-100"><RefreshCw className="h-4 w-4" aria-hidden="true" />返回面试记录</Link></section></div>;
   }
 
   const report = detail.report;
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
+    <div className="mx-auto max-w-5xl px-4 py-6 md:px-6 md:py-10">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6">
         <div><p className="text-sm font-medium text-blue-700">正式评价</p><h1 className="mt-1 text-2xl font-semibold">{detail.position}{detail.level ? ` · ${detail.level}` : ''}</h1><p className="mt-2 text-sm text-slate-600">仅基于本场已完成面试的正式评价与证据。</p></div>
         <Link to="/interviews" className="inline-flex h-10 items-center gap-2 border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" aria-hidden="true" />面试记录</Link>
@@ -107,10 +112,11 @@ export function ReportPage() {
       <section className="mt-6 grid gap-4 lg:grid-cols-3"><ReportSection title="表现较好" lines={reportLines(report.strengths)} tone="success" /><ReportSection title="需要补充" lines={reportLines(report.weaknesses)} tone="warning" /><ReportSection title="下一步建议" lines={reportLines(report.suggestions)} tone="neutral" /></section>
       <section className="mt-6 border border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-5 py-4"><p className="text-sm font-medium text-blue-700">证据回放</p><h2 className="mt-1 text-base font-semibold">问题、回答与评价依据</h2></div>
-        {evidenceQuery.isLoading ? <p className="px-5 py-6 text-sm text-slate-600">正在加载正式评价证据...</p> : evidenceQuery.isError ? <p className="px-5 py-6 text-sm text-amber-800">证据暂时无法展示，但不影响当前正式评价。</p> : evidenceQuery.data?.length ? <div className="divide-y divide-slate-200">{evidenceQuery.data.map((evidence, index) => <article key={evidence.id} className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"><div><p className="text-xs font-medium text-slate-500">{evidence.question.parentQuestionId ? '追问' : `问题 ${index + 1}`} · {evidence.question.category} · {evidence.question.difficulty}</p><h3 className="mt-2 text-sm font-semibold leading-6 text-slate-900">{evidence.question.question}</h3><p className="mt-3 border-l-2 border-slate-200 pl-3 text-sm leading-6 text-slate-700">{evidence.answer.content}</p></div><div className="border-t border-slate-100 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0"><p className="text-xs font-medium text-slate-500">评价依据</p><p className="mt-2 text-sm leading-6 text-slate-700">{evidence.reason || '本条未生成额外评价说明。'}</p>{evidence.missingEvidence?.length ? <p className="mt-3 text-sm text-amber-800">待补充：{evidence.missingEvidence.join('、')}</p> : null}{evidence.recommendation ? <p className="mt-3 text-sm text-slate-600">建议：{evidence.recommendation}</p> : null}</div></article>)}</div> : <p className="px-5 py-6 text-sm text-slate-600">本场尚无可回放的正式证据。</p>}
+        {evidenceQuery.isLoading ? <p className="px-5 py-6 text-sm text-slate-600">正在加载正式评价证据...</p> : evidenceQuery.isError ? <p role="alert" className="px-5 py-6 text-sm text-amber-800">证据暂时无法展示，但不影响当前正式评价。<button type="button" className="ml-2 underline" disabled={evidenceQuery.isFetching} onClick={() => void evidenceQuery.refetch()}>重新读取证据</button></p> : evidenceQuery.data?.length ? <div className="divide-y divide-slate-200">{evidenceQuery.data.map((evidence, index) => <article key={evidence.id} className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"><div><p className="text-xs font-medium text-slate-500">{evidence.question.parentQuestionId ? '追问' : `问题 ${index + 1}`} · {evidence.question.category} · {evidence.question.difficulty}</p><h3 className="mt-2 text-sm font-semibold leading-6 text-slate-900">{evidence.question.question}</h3><p className="mt-3 border-l-2 border-slate-200 pl-3 text-sm leading-6 text-slate-700">{evidence.answer.content}</p></div><div className="border-t border-slate-100 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0"><p className="text-xs font-medium text-slate-500">评价依据</p><p className="mt-2 text-sm leading-6 text-slate-700">{evidence.reason || '本条未生成额外评价说明。'}</p>{evidence.missingEvidence?.length ? <p className="mt-3 text-sm text-amber-800">待补充：{evidence.missingEvidence.join('、')}</p> : null}{evidence.recommendation ? <p className="mt-3 text-sm text-slate-600">建议：{evidence.recommendation}</p> : null}</div></article>)}</div> : <p className="px-5 py-6 text-sm text-slate-600">本场尚无可回放的正式证据。</p>}
       </section>
+      {startError && <p role="alert" className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{startError}</p>}
       <section className="mt-6 flex flex-wrap items-center justify-between gap-4 border border-slate-200 bg-white p-5"><div><h2 className="text-base font-semibold">继续训练</h2><p className="mt-1 text-sm text-slate-600">训练建议会基于正式证据生成；完成训练本身不会改变技能分数。</p></div><div className="flex flex-wrap gap-2"><Link to="/training" className="inline-flex h-10 items-center gap-2 border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">查看训练</Link><button type="button" onClick={startNewAttempt} disabled={starting} className="inline-flex h-10 items-center gap-2 bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-blue-300"><Play className="h-4 w-4" aria-hidden="true" />{starting ? '创建中' : '开始新的模拟'}</button></div></section>
-    </main>
+    </div>
   );
 }
 

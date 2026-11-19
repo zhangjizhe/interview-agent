@@ -33,6 +33,7 @@ async function mount() {
   return client;
 }
 beforeEach(() => {
+  window.history.replaceState(null, '', '/');
   enabled = true; brokenReceipt = false; failRead = false;
   vi.spyOn(window, 'confirm').mockReturnValue(true);
   transport.mockReset().mockImplementation(async (path: string, options?: RequestInit) => {
@@ -59,6 +60,7 @@ describe('MCP workspace process scope and state recovery', () => {
     await mount();
     expect(screen.getByText(scope)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '本进程关闭', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '确认关闭', exact: true }));
     await screen.findByText('fixture-tool 已在当前 API 进程关闭。');
     await screen.findByRole('button', { name: '本进程启用', exact: true });
     fireEvent.click(screen.getByRole('button', { name: '本进程启用', exact: true }));
@@ -69,6 +71,7 @@ describe('MCP workspace process scope and state recovery', () => {
     await mount(); brokenReceipt = true;
     const before = transport.mock.calls.filter(call => call[0] === '/admin/mcp-servers').length;
     fireEvent.click(screen.getByRole('button', { name: '本进程关闭', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '确认关闭', exact: true }));
     await screen.findByText('MCP 开关结果未确认，请重新读取服务状态后核验。');
     await screen.findByRole('button', { name: '本进程启用', exact: true });
     expect(screen.queryByText('fixture-tool 已在当前 API 进程关闭。')).toBeNull();
@@ -93,6 +96,7 @@ describe('MCP workspace process scope and state recovery', () => {
   it('requires reload confirmation and reports retained runtime switches after the POST', async () => {
     await mount();
     fireEvent.click(screen.getByRole('button', { name: '本进程关闭', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: '确认关闭', exact: true }));
     await screen.findByRole('button', { name: '本进程启用', exact: true });
     vi.mocked(window.confirm).mockReturnValueOnce(false);
     fireEvent.click(screen.getByRole('button', { name: '重新加载 MCP', exact: true }));
@@ -102,4 +106,25 @@ describe('MCP workspace process scope and state recovery', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '本进程启用', exact: true })).toBeTruthy());
     expect(transport.mock.calls.filter(call => call[0] === '/admin/mcp-servers/reload')).toEqual([['/admin/mcp-servers/reload', { method: 'POST' }]]);
   }, 15_000);
+});
+
+it('keeps a failed health check next to its tool and filters common secret values', async () => {
+  await mount();
+  const original = transport.getMockImplementation()!;
+  transport.mockImplementation((path, init) => path.endsWith('/health') ? Promise.resolve({ ok: false, latencyMs: 2, error: 'Dependency unavailable; token=synthetic-private-value' }) : original(path, init));
+  fireEvent.click(screen.getByRole('button', { name: '检查工具：Fixture tool' }));
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('检查未通过');
+  expect(alert).toHaveTextContent('Dependency unavailable');
+  expect(alert).not.toHaveTextContent('synthetic-private-value');
+  expect(screen.queryByText(/fixture-tool 执行绑定已就绪/)).toBeNull();
+});
+it('does not acknowledge malformed reload success and leaves an explicit read recovery', async () => {
+  await mount();
+  const original = transport.getMockImplementation()!;
+  transport.mockImplementation((path, init) => path.endsWith('/reload') ? Promise.resolve({ ok: false, errors: [] }) : original(path, init));
+  fireEvent.click(screen.getByRole('button', { name: '重新加载 MCP' }));
+  await screen.findByText('配置重载未确认，请重新读取状态后核对。');
+  expect(screen.queryByText(reloadSuccess)).toBeNull();
+  expect(screen.getByRole('button', { name: '刷新本进程状态' })).toBeEnabled();
 });

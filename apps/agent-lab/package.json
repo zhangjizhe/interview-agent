@@ -7,7 +7,8 @@
     "dev": "vite --port 5175",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
-    "e2e": "node e2e/admin-mcp-acceptance.mjs"
+    "e2e": "node e2e/admin-mcp-acceptance.mjs",
+    "e2e:mobile": "node e2e/mobile-layout-acceptance.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.17.0",
