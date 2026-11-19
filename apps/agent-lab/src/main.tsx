@@ -275,6 +275,9 @@ export function ControlCenter() {
     : ['experiments', 'release'].includes(view) ? [lab] : [];
   const workspaceLoading = dependencies.some(query => query.isPending);
   const workspaceError = dependencies.find(query => query.isError)?.error;
+  if (dependencies.some(query => (query.error as { status?: number } | undefined)?.status === 403)) {
+    return <main className="agent-access"><section><h1>无法读取控制面</h1><p>当前会话没有访问 Agent Lab 的权限。</p></section></main>;
+  }
 
   const data = servers.data as { servers: Server[]; runningCount: number; count: number };
   const labData = lab.data as LabDashboard;
