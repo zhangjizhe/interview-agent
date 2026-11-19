@@ -37,7 +37,7 @@ const close = server => new Promise((resolve, reject) => {
 
 test.after(() => rmSync(root, { recursive: true, force: true }));
 test('MCP SDK resolves the reviewed official security release', () => {
-  assert.equal(manifest.version, '2.1.3');
+  assert.equal(manifest.version, '2.1.9');
 });
 for (const mode of ['cjs', 'esm']) {
   test(`${mode}: static middleware rejects the second-decode authentication bypass and preserves ordinary files`, async () => {
@@ -52,6 +52,10 @@ for (const mode of ['cjs', 'esm']) {
         const response = await fetch(`http://127.0.0.1:${port}${path}`, { signal: AbortSignal.timeout(3000) });
         assert.equal(response.status, 401);
       }
+      const slashBypass = await fetch(`http://127.0.0.1:${port}/static/admin\\secret.txt`, { signal: AbortSignal.timeout(3000) });
+      const slashBody = await slashBypass.text();
+      assert.notEqual(slashBody, 'synthetic-protected-marker', 'a backslash in the path must not disclose the protected fixture');
+      assert.notEqual(slashBypass.status, 200);
       const bypass = await fetch(`http://127.0.0.1:${port}/static/%%36%31dmin/secret.txt`, { signal: AbortSignal.timeout(3000) });
       const bypassBody = await bypass.text();
       assert.notEqual(bypassBody, 'synthetic-protected-marker', 'a malformed path must not disclose the protected fixture');
