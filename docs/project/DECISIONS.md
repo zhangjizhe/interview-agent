@@ -1,8 +1,18 @@
 # 当前决策索引
 
+2026-11-19：准备流程只以匹配ID/状态的回执显示成功；网络/服务/格式未知结果保留标记，不把超时称取消，不自动重写。核对须成功GET和显式确认，弹窗内能检查已读内容而不丢草稿。确认后的缓存更新与后台核对分开，避免GET拖住焦点；前端锁不冒充服务端幂等。无后端架构替换。详见../acceptance/PREPARATION_PRODUCT_DESIGN_ACCEPTANCE.md。
+
+2026-11-18：产品/设计/声明支持设备/发布恢复必须全部有对应版本证据才交付；本地测试和截图不能豁免真实闭环或实机。Web按认证会话持有私有缓存，一条JSON发布完整会话，拒绝四字段后写标记的伪原子方案。旧字段兼容只读到首次snapshot，退出tombstone防止复活；保持既有服务端鉴权与Lab隔离。候选未部署，升级/回滚需刷新重新登录验证。见../acceptance/COMMERCIAL_PRODUCT_DESIGN_GATE.md和SESSION_CACHE_ISOLATION.md。
+
+2026-11-17：使用内容重排、长文本换行及约束grid最小宽度修复手机页面；不通过隐藏根溢出或禁用用户缩放制造适配。导航/弹层共用滚动锁，弹层portal位于inert背景之外。浏览器模拟和实体设备验收分开记录。
+
+2026-11-17：复用既有ARCHIVED作为明确“归档停用”，不新增易与版本发布/Run状态混淆的布尔开关。保留currentVersion/历史，恢复仅使用已发布版本；与DecisionRecord原子写入。执行前检查是新请求准入门，不是分布式撤回保证。MCP继续准确展示进程作用范围；未知导入/状态回执不显示成功。见LAB_WORKSPACE_FLOWS.md。
+
+2026-11-17本地UI决定：复用React/TanStack Query和现有页面，不新增路由/组件库依赖；页面参数只保存导航，不承担授权。保持独立工作区可在无关汇总失败时访问，Trace只读与业务内容显式展开保留。分阶段修控制台框架和排障，不将视觉fixture称真实模型或全平台通过。
+
 2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
 
-2026-11-10 资料分权决策：[LAB_DATA_GOVERNANCE](../architecture/LAB_DATA_GOVERNANCE.md)。沿用Workspace/可信组织与Prisma，采用默认私有的typed逻辑集合、显式READ/WRITE和owner授权管理，不为每个Agent复制数据库/表。记录修订和审计禁止UPDATE/DELETE；绑定属于固定Agent版本，资料内容为每次运行实际读取的当前修订。无数据库RLS、通用向量RAG或真实模型质量承诺。原服务未升级，精确CI/交付回执另核。
+2026-11-10 资料分权决策：[LAB_DATA_GOVERNANCE](../architecture/LAB_DATA_GOVERNANCE.md)。沿用Workspace/可信组织与Prisma，采用默认私有的typed逻辑集合、显式READ/WRITE和owner授权管理，不为每个Agent复制数据库/表。记录修订和审计禁止UPDATE/DELETE；绑定属于固定Agent版本，资料内容为每次运行实际读取的当前修订。无数据库RLS、通用向量RAG或真实模型质量承诺。PR #72及main4352323默认Product5项通过，原服务升级仍为独立验收门。
 
 2026-11-09: keep report drill-through read-only inside the report; do not switch into an editable Agent builder merely to inspect a historical sample. Reuse existing ownership-enforced APIs; show unknown cost/empty Trace/denial explicitly, with raw payloads excluded from recording summaries.
 
@@ -73,3 +83,5 @@ ADR26 (2026-10-29, candidate): distinguish deterministic business contracts from
 2026-11-05 bounded portfolio ingress candidate: preserve original modular monolith/normal release-gate/v6; expose only fixed public portfolio routes through an independent credentialed gateway and a temporary HTTPS ingress, with native Sites server Secrets. User explicitly authorized Sites/Cloudflare secret transport. Keep keys encrypted locally/tmpfs, no public admin API, no background Keychain automation without consent. Normal30-sample real-provider deterministic contract evidence is not semantic or whole-product acceptance. See [decision](../architecture/PORTFOLIO_LOCAL_INGRESS.md).
 
 2026-11-09 PLATFORM-RESTORATION: separate Trace diagnosis from data access and ingestion restoration. Reuse owned runtime GETs; explicit business-content expansion and bounded credential filtering; do not label legacy question-generation imports as generic document RAG. See PLATFORM_CAPABILITY_RESTORATION.md.
+
+2026-11-18（本机交互决策）：候选人的资料准备（简历、岗位）与低频账号安全分离；固定展示简历上传/已存摘要，文件选择不隐式触发模型调用。复用现有自有用户RAG读写，不在UI模拟未实现的下载/删除/版本选择；未知上传结果先读核对、显式解锁再重传。详见INTERVIEW_PREPARATION_REDESIGN.md，无架构/Schema替换。

@@ -25,9 +25,11 @@ export function labConfig(env,publicOrigin){
 }
 
 export function validateLabRequest(data){
-  const message=data?.messages?.at(-1)?.content;
-  if(typeof message!=='string'||!message.trim()||message.trim().length>500||new TextEncoder().encode(message.trim()).length>1500||!UUID.test(data?.requestKey||''))throw new AppError('请提供不超过500字符的问题和有效请求标识。');
-  const question=message.trim();
+  const messages=data?.messages;
+  const latest=messages?.at(-1);
+  const question=latest?.content?.trim();
+  if(!Array.isArray(messages)||messages.length<1||messages.length>9||latest?.role!=='user'||typeof question!=='string'||!question||question.length>500||new TextEncoder().encode(question).length>1500||!UUID.test(data?.requestKey||''))throw new AppError('请提供不超过500字符的问题和有效请求标识。');
+
   const previous=(Array.isArray(data.messages)?data.messages:[]).slice(0,-1).filter(m=>m?.role==='user'&&typeof m.content==='string').slice(-2);
   if(!/^(?:那|这个|这篇|它|其中|具体|详细|展开|继续|为什么|怎么实现|如何实现|再说|能否|能不能)/.test(question))return {message:question,requestKey:data.requestKey};
   const fits=value=>value.length<=500&&new TextEncoder().encode(value).length<=1500;
@@ -80,7 +82,7 @@ export async function runLabAgent({request,config,emit,signal,fetcher=fetch,wait
   };
   emit('status',{text:'正在通过 Agent Lab 检查问题范围与公开资料…',mode:'agent-lab'});
   let data=await read('/portfolio-assistant/chat',{method:'POST',body:JSON.stringify(request)});
-  if(data.status!=='REFUSED'){
+  if(!['REFUSED','COMPLETED'].includes(data.status)){
     if(!['PENDING','RUNNING'].includes(data.status)||typeof data.ticket!=='string'||!data.ticket||data.ticket.length>2048)throw new AppError('Agent Lab 受理回执不完整。',502);
     const ticket=data.ticket;
     for(let poll=0;poll<40;poll++){
@@ -99,5 +101,5 @@ export async function runLabAgent({request,config,emit,signal,fetcher=fetch,wait
   }
   const result=finalAnswer(data);
   // A completed, checked answer is emitted once, not artificial token-by-token streaming.
-  emit('delta',{text:result.answer});emit('sources',{items:result.sources});emit('done',{mode:'agent-lab',evidenceMode:data.evidenceMode==='grounded-professional-context/v1'?'grounded-professional-context/v1':'verbatim-public-excerpts',status:data.status});
+  emit('delta',{text:result.answer});emit('sources',{items:result.sources});emit('done',{mode:'agent-lab',evidenceMode:['grounded-professional-context/v1','grounded-first-person/v1'].includes(data.evidenceMode)?data.evidenceMode:'verbatim-public-excerpts',status:data.status});
 }

@@ -12,8 +12,8 @@ export class PortfolioAssistantController {
   async chat(@Body() body: unknown, @Req() request: Request, @Res() response: Response) {
     const result = await this.assistant.submit(body, request.get('origin'), request.ip || request.socket.remoteAddress || 'unknown');
     response.setHeader('Cache-Control', 'no-store');
-    if (result.status === 'REFUSED' || !request.accepts('text/event-stream') || !request.get('accept')?.includes('text/event-stream')) {
-      return response.status(result.status === 'REFUSED' ? 200 : 202).json(result);
+    if (result.status === 'REFUSED' || result.status === 'COMPLETED' || !request.accepts('text/event-stream') || !request.get('accept')?.includes('text/event-stream')) {
+      return response.status(result.status === 'REFUSED' || result.status === 'COMPLETED' ? 200 : 202).json(result);
     }
     response.status(200).set({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store, no-transform', 'X-Accel-Buffering': 'no' });
     response.flushHeaders();

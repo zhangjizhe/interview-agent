@@ -1,5 +1,6 @@
 import { PortfolioDocument } from './portfolio.contract';
 import { renderPortfolioDelivery } from './portfolio-guide.contract';
+import { renderPortfolioPersona } from './portfolio-persona.contract';
 
 // Recognize complete JSON values only. Never repair truncated model text.
 function valueEnd(text: string, start: number): number | null {
@@ -20,7 +21,7 @@ function valueEnd(text: string, start: number): number | null {
 /** Public projection consists solely of complete, independently validated units.
  * A model token checkpoint is not itself safe public output.
  */
-export function projectPortfolioStream(text: string, documents: PortfolioDocument[], references: unknown) {
+export function projectPortfolioStream(text: string, documents: PortfolioDocument[], references: unknown, personaQuestion?: string) {
   if (text.length > 8192) throw new Error('Guide output too large');
   let i = 0; const skip = () => { while (/\s/.test(text[i] || '') && i < text.length) i++; };
   skip(); if (text[i++] !== '{') return null;
@@ -53,6 +54,8 @@ export function projectPortfolioStream(text: string, documents: PortfolioDocumen
     skip(); if (text[i] !== ',') break; i++;
   }
   if (selectedIds === undefined) return null;
-  const result = renderPortfolioDelivery(JSON.stringify({ selectedIds, technicalNotes: notes }), documents, references);
+  const raw = JSON.stringify({ selectedIds, technicalNotes: notes });
+  const result = personaQuestion === undefined ? renderPortfolioDelivery(raw, documents, references)
+    : renderPortfolioPersona(raw, documents, references, personaQuestion, false);
   return result.sources.length ? result : null;
 }

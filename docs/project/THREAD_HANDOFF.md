@@ -1,17 +1,20 @@
 # Thread handoff
 
-2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
+2026-11-19新增费用问题：只读核对用户报告的昨日9元，仍UNRECONCILED。Nov18有1条portfolio-evidence-guide/qwen-plus完成记录，估算0.0010108CNY；另1条LLM_CALL准入缺费用证据，不能等同已计费调用。私有账本Nov16后未更新，4项历史未知保留。当前源码及运行编译件均确认简历embedding直接调用text-embedding-v3，绕过统一账本；这不是9元归因证据。用户已确认百炼/DashScope API消费账单，已追问模型/金额/日期；无新模型调用/重跑/重启。见../acceptance/COST_RECONCILIATION_2026-11-18.md；先回答/对账，不自动扩大为实现任务。
 
-2026-11-10。用户在PR #71合并后要求继续；当前唯一主题LAB-DATA-GOVERNANCE，原暂停候选已经复核并扩充隔离验收。先读LAB_DATA_GOVERNANCE_WIP.md和docs/architecture/LAB_DATA_GOVERNANCE.md。
+2026-11-19: preparation workflow checkpoint completed locally. Whole product NOT_ACCEPTED; user requires product/design/device acceptance before delivery. Main evidence: ../acceptance/PREPARATION_PRODUCT_DESIGN_ACCEPTANCE.md. Commercial gate remains binding.
 
-当前agent-lab基线3c8f089，与main19e911e同tree；前序PR #71已合并，默认Product各组5绿。主体源码445d572已推送PR #72，最后补选框布局，最新CI待核；尚未合并/部署，原5175仍题库UX镜像，原API/数据库/全部卷未重启或迁移。
+## Resume precisely
 
-修改包括typed集合/ACL/复合外键/不可变历史与审计、当前身份/修订冲突、版本绑定/派发前重验授权、data.read实际revision/hash、克隆清空单Agent绑定、Lab资料页与选择器。旧Interview题库、历史RAG、评测Dataset仍独立；不提供任意表读写或通用向量RAG。
+- agent-lab base7405555946f2f68c921915a8fee03184e702f04b + extensive prior WIP. Never stage all, credentials, private receipts or machine paths. No commit/push/merge.
+- Final preparation candidate11ae77053423668cd2541aa24dd9496e948212c18e209add1121318f6b401b27 only isolated. Live5173 still95fbbf3f… with interview-web-rollback-journey-nov18. No backend/volume/permission/secret change.
+- Source: JobsPage validates returned job identity/state and scopes ambiguous-operation markers to account.20-second wait is not server cancellation; refresh only reads. GET+ack unlock; modal can show returned records without discarding draft. Valid receipt updates cache immediately then background verifies; save/activate/recovery focus fixed.
+- ResumesPage validates rows, waits for job reference before upload, distinguishes file/pending/unknown text, adjacent focusable feedback, read+ack recovery, and handles marker-quota failure before POST. Existing upload/parse/storage/model contract remains unchanged and unaccepted for real quality. WorkflowDialog includes textarea/summary/focusables; preparation styles refine readability and tablet/landscape controls.
+- Red: nine original defect cases failed. Browser found save-focus loss; filtered negative regression failed, then repaired. Final45/45 across five files, correct-package types/lint/build/diff passed. Tests preserve receipt/no-repeat/persistence assertions; asynchronous waits now follow actual query notifications.
+- Browser normal flows and27 layout probes used bundlead593a819…; final bundle adds quota preflight and in-modal recovery list, verified by final tests/build and final-bundle recovery portrait/landscape. Do not claim all old probes freshly rerun on the final hash. Final mobile proof is from final bundle.
+- All browser data/API responses/file uploads were synthetic on loopback5191. No real NestJS/model/PG/Milvus/provider test. Final recovery service counter1 write/0 uploads/2 reads. Both servers stopped; synthetic storage cleared, tabs closed, viewport reset. Normal user sessions/data untouched.
+- Previous session-cache snapshot candidate still undeployed (SESSION_CACHE_ISOLATION.md). Real two-user/server/mixed-version acceptance remains open. Browser credentials remain existing local persistence, not encrypted by the snapshot change.
+- Physical devices/native keyboards, other engines/full accessibility, whole-site design, actual golden journey/report quality, server idempotency/history/full resume-RAG and release/recovery remain open in TASKS.md. Earlier simulator timeout is not new device evidence; do not replay unchanged failed tests blindly.
+- Latest remoteCI not refreshed; last recorded security audit failure still unresolved. New source has no exact greenCI/reviewed release SHA. This is a verification checkpoint, not GitHub or product delivery. Wait for user's continuation before the next phase.
 
-证据：真实PG新装/旧升级及DB/HTTP42；runtime/registry53；完整API1283通过/47跳过（专用DB另跑）；隔离完整Web385；标签后UI8；types/lint/API与Lab Docker构建通过。封闭API136/136通过，浏览器create/edit/history/reload/binding/一合成调用/持久Trace/archive拒绝与无调用增量通过，截图已视觉检查。专用PG备份恢复通过，严格结构/数据/sequence及版本/授权/审计保留。外层Docker手动等待门在回执文件前已退出，后续恢复未跑，不计通过；完整自动门与精确CI/PR/远端待核。
-
-首次失败保留：旧夹具懒PrismaPromise出ALS已修并保留拒绝断言；首轮全Web的缺新GET夹具已补，旧评测异步用例定向与隔离完整套件通过，根因未知。浏览器先缺捆绑Chrome，后发现select/有值textarea的标签识别问题，已加明确可访问名称。旧失败的合成资料保留，复验用唯一新名称，未删除失败记录制造通过。
-
-候选隔离目录与日志保留本机临时位置；不提交本机绝对路径、私有回执或敏感配置。当前仅资料治理相关WIP纳入候选；认证证据、portfolio三文件、auth档案、旧Mac手册保持原样，禁止全部暂存。无外部模型请求；合成结果非语义质量。
-
-注意原API的KnowledgeBaseBootstrap会启动旧知识导入，可能付费。本轮不可未经成本核验就重启原API或声称本机资料治理已上线。后续原部署需备份/迁移/启动成本门；简历、通用提取RAG、真实质量、全产品NOT_ACCEPTED。当前阶段完成后等待用户继续下一阶段。
+Earlier context archived in archive/context-before-preparation-acceptance-2026-11-19/; preserve its limits when using historical results.

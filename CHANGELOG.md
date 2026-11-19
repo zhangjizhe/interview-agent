@@ -1,8 +1,26 @@
 # Changelog
 
+2026-11-19（未发布、隔离候选）：岗位回执校验、未知结果读取核对/防重提、弹窗内核对保留草稿、成功/恢复后的键盘焦点；简历参考岗位前置、字段校验、临近反馈、存储不足预检和触控可读性。45相关回归与有限浏览器/尺寸检查通过；真实闭环/设备/全站设计/CI未验收，未部署/推送，非商业交付。
+
+2026-11-18（未发布、隔离候选）：新增商业产品/设计/设备放行门禁；Web会话级缓存、敏感表单清理、跨标签同步及完整会话原子存储。原六项缓存隔离回归先失败，最终75相关测试、类型/Lint/构建及合成双标签通过；未替换5173，真实业务/设计/设备/CI未放行，不是产品交付。
+
+2026-11-18（未发布，本机）：候选人体验审查与功能盘点，独立练习页、前置资料恢复、记录筛选与加载/失败分离、报告直达、删除/评价重试确认和创建迟到响应保护。76个不同用例分轮通过，最终18项复验与构建/窄屏检查通过，5173更新可回滚；完整真实质量、历史归属、CI和公网交付保留未完成。
+
+2026-11-18（未发布，本机）：Interview资料准备工作区重设计，独立简历上传/摘要库与岗位卡片编辑；账号安全移至单独设置并收起。已有RAG接口复用，未知上传结果锁定、可选岗位字段清空修复。相关回归/构建通过，5173更新可回滚；历史归属与真实上传质量、远端CI仍待。
+
+2026-11-18（未发布，本机）：Interview准备弹层、重复提交防护、岗位读写状态、报告失败反馈、简历格式校验及面试房间移动布局/无障碍修复。101个不同回归用例与28项合成布局通过，5173前端已更新可回滚；真实面试质量、实机兼容和远端CI/同步待完成。
+
+2026-11-18（未发布，本机）：微信/移动Chrome兼容续修，补输入视口请求、无visualViewport时弹窗后备、无效尺寸保护和滚动留白。23项回归与三种键盘模型通过，5175前端已更新；原生安卓/iPhone微信和远端CI仍待。
+
+2026-11-17（未发布，本机）：修复控制台手机页面撑宽、长标识、触控/输入尺寸、导航抽屉及密码弹层短屏适配；新增移动回归和隔离尺寸矩阵。5175前端已更新且可回滚；实体设备和远端CI/同步仍未完成。
+
+2026-11-17（未发布，本机）：MCP逐工具状态与关闭确认、Agent历史目录/归档恢复及入场限制、版本和未保存保护、题库本地筛选分页与未知导入结果锁定。相关回归、隔离持久化、桌面/窄屏检查通过；API/Lab本机更新且保留回滚。真实登录后的完整验收和远端CI仍未通过，未同步GitHub。
+
+2026-11-17（未发布，本机预览）：Agent Lab分组导航、上下文工具栏、固定账号入口、错误/加载状态、窄屏导航与Trace筛选/状态/运行定位改进；原鉴权和诊断过滤保留。本机5175前端已更新，旧前端保留回滚。相关回归和构建通过；真实登录后验收、对应远端CI与GitHub同步未完成。
+
 2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
 
-2026-11-10 data governance candidate: private typed collections for questions/articles/documents, explicit owner-managed READ/WRITE grants, revision history and append-only audit, bounded authenticated CRUD, Agent-version bindings with current-access rechecks and source-revision Trace. Additive PostgreSQL migration; existing Interview/vector data retained. Isolated verification in progress; original API/Lab deployment and semantic RAG quality are not accepted by this source change.
+2026-11-11 data governance source merged in PR #72: private typed collections for questions/articles/documents, explicit owner-managed READ/WRITE grants, revision history and append-only audit, bounded authenticated CRUD, Agent-version bindings with current-access rechecks and source-revision Trace. Additive PostgreSQL migration; existing Interview/vector data retained. Isolated DB/HTTP/browser/recovery and exact-source/main Product CI passed; original API/Lab deployment and semantic RAG quality are not accepted by this source change.
 
 2026-11-10 question UX: restore Lab file/URL import through existing APIs with explicit submission, real drag/drop, supported-format/size checks, distinct job/topic/level fields, pending locks, honest save/index receipts and retained drafts. Refine scoped buttons/forms/list details and move storage maintenance below everyday actions. Local frontend verified; model import quality and backend503 deployment remain separate acceptance.
 

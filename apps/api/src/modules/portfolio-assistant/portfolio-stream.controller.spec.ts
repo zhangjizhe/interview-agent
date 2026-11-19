@@ -29,6 +29,9 @@ describe('public SSE delivery lifecycle', () => {
     const refused = harness(); refused.assistant.submit.mockResolvedValue({ status: 'REFUSED', answer: '只回答公开资料', sources: [] });
     await refused.controller.chat({}, refused.request, refused.response);
     expect(refused.response.status).toHaveBeenCalledWith(200); expect(refused.response.flushHeaders).not.toHaveBeenCalled();
+    const greeting = harness(); greeting.assistant.submit.mockResolvedValue({ status: 'COMPLETED', ...facts });
+    await greeting.controller.chat({}, greeting.request, greeting.response);
+    expect(greeting.response.status).toHaveBeenCalledWith(200); expect(greeting.assistant.answer).not.toHaveBeenCalled();
   });
   it('closes a disconnected viewer without resubmitting or cancelling its already admitted Run', async () => {
     const h = harness(); h.response.write.mockImplementation((frame: string) => { if (frame.startsWith('event: delta')) h.response.emit('close'); return true; });

@@ -11,12 +11,13 @@ import { parsePortfolioRequest, PORTFOLIO_CONTRACT, PORTFOLIO_SELECTOR_PROMPT, P
 import { PORTFOLIO_GUIDE_MODE, PORTFOLIO_GUIDE_PROMPT, renderPortfolioDelivery } from './portfolio-guide.contract';
 import { technicalReferencesFor, validateTechnicalReferenceSnapshot } from './portfolio-technical-context';
 import { projectPortfolioStream } from './portfolio-stream.contract';
+import { PORTFOLIO_PERSONA_MODE, isPortfolioGreeting, renderPortfolioPersona } from './portfolio-persona.contract';
 import { PORTFOLIO_ADMIT_SCRIPT, PORTFOLIO_RELEASE_SCRIPT } from './portfolio-admission';
 export { PORTFOLIO_ADMIT_SCRIPT } from './portfolio-admission';
 type Binding = { ownerId: string; secret: string; origins: string[]; versionId: string; daily: number };
 type Actor = { id: string; organizationId: string; role: string };
 type Entry = { nonce: string; queueKey: string; ownerId: string; organizationId: string; agentId: string; versionId: string; versionHash: string;
-  sourceHash: string; sourceRevision: string; requestHash: string; message: string; documents: PortfolioDocument[] };
+  sourceHash: string; sourceRevision: string; requestHash: string; message: string; documents: PortfolioDocument[]; presentation?: typeof PORTFOLIO_PERSONA_MODE };
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const refused = (reason = 'OUT_OF_SCOPE') => ({ contractVersion: PORTFOLIO_CONTRACT, status: 'REFUSED', reason,
   answer: '我只回答张继哲公开简历、项目与文章相关的问题。现有公开资料不足以回答这个问题，请查看网站资料或通过公开邮箱联系作者。', sources: [] });
@@ -49,7 +50,7 @@ export class PortfolioAssistantService {
   }
   private scoped<T>(actor: Actor, work: () => Promise<T>) { return tenantContext.run({ organizationId: actor.organizationId, userId: actor.id }, work); }
   private async version(actor: Actor, versionId: string) {
-    const version = await this.prisma.agentVersion.findFirst({ where: { id: versionId, status: 'PUBLISHED', parentAgent: { workspace: { ownerId: actor.id, slug: `personal-${actor.id}` } } } });
+    const version = await this.prisma.agentVersion.findFirst({ where: { id: versionId, status: 'PUBLISHED', parentAgent: { status: { not: 'ARCHIVED' }, workspace: { ownerId: actor.id, slug: `personal-${actor.id}` } } } });
     if (!version) throw new ServiceUnavailableException('作品集助手未绑定可用的已发布版本');
     const runtime = validateConfiguredVersion(version);
     const model = version.modelConfig as any;
@@ -77,6 +78,7 @@ export class PortfolioAssistantService {
     if (!raw) throw new NotFoundException('回答票据不存在或已过期');
     try {
       const value = JSON.parse(raw) as Entry;
+      if (value.presentation !== undefined && value.presentation !== PORTFOLIO_PERSONA_MODE) throw new Error('Unknown presentation');
       if (value.nonce !== nonce || value.ownerId !== binding.ownerId || value.queueKey !== `portfolio-${nonce}`
         || !value.organizationId || !value.agentId || !value.versionId || !/^[a-f0-9]{64}$/.test(value.requestHash)
         || !/^[a-f0-9]{64}$/.test(value.sourceHash) || !/^[a-f0-9]{64}$/.test(value.versionHash)
@@ -111,7 +113,8 @@ export class PortfolioAssistantService {
     if (hash !== entry.versionHash || version.agentId !== entry.agentId || entry.sourceHash !== portfolioSourceHash) {
       throw new ServiceUnavailableException('助手绑定已变化，旧请求不能自动执行');
     }
-    await this.jobs.enqueue(actor.id, entry.agentId, { agentVersionId: entry.versionId, requestKey: entry.queueKey, input: { message: entry.message } }, false, { streamOutput: true });
+    await this.jobs.enqueue(actor.id, entry.agentId, { agentVersionId: entry.versionId, requestKey: entry.queueKey, input: { message: entry.message } }, false,
+      { streamOutput: true, ...(entry.presentation ? { presentation: entry.presentation } : {}) });
     return this.findRun(entry);
   }
   private async release(entry: Entry, binding: Binding) {
@@ -140,6 +143,12 @@ export class PortfolioAssistantService {
     const binding = this.binding();
     if (!origin || !binding.origins.includes(origin)) throw new ForbiddenException('该来源未开放作品集助手');
     const dto = parsePortfolioRequest(body);
+    if (isPortfolioGreeting(dto.message)) {
+      const profile = portfolioSource.documents.find(document => document.id === 'profile')!;
+      return { contractVersion: PORTFOLIO_CONTRACT, status: 'COMPLETED' as const,
+        answer: '你好，我是张继哲的 AI 分身，很高兴认识你。你想先聊我的工作经历和技术方向，还是看看我做过的项目？',
+        sources: [{ id: profile.id, title: profile.title, href: profile.href, quote: profile.text }], evidenceMode: PORTFOLIO_PERSONA_MODE };
+    }
     const selection = publicDocumentsFor(dto.message);
     if (!selection.documents.length) return refused(selection.reason);
     const actor = await this.actor(binding);
@@ -157,7 +166,8 @@ export class PortfolioAssistantService {
       const requestHash = digest({ question: dto.message, source: portfolioSourceHash, version: resolved.hash, owner: actor.id });
       const record: Entry = { nonce, queueKey: `portfolio-${nonce}`, ownerId: actor.id, organizationId: actor.organizationId,
         agentId: resolved.version.agentId, versionId: resolved.version.id, versionHash: resolved.hash,
-        sourceHash: portfolioSourceHash, sourceRevision: portfolioSource.source.revision, requestHash, message, documents: selection.documents };
+        sourceHash: portfolioSourceHash, sourceRevision: portfolioSource.source.revision, requestHash, message, documents: selection.documents,
+        ...(resolved.guide ? { presentation: PORTFOLIO_PERSONA_MODE } : {}) };
       const day = new Date().toISOString().slice(0, 10), minute = Math.floor(Date.now() / 60000);
       const keys = [`portfolio:v1:request:${digest(actor.id)}:${dto.requestKey}`, `portfolio:v1:day:${digest(actor.id)}:${day}`,
         `portfolio:v1:visitor:${visitor}:${minute}`, this.activeKey(binding), this.entryKey(nonce)];
@@ -184,7 +194,8 @@ export class PortfolioAssistantService {
       if (!run || !['PENDING', 'RUNNING'].includes(run.status)) return null;
       const checkpoint = await this.prisma.traceEvent.findFirst({ where: { runId: run.id, type: 'model.stream' }, orderBy: { seq: 'desc' }, select: { payload: true } });
       const content = (checkpoint?.payload as any)?.content;
-      return typeof content === 'string' ? projectPortfolioStream(content, entry.documents, input.technicalReferences) : null;
+      return typeof content === 'string' ? projectPortfolioStream(content, entry.documents, input.technicalReferences,
+        entry.presentation ? input.question : undefined) : null;
     }));
   }
 
@@ -200,7 +211,10 @@ export class PortfolioAssistantService {
       if (entry.sourceHash !== portfolioSourceHash) return refused('SOURCE_CHANGED');
       try {
         if (JSON.parse(entry.message).answerMode === PORTFOLIO_GUIDE_MODE) {
-          const result = renderPortfolioDelivery((run.output as any)?.response, entry.documents, JSON.parse(entry.message).technicalReferences);
+          const input = JSON.parse(entry.message);
+          const result = entry.presentation
+            ? renderPortfolioPersona((run.output as any)?.response, entry.documents, input.technicalReferences, input.question)
+            : renderPortfolioDelivery((run.output as any)?.response, entry.documents, input.technicalReferences);
           if (!result.sources.length) return refused('NO_PUBLIC_EVIDENCE');
           if (result.evidenceMode === 'verbatim-public-excerpts') this.logger.warn({ event: 'portfolio_technical_context_missing', runId: run.id, agentVersionId: entry.versionId, evidenceMode: result.evidenceMode });
           return { contractVersion: PORTFOLIO_CONTRACT, status: 'COMPLETED', ...result, sourceRevision: entry.sourceRevision };

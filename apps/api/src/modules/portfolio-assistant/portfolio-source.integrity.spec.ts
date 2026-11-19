@@ -5,9 +5,11 @@ import { portfolioSource } from './portfolio.contract';
 describe('approved public portfolio source integrity', () => {
   it('preserves every character of the eleven published historical articles and their source routes', () => {
     const articles = JSON.parse(readFileSync(resolve(process.cwd(), '../../examples/portfolio-site/src/articles.json'), 'utf8'));
-    expect(articles).toHaveLength(11);
+    const historical = articles.filter(article => Number(article.id) <= 11);
+    expect(historical).toHaveLength(11);
+    expect(articles.length).toBeGreaterThan(11);
     let preserved = 0;
-    for (const article of articles) {
+    for (const article of historical) {
       const parts = portfolioSource.documents.filter(doc => doc.id.startsWith(`article-${article.id}-`))
         .sort((a, b) => Number(a.id.split('-').at(-1)) - Number(b.id.split('-').at(-1)));
       expect(parts.length).toBeGreaterThan(0);

@@ -19,11 +19,19 @@
 | 需求 | 优先阅读 | 再检查 |
 | --- | --- | --- |
 | 大型重构/迁移 | `docs/product/REFACTOR_PROGRAM.md`、`docs/project/ARCHITECTURE_MAP.md`、`docs/project/DECISIONS.md` | Prisma Schema/Migration、Docker EntryPoint、相关模块与验收资产 |
+| Lab 移动端兼容 | `docs/project/LAB_MOBILE_LAYOUT.md` | mobile-layout.css、LabShell、AccountSecurityDialog、移动行为与隔离尺寸检查 |
+| Lab 工作区/MCP/生命周期交互 | `docs/project/LAB_WORKSPACE_FLOWS.md`、`docs/project/LAB_WORKSPACE_UX.md` | AgentCatalog/Builder、MCP controls、QuestionBank/Import、Registry/Runtime及隔离持久化脚本 |
 | Lab Agent/编排新增 | `docs/acceptance/LAB_AGENT_WORKFLOW_CONTRACT.md`、`docs/ACCEPTANCE-REPORT-2026-10-08-LAB-FOUNDATION.md` | AgentRegistry/Runtime、ToolRunner、预算/网关与独立测试；全部未实现范围不得称交付 |
+| 用户报告千问9元/费用对账 | `docs/acceptance/COST_RECONCILIATION_2026-11-18.md` | UsageLedger/Run/Trace/SessionCost、ResumeRAG直接embedding；区分准入/估算/账单，未知不记零 |
+| 商业产品/设计放行、会话隔离 | `docs/acceptance/COMMERCIAL_PRODUCT_DESIGN_GATE.md`、`docs/acceptance/SESSION_CACHE_ISOLATION.md` | AuthGate/AuthenticatedWorkspace/auth、真实业务闭环、逐状态视觉和设备证据；整体NOT_ACCEPTED，候选测试不是交付 |
 | 全产品重新验收 | `docs/acceptance/PRODUCT_REACCEPTANCE_PLAN.md`、`docs/acceptance/UI_INVENTORY.json` | 按功能矩阵仅加载相关产品规格、当前可达页面/API及测试；双证据，不复用旧通过结论 |
 | 最新完整规划/可替换架构 | `docs/product/SELF_BUILT_AGENT_PLATFORM_PLAN.md`、`docs/architecture/REPLACEABLE_AGENT_CONTRACTS.md`、`docs/product/FEATURE_MATRIX.md` | B0-B6退出门；先核当前源码/验收台账，再做单主题迁移 |
 | 产品、IA、UX | `docs/product/PRODUCT_VISION.md`、`docs/product/USER_JOURNEY.md`、`docs/product/INFORMATION_ARCHITECTURE.md`、`docs/product/SCREEN_SPEC.md`、`docs/product/P0_IMPLEMENTATION_PLAN.md` | `apps/web/src/App.tsx`、受影响页面/组件、Shared Type、匹配的 API Controller |
 | 当前架构 | `docs/project/ARCHITECTURE_MAP.md`、`docs/architecture.md`、`docs/architecture-decisions.md` | `apps/api/src/app.module.ts`、相关 Module 与 Service |
+| Interview体验审查/功能盘点 | `docs/project/INTERVIEW_UX_PRODUCT_AUDIT.md` | HomePage practice/records、ReportPage、TrainingPage，按真实/合成/未验区分 |
+| 资料准备产品/设计验收 | `docs/acceptance/PREPARATION_PRODUCT_DESIGN_ACCEPTANCE.md` | Jobs/Resumes/WorkflowDialog/preparation contracts、回执核对、焦点、尺寸证据；合成与真实分开 |
+| Interview资料准备/简历/岗位 | `docs/project/INTERVIEW_PREPARATION_REDESIGN.md` | PreparationLayout/ResumesPage/JobsPage/SettingsPage、ResumeController/RAG、JobReadinessService |
+| Interview交互/移动布局 | `docs/project/INTERVIEW_WORKFLOW_UX.md` | Web Home/Report/Settings/InterviewPage、WorkflowDialog、useVisibleViewport |
 | 面试生命周期/SSE | `docs/ACCEPTANCE-REPORT-2026-08-12.md` | `apps/api/src/modules/interview/`、`apps/web/src/pages/InterviewPage.tsx`、Stream Hook/Store |
 | Agent Runtime | `docs/agent/AGENT_RUNTIME.md`、`docs/project/ARCHITECTURE_MAP.md`、`docs/architecture-decisions.md` | `apps/api/src/modules/agent/`、`apps/api/src/agents/multi-agent/`、LLM Gateway |
 | 候选人技能/准备度 | `docs/agent/EVALUATION.md`、`docs/agent/SKILL_MODEL.md`、`docs/product/P0_IMPLEMENTATION_PLAN.md` | Prisma Schema、Report/AnswerHistory 服务、Ownership Tool、受影响 API/Web Test |

@@ -107,3 +107,24 @@ describe('MCP workspace process scope and state recovery', () => {
     expect(transport.mock.calls.filter(call => call[0] === '/admin/mcp-servers/reload')).toEqual([['/admin/mcp-servers/reload', { method: 'POST' }]]);
   }, 15_000);
 });
+
+it('keeps a failed health check next to its tool and filters common secret values', async () => {
+  await mount();
+  const original = transport.getMockImplementation()!;
+  transport.mockImplementation((path, init) => path.endsWith('/health') ? Promise.resolve({ ok: false, latencyMs: 2, error: 'Dependency unavailable; token=synthetic-private-value' }) : original(path, init));
+  fireEvent.click(screen.getByRole('button', { name: '检查工具：Fixture tool' }));
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('检查未通过');
+  expect(alert).toHaveTextContent('Dependency unavailable');
+  expect(alert).not.toHaveTextContent('synthetic-private-value');
+  expect(screen.queryByText(/fixture-tool 执行绑定已就绪/)).toBeNull();
+});
+it('does not acknowledge malformed reload success and leaves an explicit read recovery', async () => {
+  await mount();
+  const original = transport.getMockImplementation()!;
+  transport.mockImplementation((path, init) => path.endsWith('/reload') ? Promise.resolve({ ok: false, errors: [] }) : original(path, init));
+  fireEvent.click(screen.getByRole('button', { name: '重新加载 MCP' }));
+  await screen.findByText('配置重载未确认，请重新读取状态后核对。');
+  expect(screen.queryByText(reloadSuccess)).toBeNull();
+  expect(screen.getByRole('button', { name: '刷新本进程状态' })).toBeEnabled();
+});

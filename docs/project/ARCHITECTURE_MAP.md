@@ -1,8 +1,20 @@
 # 当前架构地图
 
+2026-11-19隔离候选：JobsPage复用原API，校验记录/ID/active回执，sessionStorage保存账号内未知操作标记；GET核对+显式解锁，弹窗内展示读取内容，不自动重放。已确认回执先更新Query缓存，后台读取不锁住焦点/按钮。ResumesPage验证摘要字段、岗位读取前置和上传存储预检。无API/Schema/权限/模型变化；45回归及有限浏览器证据，未部署。见../acceptance/PREPARATION_PRODUCT_DESIGN_ACCEPTANCE.md。
+
+2026-11-18候选、未部署：Web私有QueryClient从main移到按会话epoch重挂载的AuthenticatedWorkspace，退出/失效/换号清理生命周期。Web会话一次发布完整snapshot并保留退出tombstone，旧字段只作首次升级读取；fetch与Web兼容入口统一读取。Lab独立origin协议未迁移，不是SSO；无API/Schema/权限/模型变化。75项相关测试和合成双标签通过，真实服务/旧包升级与回滚待验。见../acceptance/SESSION_CACHE_ISOLATION.md。
+
+2026-11-18输入视口增强：viewport请求Chrome resizes-content；密码弹窗优先visualViewport，缺失时window.resize/innerHeight，并过滤无效尺寸。输入滚动留白不改业务/API或UA路由。对应23项回归和三种合成键盘模型通过，原生微信/WebKit实机未核实。
+
+2026-11-17移动布局：mobile-layout.css作为Lab样式最后一层统一处理手机宽度/触控/安全区；LabShell移动抽屉，AccountSecurityDialog通过body portal保持在inert背景外，page-scroll-lock按所有者释放锁，visualViewport只调整弹层。无API/Schema/模型变化，详见LAB_MOBILE_LAYOUT.md。
+
+2026-11-17本机流程修复：AgentCatalog/Builder调用既有受保护目录、版本、Run及新增ADMIN archive。Registry归档/activate与DecisionRecord同事务；Runtime父Agent ARCHIVED前置拒绝，工作流依赖/公开助手入场排除已归档Agent；不撤回在途调用。MCP仍进程内配置，无租户级或重启持久化承诺。题库分页仅已加载数据。无DDL，详见LAB_WORKSPACE_FLOWS.md。
+
+2026-11-17本地UX：Lab入口由index.html→bootstrap.tsx挂载现有LabSessionGate；main.tsx保留ControlCenter业务。LabShell负责分组导航/响应式框架，useLabNavigation仅保存白名单页面URL，Trace沿用受保护Run/Trace读取并在URL保存选择。汇总读取按页面启用，错误不替换框架；401仍走原会话失效。API/Schema/权限边界未改，未公网发布。详见LAB_WORKSPACE_UX.md。
+
 2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
 
-2026-11-10 资料分权候选：Lab DataGovernanceWorkspace/DataBindingPicker → ADMIN + 可信组织身份 → DataGovernanceService → PostgreSQL typed collection/record/version/grant/audit。默认私有；平台ADMIN不越过资料ACL；AgentVersion显式绑定，ConfiguredRuntime在读取和派发前重新授权，Trace记录实际资料revision/hash而非正文。旧Interview题库与评测集不迁移。加性迁移20261105000000；隔离验收中，原API/5175未更新。见[设计与边界](../architecture/LAB_DATA_GOVERNANCE.md)。
+2026-11-11 资料分权源码（PR #72已合并）：Lab DataGovernanceWorkspace/DataBindingPicker → ADMIN + 可信组织身份 → DataGovernanceService → PostgreSQL typed collection/record/version/grant/audit。默认私有；平台ADMIN不越过资料ACL；AgentVersion显式绑定，ConfiguredRuntime在读取和派发前重新授权，Trace记录实际资料revision/hash而非正文。旧Interview题库与评测集不迁移。加性迁移20261105000000；隔离DB/HTTP/浏览器/恢复及main4352323 Product5项通过，原API/5175未更新。见[设计与边界](../architecture/LAB_DATA_GOVERNANCE.md)。
 
 2026-11-10 题库UX：Lab QuestionImportPanel复用原Interview import-file/import-url，文件选择不自动提交，岗位/category/level显式归类，严格回执与PENDING显示，错误后保留页面草稿且不自动付费重放。高级维护下移折叠。无schema/API/权限变化；本机只替换前端，真实导入效果与后台任务/幂等仍未验收。见[UX证据](QUESTION_BANK_UX.md)。
 
@@ -90,3 +102,9 @@ ADR25 working-tree foundation: InterviewQuestionPresentation binds task and pres
 2026-11-05 portfolio ingress candidate: hosted Site server/BFF → independent restricted gateway → existing PortfolioAssistant/Redis admission → normally published configured Agent/Gateway → private Run/Trace and separate EvaluationRun report. API/admin/database ports retain loopback bindings. Gateway has only two public fixed routes and an independent server credential; temporary tunnel is not permanent server delivery. No schema/runtime rewrite. See [local ingress decision](../architecture/PORTFOLIO_LOCAL_INGRESS.md); user page confirmation and actual service-access answer/refusal passed; exact final CI remains pending.
 
 2026-11-09 Trace diagnostics candidate: RuntimeTraceWorkspace reads owned runtime Runs; shared RunInspector reads exact Run/Trace in main, builder and evaluation report. Legacy Harness summaries remain separate; no new API/schema or model path.
+
+2026-11-18 Interview frontend local increment: WorkflowDialog body portal/inert/focus lock and useVisibleViewport shared by dialog/room; candidate-workflow.css scopes responsive controls. Existing auth/upload/start/SSE/report APIs and schema preserved. UI-only synthetic acceptance and local5173 replacement; real interview/quality and remote CI pending. See INTERVIEW_WORKFLOW_UX.md.
+
+2026-11-18 preparation hub: candidate routes /prepare/{resumes,jobs} share PreparationLayout. Account settings remain /settings. ResumesPage reuses existing own-user Milvus summary read and explicit paid upload endpoints; persistent per-account unresolved upload marker prevents implicit retries. No schema, API or ownership change; no complete-history/version-selection claim. See INTERVIEW_PREPARATION_REDESIGN.md.
+
+2026-11-18 candidate journey increment: /practice uses an explicit practice view in HomePage rather than the overview/modal. The legacy inline resume upload is removed in favor of ResumesPage; records route directly to ReportPage. Confirmation/scope/unknown-result guards are frontend only; existing owned backend APIs and schema preserved. See INTERVIEW_UX_PRODUCT_AUDIT.md for hard-delete/idempotency and real-quality gaps.

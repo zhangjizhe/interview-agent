@@ -1,6 +1,6 @@
 # ADR: typed Agent Lab data collections and explicit access
 
-2026-11-10 · LAB-DATA-GOVERNANCE · implementation candidate; original deployment unchanged, exact-source CI pending.
+2026-11-11 · LAB-DATA-GOVERNANCE · source merged through PR #72 (main4352323), exact-source/main Product CI passed; original deployment unchanged.
 
 Current source: Agent Registry uses personal Workspace ownership; tenant middleware scopes Prisma models with organizationId. QuestionCatalog belongs to Interview and Qdrant knowledge is an organization-scoped question channel. Neither is a generic per-Agent data permission boundary. The accepted baseline rejected nonempty configured knowledge bindings; this candidate admits only explicit bounded collection IDs.
 

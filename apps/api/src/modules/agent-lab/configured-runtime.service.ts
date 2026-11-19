@@ -34,7 +34,7 @@ export class ConfiguredRuntimeService {
     if (definition.adapter === 'finite-workflow-v1') {
       for (const node of definition.nodes!) {
         const child = await this.prisma.agentVersion.findFirst({
-          where: { id: node.agentVersionId, parentAgent: { workspaceId } },
+          where: { id: node.agentVersionId, parentAgent: { workspaceId, status: { not: 'ARCHIVED' } } },
         });
         if (!child || !(child.status === 'PUBLISHED' || (allowDraft && child.status === 'DRAFT'))) {
           throw new BadRequestException('工作流引用版本不存在、未发布或不属于当前工作区');

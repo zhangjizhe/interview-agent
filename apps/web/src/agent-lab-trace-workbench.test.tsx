@@ -17,7 +17,7 @@ const events = [
   { id: 'start', runId: 'run-1', seq: 1, type: 'turn.start', step: 'runtime' },
 ];
 const clients: QueryClient[] = [];
-afterEach(() => { cleanup(); clients.forEach(client => client.clear()); clients.length = 0; vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(() => { window.history.replaceState(null, '', '/'); cleanup(); clients.forEach(client => client.clear()); clients.length = 0; vi.unstubAllGlobals(); vi.useRealTimers(); });
 function view(element: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); clients.push(client);
   return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
@@ -93,9 +93,9 @@ it('shows list failure rather than no-data and supports GET retry', async () => 
   const calls = setup(() => fail ? new Response(JSON.stringify({ message: 'unavailable' }), { status: 503 }) : []);
   view(<RuntimeTraceWorkspace />);
   expect(await screen.findByRole('alert')).toHaveTextContent('运行列表读取失败');
-  expect(screen.queryByText('当前工作区尚无 Agent Run。')).not.toBeInTheDocument();
+  expect(screen.queryByText('暂无运行记录')).not.toBeInTheDocument();
   fail = false; fireEvent.click(screen.getByRole('button', { name: '刷新运行列表' }));
-  expect(await screen.findByText('当前工作区尚无 Agent Run。')).toBeInTheDocument();
+  expect(await screen.findByText('暂无运行记录')).toBeInTheDocument();
   expect(calls).toHaveLength(2);
 });
 it('hides stale Run/Trace on failed reread and resets revealed content when Run changes', async () => {
@@ -142,4 +142,32 @@ it('preserves the accessible failed-Run alert used by the real external-init bro
   expect(alert).not.toHaveTextContent('secret-error');
   expect(alert).not.toHaveTextContent('user@example.com');
   expect(alert).toHaveTextContent('[已隐藏]');
+});
+
+it('restores a bookmarked Run, copies only its ID and clears selection without replaying execution', async () => {
+  window.history.replaceState(null, '', '/?view=trace&run=run-1');
+  const calls = setup(url => url === '/api/agent-lab/runs' ? [run()] : url.endsWith('/trace') ? events : run());
+  const writeText = vi.fn(async () => {});
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  view(<RuntimeTraceWorkspace />);
+  await screen.findByText('JSON schema rejected');
+  expect(screen.getByRole('region', { name: 'Run run-1 详情' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '复制 ID' }));
+  await screen.findByText('Run ID 已复制');
+  expect(writeText).toHaveBeenCalledWith('run-1');
+  fireEvent.click(screen.getByRole('button', { name: '关闭运行详情' }));
+  expect(window.location.search).toBe('?view=trace');
+  expect(screen.queryByRole('region', { name: 'Run run-1 详情' })).not.toBeInTheDocument();
+  expect(calls.every(call => call.method === 'GET')).toBe(true);
+});
+it('explains empty filtered results and resets filters without making a new model request', async () => {
+  const calls = setup(() => [run()]);
+  view(<RuntimeTraceWorkspace />);
+  const list = screen.getByRole('complementary', { name: '运行列表' });
+  await within(list).findByRole('button', { name: /Document assistant/ });
+  fireEvent.change(screen.getByLabelText('运行状态'), { target: { value: 'COMPLETED' } });
+  expect(within(list).getByText('没有匹配的运行')).toBeInTheDocument();
+  fireEvent.click(within(list).getByRole('button', { name: '清除筛选' }));
+  expect(within(list).getByRole('button', { name: /Document assistant/ })).toBeInTheDocument();
+  expect(calls).toHaveLength(1);
 });

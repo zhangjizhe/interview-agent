@@ -2,10 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { HomePage } from './HomePage';
+import { ResumesPage } from './ResumesPage';
 vi.mock('../utils/auth', () => ({ getSession: () => ({ userId: 'synthetic-owner' }) }));
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { sessionStorage.clear(); vi.unstubAllGlobals(); });
 
 it.each([
   ['empty', 201, {}], ['false', 201, { ragIngested: false }], ['string', 201, { ragIngested: 'true' }],
@@ -21,15 +21,18 @@ it.each([
     return json([]);
   }));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const view = render(<QueryClientProvider client={client}><MemoryRouter><HomePage /></MemoryRouter></QueryClientProvider>);
+  const view = render(<QueryClientProvider client={client}><MemoryRouter><ResumesPage /></MemoryRouter></QueryClientProvider>);
   try {
-    await screen.findAllByText('Synthetic role');
+    await screen.findByRole('heading', { name: '上传简历' });
     const input = view.container.querySelector('input[type="file"]')!;
     fireEvent.change(input, { target: { files: [new File(['Synthetic candidate\nTypeScript'], 'synthetic.txt', { type: 'text/plain' })] } });
-    if (status < 400 && receipt.ragIngested === true) expect(await screen.findByRole('status')).toHaveTextContent('简历已更新');
+    await waitFor(() => expect(screen.getByRole('button', { name: '上传并解析' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '上传并解析' }));
+    if (status < 400 && receipt.ragIngested === true) expect(await screen.findByText(/简历已解析并保存到个人简历库/)).toHaveAttribute('role', 'status');
     else {
-      expect(await screen.findByRole('alert')).toHaveTextContent(status >= 400 ? 'Synthetic unavailable' : '简历保存结果尚未确认');
-      expect(screen.queryByRole('status')).toBeNull();
+      expect(await screen.findByRole('alert')).toHaveTextContent(status >= 400 ? 'Synthetic unavailable' : '未确认保存结果');
+      expect(screen.queryByText(/简历已解析并保存到个人简历库/)).toBeNull();
+      expect(screen.getByRole('status', { name: '所选简历' })).toHaveTextContent('保存结果待核对');
     }
     await waitFor(() => expect(uploads).toBe(1));
   } finally { view.unmount(); client.clear(); }

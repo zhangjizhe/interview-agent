@@ -69,7 +69,7 @@ describe('Configured runtime independent regression', () => {
   it.each([null, single('one', { status: 'DRAFT' })])('rejects missing/foreign or draft dependencies before Gateway', async child => {
     const h = harness(); h.prisma.agentVersion.findFirst.mockResolvedValue(child);
     await expect(h.service.prepare(workflow([{ id: 'aa', agentVersionId: 'one', inputFrom: 'input' }]), 'workspace')).rejects.toThrow();
-    expect(h.prisma.agentVersion.findFirst).toHaveBeenCalledWith({ where: { id: 'one', parentAgent: { workspaceId: 'workspace' } } });
+    expect(h.prisma.agentVersion.findFirst).toHaveBeenCalledWith({ where: { id: 'one', parentAgent: { workspaceId: 'workspace', status: { not: 'ARCHIVED' } } } });
     expect(h.gateway.chat).not.toHaveBeenCalled();
   });
   it('allows draft dependencies only for explicit draft preparation', async () => {

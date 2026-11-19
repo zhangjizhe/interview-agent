@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Copy, RefreshCw } from 'lucide-react';
+import { RunStatusBadge } from './RunStatusBadge';
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 import { checkedEvents, costLabel, dateLabel, diagnosticJson, diagnosticText, durationLabel, eventGroup, isFailure, numeric, type RuntimeRun } from './trace-diagnostics';
@@ -22,6 +24,7 @@ export function RunInspector({ runId, agentId, versionId, close }: { runId: stri
 }
 function Inspector({ runId, agentId, versionId, close }: { runId: string; agentId?: string; versionId?: string; close?: () => void }) {
   const [selected, setSelected] = useState('');
+  const [copyNotice, setCopyNotice] = useState('');
   const [group, setGroup] = useState('all');
   const [search, setSearch] = useState('');
   const [showContent, setShowContent] = useState(false);
@@ -50,11 +53,12 @@ function Inspector({ runId, agentId, versionId, close }: { runId: string; agentI
   };
   return <section className="trace-inspector" aria-label={`Run ${runId} 详情`}>
     <header className="trace-heading"><div><p className="trace-eyebrow">RUN INSPECTOR · 只读排障</p><h2>运行详情</h2><code>{runId}</code></div>
-      <div className="trace-actions"><button type="button" disabled={run.isFetching || trace.isFetching} onClick={refresh}>重新读取</button>{close && <button type="button" onClick={close}>关闭运行详情</button>}</div></header>
+      <div className="trace-actions"><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(runId); setCopyNotice('Run ID 已复制'); } catch { setCopyNotice('无法复制，请选择上方 Run ID 手动复制。'); } }}><Copy size={14} aria-hidden="true"/>复制 ID</button><button type="button" disabled={run.isFetching || trace.isFetching} onClick={refresh}><RefreshCw size={14} className={run.isFetching || trace.isFetching ? 'spin' : ''} aria-hidden="true"/>重新读取</button>{close && <button type="button" onClick={close}>关闭运行详情</button>}</div></header>
+    {copyNotice && <p className="trace-copy-notice" role="status">{copyNotice}</p>}
     {run.isPending && <p role="status">正在读取受保护运行…</p>}
     {run.isError && <p role="alert" aria-label="运行读取失败">{run.error.message}</p>}
     {data && <>
-      <p className={`trace-status ${data.status === 'FAILED' ? 'is-failure' : ''}`}>状态：{data.status} · 版本：{data.agentVersion?.version ?? '未记录'}</p>
+      <div className="trace-status"><RunStatusBadge status={data.status}/><span>版本 {data.agentVersion?.version ?? '未记录'}</span></div>
       <div className="trace-metrics"><div><span>模型调用</span><strong>{data.tokenUsage?.calls ?? '未知'}</strong></div><div><span>估算费用</span><strong>{costLabel(data.estimatedCost)}</strong></div><div><span>总耗时</span><strong>{durationLabel(data.latencyMs)}</strong></div><div><span>输入 / 输出 Token</span><strong>{data.tokenUsage?.promptTokens ?? '未知'} / {data.tokenUsage?.completionTokens ?? '未知'}</strong></div></div>
       <dl className="trace-properties"><div><dt>Agent</dt><dd>{data.agent?.name ?? data.agentId}</dd></div><div><dt>应用</dt><dd>{data.application ?? '未记录'}</dd></div><div><dt>开始 / 完成</dt><dd>{dateLabel(data.startedAt)} / {dateLabel(data.completedAt)}</dd></div>{data.parentRunId && <div><dt>父运行</dt><dd><code>{data.parentRunId}</code></dd></div>}</dl>
       {data.error && <div role="alert" aria-label="运行失败原因" className="trace-error-summary"><strong>运行失败原因</strong><p>{diagnosticText(data.error)}</p><small>凭据与邮箱已过滤；完整原始记录不在此页面导出。</small></div>}

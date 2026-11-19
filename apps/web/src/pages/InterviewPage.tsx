@@ -1,3 +1,5 @@
+import { resumeFileError } from '../utils/resumeFile';
+import { useVisibleViewport } from '../hooks/useVisibleViewport';
 import { useRef, useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { safeJson } from '../utils/safeJson';
@@ -73,6 +75,11 @@ export function InterviewPage() {
   const currentQuestion = questionState.sessionId === interviewId ? questionState.question : null;
   const canAnswer = currentQuestion?.state === 'OPEN';
 
+  const roomRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const conversationRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLButtonElement>(null);
+  useVisibleViewport(roomRef);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -325,7 +332,9 @@ export function InterviewPage() {
   // 面试页内上传/换简历
   const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || uploading) return;
+    const invalid = resumeFileError(file);
+    if (invalid) { useInterviewStore.getState().setError(invalid); e.target.value = ''; return; }
     setUploading(true);
     try {
       const fd = new FormData();
@@ -415,10 +424,33 @@ export function InterviewPage() {
     };
   }, [interviewId, resumeConfirmed, hitlPending, setHitlPending]);
 
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mobile = window.matchMedia('(max-width: 767px)');
+    const apply = () => {
+      if (mobile.matches && !drawerOpen) drawerRef.current?.setAttribute('inert', '');
+      else drawerRef.current?.removeAttribute('inert');
+      if (mobile.matches && drawerOpen) { conversationRef.current?.setAttribute('inert', ''); drawerRef.current?.focus(); }
+      else conversationRef.current?.removeAttribute('inert');
+    };
+    const key = (event: KeyboardEvent) => {
+      if (!mobile.matches || !drawerOpen) return;
+      if (event.key === 'Escape') { event.preventDefault(); setDrawerOpen(false); }
+      if (event.key === 'Tab') {
+        const controls = Array.from(drawerRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]') ?? []).filter(el => el.getClientRects().length);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === drawerRef.current)) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && (document.activeElement === last || document.activeElement === drawerRef.current)) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    apply(); mobile.addEventListener('change', apply); document.addEventListener('keydown', key);
+    return () => { mobile.removeEventListener('change', apply); document.removeEventListener('keydown', key); drawerRef.current?.removeAttribute('inert'); conversationRef.current?.removeAttribute('inert'); if (drawerOpen && menuRef.current?.isConnected) menuRef.current.focus(); };
+  }, [drawerOpen, setDrawerOpen]);
+
   // ========== 渲染 ==========
   return (
     <div
-      className="flex h-[calc(100vh-65px)] relative"
+      ref={roomRef} className="interview-room flex relative"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       {/* 简历确认面板（未确认时全屏覆盖） */}
@@ -511,12 +543,12 @@ export function InterviewPage() {
 
       {/* 移动端背景遮罩 */}
       {drawerOpen && (
-        <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setDrawerOpen(false)} />
+        <button type="button" aria-label="关闭面试菜单" className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setDrawerOpen(false)} />
       )}
 
       {/* 左侧侧边栏 */}
-      <aside
-        className={`
+      <aside ref={drawerRef} tabIndex={-1} aria-label="面试菜单" id="interview-navigation"
+        className={`interview-room-drawer
           bg-white border-r border-slate-200 flex flex-col
           fixed md:static inset-y-0 left-0 z-40
           w-72 transform transition-transform duration-200
@@ -527,7 +559,7 @@ export function InterviewPage() {
           <Link to="/" className="text-sm text-slate-500 hover:text-slate-900 flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" /> 返回首页
           </Link>
-          <button onClick={() => setDrawerOpen(false)} className="md:hidden p-1 hover:bg-slate-100 rounded">
+          <button type="button" aria-label="收起面试菜单" onClick={() => setDrawerOpen(false)} className="md:hidden p-1 hover:bg-slate-100 rounded">
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
@@ -577,7 +609,7 @@ export function InterviewPage() {
                       </>
                     ) : (
                       <>
-                        <Upload className="w-3.5 h-3.5" /> 上传简历（PDF/Word/TXT）
+                        <Upload className="w-3.5 h-3.5" /> 上传简历（PDF/Markdown/TXT）
                       </>
                     )}
                   </button>
@@ -621,7 +653,7 @@ export function InterviewPage() {
       </aside>
 
       {/* 主对话区 */}
-      <div className="flex-1 flex flex-col bg-slate-50 min-w-0">
+      <div ref={conversationRef} className="flex-1 flex flex-col bg-slate-50 min-w-0">
         {report ? (
           <div className="flex-1 overflow-y-auto p-4 md:p-6">
             <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-8">
@@ -728,7 +760,7 @@ export function InterviewPage() {
             {/* 移动端顶部条 */}
             <div className="md:hidden bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between gap-2 pt-safe">
               <div className="flex items-center gap-2 min-w-0">
-                <button onClick={() => setDrawerOpen(true)} className="p-1.5 hover:bg-slate-100 rounded">
+                <button type="button" ref={menuRef} aria-label="打开面试菜单" aria-controls="interview-navigation" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)} className="p-1.5 hover:bg-slate-100 rounded">
                   <Menu className="w-5 h-5 text-slate-700" />
                 </button>
                 <span className="text-sm font-medium text-slate-700 truncate">
@@ -877,7 +909,7 @@ export function InterviewPage() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading || streaming}
-                  title="上传简历"
+                  title="上传简历" aria-label="上传或更换简历"
                   className={`flex-shrink-0 w-10 h-10 md:w-11 md:h-11 rounded-xl flex items-center justify-center transition ${
                     resume
                       ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
@@ -893,7 +925,7 @@ export function InterviewPage() {
                   )}
                 </button>
                 <textarea
-                  ref={composerRef}
+                  aria-label="当前题目的回答" aria-describedby="answer-help" ref={composerRef}
                   value={input}
                   onChange={(e) => {
                     setInput(e.target.value);
@@ -914,13 +946,14 @@ export function InterviewPage() {
                   className="flex-1 min-h-10 px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none overflow-y-auto disabled:bg-slate-50 max-h-32"
                 />
                 <button
-                  onClick={handleSend}
+                  aria-label={streaming ? '回答处理中' : '提交回答'} onClick={handleSend}
                   disabled={!input.trim() || streaming || !resumeConfirmed || !canAnswer || isReadOnly}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 md:px-5 rounded-xl font-medium transition disabled:opacity-50 flex items-center gap-2 h-10 md:h-11"
                 >
                   {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </div>
+              <p id="answer-help" className="mx-auto mt-2 max-w-3xl text-xs text-slate-500">Enter 换行 · Ctrl / ⌘ + Enter 提交。回答处理中请等待，勿重复提交。</p>
               {uploading && (
                 <div className="max-w-3xl mx-auto mt-1.5 text-xs text-blue-600 flex items-center gap-1">
                   <Loader2 className="w-3 h-3 animate-spin" />

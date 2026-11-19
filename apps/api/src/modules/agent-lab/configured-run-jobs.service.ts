@@ -20,7 +20,7 @@ export class ConfiguredRunJobsService implements OnModuleInit, OnModuleDestroy {
     this.timer.unref();
   }
   onModuleDestroy() { this.stopping = true; clearInterval(this.timer); clearInterval(this.heartbeat); }
-  async enqueue(userId: string, agentId: string, dto: StartConfiguredRunDto, draft: boolean, delivery?: { streamOutput: true }) {
+  async enqueue(userId: string, agentId: string, dto: StartConfiguredRunDto, draft: boolean, delivery?: { streamOutput: true; presentation?: string }) {
     if (requireTenant().userId !== userId) throw new ForbiddenException('需要当前认证身份');
     const { workspace, version } = await this.runtime.prepareConfiguredRun(userId, agentId, dto, draft);
     const requestHash = createHash('sha256').update(JSON.stringify({ agentId, versionId: version.id, input: dto.input, draft })).digest('hex');
@@ -35,7 +35,7 @@ export class ConfiguredRunJobsService implements OnModuleInit, OnModuleDestroy {
         agentVersionId: version.id, input: dto.input as any, application: draft ? 'lab-draft-test' : 'lab-configured-run',
         status: 'PENDING', requestKey: dto.requestKey, requestHash, requestedByUserId: userId,
         budget: { maxToolCalls: 0, draft, maxModelCalls: (version.runtimeConfig as any).nodes?.length ?? 1,
-          ...(delivery?.streamOutput ? { streamOutput: true } : {}) },
+          ...(delivery?.streamOutput ? { streamOutput: true } : {}), ...(delivery?.presentation ? { presentation: delivery.presentation } : {}) },
       } });
       return { id: run.id, status: run.status, reused: false };
     } catch (error: any) {

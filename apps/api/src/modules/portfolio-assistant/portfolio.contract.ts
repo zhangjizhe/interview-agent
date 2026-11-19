@@ -28,6 +28,14 @@ export function publicDocumentsFor(question: string): { documents: PortfolioDocu
   if (/[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+|(?<!\d)1[3-9]\d{9}(?!\d)|(?<!\d)\d{17}[\dx](?!\d)|bearer\s+[a-z0-9._-]{12,}/i.test(q)) return { documents: [], reason: 'RESTRICTED' };
   if (/忽略.{0,12}(规则|指令|限制|以上)|系统提示|提示词|越狱|开发者消息|ignore[\s\S]{0,25}(instruction|previous|rule)|system\s*(prompt|message)|jailbreak|developer\s*message|api.?key|secret|密码|住址|身份证|工资|薪资|薪水|女友|家庭|房贷|财产|身高|体重|出生|婚姻|手机号|\btoken\b|\bsalary\b|\baddress\b/i.test(q)) return { documents: [], reason: 'RESTRICTED' };
   if (/天气|股票|比特币|彩票|星座|吃什么|午饭|晚饭|早餐|午餐|晚餐|喜欢吃|闲聊|聊聊天|写.{0,5}(诗|小说)|讲.{0,8}(笑话|故事)|\b(joke|poem|dinner|lunch|breakfast)\b|写.{0,10}(代码|脚本|程序)|帮我.{0,5}(实现|开发)|生成.{0,10}(代码|脚本)|write.{0,20}(code|script)|implement.{0,20}(function|program)|weather|bitcoin|horoscope/i.test(q)) return { documents: [], reason: 'OUT_OF_SCOPE' };
+  let current = q;
+  try { const value = JSON.parse(question); if (typeof value.question === 'string') current = value.question.normalize('NFKC').toLowerCase(); } catch { /* ordinary question */ }
+  // A broad career introduction needs a coherent overview rather than three
+  // employers tied on the repeated word "experience". Safety filters run first.
+  if (/工作经历|职业经历|职业方向|擅长|优势|个人介绍|自我介绍|你是谁|了解你|认识你/.test(current)
+    && !/cti|urtc|\brtc\b|im\s*sdk|interview-agent|京东|优刻得|暖哇|众安|音视频|电销|送礼|rag|文章|promise|webpack/i.test(current)) {
+    return { documents: ['profile', 'skills', 'cti'].map(id => portfolioSource.documents.find(item => item.id === id)!) };
+  }
   const anchored = /你|您|张继哲|继哲|作者|博主|站长|jizhe|\byou\b|\byour\b|\bcandidate\b|简历|履历|经历|经验|作品|项目|文章|手记|技能|技术栈|工作|教育|毕业|联系|邮箱|github|interview-agent|cti|urtc|暖哇|众安|京东|优刻得|^(介绍|自我介绍|about|experience|skills|contact)/i.test(q);
   if (!anchored) return { documents: [], reason: 'OUT_OF_SCOPE' };
   const ignored = new Set(['about', 'what', 'your', 'you', 'have', 'the', 'and', 'does', 'are', 'tell', 'please', 'show', 'with', 'how', 'can', 'who', 'me', 'which', 'could', 'would', 'like', 'today', 'do', 'is', 'this', 'that', 'it', 'of', 'to', 'in']);

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AuthGate } from './App';
+import { getSession } from './utils/auth';
 
 const response = (body: unknown) => new Response(JSON.stringify(body), {
   status: 200,
@@ -50,7 +51,7 @@ it('verifies registration then logs in with password without another email', asy
   fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'long-password-123' } });
   fireEvent.click(screen.getByRole('button', { name: '登录' }));
   expect(await screen.findByTestId('protected-content')).toBeInTheDocument();
-  expect(localStorage.getItem('ia_access_token')).toBe('verified-session');
+  expect(getSession()?.accessToken).toBe('verified-session');
   expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
     '/api/auth/check/candidate-one',
     '/api/auth/registration-code',
@@ -89,7 +90,7 @@ it('only completes password recovery after requesting and entering an email code
   fireEvent.click(screen.getByRole('button', { name: '重置密码' }));
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('密码已重置'));
   expect(screen.getByRole('heading', { name: '欢迎回来' })).toBeInTheDocument();
-  expect(localStorage.getItem('ia_access_token')).toBeNull();
+  expect(getSession()).toBeNull();
 });
 
 
@@ -120,7 +121,7 @@ it('keeps registration uncreated when actual mail delivery is unavailable', asyn
   expect(await screen.findByRole('alert')).toHaveTextContent('暂未发送成功');
   expect(screen.queryByLabelText('邮箱验证码')).not.toBeInTheDocument();
   expect(screen.queryByTestId('protected-content')).not.toBeInTheDocument();
-  expect(localStorage.getItem('ia_access_token')).toBeNull();
+  expect(getSession()).toBeNull();
 });
 
 

@@ -58,8 +58,12 @@ export function QuestionBankWorkspace({
   const [showImport, setShowImport] = useState(false);
   const [importPending, setImportPending] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [localFilter, setLocalFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form, setForm] = useState({ position: 'AI Agent 工程师', level: 'P5', category: '通用', question: '', answer: '', tags: '' });
   const createQuestion = useMutation({
+    onMutate: () => setSaveMessage(''),
     mutationFn: async () => {
       const result = await api('/interview/question-bank', {
       method: 'POST',
@@ -83,16 +87,20 @@ export function QuestionBankWorkspace({
     },
   });
   const deleteQuestion = useMutation({
+    onMutate: () => setSaveMessage(''),
     mutationFn: async (questionId: string) => {
       const result = await api(`/interview/question-bank/${encodeURIComponent(questionId)}`, { method: 'DELETE' });
       if (result.deleted !== true) throw new Error('删除未确认，请刷新后核验。');
       return result;
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['agent-lab-question-bank'] }); queryClient.invalidateQueries({ queryKey: ['question-catalog-status'] }); onClearSearch(); },
+    onSuccess: () => { setSaveMessage('题目删除已确认。'); queryClient.invalidateQueries({ queryKey: ['agent-lab-question-bank'] }); queryClient.invalidateQueries({ queryKey: ['question-catalog-status'] }); onClearSearch(); },
   });
-  const visibleQuestions = searchResults ?? questions;
+  const filtered = (searchResults ?? questions).filter(item => `${item.question} ${item.answer} ${item.category} ${Array.isArray(item.tags) ? item.tags.join(' ') : item.tags}`.toLowerCase().includes(localFilter.toLowerCase()));
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pages);
+  const visibleQuestions = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const busy = createQuestion.isPending || importPending;
+  const busy = createQuestion.isPending || importPending || deleteQuestion.isPending;
   useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   const positionOptions = [...new Set(questions.map(item => item.position).filter(Boolean))];
   return <div className="agent-page-grid qb-workspace">
@@ -101,13 +109,13 @@ export function QuestionBankWorkspace({
         <button className="qb-button qb-secondary" type="button" disabled={busy} onClick={() => { setShowImport(false); setShowCreate(value => !value); createQuestion.reset(); }}><Plus size={16}/>{showCreate ? '关闭新增' : '新增题目'}</button>
         <button className="qb-button qb-primary" type="button" aria-expanded={showImport} disabled={busy} onClick={() => { setShowCreate(false); setShowImport(value => !value); }}><Upload size={16}/>{showImport ? '收起导入' : '导入题目'}</button>
       </div></header>
-      <form className="qb-filterbar" onSubmit={event => { event.preventDefault(); if (!searching && query.trim()) onSearch(); }}>
-        <label className="qb-field">岗位<input value={position} list="qb-filter-positions" onChange={event => onPosition(event.target.value)} placeholder="全部岗位 / 输入岗位" /></label>
+      <form className="qb-filterbar" onSubmit={event => { event.preventDefault(); if (!busy && !searching && query.trim()) onSearch(); }}>
+        <label className="qb-field">岗位<input disabled={busy} value={position} list="qb-filter-positions" onChange={event => onPosition(event.target.value)} placeholder="全部岗位 / 输入岗位" /></label>
         <datalist id="qb-filter-positions">{positionOptions.map(value => <option key={value} value={value}/>)}</datalist>
-        <label className="qb-field qb-search-field">搜索题目<input value={query} onChange={event => onQuery(event.target.value)} placeholder="输入问题，进行语义搜索" /></label>
-        <button className="qb-button qb-secondary" type="submit" disabled={!query.trim() || searching}>{searching ? <Loader2 className="qb-spin" size={16}/> : <Search size={16}/>}
+        <label className="qb-field qb-search-field">搜索题目<input disabled={busy} value={query} onChange={event => onQuery(event.target.value)} placeholder="输入问题，进行语义搜索" /></label>
+        <button className="qb-button qb-secondary" type="submit" disabled={busy || !query.trim() || searching}>{searching ? <Loader2 className="qb-spin" size={16}/> : <Search size={16}/>}
           {searching ? '搜索中' : '搜索'}</button>
-        {searchResults && <button className="qb-button qb-quiet" type="button" onClick={onClearSearch}>清除</button>}
+        {searchResults && <button className="qb-button qb-quiet" type="button" disabled={busy} onClick={onClearSearch}>清除</button>}
         {(listError || retrying) && onRetryList && <button className="qb-button qb-secondary" type="button" disabled={retrying} onClick={onRetryList}>{retrying ? '读取中' : '重试读取题库'}</button>}
       </form>
       <p className="qb-help">语义搜索和新增会消耗模型额度；查看列表、展开答案和删除不调用模型。</p>
@@ -127,11 +135,13 @@ export function QuestionBankWorkspace({
       <label>标签<input disabled={createQuestion.isPending} value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder="架构,性能" /></label>
       <button className="qb-button qb-primary" type="submit" disabled={createQuestion.isPending}><Plus size={16}/>{createQuestion.isPending ? '保存中' : '保存题目'}</button>
     </form>}
-    {!loading && !listError && <div className="qb-list-heading"><h2><BookOpen size={17}/>{searchResults ? '搜索结果' : '题目列表'}</h2><span>{visibleQuestions.length} 条已加载 · {searchResults ? '语义搜索结果' : '非全库总量'}</span></div>}
-    {!visibleQuestions.length ? loading ? <EmptyState title="正在读取题库" text="请稍候" /> : message ? null : <EmptyState title="暂无题目" text={searchResults ? '没有匹配的题目。' : '题库列表为空，可新增题目或导入脱敏题库。'} /> : <section className="lab-list">{visibleQuestions.map((item) => <article className="lab-row question-bank-row" key={item.questionId || item.id}>
+    {!loading && !listError && <div className="qb-list-heading"><h2><BookOpen size={17}/>{searchResults ? '搜索结果' : '题目列表'}</h2><span>{filtered.length} 条匹配 · {(searchResults ?? questions).length} 条已加载 · {searchResults ? '语义搜索结果' : '非全库总量'}</span></div>}
+    {!loading && !listError && <div className="qb-local-controls"><label>筛选已加载题目<input disabled={busy} value={localFilter} placeholder="关键词、答案或标签 · 不调用模型" onChange={event => { setLocalFilter(event.target.value); setPage(1); }}/></label><label>每页条数<select disabled={busy} value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }}><option value={10}>10 条</option><option value={25}>25 条</option><option value={50}>50 条</option></select></label>{localFilter && <button type="button" className="qb-button qb-quiet" onClick={() => { setLocalFilter(''); setPage(1); }}>清除列表筛选</button>}</div>}
+    {!visibleQuestions.length ? loading ? <EmptyState title="正在读取题库" text="请稍候" /> : message ? null : <EmptyState title="暂无题目" text={localFilter ? '已加载题目中没有匹配内容，请调整列表筛选。' : searchResults ? '没有匹配的题目。' : '题库列表为空，可新增题目或导入脱敏题库。'} /> : <section className="lab-list">{visibleQuestions.map((item) => <article className="lab-row question-bank-row" key={item.questionId || item.id}>
       <div><p className="agent-eyebrow">{item.position} / {item.level || '未指定'} / {item.category || '通用'}</p><h2>{item.question}</h2><details><summary>参考答案</summary><p>{item.answer || '未提供参考答案'}</p></details><p>{item.source || '来源未记录'} · {Array.isArray(item.tags) ? item.tags.join('、') : item.tags || '无标签'}</p>{item.version && <p>主数据版本 {item.version} · {item.indexStatus === 'READY' ? '索引就绪' : '待索引'}</p>}</div>
-      <div className="question-bank-row-actions"><button className="qb-icon-button qb-danger" type="button" title="删除题目" aria-label={`删除题目：${item.question}`} onClick={() => { if (item.questionId && window.confirm(`删除题目“${item.question.slice(0, 80)}”？删除后请核对题库列表。`)) deleteQuestion.mutate(item.questionId); }} disabled={deleteQuestion.isPending || !item.questionId}><Trash2 size={16}/></button></div>
+      <div className="question-bank-row-actions"><button className="qb-icon-button qb-danger" type="button" title="删除题目" aria-label={`删除题目：${item.question}`} onClick={() => { if (item.questionId && window.confirm(`删除题目“${item.question.slice(0, 80)}”？删除后请核对题库列表。`)) deleteQuestion.mutate(item.questionId); }} disabled={busy || !item.questionId}><Trash2 size={16}/></button></div>
     </article>)}</section>}
+    {!loading && !listError && filtered.length > 0 && <nav className="qb-pagination" aria-label="题目列表分页"><span>第 {currentPage} / {pages} 页 · 仅对已加载题目分页</span><div><button type="button" className="qb-button qb-secondary" disabled={busy || currentPage <= 1} onClick={() => setPage(currentPage - 1)}>上一页</button><button type="button" className="qb-button qb-secondary" disabled={busy || currentPage >= pages} onClick={() => setPage(currentPage + 1)}>下一页</button></div></nav>}
   </div>;
 }
 

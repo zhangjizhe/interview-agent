@@ -1,0 +1,42 @@
+{
+  "profile": {
+    "sourceSha256": "e86fd3ae8f4a315987200e344e1f98ebe2437f1358c2c22f34e3ccd6548cbbe2",
+    "text": "我做前端开发和工程交付有 10 年，经历过电商、SaaS 和音视频业务。现在主要关注 AI 应用交互，把实时通信和复杂状态管理的经验，用在流式对话、会话隔离和异常恢复上。"
+  },
+  "skills": {
+    "sourceSha256": "5ca15e497f1a178adbbc8555eba51a446f2c893dc5ccd73426eb014e82757f5a",
+    "text": "技术栈方面，我使用 React、Vue 2/3 和 TypeScript，也有 Zustand、TanStack Query 相关的前端实践。"
+  },
+  "ai-skills": {
+    "sourceSha256": "0aa7923f1b98efbc7409cd2a08c4d6ea92246ee9f2215851e09e73cd255f1ac1",
+    "text": "AI 和实时交互方面，我的实践涉及 SSE、WebSocket、请求取消、超时处理和 RAG 前端集成，也包括 NestJS、LangGraph 项目。"
+  },
+  "engineering": {
+    "sourceSha256": "59e8431aa8da8cb77485f7ea6df2f629c5949644f505f336fc95685c25df496a",
+    "text": "工程交付方面，我使用 Vite、Webpack、Vitest、Playwright、pnpm Monorepo 和 Docker Compose。"
+  },
+  "jd": {
+    "sourceSha256": "fabe247b04eb996354163122af7fb324de91eff151578dfd6d789b1645db8bed",
+    "text": "在京东项目中，我负责送礼频道的页面和业务模块，打通商品卡片、SKU 选择、定制贺卡、下单和分享这一条完整体验。"
+  },
+  "cti": {
+    "sourceSha256": "91e288c9473fb0858942c5aa9fef93d201dda6788acafd1cde47b1072e95f699",
+    "text": "一个具体的项目例子，是在众安在线／暖哇科技期间做的 CTI 电销管理平台。我从 0 到 1 主导电销管理平台的前端架构和核心模块，覆盖坐席外呼、通话控制、客户管理和坐席绩效，并把多家 CTI 服务商的差异收在适配层。具体工作还包括抽象呼叫控制层与服务商适配层、处理不同协议和事件模型，以及结合长连接和本地状态处理通话同步、弱网异常；同时参与多租户配置、权限模型和多个 CTI 服务商接入。"
+  },
+  "cti-scale": {
+    "sourceSha256": "2d89a2c60c6b09b5a549ce4c5ca2a574b97fdfa7c1a851069b2dd1f1ac9f8e24",
+    "text": "公开资料记录的平台业务规模是 19 个职场、2700+ 坐席。这是平台规模，不能当作我个人带来的性能提升或绩效指标。"
+  },
+  "rtc": {
+    "sourceSha256": "71cf758fd84830544e89b8bc6a7a026384e9262c081f53726fc412313de42f17",
+    "text": "在优刻得的 URtc 业务里，我参与了 Web 接入和即时通信相关工作，负责 urtc-im-sdk 初版，后期转向客户案例、接入 Demo 和问题支持。我协作开发过 IM 聊天 SDK，初版是我负责的，后续主要做案例和接入支持，参与过监狱、医院、教育等领域的案例和 Demo，包括大班课、小班课教学演示。我的职责集中在 IM SDK 初版与应用接入，不应理解为独立实现整个音视频底层引擎。"
+  },
+  "rag-work": {
+    "sourceSha256": "cc0a5afe26ef780ce9b8639bf5d2a9a55a9442c390235edc0436c6bddb23d43f",
+    "text": "我还负责过内部 RAG 知识库平台的前端迭代和维护，让文档上传、解析进度、检索问答、引用溯源和历史会话形成完整路径。"
+  },
+  "interview-agent": {
+    "sourceSha256": "9d877a26d4db7e21cdea20a5b0d2d20f3c545c1096ad6ed181549393969613ec",
+    "text": "我还在持续做开源项目 interview-agent，这是一个 AI 面试训练应用，覆盖简历确认、面试对话和结构化评价。我把流式回复、会话隔离和异常恢复做成可验证的交互流程，而不是只演示一轮问答。具体包括用 SSE Hook 处理增量消息、心跳超时和请求取消，切换会话时清理请求生命周期，流式展示结束后再核验服务端业务状态，以及结构化评价、题库和针对超时、旧响应隔离的测试与浏览器验收。"
+  }
+}
