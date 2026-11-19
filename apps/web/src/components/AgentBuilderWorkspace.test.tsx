@@ -25,6 +25,7 @@ function confirmInput() {
   fireEvent.click(screen.getByLabelText('确认按已保存版本启动模型调用及预算'));
 }
 beforeEach(() => {
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
   post = vi.fn(); runState = { id: 'run-one', agentId: 'agent-one', agentVersionId: 'saved-one', status: 'COMPLETED', application: 'lab-draft-test', estimatedCost: null };
   transport.mockReset().mockImplementation(async (path: string, options?: any) => {
     if (options?.method === 'POST') return post(path, JSON.parse(options.body ?? '{}'));

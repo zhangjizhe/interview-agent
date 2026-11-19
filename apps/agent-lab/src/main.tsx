@@ -1,28 +1,27 @@
+import { diagnosticText } from './trace-diagnostics';
+import { LabShell } from './LabShell';
+import { useLabNavigation } from './useLabNavigation';
 import { KnowledgeLibraryPanel } from './KnowledgeLibraryPanel';
 import { DataGovernanceWorkspace } from './DataGovernanceWorkspace';
-import { toggleMcpServer } from './mcp-controls';
+import { toggleMcpServer, readMcpServers, reloadMcpServers } from './mcp-controls';
 import { RuntimeTraceWorkspace } from './RuntimeTraceWorkspace';
 import { AgentBuilderWorkspace } from './AgentBuilderWorkspace';
 import { AccountSecurityDialog } from './AccountSecurityDialog';
-import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
-  BookOpen,
   Bot,
-  FlaskConical,
   FileUp,
-  Gauge,
-  GitBranch,
-  LogOut,
+  FlaskConical,
   RefreshCw,
   Search,
   ScrollText,
   ShieldAlert,
   SlidersHorizontal,
   ToggleLeft,
+  ToggleRight,
   Workflow,
 } from 'lucide-react';
-import { createRoot } from 'react-dom/client';
 import { useEffect, useRef, useState } from 'react';
 import { api, logoutSession, role, token } from './api';
 import { QuestionBankWorkspace, type QuestionBankItem } from './QuestionBankWorkspace';
@@ -32,8 +31,9 @@ import './styles.css';
 import './lab.css';
 import { ControlledEvolutionWorkspace } from './ControlledEvolutionWorkspace';
 import './visual-theme.css';
+import './workspace-shell.css';
+import './mobile-layout.css';
 
-type View = 'data' | 'overview' | 'runtime' | 'mcp' | 'question-bank' | 'trace' | 'evaluation' | 'evolution' | 'experiments' | 'release' | 'audit' | 'operations';
 type Server = {
   name: string;
   displayName?: string;
@@ -41,6 +41,10 @@ type Server = {
   transport?: string;
   enabled: boolean;
   description?: string;
+  executable?: boolean;
+  lastHealthCheck?: string;
+  errorMessage?: string;
+  builtin?: boolean;
 };
 
 type LabRun = {
@@ -109,26 +113,11 @@ type LabOperationLogResponse = {
 };
 
 
-const CONTROL_NAV: Array<{ id: View; label: string; icon: typeof Gauge; enabled: boolean }> = [
-  { id: 'overview', label: '控制中心', icon: Gauge, enabled: true },
-  { id: 'runtime', label: '运行编排', icon: Workflow, enabled: true },
-  { id: 'mcp', label: 'MCP 与工具', icon: SlidersHorizontal, enabled: true },
-  { id: 'data', label: '数据治理', icon: BookOpen, enabled: true },
-  { id: 'question-bank', label: '题库治理', icon: BookOpen, enabled: true },
-  { id: 'trace', label: 'Trace', icon: GitBranch, enabled: true },
-  { id: 'evaluation', label: '评测', icon: FlaskConical, enabled: true },
-  { id: 'evolution', label: '自进化', icon: RefreshCw, enabled: true },
-  { id: 'experiments', label: '实验', icon: Bot, enabled: true },
-  { id: 'release', label: '发布', icon: ShieldAlert, enabled: true },
-  { id: 'audit', label: '审计', icon: ScrollText, enabled: true },
-  { id: 'operations', label: '操作日志', icon: ScrollText, enabled: true },
-];
-
 export function ControlCenter() {
   const queryClient = useQueryClient();
-  const [view, setView] = useState<View>('overview');
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [mcpChecks, setMcpChecks] = useState<Record<string, { ok: boolean; error?: string; latencyMs: number; at: string }>>({});
   const [auditKind, setAuditKind] = useState<AuditKind>('RUN');
   const [auditDataset, setAuditDataset] = useState('');
   const [auditAgent, setAuditAgent] = useState('');
@@ -140,7 +129,9 @@ export function ControlCenter() {
   const [operationOutcome, setOperationOutcome] = useState('');
   const [operationObjectType, setOperationObjectType] = useState('');
   const [operationPage, setOperationPage] = useState(1);
-  const [questionBusy, setQuestionBusy] = useState(false);
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [view, setView] = useLabNavigation(workspaceBusy, unsavedChanges);
   const [questionSource, setQuestionSource] = useState<'catalog' | 'knowledge'>('catalog');
   const [questionQuery, setQuestionQuery] = useState('');
   const [questionSearching, setQuestionSearching] = useState(false);
@@ -156,16 +147,19 @@ export function ControlCenter() {
   };
   const servers = useQuery({
     queryKey: ['agent-lab-mcp'],
-    queryFn: () => api('/admin/mcp-servers'),
+    enabled: view === 'overview' || view === 'mcp',
+    queryFn: readMcpServers,
     refetchInterval: 30_000,
   });
   const lab = useQuery({
     queryKey: ['agent-lab-dashboard'],
+    enabled: ['overview', 'evaluation', 'experiments', 'release', 'audit'].includes(view),
     queryFn: () => api('/agent-lab/dashboard'),
     refetchInterval: 30_000,
   });
   const recordedImports = useQuery({
     queryKey: ['agent-lab-recorded-imports'],
+    enabled: view === 'evaluation' || view === 'audit',
     queryFn: () => api('/agent-lab/recorded-imports'),
     refetchInterval: 30_000,
   });
@@ -180,7 +174,7 @@ export function ControlCenter() {
       if (auditTo) params.set('to', auditTo);
       return api(`/agent-lab/audit?${params.toString()}`);
     },
-    enabled: role() === 'ADMIN',
+    enabled: role() === 'ADMIN' && view === 'audit',
   });
   const operationLogs = useQuery({
     queryKey: ['agent-lab-operation-logs', operationAction, operationOutcome, operationObjectType, operationPage],
@@ -191,7 +185,7 @@ export function ControlCenter() {
       if (operationObjectType) params.set('objectType', operationObjectType);
       return api(`/agent-lab/operation-logs?${params.toString()}`);
     },
-    enabled: role() === 'ADMIN',
+    enabled: role() === 'ADMIN' && view === 'operations',
   });
   const questions = useQuery({
     queryKey: ['agent-lab-question-bank', questionPosition],
@@ -217,7 +211,7 @@ export function ControlCenter() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['agent-lab-mcp'] }),
   });
   const readMcpState = useMutation({
-    mutationFn: () => api('/admin/mcp-servers'),
+    mutationFn: readMcpServers,
     onMutate: () => setFeedback(''),
     onSuccess: (result) => {
       queryClient.setQueryData(['agent-lab-mcp'], result);
@@ -225,16 +219,17 @@ export function ControlCenter() {
     },
   });
   const health = useMutation({
-    mutationFn: (name: string) => api(`/admin/mcp-servers/${name}/health`),
+    mutationFn: async (name: string) => { const result = await api(`/admin/mcp-servers/${encodeURIComponent(name)}/health`); if (typeof result?.ok !== 'boolean' || !Number.isFinite(result.latencyMs) || result.latencyMs < 0) throw new Error('未收到有效检查结果，请重新读取后核对。'); return result; },
     onSuccess: (result, name) => {
+      setMcpChecks(current => ({ ...current, [name]: { ...result, at: new Date().toLocaleTimeString() } }));
       setFeedback(result.ok
         ? `${name} 执行绑定已就绪；依赖及实际调用仍需验收。`
-        : `${name} 未通过检查：${result.error || '尚未验证可调用性'}`);
+        : '');
       refresh();
     },
   });
   const reload = useMutation({
-    mutationFn: () => api('/admin/mcp-servers/reload', { method: 'POST' }),
+    mutationFn: reloadMcpServers,
     onSuccess: () => {
       setFeedback('当前 API 进程的 MCP 配置已重新加载；运行时开关保持不变。');
       refresh();
@@ -274,17 +269,19 @@ export function ControlCenter() {
   });
 
   if (role() !== 'ADMIN') return <AdminAccess />;
-  if (servers.isLoading || lab.isLoading || recordedImports.isLoading) return <main className="agent-loading">正在连接控制面...</main>;
-  if (servers.isError || lab.isError || recordedImports.isError) {
-    const error = (servers.error || lab.error || recordedImports.error) as Error;
-    return <main className="agent-gate"><ShieldAlert size={26}/><h1>无法读取控制面</h1><p>{error.message}</p><button className="agent-command" onClick={() => {
-      localStorage.removeItem('ia_access_token'); localStorage.removeItem('ia_user_role'); localStorage.removeItem('ia_userId'); window.location.reload();
-    }}>重新登录控制台</button><button className="agent-command" onClick={() => { void servers.refetch(); void lab.refetch(); void recordedImports.refetch(); }}>重试连接</button></main>;
+  const dependencies = view === 'overview' ? [servers, lab]
+    : view === 'mcp' ? [servers]
+    : ['evaluation', 'audit'].includes(view) ? [lab, recordedImports]
+    : ['experiments', 'release'].includes(view) ? [lab] : [];
+  const workspaceLoading = dependencies.some(query => query.isPending);
+  const workspaceError = dependencies.find(query => query.isError)?.error;
+  if (dependencies.some(query => (query.error as { status?: number } | undefined)?.status === 403)) {
+    return <main className="agent-access"><section><h1>无法读取控制面</h1><p>当前会话没有访问 Agent Lab 的权限。</p></section></main>;
   }
 
   const data = servers.data as { servers: Server[]; runningCount: number; count: number };
   const labData = lab.data as LabDashboard;
-  const imports = (recordedImports.data as { imports: LabRecordedImport[] }).imports;
+  const imports = (recordedImports.data as { imports: LabRecordedImport[] } | undefined)?.imports ?? [];
   const questionItems = ((questions.data as { results?: QuestionBankItem[] })?.results || []);
   const currentMutationError = readMcpState.error || toggle.error || health.error || reload.error || executeImport.error || createExperiment.error || recordDecision.error;
   const searchQuestions = async () => {
@@ -304,60 +301,32 @@ export function ControlCenter() {
     } finally { questionSearchPending.current = false; setQuestionSearching(false); }
   };
   return (
-    <div className="agent-shell">
-      <aside className="agent-sidebar">
-        <div className="agent-brand"><Bot size={19}/><span>Agent Lab</span></div>
-        <p className="agent-section-label">CONTROL PLANE</p>
-        <nav aria-label="Agent Lab 导航">
-          {CONTROL_NAV.map(({ id, label, icon: Icon, enabled }) => (
-            <button
-              key={id}
-              type="button"
-              className={`agent-nav-item ${view === id ? 'is-active' : ''}`}
-              disabled={!enabled || (questionBusy && id !== view)}
-              title={questionBusy && id !== view ? '题目正在处理，请等待结果后切换页面。' : undefined}
-              onClick={() => enabled && !questionBusy && setView(id)}
-            >
-              <Icon size={16}/><span>{label}</span>{!enabled && <em>未配置</em>}
-            </button>
-          ))}
-        </nav>
-        <div className="agent-sidebar-note"><span className="agent-status-dot"/>控制 API 已受 RBAC 保护</div>
-        <button
-          type="button"
-          className="agent-signout"
-          onClick={async () => {
-            try { if (await logoutSession()) window.location.reload(); }
-            catch (error) { setFeedback(error instanceof Error ? error.message : '退出未确认，请重试。'); }
-          }}
-        ><LogOut size={16}/>退出控制台</button>
-      </aside>
-
-      <main className="agent-workspace">
-        <header className="agent-topbar">
-          <div><p className="agent-eyebrow">AGENT OPERATIONS</p><h1>{titleFor(view)}</h1></div>
-          <button className="agent-command" onClick={() => setShowPasswordChange(true)}>修改密码</button>
-          {view === 'mcp' && <button className="agent-command" onClick={() => readMcpState.mutate()} disabled={readMcpState.isPending || toggle.isPending || reload.isPending}>刷新本进程状态</button>}
-          <button className="agent-command" onClick={() => {
-            if (window.confirm('仅重新加载当前 API 进程的 MCP 配置；保留运行时开关，不同步其他实例。继续吗？')) reload.mutate();
-          }} disabled={reload.isPending}>
-            <RefreshCw size={16} className={reload.isPending ? 'spin' : ''}/>{reload.isPending ? '重载中' : '重新加载 MCP'}
-          </button>
-        </header>
-
+    <LabShell view={view} onView={setView} locked={workspaceBusy} onAccount={() => setShowPasswordChange(true)}
+      onLogout={async () => {
+        try { if (await logoutSession()) window.location.reload(); }
+        catch (error) { setFeedback(error instanceof Error ? error.message : '退出未确认，请重试。'); }
+      }} actions={view === 'mcp' ? <>
+        <button className="agent-command quiet-command" onClick={() => readMcpState.mutate()} disabled={readMcpState.isPending || toggle.isPending || reload.isPending || health.isPending}><RefreshCw size={15} className={readMcpState.isPending ? 'spin' : ''}/>{readMcpState.isPending ? '正在读取…' : '刷新本进程状态'}</button>
+        <button className="agent-command" onClick={() => {
+          if (window.confirm('仅重新加载当前 API 进程的 MCP 配置；保留运行时开关，不同步其他实例。继续吗？')) reload.mutate();
+        }} disabled={reload.isPending || toggle.isPending || readMcpState.isPending || health.isPending}><RefreshCw size={15} className={reload.isPending ? 'spin' : ''}/>{reload.isPending ? '重载中' : '重新加载 MCP'}</button>
+      </> : undefined}>
         {showPasswordChange && <AccountSecurityDialog onClose={() => setShowPasswordChange(false)} />}
 
 
-        {questionBusy && <p className="qb-feedback" role="status">题目正在处理，完成后可切换页面；请勿重复提交或刷新。</p>}
-        {currentMutationError && <p className="agent-error">{(currentMutationError as Error).message}</p>}
-        {feedback && <p className="agent-feedback">{feedback}</p>}
+        {workspaceBusy && <p className="qb-feedback" role="status">当前操作正在处理，完成后可切换页面；请勿重复提交或刷新。</p>}
+        {currentMutationError && <p className="agent-error" role="alert">{(currentMutationError as Error).message}</p>}
+        {feedback && <p className="agent-feedback" role="status">{feedback}</p>}
 
+        {workspaceLoading && !workspaceError && <section className="lab-state-card" role="status"><RefreshCw size={22} className="spin"/><h2>正在读取工作区</h2><p>正在连接此页面需要的服务，请稍候。</p></section>}
+        {workspaceError && <section className="lab-state-card lab-state-error" role="alert"><ShieldAlert size={24}/><h2>此页面的数据暂时不可用</h2><p>{workspaceError.message}</p><button className="agent-command" onClick={() => { for (const query of dependencies) void query.refetch(); }} disabled={dependencies.some(query => query.isFetching)}>重试读取</button><small>你仍可以通过导航访问其他工作区。</small></section>}
+        {!workspaceLoading && !workspaceError && <>
         {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} />}
-        {view === 'runtime' && <AgentBuilderWorkspace />}
-        {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} />}
+        {view === 'runtime' && <AgentBuilderWorkspace onBusyChange={setWorkspaceBusy} onDirtyChange={setUnsavedChanges} />}
+        {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} checks={mcpChecks} operationBusy={readMcpState.isPending || reload.isPending} />}
         {view === 'data' && <DataGovernanceWorkspace />}
-        {view === 'question-bank' && <><div className="question-source-switch" role="group" aria-label="题库资料来源"><button type="button" disabled={questionBusy} aria-pressed={questionSource === 'catalog'} onClick={() => setQuestionSource('catalog')}>业务题库</button><button type="button" disabled={questionBusy} aria-pressed={questionSource === 'knowledge'} onClick={() => setQuestionSource('knowledge')}>RAG 知识资料（只读）</button></div>{questionSource === 'knowledge' ? <KnowledgeLibraryPanel /> : <><QuestionBankWorkspace
-          onBusyChange={setQuestionBusy}
+        {view === 'question-bank' && <><div className="question-source-switch" role="group" aria-label="题库资料来源"><button type="button" disabled={workspaceBusy} aria-pressed={questionSource === 'catalog'} onClick={() => setQuestionSource('catalog')}>业务题库</button><button type="button" disabled={workspaceBusy} aria-pressed={questionSource === 'knowledge'} onClick={() => setQuestionSource('knowledge')}>RAG 知识资料（只读）</button></div>{questionSource === 'knowledge' ? <KnowledgeLibraryPanel /> : <><QuestionBankWorkspace
+          onBusyChange={setWorkspaceBusy}
           questions={questionItems}
           query={questionQuery}
           position={questionPosition}
@@ -403,13 +372,9 @@ export function ControlCenter() {
             setOperationPage(next.page);
           }}
         />}
-      </main>
-    </div>
+        </>}
+    </LabShell>
   );
-}
-
-function titleFor(view: View) {
-  return { data: '数据治理', overview: '控制中心', runtime: 'Agent 与工作流编排', mcp: 'MCP 与工具治理', 'question-bank': '题库治理', trace: 'Trace 运行记录', evaluation: '评测证据', evolution: '受控自进化', experiments: '实验比较', release: '发布决策', audit: '审计查询', operations: '操作日志' }[view];
 }
 
 function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void }) {
@@ -612,24 +577,37 @@ function RuntimeCanvas({ compact = false }: { compact?: boolean }) {
   </section>;
 }
 
-function McpWorkspace({ data, health, toggle }: {
+function McpWorkspace({ data, health, toggle, checks, operationBusy }: {
   data: { servers: Server[]; runningCount: number; count: number };
   health: { isPending: boolean; variables?: string; mutate: (name: string) => void };
   toggle: { isPending: boolean; variables?: { toolName: string; enabled: boolean }; mutate: (input: { toolName: string; enabled: boolean }) => void };
+  checks: Record<string, { ok: boolean; error?: string; latencyMs: number; at: string }>;
+  operationBusy: boolean;
 }) {
-  return <section className="mcp-workspace">
-    <p>开关仅作用于当前 API 进程，会影响该进程服务的所有组织；不会同步其他实例。重新加载配置保留当前开关，API 重启后恢复配置文件默认值。关闭会阻止后续工具调用，不会取消已经开始的调用。</p>
-    <div className="mcp-summary"><Activity size={17}/><strong>{data.runningCount} / {data.count}</strong><span>已启用且执行绑定就绪</span></div>
-    <div className="mcp-list">
-      {data.servers.map((server) => {
-        const healthBusy = health.isPending && health.variables === server.name;
-        const toggleBusy = toggle.isPending && toggle.variables?.toolName === server.name;
-        return <article className="mcp-row" key={server.name}>
-          <div className="mcp-identity"><span className={`agent-status-dot ${server.status}`}/><div><h2>{server.displayName || server.name}</h2><p>{server.description || `${server.transport || 'internal'} · ${server.status}`}</p></div></div>
-          <div className="mcp-actions"><button className="icon-command" title="健康检查" onClick={() => health.mutate(server.name)} disabled={healthBusy}><Activity size={16} className={healthBusy ? 'spin' : ''}/></button><button onClick={() => toggle.mutate({ toolName: server.name, enabled: !server.enabled })} disabled={toggleBusy}><ToggleLeft size={16}/>{toggleBusy ? '处理中' : server.enabled ? '本进程关闭' : '本进程启用'}</button></div>
-        </article>;
-      })}
-    </div>
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('');
+  const [confirmOff, setConfirmOff] = useState('');
+  const busy = operationBusy || health.isPending || toggle.isPending;
+  const visible = data.servers.filter(server => (!filter || (filter === 'enabled' ? server.enabled : !server.enabled)) && `${server.name} ${server.displayName ?? ''} ${server.description ?? ''}`.toLowerCase().includes(search.toLowerCase()));
+  return <section className="mcp-workspace mcp-governance">
+    <div className="mcp-overview"><div><p className="agent-eyebrow">当前 API 进程</p><h2>工具可用性与访问控制</h2><p>启用开关、执行器绑定与检查结果分别展示，便于定位工具不能调用的原因。</p></div><div className="mcp-count"><strong>{data.runningCount} / {data.count}</strong><span>已启用且执行绑定就绪</span></div></div>
+    <details className="mcp-scope"><summary>操作范围与持久性</summary><p>开关仅作用于当前 API 进程，会影响该进程服务的所有组织；不会同步其他实例。重新加载配置保留当前开关，API 重启后恢复配置文件默认值。关闭会阻止后续工具调用，不会取消已经开始的调用。</p></details>
+    <div className="mcp-filterbar"><label>查找工具<input value={search} onChange={e => setSearch(e.target.value)} placeholder="名称、key 或用途"/></label><label>启用状态<select value={filter} onChange={e => setFilter(e.target.value)}><option value="">全部工具</option><option value="enabled">已启用</option><option value="disabled">已关闭</option></select></label><span>{visible.length} 个匹配工具</span></div>
+    <div className="mcp-card-grid">{visible.map(server => {
+      const healthBusy = health.isPending && health.variables === server.name;
+      const toggleBusy = toggle.isPending && toggle.variables?.toolName === server.name;
+      const check = checks[server.name];
+      return <article className="mcp-tool-card" key={server.name}>
+        <div className="mcp-card-heading"><span className="mcp-tool-icon"><SlidersHorizontal size={19}/></span><div><h3>{server.displayName || server.name}</h3><code>{server.name}</code></div><span className={`mcp-enabled-label ${server.enabled ? 'is-enabled' : ''}`}>{server.enabled ? '已启用' : '已关闭'}</span></div>
+        <p className="mcp-description">{server.description || '尚未填写用途'}</p>
+        <dl className="mcp-properties"><div><dt>连接方式</dt><dd>{server.transport || '未记录'}</dd></div><div><dt>服务状态</dt><dd>{server.status}</dd></div><div><dt>执行器</dt><dd>{server.executable === true ? '已绑定' : server.executable === false ? '未绑定' : '未记录'}</dd></div><div><dt>最近检查</dt><dd>{check?.at || (server.lastHealthCheck ? new Date(server.lastHealthCheck).toLocaleString() : '尚未检查')}</dd></div></dl>
+        {server.errorMessage && <p className="mcp-check-result is-error">{diagnosticText(server.errorMessage)}</p>}
+        {check && <div role={check.ok ? 'status' : 'alert'} className={`mcp-check-result ${check.ok ? '' : 'is-error'}`}><strong>{check.ok ? '执行绑定检查通过' : '检查未通过'}</strong><span>{check.ok ? '依赖与实际业务调用仍需单独验证。' : diagnosticText(check.error || '尚未确认可调用性')}</span><small>{check.at} · {check.latencyMs} ms</small></div>}
+        {confirmOff === server.name && <div className="mcp-disable-confirm" role="group" aria-label={`确认关闭工具：${server.displayName || server.name}`}><p>关闭会阻止当前进程所有组织后续调用此工具，已开始的调用不会撤回。</p><button type="button" disabled={busy} onClick={() => { setConfirmOff(''); toggle.mutate({ toolName: server.name, enabled: false }); }}>确认关闭</button><button type="button" disabled={busy} onClick={() => setConfirmOff('')}>取消</button></div>}
+        <div className="mcp-actions"><button type="button" aria-label={`检查工具：${server.displayName || server.name}`} disabled={busy || !server.enabled} onClick={() => health.mutate(server.name)}><Activity size={15} className={healthBusy ? 'spin' : ''}/>{healthBusy ? '检查中…' : '检查连接'}</button><button type="button" disabled={busy} onClick={() => { if (server.enabled) setConfirmOff(server.name); else toggle.mutate({ toolName: server.name, enabled: true }); }}>{server.enabled ? <ToggleRight size={18}/> : <ToggleLeft size={18}/>} {toggleBusy ? '处理中' : server.enabled ? '本进程关闭' : '本进程启用'}</button></div>
+      </article>;
+    })}</div>
+    {!visible.length && <div className="lab-empty"><Search size={22}/><h2>{data.servers.length ? '没有匹配的工具' : '当前没有工具配置'}</h2><p>{data.servers.length ? '调整名称或启用状态筛选。' : '请检查服务端 MCP 注册配置，再刷新本进程状态。'}</p></div>}
   </section>;
 }
 
@@ -719,7 +697,7 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
   </form></section><aside><p>CONTROLLED OPERATIONS</p><strong>运行、MCP、评测与发布。</strong><span>未配置的控制面能力不会显示虚构运行数据。</span></aside></main>;
 }
 
-function LabSessionGate() {
+export function LabSessionGate() {
   const queryClient = useQueryClient();
   const [active, setActive] = useState(Boolean(token()) && role() === 'ADMIN');
   const [expired, setExpired] = useState(false);
@@ -730,5 +708,3 @@ function LabSessionGate() {
   }, [queryClient]);
   return active ? <ControlCenter /> : <AdminAccess expired={expired} />;
 }
-
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={new QueryClient()}><LabSessionGate/></QueryClientProvider>);

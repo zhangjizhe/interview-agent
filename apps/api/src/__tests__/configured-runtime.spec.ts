@@ -36,6 +36,19 @@ function harness() {
 }
 
 describe('Configured runtime independent regression', () => {
+  it('uses provider streaming only for internally admitted streaming Runs and persists billable evidence', async () => {
+    const h = harness(), version = single();
+    const streamChat = jest.fn(async function* () {
+      yield { content: 'live provider output', provider: 'qwen', model: 'synthetic-model' };
+      yield { usage: { promptTokens: 10, completionTokens: 5 }, finishReason: 'stop' as const };
+    });
+    (h.gateway as any).streamChat = streamChat;
+    const result = await h.service.execute('user', { ...h.run, budget: { streamOutput: true } }, version, { message: 'initial' }, await h.service.prepare(version, 'workspace'));
+    expect(h.gateway.chat).not.toHaveBeenCalled();
+    expect(streamChat).toHaveBeenCalledWith(expect.objectContaining({ allowFallback: false }), 'qwen');
+    expect(h.trace.append).toHaveBeenCalledWith('parent', expect.objectContaining({ type: 'model.stream', payload: { content: 'live provider output' } }));
+    expect(result).toMatchObject({ response: 'live provider output', tokenUsage: { calls: 1, totalTokens: 15 }, estimatedCostCny: 0.01 });
+  });
   it.each([
     ['unknown adapter', { runtimeConfig: { adapter: 'unknown', maxEstimatedCostCny: 1, maxDurationMs: 1000 } }],
     ['unbounded budget', { runtimeConfig: { adapter: 'single-agent-v1', maxEstimatedCostCny: Infinity, maxDurationMs: 1000 } }],

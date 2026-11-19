@@ -1,5 +1,7 @@
 # Current state
 
+2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
+
 2026-11-10 — 当前唯一主题 LAB-DATA-GOVERNANCE。用户在PR #71合并后要求继续，正在完成资料集合分权的隔离验收与源码交付。主体源码445d572已推送并创建PR #72，后补绑定选框尺寸样式；最新对应CI核验中，未合并/部署；原Lab5175保持此前题库UX镜像，原API/数据卷未改。
 
 前序已交付：Trace排障、历史资料读取、题库上传/主题/按钮体验；PR #71合并main19e911e，push/PR/merge对应默认Product各5绿。原正常管理员会话核对业务16条、RAG142条和展开正文。完整历史对账及真实模型导入质量仍未验收。见QUESTION_BANK_UX.md。
