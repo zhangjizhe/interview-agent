@@ -1,7 +1,14 @@
-import fs from 'node:fs/promises';import path from 'node:path';import{fileURLToPath}from'node:url';
+import fs from 'node:fs/promises';import {readFileSync} from 'node:fs';import path from 'node:path';import{fileURLToPath}from'node:url';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url))),read=n=>fs.readFile(path.join(root,n),'utf8');
+const design=path.resolve(root,'../../packages/design');
+function inlineFonts(css){return css.replace(/url\((['"]?)([^'")]+)\1\)/g,(match,quote,rel)=>{if(rel.startsWith('data:'))return match;const file=path.resolve(design,rel);if(!file.startsWith(design)||!file.endsWith('.woff2'))return match;return `url("data:font/woff2;base64,${readFileSync(file).toString('base64')}")`})}
 const articles=JSON.parse(await read('src/articles.json')),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let html=await read('src/base.html');html=html.replace(/<div class="page" id="notes">[\s\S]*?(?=<div class="page" id="resume">)/,'').replaceAll('href="#notes"','href="#articles"').replaceAll('data-nav="notes"','data-nav="articles"').replace('>工程手记</a>','>文章</a>');
+let html=await read('src/base.html');
+const atelier=(await fs.readFile(path.join(design,'fonts.css'),'utf8')).replaceAll('./fonts/','fonts/')
+  +'\n'+await fs.readFile(path.join(design,'tokens.css'),'utf8')
+  +'\n'+await read('src/atelier.css');
+html=html.replace('/*__ATELIER__*/',inlineFonts(atelier));
+html=html.replace(/<div class="page" id="notes">[\s\S]*?(?=<div class="page" id="resume">)/,'').replaceAll('href="#notes"','href="#articles"').replaceAll('data-nav="notes"','data-nav="articles"').replace('>工程手记</a>','>文章</a>');
 html=html.replace(/<section class="home-notes">[\s\S]*?<\/section>/,`<section class="home-notes"><div class="section-head"><div><div class="eyebrow">Writing / Archive</div><h2>从实践中记录</h2></div><a class="textlink" href="#articles">全部 ${articles.length} 篇文章 →</a></div><div class="note-cards">${['promise实现','webpack基础知识点','手写bind,apply,call'].map(t=>articles.find(a=>a.title===t)).map(a=>`<a class="note-card" href="#article/${a.id}"><span class="note-icon">⌘</span><span class="note-topic">${esc(a.category)}</span><h3>${esc(a.title)}</h3><p>${esc(a.excerpt.slice(0,65))}…</p><span class="note-bottom">${a.date} · 历史笔记 <b>↗</b></span></a>`).join('')}</div></section>`);
 html=html.replace('<div><strong>开源实践</strong><span>interview-agent</span></div>',`<div><strong>${articles.length} 篇</strong><span>真实技术文章归档</span></div>`);
 html=html.replace(/function route\(\)\{[\s\S]*?window.addEventListener\('hashchange',route\);route\(\);/,"function route(){window.siteRoute()};window.addEventListener('hashchange',route);route();");

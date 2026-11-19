@@ -155,7 +155,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       <div className="studio-auth-form">
       <form onSubmit={submit} className="space-y-5">
         <div>
-          <p className="mb-3 text-xs font-semibold tracking-wider text-blue-700">INTERVIEW STUDIO</p>
+          <p className="mb-3 text-xs font-semibold tracking-wider text-blue-700">面试工作室</p>
           <h1 className="font-semibold text-slate-900">{mode === 'register' ? '创建你的训练空间' : mode === 'login-code' ? '验证登录邮箱' : mode === 'claim' || mode === 'claim-code' ? '绑定并验证旧账号邮箱' : mode === 'forgot' || mode === 'reset' ? '找回密码' : '欢迎回来'}</h1>
           <p className="mt-1 text-sm text-slate-500">{mode === 'register' ? '先验证邮箱，再创建账号' : mode === 'login' ? '使用用户名和密码登录' : '验证码 10 分钟有效且只能使用一次'}</p>
         </div>

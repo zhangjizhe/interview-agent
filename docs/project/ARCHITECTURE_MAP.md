@@ -1,5 +1,7 @@
 # 当前架构地图
 
+2026-11-19 三端视觉令牌在 `packages/design`。产品边界、鉴权与数据路径未改。
+
 2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
 
 2026-11-10 资料分权候选：Lab DataGovernanceWorkspace/DataBindingPicker → ADMIN + 可信组织身份 → DataGovernanceService → PostgreSQL typed collection/record/version/grant/audit。默认私有；平台ADMIN不越过资料ACL；AgentVersion显式绑定，ConfiguredRuntime在读取和派发前重新授权，Trace记录实际资料revision/hash而非正文。旧Interview题库与评测集不迁移。加性迁移20261105000000；隔离验收中，原API/5175未更新。见[设计与边界](../architecture/LAB_DATA_GOVERNANCE.md)。
@@ -34,6 +36,7 @@ Auth (2026-11-04): Candidate Web and Agent Lab share the NestJS Auth API/user ta
 
 | 层 | 入口 | 当前合同 |
 | --- | --- | --- |
+| 视觉 | packages/design | 三端共用的自托管字体与 CSS 令牌；不承载业务状态 |
 | Interview | apps/web/src | JWT 会话、候选人导航、岗位/简历/面试/报告与训练入口 |
 | Lab | apps/agent-lab/src | ADMIN 门禁、MCP/题库/录制报告与 ControlledEvolutionWorkspace |
 | 授权 | apps/api/src/modules/auth | 全局 JWT、ADMIN RBAC、用户资源归属与组织范围 |

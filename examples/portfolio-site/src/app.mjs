@@ -26,6 +26,6 @@ export async function handleRequest(request,env={},options={}){try{
  if(u.pathname.startsWith('/api/'))return json({error:'接口不存在。'},404);
  if(!['GET','HEAD'].includes(request.method))return json({error:'不支持的方法。'},405);
  if(!['/','/index.html'].includes(u.pathname))return new Response('Not found',{status:404});
- return new Response(request.method==='HEAD'?null:SITE_HTML,{headers:{...headers,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; object-src 'none'"}})
+ return new Response(request.method==='HEAD'?null:SITE_HTML,{headers:{...headers,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; base-uri 'none'; object-src 'none'"}})
 }catch(e){return json({error:e instanceof AppError?e.message:'服务暂不可用。'},e instanceof AppError?e.status:500)}}
 export default {fetch:handleRequest};

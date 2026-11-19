@@ -5,10 +5,12 @@ ENV npm_config_registry=https://registry.npmjs.org
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
 COPY patches ./patches
 COPY apps/agent-lab/package.json ./apps/agent-lab/
+COPY packages/design/package.json ./packages/design/
 RUN --mount=type=cache,id=interview-agent-pnpm-agent-lab,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store && \
     pnpm install --frozen-lockfile
 COPY apps/agent-lab ./apps/agent-lab
+COPY packages/design ./packages/design
 RUN pnpm --filter @interview-agent/agent-lab build
 
 FROM nginx:alpine

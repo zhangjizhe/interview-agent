@@ -31,7 +31,7 @@ export function AppShell() {
       <aside className="candidate-sidebar hidden border-r border-slate-200 md:flex md:min-h-screen md:flex-col">
         <NavLink to="/" className="flex h-24 items-center gap-3 px-6">
           <div className="brand-mark grid h-10 w-10 place-items-center text-base font-bold text-white">面</div>
-          <span><span className="block text-base font-semibold tracking-normal">小面训练</span><span className="mt-0.5 block text-[10px] tracking-[0.16em] text-slate-500">INTERVIEW STUDIO</span></span>
+          <span><span className="block text-base font-semibold tracking-normal">小面训练</span><span className="mt-0.5 block text-[10px] tracking-[0.14em] text-slate-500">面试工作室</span></span>
         </NavLink>
         <nav aria-label="候选人导航" className="flex-1 space-y-2 px-4 py-5">
           <p className="px-3 pb-3 text-[11px] font-semibold tracking-wider text-slate-500">我的工作台</p>

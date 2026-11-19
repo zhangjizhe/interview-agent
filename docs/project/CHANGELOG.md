@@ -1,5 +1,7 @@
 # 当前变更摘要
 
+2026-11-19 色调改回暖象牙与偏粉陶土：页面 `#FBF6F1`，正文 `#3F2C24`，主色 `#8E4A42`。字体仍是 Plus Jakarta Sans + Noto Sans SC。首页仍是引文，Lab 眉题仍是中文。镜像仍在安装和打包前拷贝 `packages/design`。无数据库、鉴权、API 或发布门禁变更。复验 portfolio 33、Web 385、两端类型检查与构建通过。本环境没有 Docker。未部署。
+
 更新：2026-10-09。历史流水与既有本地补充[归档](archive/release-readiness-2026-10-08/CHANGELOG.md)。
 
 ## PRODUCT-REACCEPTANCE-1

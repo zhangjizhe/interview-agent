@@ -1,0 +1,90 @@
+/* Warm ivory and clay, shared by the personal site, Interview, and Agent Lab.
+   Type stays Plus Jakarta Sans + Noto Sans SC. */
+
+:root {
+  color-scheme: light;
+  --font-display: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-ui: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "IBM Plex Mono", "Noto Sans SC", ui-monospace, "SFMono-Regular", monospace;
+  --paper: #fbf6f1;
+  --paper-2: #f6efe8;
+  --surface: #fffdfa;
+  --ink: #3f2c24;
+  --ink-soft: #5c453c;
+  --muted: #7c6458;
+  --faint: #80685c;
+  --line: #f0e4da;
+  --line-strong: #e4d3c6;
+  --brass: #8e4a42;
+  --brass-soft: #f8ebe6;
+  --pine: #3f6b52;
+  --pine-soft: #e7f3ec;
+  --seal: #9a3d48;
+  --seal-soft: #f8eeeb;
+  --success: #2f6a45;
+  --success-soft: #e7f3ec;
+  --warning: #8a5a22;
+  --warning-soft: #f8f1e3;
+  --danger: #9a3d48;
+  --danger-soft: #f8eeeb;
+  --danger-line: #e7cfc8;
+  --focus: #8e4a42;
+  --primary: #8e4a42;
+  --primary-hover: #7a3d38;
+  --on-primary: #fff8f3;
+  --shadow: 0 24px 60px rgba(142, 74, 66, 0.1);
+  --radius: 14px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --glow:
+    radial-gradient(920px 460px at 8% -12%, rgba(232, 176, 160, 0.42), transparent 60%),
+    radial-gradient(680px 380px at 100% 0%, rgba(244, 214, 196, 0.55), transparent 54%);
+  --canvas: var(--paper);
+  --verified: var(--success);
+}
+
+body.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #241812;
+  --paper-2: #2c1e18;
+  --surface: #2e211c;
+  --ink: #f6ede6;
+  --ink-soft: #e7d8cc;
+  --muted: #cdb5a6;
+  --faint: #b19786;
+  --line: #3d2c24;
+  --line-strong: #5a4034;
+  --brass: #f0b0a4;
+  --brass-soft: #3a241f;
+  --pine: #b7d4c4;
+  --pine-soft: #1c2e26;
+  --seal: #f0b0a4;
+  --seal-soft: #3a2220;
+  --success: #b7d4c4;
+  --success-soft: #1c2e26;
+  --warning: #e4c68a;
+  --warning-soft: #3a2c1c;
+  --danger: #f0b0a4;
+  --danger-soft: #3a2220;
+  --danger-line: #6a4038;
+  --focus: #f0b0a4;
+  --primary: #f3d4cc;
+  --primary-hover: #e7c4ba;
+  --on-primary: #3f2c24;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  --glow:
+    radial-gradient(820px 420px at 8% -10%, rgba(168, 80, 70, 0.3), transparent 60%),
+    radial-gradient(640px 360px at 100% 0%, rgba(120, 60, 48, 0.35), transparent 55%);
+  --canvas: var(--paper);
+}
+
+::selection {
+  background: #f3d0c8;
+  color: #3f2c24;
+}
+
+body.dark ::selection,
+[data-theme="dark"] ::selection {
+  background: #8e4a42;
+  color: #fff8f3;
+}

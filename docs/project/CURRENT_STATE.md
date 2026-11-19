@@ -1,5 +1,7 @@
 # Current state
 
+2026-11-19 色调改回暖象牙 `#FBF6F1`、正文 `#3F2C24`、主色 `#8E4A42`；字体仍是 Plus Jakarta Sans + Noto Sans SC。个人站首页仍是引文，不再使用代码卡片。Lab 眉题仍是中文工作室用语。三端视觉重做（个人站、Interview、Agent Lab）收成同一套字体、色彩、图标笔画和控件。共享层在 `packages/design`（自托管 OFL 字体子集与 CSS 令牌）。个人站样式在 `examples/portfolio-site/src/atelier.css`，构建时内联字体；Interview 用同一令牌重映射 Tailwind；Lab `visual-theme.css` 覆盖控件，资料绑定改为工具条。未改路由、鉴权、API、SSE、预算或发布门禁，未新增产品功能。本轮验证：portfolio Node 测试 33 通过；Web Vitest 385 通过；Web/Lab `tsc` 与 Vite 构建通过，产物含 woff2；改动过的 TSX eslint 无警告。本地预览核对首页/作品/文章/简历/小哲助手、深色首页、Interview 登录与工作台、Lab 登录/控制中心/编排/资料绑定/MCP/数据治理。未做自动化对比度扫描，未部署，线上 zhezone.cn 未因本分支更新。CI 尚未在本提交上核验。Agent Lab 与 Web 的 Docker 构建在安装前拷贝 `packages/design/package.json`，并在打包前拷贝该目录，否则冻结锁文件与 CSS 导入无法在镜像内解析。
+
 2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
 
 2026-11-10 — 当前唯一主题 LAB-DATA-GOVERNANCE。用户在PR #71合并后要求继续，正在完成资料集合分权的隔离验收与源码交付。主体源码445d572已推送并创建PR #72，后补绑定选框尺寸样式；最新对应CI核验中，未合并/部署；原Lab5175保持此前题库UX镜像，原API/数据卷未改。
