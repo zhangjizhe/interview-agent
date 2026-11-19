@@ -1,22 +1,22 @@
 /** @type {import('tailwindcss').Config} */
-const ink = { 50: '#F8EFE8', 100: '#F3E4D8', 200: '#E7D3C4', 300: '#D4B8A4', 400: '#A07862', 500: '#8A5340', 600: '#8A5340', 700: '#73432F', 800: '#5C3626', 900: '#3F2C24' };
-const paper = { 50: '#FBF6F1', 100: '#F6EFE8', 200: '#EFE4DA', 300: '#E4D5C8', 400: '#B7A094', 500: '#8A7266', 600: '#7C6458', 700: '#5C453C', 800: '#4A382F', 900: '#3F2C24' };
-const pine = { 50: '#E7F3EC', 100: '#D5E8DC', 200: '#C5DDD0', 300: '#9BB8AA', 400: '#4E7A68', 500: '#3F6B52', 600: '#3F6B52', 700: '#2F5640', 800: '#244433', 900: '#1C3326' };
-const seal = { 50: '#F8EEEB', 100: '#F0DDD7', 200: '#E7D0C9', 300: '#D7B3A9', 400: '#B56A5E', 500: '#8F3A32', 600: '#8F3A32', 700: '#732E28', 800: '#5C261F', 900: '#3E1A16' };
-const brass = { 50: '#F8EFE8', 100: '#F3E4D8', 200: '#E7D3C4', 300: '#D4B8A4', 400: '#A07862', 500: '#8C4F38', 600: '#8A5340', 700: '#73432F', 800: '#5C3626', 900: '#3F2C24' };
+const ink = { 50: '#F4F1FC', 100: '#E9E4FA', 200: '#D9D2F6', 300: '#C4BAF0', 400: '#9B8BE8', 500: '#7A68E0', 600: '#6456DC', 700: '#5344C8', 800: '#4336A4', 900: '#23243A' };
+const paper = { 50: '#F7F8FC', 100: '#F1F2F8', 200: '#E6E7F0', 300: '#D5D7E4', 400: '#9AA0B2', 500: '#656779', 600: '#545668', 700: '#3E4154', 800: '#2E3144', 900: '#232332' };
+const pine = { 50: '#E7F6EE', 100: '#D3EDDF', 200: '#B7E0CB', 300: '#8FCBAA', 400: '#4E9A72', 500: '#2F7A58', 600: '#2F7A58', 700: '#246348', 800: '#1C4C38', 900: '#143628' };
+const seal = { 50: '#FDECEF', 100: '#F8D5DC', 200: '#F0C2CC', 300: '#E49AAB', 400: '#D45A74', 500: '#C43B55', 600: '#C43B55', 700: '#A42E46', 800: '#7E2436', 900: '#541824' };
+const brass = ink;
 
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"IBM Plex Sans"', '"Noto Sans SC"', '"PingFang SC"', 'sans-serif'],
-        serif: ['Newsreader', '"Noto Serif SC"', 'serif'],
+        sans: ['"Plus Jakarta Sans"', '"Noto Sans SC"', '"PingFang SC"', 'sans-serif'],
+        serif: ['"Plus Jakarta Sans"', '"Noto Sans SC"', 'sans-serif'],
         mono: ['"IBM Plex Mono"', '"Noto Sans SC"', 'ui-monospace', 'monospace'],
       },
       colors: {
-        white: '#FFFCFA',
-        black: '#3F2C24',
+        white: '#FFFFFF',
+        black: '#23243A',
         blue: ink,
         slate: paper,
         zinc: paper,

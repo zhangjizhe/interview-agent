@@ -64,7 +64,7 @@ header {
 }
 .brand-name {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 22px;
   letter-spacing: -0.03em;
   font-variation-settings: "opsz" 36;
@@ -134,16 +134,16 @@ nav a.active::after {
   font-size: 12px;
   letter-spacing: 0.08em;
 }
-.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pine); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
 .hello { margin: 28px 0 0; color: var(--muted); font-size: 15px; }
 .hero h1 {
   margin: 8px 0 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: clamp(56px, 6.6vw, 88px);
-  line-height: 1.02;
-  letter-spacing: -0.045em;
-  color: var(--ink);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  color: var(--primary);
 }
 .hero h1 span {
   display: block;
@@ -198,12 +198,11 @@ nav a.active::after {
 
 .plate {
   align-self: center;
-  background:
-    linear-gradient(180deg, rgba(255, 253, 250, 0.72), rgba(246, 235, 227, 0.55));
-  border: 1px solid rgba(140, 79, 56, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(239, 236, 252, 0.72));
+  border: 1px solid rgba(100, 86, 220, 0.12);
   border-radius: 28px;
   padding: 40px 36px 36px;
-  box-shadow: 0 30px 80px rgba(138, 83, 64, 0.08);
+  box-shadow: 0 30px 80px rgba(70, 60, 140, 0.1);
 }
 .plate-kicker {
   margin: 0;
@@ -215,7 +214,7 @@ nav a.active::after {
 .plate blockquote p {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: clamp(28px, 2.6vw, 40px);
   line-height: 1.35;
   letter-spacing: -0.03em;
@@ -235,7 +234,7 @@ nav a.active::after {
 .strip strong {
   display: block;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 40px;
   line-height: 1;
   letter-spacing: -0.04em;
@@ -247,7 +246,7 @@ section { padding: 72px 0; }
 h2 {
   margin: 8px 0 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 36px;
   line-height: 1.2;
   letter-spacing: -0.03em;
@@ -452,10 +451,10 @@ footer {
 .resume-sheet h1 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 48px;
   letter-spacing: -0.04em;
-  color: var(--ink);
+  color: var(--primary);
 }
 .resume-sheet h2 {
   margin-top: 32px;
@@ -519,7 +518,7 @@ footer {
 .read-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-top: 36px; }
 .read-layout { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 40px; margin: 24px 0 80px; align-items: start; }
 .read-paper { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 40px 44px; }
-.read-paper > h1 { margin: 12px 0 14px; font-family: var(--font-display); font-weight: 500; font-size: 36px; line-height: 1.25; letter-spacing: -0.03em; }
+.read-paper > h1 { margin: 12px 0 14px; font-family: var(--font-display); font-weight: 600; font-size: 36px; line-height: 1.25; letter-spacing: -0.03em; }
 .read-meta { display: flex; gap: 14px; color: var(--faint); font-size: 12px; }
 .archive-notice { margin: 20px 0; padding: 12px 14px; background: var(--brass-soft); color: var(--ink-soft); border-radius: 12px; font-size: 12px; line-height: 1.7; }
 .read-body { font-size: 16px; line-height: 1.9; overflow-wrap: anywhere; }
