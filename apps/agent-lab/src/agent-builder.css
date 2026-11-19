@@ -1,17 +1,36 @@
 .builder-workspace { display: grid; gap: 20px; max-width: 1100px; }
-.builder-workspace form, .builder-workspace section { display: grid; gap: 16px; padding: 20px; border: 1px solid var(--agent-border, #deddd9); border-radius: 12px; background: white; }
-.builder-heading { display:flex; justify-content:space-between; gap:20px; align-items:start; }
-.builder-workspace label { display:grid; gap:7px; font-size:13px; }
-.builder-workspace input, .builder-workspace select, .builder-workspace textarea { width:100%; box-sizing:border-box; padding:10px; border:1px solid #d4d3d0; border-radius:6px; background:white; font:inherit; }
-.builder-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
-.builder-workspace button { padding:10px 14px; border:1px solid #d4d3d0; border-radius:7px; background:#f7f7f4; cursor:pointer; }
-.builder-workspace button:disabled { opacity:.5; cursor:default; }
-.builder-workspace fieldset { border:1px solid #deddd9; border-radius:8px; padding:16px; }
-.builder-workspace .builder-confirm { display:flex; align-items:center; }
+.builder-workspace form, .builder-workspace section { display: grid; gap: 16px; padding: 20px; border: 1px solid #e4e5e1; border-radius: 12px; background: white; }
+.builder-heading { display:flex; justify-content:space-between; gap:16px; align-items:center; }
+.builder-heading h2 { margin: 0; font-size: 18px; font-weight: 620; }
+.builder-heading p, .builder-workspace section > p { margin: 0; color: var(--lab-muted, #68727d); font-size: 13px; line-height: 1.65; }
+.builder-workspace label { display:grid; gap:6px; font-size:12px; font-weight: 550; color: #4c5864; }
+.builder-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 16px; }
+.builder-actions, .builder-submit { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.builder-submit { padding-top: 4px; }
+.builder-history { align-content: start; }
+.builder-workspace button.builder-run {
+  display: flex; justify-self: stretch; width: 100%; min-height: 42px; justify-content: space-between;
+  padding: 8px 12px; border: 1px solid #e4e5e1; border-radius: 8px; background: #fafaf8; color: #24303c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; font-weight: 500;
+  letter-spacing: 0; text-align: left; cursor: pointer;
+}
+.builder-workspace button.builder-run:hover:not(:disabled) { background: #f3f3ef; border-color: #d4d5d0; }
+.builder-workspace button.builder-run:disabled { opacity: 1; background: #f6f6f3; color: #6b7280; border-color: #e6e6e2; cursor: not-allowed; }
+.builder-workspace button.builder-run:focus-visible { outline: 2px solid var(--lab-primary, #4f46c8); outline-offset: 2px; }
+.builder-workspace fieldset { border:1px solid #e4e5e1; border-radius:10px; padding:16px; }
+.builder-workspace fieldset.binding-panel { display:grid; gap:12px; margin:0; background:#fcfcfb; }
+.builder-workspace fieldset.binding-panel > legend { padding: 0 4px; font-size: 13px; font-weight: 620; color: #202938; }
+.binding-panel > p { margin: 0; color: #68727d; font-size: 12px; line-height: 1.65; }
+.binding-search { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:end; }
+.binding-pager { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.binding-pager-nav { display:inline-flex; align-items:center; gap:6px; }
+.builder-workspace .builder-confirm { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:450; color:#24303c; }
 .builder-confirm input { width:auto; }
 .builder-workspace pre { white-space:pre-wrap; overflow-wrap:anywhere; }
-@media(max-width:768px) { .builder-fields { grid-template-columns:1fr; } .builder-heading { flex-direction:column; } }
+@media(max-width:768px) { .builder-fields, .binding-search { grid-template-columns:1fr; } .builder-heading { flex-direction:column; align-items:stretch; } }
 
 .builder-workspace .builder-save-fields { display: grid; gap: 16px; border: 0; margin: 0; padding: 0; min-width: 0; }
-.builder-workspace .data-binding-options label { display:flex; align-items:center; gap:8px; min-width:0; overflow-wrap:anywhere; }
+.builder-workspace .data-binding-options { display:grid; gap:2px; }
+.builder-workspace .data-binding-options label { display:flex; align-items:flex-start; gap:8px; min-width:0; overflow-wrap:anywhere; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:450; color:#24303c; }
+.builder-workspace .data-binding-options label:hover { background:#f3f3ef; }
 .builder-workspace .data-binding-options input[type=checkbox] { width:16px; height:16px; min-height:16px; flex:0 0 16px; padding:0; margin:0; }

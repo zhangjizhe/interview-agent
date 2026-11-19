@@ -32,6 +32,7 @@ import './styles.css';
 import './lab.css';
 import { ControlledEvolutionWorkspace } from './ControlledEvolutionWorkspace';
 import './visual-theme.css';
+import './controls.css';
 
 type View = 'data' | 'overview' | 'runtime' | 'mcp' | 'question-bank' | 'trace' | 'evaluation' | 'evolution' | 'experiments' | 'release' | 'audit' | 'operations';
 type Server = {
@@ -277,9 +278,9 @@ export function ControlCenter() {
   if (servers.isLoading || lab.isLoading || recordedImports.isLoading) return <main className="agent-loading">正在连接控制面...</main>;
   if (servers.isError || lab.isError || recordedImports.isError) {
     const error = (servers.error || lab.error || recordedImports.error) as Error;
-    return <main className="agent-gate"><ShieldAlert size={26}/><h1>无法读取控制面</h1><p>{error.message}</p><button className="agent-command" onClick={() => {
+    return <main className="agent-gate"><ShieldAlert size={26}/><h1>无法读取控制面</h1><p>{error.message}</p><button type="button" className="agent-command lab-btn-primary" onClick={() => {
       localStorage.removeItem('ia_access_token'); localStorage.removeItem('ia_user_role'); localStorage.removeItem('ia_userId'); window.location.reload();
-    }}>重新登录控制台</button><button className="agent-command" onClick={() => { void servers.refetch(); void lab.refetch(); void recordedImports.refetch(); }}>重试连接</button></main>;
+    }}>重新登录控制台</button><button type="button" className="agent-command" onClick={() => { void servers.refetch(); void lab.refetch(); void recordedImports.refetch(); }}>重试连接</button></main>;
   }
 
   const data = servers.data as { servers: Server[]; runningCount: number; count: number };
@@ -336,13 +337,15 @@ export function ControlCenter() {
       <main className="agent-workspace">
         <header className="agent-topbar">
           <div><p className="agent-eyebrow">AGENT OPERATIONS</p><h1>{titleFor(view)}</h1></div>
-          <button className="agent-command" onClick={() => setShowPasswordChange(true)}>修改密码</button>
-          {view === 'mcp' && <button className="agent-command" onClick={() => readMcpState.mutate()} disabled={readMcpState.isPending || toggle.isPending || reload.isPending}>刷新本进程状态</button>}
-          <button className="agent-command" onClick={() => {
-            if (window.confirm('仅重新加载当前 API 进程的 MCP 配置；保留运行时开关，不同步其他实例。继续吗？')) reload.mutate();
-          }} disabled={reload.isPending}>
-            <RefreshCw size={16} className={reload.isPending ? 'spin' : ''}/>{reload.isPending ? '重载中' : '重新加载 MCP'}
-          </button>
+          <div className="agent-topbar-actions">
+            <button type="button" className="agent-command" onClick={() => setShowPasswordChange(true)}>修改密码</button>
+            {view === 'mcp' && <button type="button" className="agent-command" onClick={() => readMcpState.mutate()} disabled={readMcpState.isPending || toggle.isPending || reload.isPending}>刷新本进程状态</button>}
+            <button type="button" className="agent-command" onClick={() => {
+              if (window.confirm('仅重新加载当前 API 进程的 MCP 配置；保留运行时开关，不同步其他实例。继续吗？')) reload.mutate();
+            }} disabled={reload.isPending}>
+              <RefreshCw size={16} className={reload.isPending ? 'spin' : ''}/>{reload.isPending ? '重载中' : '重新加载 MCP'}
+            </button>
+          </div>
         </header>
 
         {showPasswordChange && <AccountSecurityDialog onClose={() => setShowPasswordChange(false)} />}
@@ -419,7 +422,7 @@ function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: numbe
       <p className="agent-eyebrow">SYSTEM STATUS</p>
       <h2>Agent 的运行与评测工作台</h2>
       <p>合成基准：Golden Dataset {lab.dataset.version}，格式校验覆盖 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。录制指标用于回放与工程验证；当前业务版本的质量结论见受控自进化证据。</p>
-      <div className="agent-hero-actions"><button onClick={onRuntime}><Workflow size={16}/>查看编排</button><button className="quiet" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button></div>
+      <div className="agent-hero-actions"><button type="button" className="lab-btn-primary" onClick={onRuntime}><Workflow size={16}/>查看编排</button><button type="button" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button></div>
     </section>
     <section className="agent-metric-grid">
       <article><span>MCP 服务</span><strong>{data.runningCount} / {data.count}</strong><small>已启用且执行绑定就绪</small></article>
@@ -467,7 +470,7 @@ function RecordedImports({ imports, executeImport }: {
     return <article className="lab-import-row" key={record.id}>
       <div><p className={`import-${record.status.toLowerCase()}`}>{record.status}</p><h3>{record.agent.agentKey} <span>{record.agent.version}</span></h3><p>{record.datasetVersion} · {new Date(record.createdAt).toLocaleString()}</p></div>
       <div className="lab-row-metrics"><span>质量 {Math.round(record.metrics.qualityScore * 100)}%</span><span>失败 {record.failureCount}</span><span>{record.receiptHash.slice(0, 12)}</span></div>
-      {pending ? <button className="agent-command" onClick={() => executeImport.mutate(record.id)} disabled={busy}><FileUp size={16}/>{busy ? '导入中' : '导入'}</button> : <p className="lab-import-detail">{record.importedBy || record.error || record.runId || ''}</p>}
+      {pending ? <button type="button" className="agent-command lab-btn-primary" onClick={() => executeImport.mutate(record.id)} disabled={busy}><FileUp size={16}/>{busy ? '导入中' : '导入'}</button> : <p className="lab-import-detail">{record.importedBy || record.error || record.runId || ''}</p>}
     </article>;
   })}</section>;
 }
@@ -496,7 +499,7 @@ function ExperimentComposer({ runs, createExperiment }: {
     <div><p className="agent-eyebrow">EXPERIMENT</p><h2>创建比较</h2></div>
     <label>Control<select aria-label="Control run" value={controlRunId} onChange={(event) => setControlRunId(event.target.value)}><option value="">选择运行</option>{runs.map((run) => <option key={run.id} value={run.id}>{run.agent.agentKey} {run.agent.version} · {run.datasetVersion}</option>)}</select></label>
     <label>Treatment<select aria-label="Treatment run" value={treatmentRunId} onChange={(event) => setTreatmentRunId(event.target.value)}><option value="">选择运行</option>{compatibleTreatmentRuns.map((run) => <option key={run.id} value={run.id} disabled={run.id === controlRunId || run.agent.version === runs.find((item) => item.id === controlRunId)?.agent.version}>{run.agent.agentKey} {run.agent.version} · {run.datasetVersion}</option>)}</select></label>
-    <button className="agent-command" onClick={() => createExperiment.mutate({ controlRunId, treatmentRunId })} disabled={!controlRunId || !treatmentRunId || controlRunId === treatmentRunId || createExperiment.isPending}>{createExperiment.isPending ? '创建中' : '创建实验'}</button>
+    <button type="button" className="agent-command lab-btn-primary" onClick={() => createExperiment.mutate({ controlRunId, treatmentRunId })} disabled={!controlRunId || !treatmentRunId || controlRunId === treatmentRunId || createExperiment.isPending}>{createExperiment.isPending ? '创建中' : '创建实验'}</button>
   </section>;
 }
 
@@ -523,7 +526,7 @@ function DecisionCommand({ run, recordDecision }: {
   return <article className="lab-release-row">
     <div><p className="agent-eyebrow">{run.datasetVersion}</p><h2>{run.agent.agentKey} <span>{run.agent.version}</span></h2><p>质量 {Math.round(run.metrics.qualityScore * 100)}% · {run.durationMs}ms</p></div>
     <select aria-label={`Release decision for ${run.agent.version}`} value={decision} onChange={(event) => setDecision(event.target.value)}><option value="APPROVE">APPROVE</option><option value="NEEDS_REVIEW">NEEDS_REVIEW</option><option value="REJECT">REJECT</option></select>
-    <button className="agent-command" onClick={() => recordDecision.mutate({ runId: run.id, decision, rationaleCode })} disabled={busy}>{busy ? '记录中' : '记录决策'}</button>
+    <button type="button" className="agent-command lab-btn-primary" onClick={() => recordDecision.mutate({ runId: run.id, decision, rationaleCode })} disabled={busy}>{busy ? '记录中' : '记录决策'}</button>
   </article>;
 }
 
@@ -626,7 +629,7 @@ function McpWorkspace({ data, health, toggle }: {
         const toggleBusy = toggle.isPending && toggle.variables?.toolName === server.name;
         return <article className="mcp-row" key={server.name}>
           <div className="mcp-identity"><span className={`agent-status-dot ${server.status}`}/><div><h2>{server.displayName || server.name}</h2><p>{server.description || `${server.transport || 'internal'} · ${server.status}`}</p></div></div>
-          <div className="mcp-actions"><button className="icon-command" title="健康检查" onClick={() => health.mutate(server.name)} disabled={healthBusy}><Activity size={16} className={healthBusy ? 'spin' : ''}/></button><button onClick={() => toggle.mutate({ toolName: server.name, enabled: !server.enabled })} disabled={toggleBusy}><ToggleLeft size={16}/>{toggleBusy ? '处理中' : server.enabled ? '本进程关闭' : '本进程启用'}</button></div>
+          <div className="mcp-actions"><button type="button" className="icon-command" title="健康检查" aria-label="健康检查" onClick={() => health.mutate(server.name)} disabled={healthBusy}><Activity size={16} className={healthBusy ? 'spin' : ''}/></button><button type="button" onClick={() => toggle.mutate({ toolName: server.name, enabled: !server.enabled })} disabled={toggleBusy}><ToggleLeft size={16}/>{toggleBusy ? '处理中' : server.enabled ? '本进程关闭' : '本进程启用'}</button></div>
         </article>;
       })}
     </div>
@@ -712,7 +715,7 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
     {(mode === 'login-code' || mode === 'claim-code') && <button type="button" className="text-command" onClick={() => { setMode(mode === 'login-code' ? 'login' : 'claim'); setChallengeId(''); setCode(''); setError(''); setNotice('请再次提交账号密码以发送新验证码。'); }}>重新发送验证码</button>}
     {mode === 'reset' && <button type="button" className="text-command" onClick={() => { setMode('forgot'); setChallengeId(''); setCode(''); setNewPassword(''); setError(''); setNotice('请重新请求找回验证码。'); }}>重新发送验证码</button>}
     {notice && <p role="status">{notice}</p>}{error && <p className="agent-error" role="alert">{error}</p>}
-    {(mode !== 'register' || challengeId) && <button disabled={pending}>{pending ? '处理中' : mode === 'register' ? '验证并创建账号' : mode === 'login' ? '登录' : mode === 'login-code' || mode === 'claim-code' ? '验证并登录' : mode === 'claim' ? '发送绑定验证码' : mode === 'forgot' ? '发送找回验证码' : '重置密码'}</button>}
+    {(mode !== 'register' || challengeId) && <button className="lab-btn-primary" disabled={pending}>{pending ? '处理中' : mode === 'register' ? '验证并创建账号' : mode === 'login' ? '登录' : mode === 'login-code' || mode === 'claim-code' ? '验证并登录' : mode === 'claim' ? '发送绑定验证码' : mode === 'forgot' ? '发送找回验证码' : '重置密码'}</button>}
     {mode === 'login' && <button type="button" className="text-command" onClick={() => { setMode('forgot'); setError(''); }}>忘记密码？</button>}
     {(mode === 'login' || mode === 'register') && <button type="button" className="text-command" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setNotice(''); setChallengeId(''); setCode(''); }}>{mode === 'register' ? '已有账号，返回登录' : '创建管理员账号'}</button>}
     {mode !== 'login' && mode !== 'register' && <button type="button" className="text-command" onClick={() => { setMode('login'); setError(''); setNotice(''); setChallengeId(''); setCode(''); }}>返回登录</button>}

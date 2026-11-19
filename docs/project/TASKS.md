@@ -1,5 +1,7 @@
 # Tasks
 
+2026-11-19。Agent Lab 控制台视觉：共享按钮 / 字段语言已落到编排、控制中心、MCP、数据治理、题库、Trace 卡片和登录。相关 Web 150 项与 Lab 类型检查通过；本地合成页面已看过。未部署。全平台其余产品面的设计系统仍未做。不要并入 `feat/lab-shell-mobile`。
+
 2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
 
 2026-11-10。
