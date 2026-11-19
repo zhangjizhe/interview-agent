@@ -436,7 +436,7 @@ export function ControlledEvolutionWorkspace() {
       <button onClick={() => runEvaluation.mutate(candidateVersionId)} disabled={busy || !candidateVersionId || !datasetId || !evaluatorId || !releaseEvidenceReady}>评测候选</button>
       <button onClick={() => compare.mutate()} disabled={busy || !selectedAgent?.currentVersion || !candidateVersionId || !datasetId || !evaluatorId}>同集对比</button>
       {selectedAgent && !selectedAgent.currentVersion && <button onClick={() => checkFirstRelease.mutate()} disabled={busy || !candidateVersionId}>核验首次发布门禁</button>}
-      <button onClick={() => publish.mutate()} disabled={busy || (selectedAgent?.currentVersion ? comparison?.releaseRecommendation !== 'APPROVE' : !(firstReleaseGate?.agentId === agentId && firstReleaseGate?.versionId === candidateVersionId && firstReleaseGate?.gate.outcome.allowed === true))}>管理员发布</button>
+      <button type="button" className="lab-btn-primary" onClick={() => publish.mutate()} disabled={busy || (selectedAgent?.currentVersion ? comparison?.releaseRecommendation !== 'APPROVE' : !(firstReleaseGate?.agentId === agentId && firstReleaseGate?.versionId === candidateVersionId && firstReleaseGate?.gate.outcome.allowed === true))}>管理员发布</button>
     </div>
 
     {selectedDataset && !releaseEvidenceReady && <p className="lab-feedback">发布评测要求 Dataset 已冻结、至少 10 个带完整业务切片的 Case，并由管理员逐条审查批准。</p>}
@@ -462,7 +462,7 @@ export function ControlledEvolutionWorkspace() {
           <QualityEvidenceSummary evidence={item.metrics?.qualityEvidence} />
           <button onClick={() => setSelectedEvaluationId(item.id)}>查看 {item.id} 的逐项证据</button>
           <progress aria-label="已完成样本" max={Math.max(total ?? completed, 1)} value={total == null || samples == null ? undefined : completed} />
-          {(item.status === 'PENDING' || item.status === 'RUNNING') && <button disabled={Boolean(item.cancelRequestedAt) || cancelEvaluation.isPending} onClick={() => cancelEvaluation.mutate(item.id)}>{item.cancelRequestedAt ? '等待停止与结算' : '取消后续样本'}</button>}
+          {(item.status === 'PENDING' || item.status === 'RUNNING') && <button type="button" className="lab-btn-danger" disabled={Boolean(item.cancelRequestedAt) || cancelEvaluation.isPending} onClick={() => cancelEvaluation.mutate(item.id)}>{item.cancelRequestedAt ? '等待停止与结算' : '取消后续样本'}</button>}
           {item.error && <p className="evolution-rejection">{item.error}</p>}
           {item.metrics?.budget?.costEvidenceStatus === 'unavailable' && <p className="evolution-rejection">中断费用未知；以上仅为已核验样本小计。</p>}
           {item.status === 'COMPLETED' && item.metrics?.cachePolicy !== 'semantic-cache-bypass/v1' && <p>旧运行缺少答案缓存隔离证据，不能作为发布质量依据。</p>}

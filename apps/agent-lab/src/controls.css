@@ -1,0 +1,564 @@
+/* Lab control language. One height, radius, border, and focus treatment
+   for actions and fields. Loaded last so page-level button resets cannot
+   fall back to native or one-off chrome. */
+
+:root {
+  --ctrl-height: 36px;
+  --ctrl-radius: 8px;
+  --ctrl-border: #d5d6d2;
+  --ctrl-text: #24303c;
+  --ctrl-muted: #5c6772;
+  --ctrl-primary: #4f46c8;
+  --ctrl-primary-hover: #3f38b5;
+  --ctrl-primary-active: #37319f;
+  --ctrl-canvas: #f7f7f4;
+  --ctrl-danger: #9f1239;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) :is(input, select, textarea):not(
+  [type="checkbox"],
+  [type="radio"],
+  [type="file"],
+  [type="range"],
+  [type="hidden"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  .qb-file-input
+) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: var(--ctrl-height);
+  min-height: var(--ctrl-height);
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--ctrl-border);
+  border-radius: var(--ctrl-radius);
+  background-color: #fff;
+  color: var(--ctrl-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: none;
+  appearance: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) textarea:not(.qb-file-input) {
+  height: auto;
+  min-height: 96px;
+  padding: 10px 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) select:not([multiple]) {
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='M4 6.25 8 10.25 12 6.25' stroke='%235c6772' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px 14px;
+  cursor: pointer;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) input[type="number"]::-webkit-outer-spin-button,
+:is(.agent-workspace, .agent-gate, .agent-access) input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) :is(input, select, textarea):not(
+  [type="checkbox"],
+  [type="radio"],
+  [type="file"],
+  .qb-file-input
+)::placeholder {
+  color: #8b939c;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) :is(input, select, textarea):not(
+  [type="checkbox"],
+  [type="radio"],
+  [type="file"],
+  .qb-file-input
+):hover:not(:disabled):not(:focus-visible) {
+  border-color: #b7bab4;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) :is(input, select, textarea):not(
+  [type="checkbox"],
+  [type="radio"],
+  [type="file"],
+  .qb-file-input
+):focus-visible {
+  outline: 2px solid var(--ctrl-primary);
+  outline-offset: 1px;
+  border-color: var(--ctrl-primary);
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) :is(input, select, textarea):not(
+  [type="checkbox"],
+  [type="radio"],
+  [type="file"],
+  .qb-file-input
+):disabled {
+  background-color: #f3f3f0;
+  color: #5f6770;
+  border-color: #e4e5e1;
+  cursor: not-allowed;
+}
+
+.agent-workspace input[type="checkbox"],
+.agent-access input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin-top: 1px;
+  padding: 0;
+  border-radius: 4px;
+  accent-color: var(--ctrl-primary);
+  box-shadow: none;
+  flex: 0 0 16px;
+}
+
+.agent-workspace .builder-workspace textarea {
+  min-height: 128px;
+}
+
+.agent-workspace .evolution-assets textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.agent-gate button + button {
+  margin-left: 8px;
+}
+
+/* Action buttons. Variants only swap tokens; chrome stays here. */
+:is(.agent-workspace, .agent-gate, .agent-access) button:not(
+  .trace-run-card,
+  .trace-event,
+  .builder-run,
+  .data-card,
+  .qb-icon-button
+) {
+  --btn-bg: #fff;
+  --btn-fg: var(--ctrl-text);
+  --btn-bd: var(--ctrl-border);
+  --btn-bg-hover: #f4f4f1;
+  --btn-bd-hover: #c5c7c2;
+  --btn-fg-hover: var(--ctrl-text);
+  --btn-bg-active: #ecece8;
+  --btn-bg-disabled: #f3f3f0;
+  --btn-fg-disabled: #5f6770;
+  --btn-bd-disabled: #e4e5e1;
+  --btn-shadow: 0 1px 0 rgba(32, 41, 56, 0.04);
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  max-width: 100%;
+  min-height: var(--ctrl-height);
+  height: auto;
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--btn-bd);
+  border-radius: var(--ctrl-radius);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  box-shadow: var(--btn-shadow);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+  justify-self: start;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button:not(
+  .trace-run-card,
+  .trace-event,
+  .builder-run,
+  .data-card,
+  .qb-icon-button
+) svg {
+  flex: none;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button.lab-btn-primary:not(.qb-secondary, .qb-quiet),
+:is(.agent-workspace, .agent-gate, .agent-access) button.qb-primary,
+:is(.agent-workspace, .agent-gate, .agent-access) button[type="submit"]:not(
+  .qb-secondary,
+  .qb-quiet,
+  .lab-btn-secondary,
+  .lab-btn-ghost,
+  .lab-btn-danger,
+  .text-command
+) {
+  --btn-bg: var(--ctrl-primary);
+  --btn-fg: #fff;
+  --btn-bd: var(--ctrl-primary);
+  --btn-bg-hover: var(--ctrl-primary-hover);
+  --btn-bd-hover: var(--ctrl-primary-hover);
+  --btn-fg-hover: #fff;
+  --btn-bg-active: var(--ctrl-primary-active);
+  --btn-bg-disabled: #ecebf6;
+  --btn-fg-disabled: #4c4870;
+  --btn-bd-disabled: #dddbee;
+  --btn-shadow: 0 1px 1px rgba(47, 42, 120, 0.16);
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button.lab-btn-ghost,
+:is(.agent-workspace, .agent-gate, .agent-access) button.qb-quiet,
+:is(.agent-workspace, .agent-gate, .agent-access) button.quiet-command,
+:is(.agent-workspace, .agent-gate, .agent-access) button.text-command {
+  --btn-bg: transparent;
+  --btn-bd: transparent;
+  --btn-fg: #3a4553;
+  --btn-bg-hover: #efefeb;
+  --btn-bd-hover: transparent;
+  --btn-fg-hover: #202938;
+  --btn-bg-active: #e7e7e2;
+  --btn-bg-disabled: transparent;
+  --btn-fg-disabled: #6b7280;
+  --btn-bd-disabled: transparent;
+  --btn-shadow: none;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button.text-command {
+  --btn-fg: #3c349e;
+  --btn-fg-hover: #2f2978;
+  --btn-bg-hover: transparent;
+  --btn-bg-active: transparent;
+  --btn-fg-disabled: #6b6896;
+  min-height: 32px;
+  padding: 2px;
+  justify-content: flex-start;
+  font-weight: 560;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button.lab-btn-danger {
+  --btn-bg: #fff;
+  --btn-fg: var(--ctrl-danger);
+  --btn-bd: #f0cfd4;
+  --btn-bg-hover: #fdf2f3;
+  --btn-bd-hover: #e4b4bb;
+  --btn-fg-hover: #881337;
+  --btn-bg-active: #fbe7ea;
+  --btn-bg-disabled: #faf7f7;
+  --btn-fg-disabled: #7c3a48;
+  --btn-bd-disabled: #f0e0e3;
+  --btn-shadow: none;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button:not(
+  .trace-run-card,
+  .trace-event,
+  .builder-run,
+  .data-card,
+  .qb-icon-button
+):hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+  border-color: var(--btn-bd-hover);
+  color: var(--btn-fg-hover);
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button:not(
+  .trace-run-card,
+  .trace-event,
+  .builder-run,
+  .data-card,
+  .qb-icon-button
+):active:not(:disabled) {
+  background: var(--btn-bg-active, var(--btn-bg-hover));
+  border-color: var(--btn-bd-hover);
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button:not(
+  .trace-run-card,
+  .trace-event,
+  .builder-run,
+  .data-card,
+  .qb-icon-button
+):disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  background: var(--btn-bg-disabled);
+  color: var(--btn-fg-disabled);
+  border-color: var(--btn-bd-disabled);
+  box-shadow: none;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button:not(
+  .trace-run-card,
+  .trace-event,
+  .builder-run,
+  .data-card,
+  .qb-icon-button
+):focus-visible {
+  outline: 2px solid var(--ctrl-primary);
+  outline-offset: 2px;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button.text-command:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+button.text-command,
+button.quiet-command {
+  background: var(--btn-bg) !important;
+  border-color: var(--btn-bd) !important;
+  color: var(--btn-fg) !important;
+  box-shadow: var(--btn-shadow) !important;
+}
+
+button.text-command:hover:not(:disabled),
+button.quiet-command:hover:not(:disabled) {
+  background: var(--btn-bg-hover) !important;
+  color: var(--btn-fg-hover, var(--btn-fg)) !important;
+}
+
+button.text-command:disabled,
+button.quiet-command:disabled {
+  background: var(--btn-bg-disabled) !important;
+  color: var(--btn-fg-disabled) !important;
+  opacity: 1 !important;
+}
+
+:is(.agent-workspace, .agent-gate, .agent-access) button.icon-command,
+:is(.agent-workspace, .agent-gate, .agent-access) button.lab-btn-icon {
+  width: var(--ctrl-height);
+  min-width: var(--ctrl-height);
+  padding: 0 !important;
+  --btn-shadow: none;
+}
+
+.agent-access form > button.lab-btn-primary,
+.agent-security-dialog button.lab-btn-primary {
+  width: 100%;
+  justify-self: stretch;
+}
+
+.agent-topbar {
+  align-items: center;
+}
+
+.agent-topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+}
+
+.agent-hero-actions {
+  align-items: center;
+}
+
+.agent-workspace .question-source-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 18px;
+  padding: 3px;
+  border: 1px solid #e4e5e1;
+  border-radius: 10px;
+  background: #efefeb;
+}
+
+.agent-workspace .question-source-switch button {
+  --btn-bg: transparent;
+  --btn-bd: transparent;
+  --btn-fg: var(--ctrl-muted);
+  --btn-bg-hover: rgba(255, 255, 255, 0.72);
+  --btn-bd-hover: transparent;
+  --btn-fg-hover: var(--ctrl-text);
+  --btn-bg-active: #fff;
+  --btn-shadow: none;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 7px;
+}
+
+.agent-workspace .question-source-switch button[aria-pressed="true"] {
+  --btn-bg: #fff;
+  --btn-fg: #202938;
+  --btn-fg-hover: #202938;
+  --btn-bg-hover: #fff;
+  --btn-shadow: 0 1px 2px rgba(32, 41, 56, 0.06);
+}
+
+.agent-workspace .qb-methods {
+  background: #efefeb;
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.agent-workspace .qb-methods button {
+  --btn-bg: transparent;
+  --btn-bd: transparent;
+  --btn-fg: var(--ctrl-muted);
+  --btn-bg-hover: rgba(255, 255, 255, 0.72);
+  --btn-bd-hover: transparent;
+  --btn-shadow: none;
+  min-height: 30px;
+  border-radius: 7px;
+}
+
+.agent-workspace .qb-methods button[aria-pressed="true"] {
+  --btn-bg: #fff;
+  --btn-fg: var(--ctrl-primary);
+  --btn-fg-hover: var(--ctrl-primary);
+  --btn-bg-hover: #fff;
+  --btn-shadow: 0 1px 2px rgba(32, 41, 56, 0.06);
+}
+
+.agent-workspace .data-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid #e4e5e1;
+  border-radius: 10px;
+  background: #efefeb;
+}
+
+.agent-workspace .data-tabs button {
+  --btn-bg: transparent;
+  --btn-bd: transparent;
+  --btn-fg: var(--ctrl-muted);
+  --btn-bg-hover: rgba(255, 255, 255, 0.72);
+  --btn-bd-hover: transparent;
+  --btn-shadow: none;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 7px;
+}
+
+.agent-workspace .data-tabs button[aria-pressed="true"] {
+  --btn-bg: #fff;
+  --btn-fg: #202938;
+  --btn-fg-hover: #202938;
+  --btn-bg-hover: #fff;
+  --btn-shadow: 0 1px 2px rgba(32, 41, 56, 0.06);
+}
+
+.agent-workspace .data-collection-list button.data-card {
+  appearance: none;
+  display: grid;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  justify-self: stretch;
+  align-items: start;
+  justify-content: start;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #e4e5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #202938;
+  box-shadow: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 580;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.agent-workspace .data-collection-list button.data-card:hover {
+  border-color: #c9cac4;
+  background: #fafaf8;
+}
+
+.agent-workspace .data-collection-list button.data-card.selected {
+  border-color: var(--ctrl-primary);
+  background: #f6f5ff;
+  box-shadow: inset 0 0 0 1px var(--ctrl-primary);
+}
+
+.agent-workspace .data-collection-list button.data-card:focus-visible {
+  outline: 2px solid var(--ctrl-primary);
+  outline-offset: 2px;
+}
+
+.binding-page,
+.data-actions > span,
+.lab-pagination span {
+  color: var(--ctrl-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mcp-actions {
+  align-items: center;
+}
+
+.agent-security-backdrop {
+  background: rgba(24, 28, 36, 0.42);
+}
+
+.agent-security-dialog {
+  position: relative;
+  background: #fff;
+  color: #202938;
+  border: 1px solid #e4e5e1;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(32, 41, 56, 0.16);
+}
+
+.agent-security-dialog h2 {
+  margin: 4px 40px 8px 0;
+  color: #202938;
+}
+
+.agent-security-dialog p,
+.agent-security-form label {
+  color: #68727d;
+}
+
+.agent-security-form label {
+  color: #4c5864;
+  font-weight: 550;
+}
+
+.agent-security-dialog > button.lab-btn-ghost {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+
+.qb-workspace button.qb-button:disabled,
+.qb-workspace button.qb-icon-button:disabled,
+.knowledge-library button:disabled,
+.data-governance button:disabled,
+.builder-workspace button:disabled,
+.trace-workspace button:disabled,
+.trace-inspector button:disabled {
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .agent-topbar { flex-wrap: wrap; gap: 12px; }
+  .agent-topbar-actions { justify-content: flex-start; }
+}

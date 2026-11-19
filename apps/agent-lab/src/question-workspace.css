@@ -11,7 +11,7 @@
 .qb-workspace .qb-secondary { background:#fff; border-color:#ced4de; color:#374151; }
 .qb-workspace .qb-secondary:hover:not(:disabled), .qb-workspace .qb-quiet:hover:not(:disabled) { background:#f1f3f8; }
 .qb-workspace .qb-quiet { color:#536174; background:transparent; }
-.qb-workspace .qb-button:disabled { cursor:not-allowed; opacity:.55; }
+.qb-workspace .qb-button:disabled, .qb-workspace .qb-icon-button:disabled { cursor:not-allowed; opacity:1; }
 .qb-workspace button:focus-visible, .qb-workspace summary:focus-visible, .qb-maintenance summary:focus-visible { outline:2px solid var(--qb-primary,#4f46c8); outline-offset:3px; }
 .qb-filterbar { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; }
 .qb-field { display:flex; flex-direction:column; gap:7px; color:#445066; font-size:12px; min-width:0; }

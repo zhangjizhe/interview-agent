@@ -6,10 +6,9 @@
 .trace-heading, .trace-toolbar, .trace-actions { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
 .trace-actions { flex-wrap:wrap; justify-content:flex-end; }
 .trace-eyebrow { font-size:10px; font-weight:700; color:#6879a1; letter-spacing:.12em; }
-.trace-workspace button, .trace-inspector button { font:inherit; font-size:12px; border:1px solid #d6ddea; border-radius:8px; background:white; color:#243456; padding:9px 12px; cursor:pointer; }
-.trace-workspace button:disabled, .trace-inspector button:disabled { opacity:.45; cursor:default; }
-.trace-workspace button:focus-visible, .trace-inspector button:focus-visible { outline:3px solid #c7d2fe; outline-offset:2px; }
-.trace-workspace button[aria-pressed=true], .trace-inspector button[aria-pressed=true] { background:#eef2ff; border-color:#7b8bd0; box-shadow:inset 3px 0 #596bc4; }
+.trace-workspace .trace-run-card, .trace-inspector .trace-event { font:inherit; font-size:12px; border:1px solid #e4e5e1; border-radius:10px; background:#fff; color:#24303c; cursor:pointer; text-align:left; }
+.trace-workspace .trace-run-card:focus-visible, .trace-inspector .trace-event:focus-visible { outline:2px solid var(--lab-primary,#4f46c8); outline-offset:2px; }
+.trace-workspace .trace-run-card[aria-pressed=true], .trace-inspector .trace-event[aria-pressed=true] { background:#f6f5ff; border-color:#d9d6f5; box-shadow:inset 2px 0 0 #4f46c8; }
 .trace-workspace-grid { display:grid; grid-template-columns:minmax(240px, .85fr) minmax(0, 2.4fr); align-items:start; gap:22px; }
 .trace-run-list { display:grid; gap:10px; max-height:1000px; overflow:auto; padding:2px; }
 .trace-workspace .trace-run-card { display:grid; text-align:left; gap:8px; padding:16px; }
