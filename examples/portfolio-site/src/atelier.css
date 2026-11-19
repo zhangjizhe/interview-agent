@@ -134,7 +134,7 @@ nav a.active::after {
   font-size: 12px;
   letter-spacing: 0.08em;
 }
-.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pine); }
 .hello { margin: 28px 0 0; color: var(--muted); font-size: 15px; }
 .hero h1 {
   margin: 8px 0 0;
@@ -143,7 +143,7 @@ nav a.active::after {
   font-size: clamp(56px, 6.6vw, 88px);
   line-height: 1.08;
   letter-spacing: -0.04em;
-  color: var(--primary);
+  color: var(--ink);
 }
 .hero h1 span {
   display: block;
@@ -198,11 +198,11 @@ nav a.active::after {
 
 .plate {
   align-self: center;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(239, 236, 252, 0.72));
-  border: 1px solid rgba(100, 86, 220, 0.12);
+  background: linear-gradient(180deg, rgba(255, 253, 250, 0.92), rgba(248, 235, 230, 0.72));
+  border: 1px solid rgba(142, 74, 66, 0.12);
   border-radius: 28px;
   padding: 40px 36px 36px;
-  box-shadow: 0 30px 80px rgba(70, 60, 140, 0.1);
+  box-shadow: 0 30px 80px rgba(142, 74, 66, 0.08);
 }
 .plate-kicker {
   margin: 0;
@@ -454,7 +454,7 @@ footer {
   font-weight: 600;
   font-size: 48px;
   letter-spacing: -0.04em;
-  color: var(--primary);
+  color: var(--ink);
 }
 .resume-sheet h2 {
   margin-top: 32px;

@@ -1,42 +1,43 @@
-/* Bright cool family shared by the personal site, Interview, and Agent Lab. */
+/* Warm ivory and clay, shared by the personal site, Interview, and Agent Lab.
+   Type stays Plus Jakarta Sans + Noto Sans SC. */
 
 :root {
   color-scheme: light;
   --font-display: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-ui: "Plus Jakarta Sans", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-mono: "IBM Plex Mono", "Noto Sans SC", ui-monospace, "SFMono-Regular", monospace;
-  --paper: #f7f8fc;
-  --paper-2: #f1f2f8;
-  --surface: #ffffff;
-  --ink: #23243a;
-  --ink-soft: #3e4158;
-  --muted: #656779;
-  --faint: #8b8ea3;
-  --line: #e7e8f2;
-  --line-strong: #d8daea;
-  --brass: #6456dc;
-  --brass-soft: #efecfc;
-  --pine: #2f7a58;
-  --pine-soft: #e7f6ee;
-  --seal: #c43b55;
-  --seal-soft: #fdecef;
-  --success: #1f7a4d;
-  --success-soft: #e7f6ee;
-  --warning: #9a6708;
-  --warning-soft: #fff6e4;
-  --danger: #c43b55;
-  --danger-soft: #fdecef;
-  --danger-line: #f3c9d2;
-  --focus: #6456dc;
-  --primary: #6456dc;
-  --primary-hover: #5344c8;
-  --on-primary: #ffffff;
-  --shadow: 0 18px 50px rgba(70, 60, 140, 0.08);
+  --paper: #fbf6f1;
+  --paper-2: #f6efe8;
+  --surface: #fffdfa;
+  --ink: #3f2c24;
+  --ink-soft: #5c453c;
+  --muted: #7c6458;
+  --faint: #80685c;
+  --line: #f0e4da;
+  --line-strong: #e4d3c6;
+  --brass: #8e4a42;
+  --brass-soft: #f8ebe6;
+  --pine: #3f6b52;
+  --pine-soft: #e7f3ec;
+  --seal: #9a3d48;
+  --seal-soft: #f8eeeb;
+  --success: #2f6a45;
+  --success-soft: #e7f3ec;
+  --warning: #8a5a22;
+  --warning-soft: #f8f1e3;
+  --danger: #9a3d48;
+  --danger-soft: #f8eeeb;
+  --danger-line: #e7cfc8;
+  --focus: #8e4a42;
+  --primary: #8e4a42;
+  --primary-hover: #7a3d38;
+  --on-primary: #fff8f3;
+  --shadow: 0 24px 60px rgba(142, 74, 66, 0.1);
   --radius: 14px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --glow:
-    radial-gradient(980px 520px at 12% -8%, rgba(196, 184, 250, 0.55), transparent 58%),
-    radial-gradient(720px 420px at 96% 0%, rgba(190, 220, 240, 0.45), transparent 52%);
+    radial-gradient(920px 460px at 8% -12%, rgba(232, 176, 160, 0.42), transparent 60%),
+    radial-gradient(680px 380px at 100% 0%, rgba(244, 214, 196, 0.55), transparent 54%);
   --canvas: var(--paper);
   --verified: var(--success);
 }
@@ -44,46 +45,46 @@
 body.dark,
 [data-theme="dark"] {
   color-scheme: dark;
-  --paper: #14141f;
-  --paper-2: #1c1c2a;
-  --surface: #1e1e2c;
-  --ink: #eeeef8;
-  --ink-soft: #d5d6e6;
-  --muted: #b0b2c6;
-  --faint: #8e91aa;
-  --line: #2e2e42;
-  --line-strong: #43435c;
-  --brass: #c4b8ff;
-  --brass-soft: #2a2644;
-  --pine: #9ddec0;
+  --paper: #241812;
+  --paper-2: #2c1e18;
+  --surface: #2e211c;
+  --ink: #f6ede6;
+  --ink-soft: #e7d8cc;
+  --muted: #cdb5a6;
+  --faint: #b19786;
+  --line: #3d2c24;
+  --line-strong: #5a4034;
+  --brass: #f0b0a4;
+  --brass-soft: #3a241f;
+  --pine: #b7d4c4;
   --pine-soft: #1c2e26;
-  --seal: #ffb4c2;
-  --seal-soft: #3a222a;
-  --success: #9ddec0;
+  --seal: #f0b0a4;
+  --seal-soft: #3a2220;
+  --success: #b7d4c4;
   --success-soft: #1c2e26;
-  --warning: #f0d48a;
-  --warning-soft: #332a18;
-  --danger: #ffb4c2;
-  --danger-soft: #3a222a;
-  --danger-line: #5c3340;
-  --focus: #c4b8ff;
-  --primary: #7d6ef0;
-  --primary-hover: #9486f6;
-  --on-primary: #ffffff;
+  --warning: #e4c68a;
+  --warning-soft: #3a2c1c;
+  --danger: #f0b0a4;
+  --danger-soft: #3a2220;
+  --danger-line: #6a4038;
+  --focus: #f0b0a4;
+  --primary: #f3d4cc;
+  --primary-hover: #e7c4ba;
+  --on-primary: #3f2c24;
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   --glow:
-    radial-gradient(820px 420px at 10% -10%, rgba(110, 90, 200, 0.28), transparent 60%),
-    radial-gradient(640px 360px at 100% 0%, rgba(70, 110, 150, 0.22), transparent 55%);
+    radial-gradient(820px 420px at 8% -10%, rgba(168, 80, 70, 0.3), transparent 60%),
+    radial-gradient(640px 360px at 100% 0%, rgba(120, 60, 48, 0.35), transparent 55%);
   --canvas: var(--paper);
 }
 
 ::selection {
-  background: #ddd6fb;
-  color: #23243a;
+  background: #f3d0c8;
+  color: #3f2c24;
 }
 
 body.dark ::selection,
 [data-theme="dark"] ::selection {
-  background: #6456dc;
-  color: #ffffff;
+  background: #8e4a42;
+  color: #fff8f3;
 }
