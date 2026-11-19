@@ -73,3 +73,10 @@ docker/mem0/
 
 # Local database recovery snapshots (never commit)
 .local-backups/
+
+# Local cloud credentials and COS upload trees (never commit)
+SecretKey.csv
+**/SecretKey.csv
+.tencent-cos.env
+deploy/tencent-cos/.venv/
+deploy/tencent-cos/local-upload/
