@@ -306,7 +306,7 @@ export function ControlCenter() {
   return (
     <div className="agent-shell">
       <aside className="agent-sidebar">
-        <div className="agent-brand"><Bot size={19}/><span>Agent Lab</span></div>
+        <div className="agent-brand"><span className="mark" aria-hidden="true">A</span><span>Agent Lab</span></div>
         <p className="agent-section-label">CONTROL PLANE</p>
         <nav aria-label="Agent Lab 导航">
           {CONTROL_NAV.map(({ id, label, icon: Icon, enabled }) => (
@@ -336,6 +336,7 @@ export function ControlCenter() {
       <main className="agent-workspace">
         <header className="agent-topbar">
           <div><p className="agent-eyebrow">AGENT OPERATIONS</p><h1>{titleFor(view)}</h1></div>
+          <div className="topbar-actions">
           <button className="agent-command" onClick={() => setShowPasswordChange(true)}>修改密码</button>
           {view === 'mcp' && <button className="agent-command" onClick={() => readMcpState.mutate()} disabled={readMcpState.isPending || toggle.isPending || reload.isPending}>刷新本进程状态</button>}
           <button className="agent-command" onClick={() => {
@@ -343,6 +344,7 @@ export function ControlCenter() {
           }} disabled={reload.isPending}>
             <RefreshCw size={16} className={reload.isPending ? 'spin' : ''}/>{reload.isPending ? '重载中' : '重新加载 MCP'}
           </button>
+          </div>
         </header>
 
         {showPasswordChange && <AccountSecurityDialog onClose={() => setShowPasswordChange(false)} />}
@@ -702,7 +704,7 @@ function AdminAccess({ expired = false }: { expired?: boolean }) {
     }
   };
   const title = mode === 'register' ? '创建管理员账号' : mode === 'login-code' ? '验证登录邮箱' : mode === 'claim' || mode === 'claim-code' ? '绑定旧账号邮箱' : mode === 'forgot' || mode === 'reset' ? '找回密码' : '进入控制台';
-  return <main className="agent-access"><section><div className="agent-access-mark"><Bot size={22}/></div><p className="agent-eyebrow">AGENT LAB / CONTROL PLANE</p><h1>{title}</h1><p>管理员账号由部署允许名单授予。注册时验证邮箱，之后使用用户名和密码登录。</p><form onSubmit={submit}>
+  return <main className="agent-access"><section><div className="agent-access-mark" aria-hidden="true">A</div><p className="agent-eyebrow">AGENT LAB / CONTROL PLANE</p><h1>{title}</h1><p>管理员账号由部署允许名单授予。注册时验证邮箱，之后使用用户名和密码登录。</p><form onSubmit={submit}>
     {mode !== 'login-code' && mode !== 'claim-code' && mode !== 'reset' && mode !== 'forgot' && <label>用户名<input value={userId} onChange={(event) => setUserId(event.target.value.toLowerCase())} autoComplete="username" required /></label>}
     {(mode === 'login' || mode === 'register' || mode === 'claim') && <label>密码<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={12} maxLength={128} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} required /></label>}
     {(mode === 'register' || mode === 'claim' || mode === 'claim-code' || mode === 'forgot') && <label>邮箱<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); setChallengeId(''); setCode(''); }} maxLength={254} autoComplete="email" required /></label>}

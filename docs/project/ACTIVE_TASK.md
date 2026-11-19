@@ -1,6 +1,8 @@
 # Active task
 
-2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
+2026-11-19 当前唯一任务：三端同一视觉语言。个人站、Interview 与 Agent Lab 共用 `packages/design` 的自托管字体和令牌；控件、图标笔画、圆角和焦点环对齐。不改产品行为。验证见 CURRENT_STATE。未部署，等待用户决定是否继续把个人站样式接到线上 Codex Site。
+
+2026-11-16 前序任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
 
 2026-11-10 — LAB-DATA-GOVERNANCE 续验，用户在 PR #71 合并后要求继续。唯一主题：完成资料集合的类型、归属、READ/WRITE/所有者授权和 Agent 版本绑定的实际隔离验证。沿用暂停的本地候选，禁止混入网站/认证历史修改。
 

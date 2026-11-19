@@ -1,5 +1,7 @@
 # 当前决策索引
 
+2026-11-19 视觉：三端共用 `packages/design` 的字体与令牌，不把样式复制成三套互不相干的调色板。个人站可以更疏、更偏排版；Interview 与 Lab 保持操作密度。不为此新增主题开关、页面或接口。线上站点仍独立部署，仓库内的个人站是可移植的视觉源。
+
 2026-11-16 当前唯一任务：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
 
 2026-11-10 资料分权决策：[LAB_DATA_GOVERNANCE](../architecture/LAB_DATA_GOVERNANCE.md)。沿用Workspace/可信组织与Prisma，采用默认私有的typed逻辑集合、显式READ/WRITE和owner授权管理，不为每个Agent复制数据库/表。记录修订和审计禁止UPDATE/DELETE；绑定属于固定Agent版本，资料内容为每次运行实际读取的当前修订。无数据库RLS、通用向量RAG或真实模型质量承诺。原服务未升级，精确CI/交付回执另核。

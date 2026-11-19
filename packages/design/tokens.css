@@ -1,0 +1,79 @@
+/* Atelier — one material language for the personal site, Interview, and Agent Lab. */
+
+:root {
+  color-scheme: light;
+  --font-display: "Newsreader", "Noto Serif SC", "Songti SC", "STSong", serif;
+  --font-ui: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: "IBM Plex Mono", "Noto Sans SC", ui-monospace, "SFMono-Regular", monospace;
+  --paper: #f3f0ea;
+  --paper-2: #e8e2d8;
+  --surface: #fbfaf7;
+  --ink: #1c1915;
+  --ink-soft: #3f3830;
+  --muted: #6f675e;
+  --faint: #8a8176;
+  --line: #e3dcd2;
+  --line-strong: #cfc6b8;
+  --brass: #6f522c;
+  --brass-soft: #f4efe4;
+  --pine: #1e463c;
+  --pine-soft: #e7f0ec;
+  --seal: #8c3a2f;
+  --seal-soft: #f8eeeb;
+  --success: #1e6b45;
+  --success-soft: #e7f3ec;
+  --warning: #7a5410;
+  --warning-soft: #f8f1e3;
+  --danger: #8f3a32;
+  --danger-soft: #f8eeeb;
+  --danger-line: #e4c8c2;
+  --focus: #6f522c;
+  --shadow: 0 24px 60px rgba(28, 25, 21, 0.08);
+  --radius: 2px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --canvas: var(--paper);
+  --primary: var(--ink);
+  --verified: var(--success);
+}
+
+body.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #121110;
+  --paper-2: #1c1b18;
+  --surface: #191816;
+  --ink: #ede8e0;
+  --ink-soft: #d5cec4;
+  --muted: #b1a89c;
+  --faint: #8a8278;
+  --line: #2e2b26;
+  --line-strong: #433e37;
+  --brass: #e0c092;
+  --brass-soft: #2a241c;
+  --pine: #c5ddd2;
+  --pine-soft: #1c2824;
+  --seal: #f0b8ae;
+  --seal-soft: #2c211e;
+  --success: #9dcfb4;
+  --success-soft: #1a2820;
+  --warning: #e4c68a;
+  --warning-soft: #2a2418;
+  --danger: #f0b2aa;
+  --danger-soft: #2c201e;
+  --danger-line: #5c3d38;
+  --focus: #e0c092;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+  --canvas: var(--paper);
+  --primary: var(--ink);
+}
+
+::selection {
+  background: #e4d2ae;
+  color: #1c1915;
+}
+
+body.dark ::selection,
+[data-theme="dark"] ::selection {
+  background: #6f522c;
+  color: #fbfaf7;
+}
