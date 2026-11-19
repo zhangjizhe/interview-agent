@@ -1,6 +1,6 @@
 # Thread handoff
 
-2026-11-19 视觉重做交接：从 origin/agent-lab `7405555` 拉出 `cursor/visual-redesign-f37b`。`packages/design` 提供 Newsreader、IBM Plex Sans/Mono 与按仓库用字裁过的 Noto Sans/Serif SC。个人站 `atelier.css` 在 `scripts/build.mjs` 里和字体 data URI 一起注入；深色仍走原有 `body.dark` 与 `jizhe-theme`。Interview 不新增主题开关。Lab 原生按钮由 `visual-theme.css` 收成主/次/幽灵/危险，资料集合查找与分页在 `DataBindingPicker` 的工具条里。不要把 `examples/portfolio-site/dist`、`preview` 或 `src/site-html.mjs` 提交。未改 API。
+2026-11-19 视觉重做交接：从 origin/agent-lab `7405555` 拉出 `cursor/visual-redesign-f37b`。`packages/design` 提供 Newsreader、IBM Plex Sans/Mono 与按仓库用字裁过的 Noto Sans/Serif SC。个人站 `atelier.css` 在 `scripts/build.mjs` 里和字体 data URI 一起注入；深色仍走原有 `body.dark` 与 `jizhe-theme`。Interview 不新增主题开关。Lab 原生按钮由 `visual-theme.css` 收成主/次/幽灵/危险，资料集合查找与分页在 `DataBindingPicker` 的工具条里。不要把 `examples/portfolio-site/dist`、`preview` 或 `src/site-html.mjs` 提交。未改 API。两个前端 Dockerfile 必须带上 `packages/design`：安装阶段要有 package.json，打包阶段要有字体和 CSS。
 
 2026-11-16 前序：个人网站经 Agent Lab 返回已校验的分段 SSE，详见 docs/project/PORTFOLIO_STREAMING.md。真实网页已在运行完成前两次显示内容，单次模型调用完成且有6条持久流检查点；估算0.000948CNY非账单。相关143项离线回归、类型/Lint/API及Docker构建通过；本机API已部署并保留旧容器及211条既有Run，首次启动参数错误回滚亦保留记录。不是逐Token输出；公网TLS及JSON-only外部网关仍未通过，GitHub最新CI/合并待核验。无数据库迁移、未改鉴权或已发布Prompt、未混入历史网站WIP。
 

@@ -10,6 +10,7 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
 COPY patches ./patches
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/design/package.json ./packages/design/
 
 # BuildKit cache keeps partial downloads across retrying builds.
 RUN --mount=type=cache,id=interview-agent-pnpm-web,target=/pnpm/store \
