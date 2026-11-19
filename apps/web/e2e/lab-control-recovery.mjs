@@ -63,4 +63,6 @@ export async function verifyControlRecovery(page, context, origin) {
   await page.unroute(reloadPattern);
   page.off('request', observeReload);
   console.log('PASS MCP reload: cancel sends no POST, confirm sends one real POST, pending disabled and bindings retained');
+  await page.getByRole('button', { name: '控制中心', exact: true }).click();
+  await page.getByRole('heading', { name: '控制中心', level: 1, exact: true }).waitFor();
 }
