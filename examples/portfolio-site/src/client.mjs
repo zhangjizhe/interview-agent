@@ -10,9 +10,30 @@ $('article-search').oninput=renderList;$('article-sort').onclick=()=>{descending
 function renderArticle(id){const a=ARTICLES.find(a=>a.id===id);if(!a){reader.innerHTML='<div class="page-title"><h2>未找到文章</h2><a href="#articles">返回文章列表 →</a></div>';return}const index=ARTICLES.indexOf(a),prev=ARTICLES[index-1],next=ARTICLES[index+1];reader.innerHTML=`<div class="read-top"><a class="textlink" href="#articles">← 返回文章列表</a><button class="btn secondary" id="ask-article">问问这篇文章 ✧</button></div><div class="read-layout"><article class="read-paper"><span class="textlink">${escapeHTML(a.category)} / ${isArchive(a)?'原始归档':'工程实践'}</span><h1>${escapeHTML(a.title)}</h1><div class="read-meta"><span>张继哲</span><time>${a.date}</time><span>约 ${a.minutes} 分钟阅读</span></div>${isArchive(a)?`<div class="archive-notice">这是 ${a.date.slice(0,4)} 年的原始笔记，保留当时的思路与代码。部分内容可能过时，代码未因本次迁移重新验证。</div>`:'<div class="archive-notice">根据已公开的项目实践整理，只写可以核对的工作内容，不把未核验的指标写成确定效果。</div>'}<div class="read-body" id="read-body">${a.html}</div><div class="read-nav">${prev?`<a href="#article/${prev.id}">← ${escapeHTML(prev.title)}</a>`:'<span></span>'}${next?`<a href="#article/${next.id}">${escapeHTML(next.title)} →</a>`:''}</div></article><aside class="toc" id="read-toc"><strong>本篇目录</strong></aside></div>`;const headings=$('read-body').querySelectorAll('h1,h2,h3,h4');headings.forEach((h,n)=>{h.id='part-'+n;const a=document.createElement('a');a.textContent=h.textContent;a.href='#';a.onclick=e=>{e.preventDefault();h.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})};$('read-toc').append(a)});if(!headings.length){const p=document.createElement('p');p.textContent='本文以代码为主';$('read-toc').append(p)}$('read-body').querySelectorAll('pre').forEach(pre=>{const b=document.createElement('button');b.className='copy-code';b.textContent='复制代码';b.onclick=async()=>{try{await navigator.clipboard.writeText(pre.querySelector('code')?.textContent||pre.textContent);b.textContent='已复制';setTimeout(()=>b.textContent='复制代码',1800)}catch{b.textContent='请选中代码复制'}};pre.append(b)});$('ask-article').onclick=()=>{openChat();$('chat-input').value=`请结合原文解释《${a.title}》，并指出需要注意的地方。`;$('chat-input').focus()}}
 window.siteRoute=()=>{const raw=location.hash.slice(1)||'home',article=raw.startsWith('article/');let view=article?'read':raw;if(!['home','projects','resume','articles','read','status'].includes(view))view='home';if(article)renderArticle(raw.split('/')[1]);document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===view));document.querySelectorAll('[data-nav]').forEach(a=>{const active=a.dataset.nav===(view==='read'?'articles':view);a.classList.toggle('active',active);if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});document.title=({home:'张继哲 · AI 应用前端工程师',projects:'作品 · 张继哲',articles:'文章 · 张继哲',resume:'在线简历 · 张继哲',status:'服务状态 · 张继哲',read:(ARTICLES.find(a=>a.id===raw.split('/')[1])?.title||'文章')+' · 张继哲'})[view];window.scrollTo(0,0);if(view==='status')checkHealth()};
 let history=[],busy=false,aborter=null,health=null;const feed=$('chat-feed'),state=$('chat-state'),input=$('chat-input'),send=$('chat-send');
-function openChat(){$('chat-panel').hidden=false;$('chat-launch').hidden=true;$('chat-launch').setAttribute('aria-expanded','true');input.focus()}
-function closeChat(){$('chat-panel').hidden=true;$('chat-launch').hidden=false;$('chat-launch').setAttribute('aria-expanded','false');$('chat-launch').focus()}
-$('chat-launch').onclick=openChat;$('chat-close').onclick=closeChat;$('chat-panel').onkeydown=e=>{if(e.key==='Escape'){closeChat();e.stopPropagation()}};
+const chatPanel=$('chat-panel'),chatLaunch=$('chat-launch');
+function openChat(){
+ document.documentElement.classList.add('chat-open');
+ chatPanel.hidden=false;chatLaunch.hidden=true;chatLaunch.setAttribute('aria-expanded','true');
+ input.focus({preventScroll:true});
+}
+function closeChat(){
+ chatPanel.hidden=true;chatLaunch.hidden=false;chatLaunch.setAttribute('aria-expanded','false');
+ document.documentElement.classList.remove('chat-open');
+ chatLaunch.focus({preventScroll:true});
+}
+chatLaunch.onclick=openChat;$('chat-close').onclick=closeChat;
+document.addEventListener('keydown',event=>{
+ if(chatPanel.hidden||event.defaultPrevented||event.isComposing)return;
+ if(event.key==='Escape'){event.preventDefault();closeChat();return}
+ if(event.altKey||event.ctrlKey||event.metaKey)return;
+ const target=event.target;
+ if(target.closest('input,textarea,select,[contenteditable]'))return;
+ if(event.key===' '&&target.closest('button,summary'))return;
+ const page=feed.clientHeight;
+ const steps={ArrowUp:-40,ArrowDown:40,PageUp:-page,PageDown:page,Home:-feed.scrollHeight,End:feed.scrollHeight,' ':event.shiftKey?-page:page};
+ if(!Object.hasOwn(steps,event.key))return;
+ event.preventDefault();feed.scrollTop+=steps[event.key];
+});
 $('chat-reset').onclick=()=>{history=[];feed.querySelectorAll('.message').forEach(m=>m.remove());state.textContent='对话已清空'};
 const scrollFeed=()=>feed.scrollTop=feed.scrollHeight;
 function showSources(node,items){
