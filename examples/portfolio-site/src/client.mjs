@@ -31,6 +31,39 @@ async function admissionFor(question){
  try{sessionStorage.setItem(ADMISSION_KEY,JSON.stringify(admission))}catch{throw Error('无法保存请求标识，本次未发送。')}
  return {...admission,stored:true};
 }
+function typeAnswer(element,signal){
+ const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const segmenter=new Intl.Segmenter(undefined,{granularity:'grapheme'});
+ let pending=[],position=0,frame=0,last=0,finish;
+ const append=text=>{element.append(text);scrollFeed()};
+ function tick(now){
+  frame=0;
+  if(!last||now-last>=24){
+   // Catch up gently when the server sends a long answer in one chunk.
+   const step=Math.max(1,Math.ceil((pending.length-position)/150));
+   append(pending.slice(position,position+step).join(''));
+   position+=step;last=now;
+  }
+  if(position<pending.length){frame=requestAnimationFrame(tick);return}
+  pending=[];position=0;last=0;finish?.();
+ }
+ function flush(){
+  cancelAnimationFrame(frame);frame=0;
+  if(position<pending.length)append(pending.slice(position).join(''));
+  pending=[];position=0;last=0;finish?.();
+ }
+ signal.addEventListener('abort',flush,{once:true});
+ return {
+  push(text){
+   if(!text)return;
+   if(reducedMotion||signal.aborted){append(text);return}
+   pending.push(...Array.from(segmenter.segment(text),part=>part.segment));
+   if(!frame)frame=requestAnimationFrame(tick);
+  },
+  drain(){return frame?new Promise(resolve=>{finish=resolve}):Promise.resolve()},
+  flush
+ };
+}
 async function ask(question,retry=false){
  if(busy||!question.trim())return;
  if(location.protocol==='file:'){state.textContent='当前为离线文件，助手需要在线服务。';return}
@@ -39,7 +72,8 @@ async function ask(question,retry=false){
  if(!retry)addMessage('user',question);
  const controller=new AbortController();aborter=controller;
  const timeout=setTimeout(()=>controller.abort('timeout'),65000),current=addMessage('assistant','');
- let full='',done=false,admission;state.textContent='正在连接助手…';
+ const typing=typeAnswer(current.p,controller.signal);
+ let full='',done=false,admission,sources;state.textContent='正在连接助手…';
  try{
   admission=await admissionFor(question);input.value='';
   const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[...history.slice(-8),{role:'user',content:question}],requestKey:admission.requestKey}),signal:controller.signal});
@@ -48,16 +82,20 @@ async function ask(question,retry=false){
   for await(const e of readSSE(res.body)){
    const d=JSON.parse(e.data);
    if(e.event==='status')state.textContent=d.text;
-   if(e.event==='delta'){full+=d.text||'';if(full.length>22000)throw Error('回答过长。');current.p.textContent=full;scrollFeed()}
+   if(e.event==='delta'){full+=d.text||'';if(full.length>22000)throw Error('回答过长。');typing.push(d.text)}
    if(e.event==='error'){const error=Error(d.message||'回答中断。');error.terminal=d.terminal===true;throw error}
-   if(e.event==='sources'){showSources(current.m,d.items);scrollFeed()}
+   if(e.event==='sources')sources=d.items;
    if(e.event==='done')done=true;
   }
   if(!done||!full.trim())throw Error('连接中断，回答可能不完整。');
+  clearTimeout(timeout);
+  await typing.drain();
+  if(sources){showSources(current.m,sources);scrollFeed()}
   if(admission.stored)sessionStorage.removeItem(ADMISSION_KEY);
   history.push({role:'user',content:question},{role:'assistant',content:full.slice(0,2500)});history=history.slice(-8);
   state.textContent=health?.agentMode==='direct'?'回答完成 · 请核对来源':'回答完成 · 可继续追问，也可查看来源';
  }catch(e){
+  typing.flush();
   if(!full)current.p.remove();const p=document.createElement('p');p.className='chat-error';
   const lab=health?.agentMode!=='direct';
   p.textContent=controller.signal.aborted?(lab?'已停止等待；服务端运行可能仍在继续，不代表取消或退款。':(controller.signal.reason==='timeout'?'响应超时，已停止。':'已停止生成。')):e.message;
