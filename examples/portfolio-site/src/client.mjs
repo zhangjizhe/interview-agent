@@ -15,7 +15,26 @@ function closeChat(){$('chat-panel').hidden=true;$('chat-launch').hidden=false;$
 $('chat-launch').onclick=openChat;$('chat-close').onclick=closeChat;$('chat-panel').onkeydown=e=>{if(e.key==='Escape'){closeChat();e.stopPropagation()}};
 $('chat-reset').onclick=()=>{history=[];feed.querySelectorAll('.message').forEach(m=>m.remove());state.textContent='对话已清空'};
 const scrollFeed=()=>feed.scrollTop=feed.scrollHeight;
-function showSources(node,items){node.querySelectorAll('.sources').forEach(old=>old.remove());const box=document.createElement('div');box.className='sources';for(const source of items||[]){if(!/^#(article\/[0-9]+|projects|resume|notes)$/.test(source.url)&&source.url!=='https://github.com/zhangjizhe')continue;const a=document.createElement('a');a.href=source.url;if(source.url==='https://github.com/zhangjizhe'){a.target='_blank';a.rel='noopener noreferrer'}a.textContent='↗ '+source.title;a.onclick=()=>{if(innerWidth<760)closeChat()};box.append(a)}if(box.childNodes.length)node.append(box)}
+function showSources(node,items){
+ const links=document.createElement('div');links.className='sources';
+ const seen=new Set();
+ for(const source of items||[]){
+  if(seen.has(source.url))continue;
+  const profile=source.url==='https://github.com/zhangjizhe';
+  if(!profile&&!/^#(article\/[0-9]+|projects|resume|notes)$/.test(source.url))continue;
+  seen.add(source.url);
+  const link=document.createElement('a');
+  link.href=source.url;link.textContent=source.title;
+  if(profile){link.target='_blank';link.rel='noopener noreferrer'}
+  link.onclick=()=>{if(innerWidth<760)closeChat()};
+  links.append(link);
+ }
+ if(!seen.size)return;
+ const disclosure=document.createElement('details');
+ const label=document.createElement('summary');
+ label.textContent='查看来源';
+ disclosure.append(label,links);node.append(disclosure);
+}
 function addMessage(role,text){const m=document.createElement('div');m.className='message '+role;const name=document.createElement('span');name.className='speaker';name.textContent=role==='user'?'你':'小哲';const p=document.createElement('div');p.className='chat-text';p.textContent=text;m.append(name,p);feed.append(m);scrollFeed();return {m,p}}
 function setBusy(value){busy=value;send.textContent=value?'停止等待 ■':'发送 ↑';input.disabled=value;$('chat-reset').disabled=value;feed.setAttribute('aria-busy',String(value))}
 const ADMISSION_KEY='portfolio-lab-admission/v1';
@@ -93,7 +112,7 @@ async function ask(question,retry=false){
   if(sources){showSources(current.m,sources);scrollFeed()}
   if(admission.stored)sessionStorage.removeItem(ADMISSION_KEY);
   history.push({role:'user',content:question},{role:'assistant',content:full.slice(0,2500)});history=history.slice(-8);
-  state.textContent=health?.agentMode==='direct'?'回答完成 · 请核对来源':'回答完成 · 可继续追问，也可查看来源';
+  state.textContent='';
  }catch(e){
   typing.flush();
   if(!full)current.p.remove();const p=document.createElement('p');p.className='chat-error';
