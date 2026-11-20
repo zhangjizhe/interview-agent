@@ -10,7 +10,7 @@ export const portfolioDocumentSchema = z.object({ id: z.string().regex(/^[a-z][a
   href: z.union([z.string().regex(/^#(?:resume|projects|notes|article\/[0-9]+)$/), z.literal('https://github.com/zhangjizhe')]), text: z.string().min(1).max(1600), topics: z.array(z.string().min(1).max(60)).min(1).max(30) }).strict();
 const sourceSchema = z.object({ schemaVersion: z.literal('portfolio-public/v1'), source: z.object({ title: z.string(), revision: z.string().min(1).max(100),
   capturedAt: z.string(), authority: z.enum(['owner-provided-public-page', 'owner-authorized-public-profile']), verifiedAgainstRepository: z.literal(false), htmlSha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
-  documents: z.array(portfolioDocumentSchema).min(1).max(60) }).strict();
+  documents: z.array(portfolioDocumentSchema).min(1).max(72) }).strict();
 export const portfolioSource = sourceSchema.parse(publicSource);
 if (new Set(portfolioSource.documents.map(item => item.id)).size !== portfolioSource.documents.length) throw new Error('Duplicate public portfolio document IDs');
 export type PortfolioDocument = z.infer<typeof portfolioDocumentSchema>;
