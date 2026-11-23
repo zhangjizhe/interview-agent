@@ -21,6 +21,12 @@ export async function verifyMcpToggle(page, context, origin) {
     await row.getByRole('button', { name: '本进程关闭', exact: true }).click();
     await row.getByRole('button', { name: '确认关闭', exact: true }).click();
   };
+  const scopeDetails = page.locator('details.mcp-scope');
+  const scopeSummary = scopeDetails.locator('summary', { hasText: '操作范围与持久性' });
+  await scopeSummary.waitFor();
+  if ((await scopeDetails.getAttribute('open')) === null) {
+    await scopeSummary.click();
+  }
   await page.getByText('开关仅作用于当前 API 进程，会影响该进程服务的所有组织；不会同步其他实例。重新加载配置保留当前开关，API 重启后恢复配置文件默认值。关闭会阻止后续工具调用，不会取消已经开始的调用。', { exact: true }).waitFor();
   const path = `${origin}/api/admin/mcp-servers/toggle`;
   const failure = page.getByText('Synthetic MCP toggle refused', { exact: false });
