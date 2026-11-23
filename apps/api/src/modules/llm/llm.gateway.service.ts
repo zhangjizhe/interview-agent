@@ -33,6 +33,18 @@ import { SessionCostTracker } from './cost/session-cost.tracker';
  *  - 5xx / 429 = 临时错,走 fallback
  *  - 进程级 disabled 状态,新 key 后用 setProviderEnabled 重新启用
  */
+type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
+interface ProviderCircuitBreaker {
+  state: CircuitState;
+  consecutiveFailures: number;
+  openedAt: number | null;
+  halfOpenProbeInFlight: boolean;
+  totalTrips: number;
+  totalFallbacks: number;
+  lastError?: string;
+}
+
 @Injectable()
 export class LlmGatewayService {
   private readonly logger = new Logger(LlmGatewayService.name);
@@ -48,6 +60,13 @@ export class LlmGatewayService {
   ]);
   /** provider 永久错误原因（用于可观测） */
   private providerDisabledReason: Map<LLMProviderName, string> = new Map();
+  /** 瞬态错误熔断器配置（支持环境变量覆盖） */
+  private readonly circuitFailureThreshold = Math.max(1, Number(process.env.LLM_CB_FAILURE_THRESHOLD || 3));
+  private readonly circuitCooldownMs = Math.max(1000, Number(process.env.LLM_CB_COOLDOWN_MS || 60_000));
+  private readonly circuitBreakers: Map<LLMProviderName, ProviderCircuitBreaker> = new Map([
+    ['qwen', { state: 'CLOSED', consecutiveFailures: 0, openedAt: null, halfOpenProbeInFlight: false, totalTrips: 0, totalFallbacks: 0 }],
+    ['deepseek', { state: 'CLOSED', consecutiveFailures: 0, openedAt: null, halfOpenProbeInFlight: false, totalTrips: 0, totalFallbacks: 0 }],
+  ]);
 
   constructor(
     private qwen: QwenProvider,
@@ -66,36 +85,94 @@ export class LlmGatewayService {
   }
 
   /**
-   * 路由策略：
-   * - 代码 / 技术题 → DeepSeek
-   * - 通用对话 / 评估 → Qwen
-   * - 用户显式指定 → 用指定的
+   * 判断 Provider 当前是否可路由：
+   * - 永久禁用（401/402/403/404）返回 false
+   * - 熔断器 OPEN 且未过冷却期返回 false
+   * - 冷却期满转入 HALF_OPEN，仅放行 1 个探测请求
+   */
+  private isProviderRoutable(name: LLMProviderName): boolean {
+    if (this.providerEnabled.get(name) !== true) return false;
+    const cb = this.circuitBreakers.get(name);
+    if (!cb) return true;
+    if (cb.state === 'CLOSED') return true;
+    if (cb.state === 'OPEN') {
+      if (cb.openedAt !== null && Date.now() - cb.openedAt >= this.circuitCooldownMs) {
+        cb.state = 'HALF_OPEN';
+        cb.halfOpenProbeInFlight = true;
+        this.logger.warn(`[${name}] CIRCUIT HALF_OPEN: allowing recovery probe`);
+        return true;
+      }
+      return false;
+    }
+    if (cb.halfOpenProbeInFlight) return false;
+    cb.halfOpenProbeInFlight = true;
+    return true;
+  }
+
+  private recordProviderSuccess(name: LLMProviderName): void {
+    const cb = this.circuitBreakers.get(name);
+    if (!cb) return;
+    if (cb.state !== 'CLOSED' || cb.consecutiveFailures > 0) {
+      this.logger.log(`[${name}] CIRCUIT CLOSED (recovered)`);
+    }
+    cb.state = 'CLOSED';
+    cb.consecutiveFailures = 0;
+    cb.openedAt = null;
+    cb.halfOpenProbeInFlight = false;
+    cb.lastError = undefined;
+  }
+
+  private recordProviderFailure(name: LLMProviderName, err: any): void {
+    if (this.isPermanentProviderError(err)) {
+      this.disableProvider(name, 'Provider authentication, billing or model configuration failed');
+      return;
+    }
+    const cb = this.circuitBreakers.get(name);
+    if (!cb) return;
+    cb.consecutiveFailures += 1;
+    cb.halfOpenProbeInFlight = false;
+    cb.lastError = typeof err?.message === 'string' ? err.message.slice(0, 200) : 'transient provider error';
+    if (cb.state === 'HALF_OPEN' || cb.consecutiveFailures >= this.circuitFailureThreshold) {
+      cb.state = 'OPEN';
+      cb.openedAt = Date.now();
+      cb.totalTrips += 1;
+      this.logger.error(`[${name}] CIRCUIT OPEN after ${cb.consecutiveFailures} failures (cooldown=${this.circuitCooldownMs}ms): ${cb.lastError}`);
+    }
+  }
+
+  private recordFallback(from: LLMProviderName): void {
+    const cb = this.circuitBreakers.get(from);
+    if (cb) cb.totalFallbacks += 1;
+  }
+
+  /**
+   * 路由策略（DeepSeek + 千问双模型熔断兜底）：
+   * - 用户显式指定且可路由 → 用指定的
+   * - 默认主备优先级由 LLM_PRIMARY_PROVIDER 控制（默认 deepseek 优先、qwen 热备）
+   * - 任一端永久禁用或熔断 OPEN 时，立即切向另一端健康 Provider
    */
   private selectProvider(params: ChatParams, preferred?: LLMProviderName): BaseLLMProvider {
-    if (preferred && this.providers.has(preferred)) {
-      // 优先 provider 如果被 disabled,降级选可用的
-      if (this.providerEnabled.get(preferred)) {
-        return this.providers.get(preferred);
-      }
+    if (preferred && this.providers.has(preferred) && this.isProviderRoutable(preferred)) {
+      return this.providers.get(preferred)!;
     }
 
-    // 简易意图识别
+    const configuredPrimary: LLMProviderName = process.env.LLM_PRIMARY_PROVIDER === 'qwen' ? 'qwen' : 'deepseek';
     const lastMessage = params.messages[params.messages.length - 1]?.content || '';
     const isCoding =
       /代码|code|implement|算法|function|class|实现|写一个/i.test(lastMessage) ||
       params.tools?.some((t) => t.function.name.includes('code'));
 
-    // 技术题优先 DeepSeek，但余额不足/凭据失效后不能继续选中已禁用的 provider。
-    // 否则每一轮都会先打一次必失败请求，再等待 fallback，放大首字延迟。
-    if (isCoding) {
-      if (this.providerEnabled.get('deepseek')) return this.deepseek;
-      if (this.providerEnabled.get('qwen')) return this.qwen;
-    } else {
-      if (this.providerEnabled.get('qwen')) return this.qwen;
-      if (this.providerEnabled.get('deepseek')) return this.deepseek;
+    const primaryOrder: LLMProviderName[] = isCoding
+      ? ['deepseek', 'qwen']
+      : [configuredPrimary, this.fallbackMap.get(configuredPrimary) || 'qwen'];
+
+    for (const candidate of primaryOrder) {
+      if (this.isProviderRoutable(candidate)) {
+        return this.providers.get(candidate)!;
+      }
     }
 
-    throw new ServiceUnavailableException('所有模型 Provider 暂不可用，请稍后重试');
+    throw new ServiceUnavailableException('所有模型 Provider 暂不可用或已熔断，请稍后重试');
   }
 
   /**
@@ -120,32 +197,63 @@ export class LlmGatewayService {
   }
 
   /**
-   * 外部调用：换 key 后重新启用
+   * 外部调用：换 key 后重新启用（同时重置熔断器）
    */
   setProviderEnabled(name: LLMProviderName, enabled: boolean, reason?: string): void {
     this.providerEnabled.set(name, enabled);
     if (enabled) {
       this.providerDisabledReason.delete(name);
-      this.logger.warn(`[${name}] re-enabled`);
+      const cb = this.circuitBreakers.get(name);
+      if (cb) {
+        cb.state = 'CLOSED';
+        cb.consecutiveFailures = 0;
+        cb.openedAt = null;
+        cb.halfOpenProbeInFlight = false;
+        cb.lastError = undefined;
+      }
+      this.logger.warn(`[${name}] re-enabled (circuit reset)`);
     } else {
       this.providerDisabledReason.set(name, reason || 'manually disabled');
       this.logger.warn(`[${name}] disabled: ${reason || 'manually'}`);
     }
   }
 
-  getProviderStatus(): Record<string, { enabled: boolean; reason?: string }> {
-    const out: Record<string, { enabled: boolean; reason?: string }> = {};
+  getProviderStatus(): Record<string, {
+    enabled: boolean;
+    reason?: string;
+    circuitState: CircuitState;
+    consecutiveFailures: number;
+    totalTrips: number;
+    totalFallbacks: number;
+    lastError?: string;
+  }> {
+    const out: Record<string, any> = {};
     for (const [k, v] of this.providerEnabled) {
-      out[k] = { enabled: v, reason: this.providerDisabledReason.get(k) };
+      const cb = this.circuitBreakers.get(k);
+      out[k] = {
+        enabled: v,
+        reason: this.providerDisabledReason.get(k),
+        circuitState: cb?.state ?? 'CLOSED',
+        consecutiveFailures: cb?.consecutiveFailures ?? 0,
+        totalTrips: cb?.totalTrips ?? 0,
+        totalFallbacks: cb?.totalFallbacks ?? 0,
+        lastError: cb?.lastError,
+      };
     }
     return out;
   }
 
   getConfiguredModels() {
-    return Array.from(this.providers.values()).map(provider => ({
-      provider: provider.name, model: provider.defaultModel,
-      enabled: this.providerEnabled.get(provider.name as LLMProviderName) === true,
-    }));
+    return Array.from(this.providers.values()).map(provider => {
+      const name = provider.name as LLMProviderName;
+      const cb = this.circuitBreakers.get(name);
+      return {
+        provider: provider.name,
+        model: provider.defaultModel,
+        enabled: this.providerEnabled.get(name) === true,
+        circuitState: cb?.state ?? 'CLOSED',
+      };
+    });
   }
 
   private async auxiliary<T extends { promptTokens?: number }>(task: 'embedding' | 'rerank', model: string, inputBytes: number, invoke: () => Promise<T>): Promise<T> {
@@ -244,15 +352,18 @@ export class LlmGatewayService {
     let preparedMaxTokens: number;
 
     const invoke = async (provider: BaseLLMProvider, fallback: boolean) => {
+      const name = provider.name as LLMProviderName;
       try {
-        return await this.promptCache.wrapChat(
+        const res = await this.promptCache.wrapChat(
           (prepared) => this.quotaChat(provider, prepared, p => { preparedMaxTokens = p.maxTokens; }),
           { ...params, interviewId, userId, isFallback: fallback },
           { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: provider.name, model: provider.defaultModel },
         );
+        this.recordProviderSuccess(name);
+        return res;
       } catch (err) {
-        if (this.isPermanentProviderError(err)) {
-          this.disableProvider(provider.name as LLMProviderName, 'Provider authentication, billing or model configuration failed');
+        if (!(err instanceof HttpException)) {
+          this.recordProviderFailure(name, err);
         }
         throw err;
       }
@@ -262,9 +373,10 @@ export class LlmGatewayService {
     } catch (err) {
       if (err instanceof HttpException || params.allowFallback === false) throw err;
       const fallbackName = this.fallbackMap.get(primary.name as LLMProviderName);
-      if (!fallbackName || !this.providerEnabled.get(fallbackName)) throw err;
+      if (!fallbackName || !this.isProviderRoutable(fallbackName)) throw err;
+      this.recordFallback(primary.name as LLMProviderName);
       isFallback = true;
-      response = await invoke(this.providers.get(fallbackName), true);
+      response = await invoke(this.providers.get(fallbackName)!, true);
     }
 
     // Langfuse 埋点（保留 v13 原有可观测）
@@ -363,33 +475,31 @@ export class LlmGatewayService {
         if (chunk.content || chunk.toolCall || (chunk.finishReason && chunk.finishReason !== 'error')) hasEmitted = true;
         yield chunk;
       }
+      this.recordProviderSuccess(primary.name as LLMProviderName);
     } catch (err) {
       if (err instanceof HttpException) throw err;
-      // 永久错 vs 临时错同样处理
-      if (this.isPermanentProviderError(err)) {
-        this.disableProvider(primary.name as LLMProviderName, 'Provider authentication, billing or model configuration failed');
-      } else {
-        this.logger.warn({ event: 'provider_stream_failed', provider: primary.name });
-      }
+      this.recordProviderFailure(primary.name as LLMProviderName, err);
       // 已输出文本、工具调用或终态后不得重放另一模型，避免重复/混合回答。
       if (hasEmitted) throw err;
       const fallbackName = this.fallbackMap.get(primary.name as LLMProviderName);
-      if (params.allowFallback !== false && fallbackName && this.providerEnabled.get(fallbackName)) {
-        const fallback = this.providers.get(fallbackName);
+      if (params.allowFallback !== false && fallbackName && this.isProviderRoutable(fallbackName)) {
+        this.recordFallback(primary.name as LLMProviderName);
+        const fallback = this.providers.get(fallbackName)!;
         actualProvider = fallback;
         totalContent = '';
         try {
-        for await (const chunk of this.promptCache.wrapStream(
-          (prepared) => this.quotaStream(fallback, prepared),
-          { ...params, interviewId, userId, isFallback: true },
-          { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: fallback.name, model: fallback.defaultModel },
-        )) {
-          if (chunk.content) totalContent += chunk.content;
-          yield chunk;
-        }
+          for await (const chunk of this.promptCache.wrapStream(
+            (prepared) => this.quotaStream(fallback, prepared),
+            { ...params, interviewId, userId, isFallback: true },
+            { protocol: 'openai_compat', systemVersion: 'sys-v1', provider: fallback.name, model: fallback.defaultModel },
+          )) {
+            if (chunk.content) totalContent += chunk.content;
+            yield chunk;
+          }
+          this.recordProviderSuccess(fallback.name as LLMProviderName);
         } catch (fallbackError) {
-          if (this.isPermanentProviderError(fallbackError)) {
-            this.disableProvider(fallback.name as LLMProviderName, 'Provider authentication, billing or model configuration failed');
+          if (!(fallbackError instanceof HttpException)) {
+            this.recordProviderFailure(fallback.name as LLMProviderName, fallbackError);
           }
           throw fallbackError;
         }

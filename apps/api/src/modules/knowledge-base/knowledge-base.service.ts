@@ -16,12 +16,13 @@ import { DEFAULT_ORGANIZATION_ID, tenantContext, tenantCollection } from '../org
  *  - 启动优先用 knowledge-base-retagged.json（如存在）
  */
 
-import { Injectable, Logger, OnModuleInit, OnApplicationBootstrap, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnApplicationBootstrap, ServiceUnavailableException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as path from 'path';
 import { QdrantService } from '../../infra/qdrant/qdrant.service';
+import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { randomUUID } from 'crypto';
 
 
@@ -77,6 +78,7 @@ export class KnowledgeBaseService implements OnModuleInit {
   constructor(
     private config: ConfigService,
     private qdrant: QdrantService,
+    @Optional() private llmGateway?: LlmGatewayService,
   ) { }
 
   async onModuleInit() {
@@ -447,9 +449,13 @@ export class KnowledgeBaseService implements OnModuleInit {
   // ===== private helpers =====
 
   private async embedOne(text: string): Promise<number[]> {
+    const bounded = text.slice(0, 4096);
+    if (this.llmGateway && tenantContext.getStore()?.organizationId) {
+      return this.llmGateway.embedText(bounded);
+    }
     const res = await this.embedder.embeddings.create({
       model: 'text-embedding-v3',
-      input: text.slice(0, 4096),
+      input: bounded,
       encoding_format: 'float',
       dimensions: VECTOR_SIZE,
     } as any);

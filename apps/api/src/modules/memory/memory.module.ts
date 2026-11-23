@@ -3,8 +3,10 @@ import { RedisShortTermMemory } from './short-term/redis-memory.store';
 import { MilvusLongTermMemory } from './long-term/milvus-memory.store';
 import { Mem0CloudMemory } from './long-term/mem0.store';
 import { MemoryService } from './memory.service';
+import { LlmModule } from '../llm/llm.module';
 
 @Module({
+  imports: [LlmModule],
   providers: [
     RedisShortTermMemory,
     MilvusLongTermMemory,

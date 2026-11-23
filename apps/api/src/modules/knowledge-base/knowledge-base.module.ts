@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { KnowledgeBaseService, KnowledgeBaseBootstrap } from './knowledge-base.service';
 import { KnowledgeBaseController } from './knowledge-base.controller';
 import { QdrantModule } from '../../infra/qdrant/qdrant.module';
+import { LlmModule } from '../llm/llm.module';
 
 @Module({
-  imports: [QdrantModule],
+  imports: [QdrantModule, LlmModule],
   providers: [KnowledgeBaseService, KnowledgeBaseBootstrap],
   controllers: [KnowledgeBaseController],
   exports: [KnowledgeBaseService],

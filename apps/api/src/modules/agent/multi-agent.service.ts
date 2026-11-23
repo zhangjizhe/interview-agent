@@ -66,8 +66,9 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
 
     try {
       // P0-1 修复：不再直接 new ChatOpenAI，而是用 LlmGatewayChatModel 包装
-      // 这样 LangGraph 节点的 model.invoke() 实际走 LlmGateway → 享受 P0 缓存工程
-      const providerName = 'qwen' as const;
+      // 这样 LangGraph 节点的 model.invoke() 实际走 LlmGateway → 享受 P0 缓存与双模型熔断兜底
+      const configuredPrimary = this.config.get<string>('agent.primaryProvider') || process.env.LLM_PRIMARY_PROVIDER;
+      const providerName: 'qwen' | 'deepseek' = configuredPrimary === 'qwen' ? 'qwen' : 'deepseek';
       const model = new LlmGatewayChatModel({
         llmGateway: this.llm,
         provider: providerName,
@@ -409,7 +410,9 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
                 reflection: reflection || undefined,
                 retryCount,
                 hitlPending,
-                modelName: 'qwen-plus', // TODO: 从 config 读
+                modelName: process.env.LLM_PRIMARY_PROVIDER === 'qwen'
+                  ? (this.config.get<string>('qwen.model') || 'qwen-plus')
+                  : (this.config.get<string>('deepseek.model') || 'deepseek-flash'),
                 nodeName: 'reviewer',
               }).catch((e: any) => {
                 self.logger.warn(`reflection record failed: ${e.message}`);

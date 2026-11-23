@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import OpenAI from 'openai';
 import { MilvusClient, DataType, MetricType, IndexType, ConsistencyLevelEnum } from '@zilliz/milvus2-sdk-node';
 import { ConfigService } from '@nestjs/config';
 import { ParsedResume } from './resume-parser.service';
 import { scrubPdfStructureNoise, isPdfStructureToken } from '../../../common/pdf-noise';
+import { LlmGatewayService } from '../../llm/llm.gateway.service';
+import { tenantContext } from '../../organizations/tenant-context';
 
 /**
  * 简历 RAG 服务（lazy init）
@@ -25,7 +27,10 @@ export class ResumeRAGService {
   private readonly VECTOR_DIM = 1024;
   private initialized = false;
 
-  constructor(private config: ConfigService) {
+  constructor(
+    private config: ConfigService,
+    @Optional() private llmGateway?: LlmGatewayService,
+  ) {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
     const qwenKey = this.config.get<string>('qwen.apiKey');
     const qwenBase = this.config.get<string>('qwen.baseUrl');
@@ -223,9 +228,13 @@ export class ResumeRAGService {
   }
 
   private async embedText(text: string): Promise<number[]> {
+    const bounded = text.slice(0, 2048);
+    if (this.llmGateway && tenantContext.getStore()?.organizationId) {
+      return this.llmGateway.embedText(bounded);
+    }
     const res = await this.embedder.embeddings.create({
       model: 'text-embedding-v3',
-      input: text.slice(0, 2048),
+      input: bounded,
       encoding_format: 'float',
     });
     const vector = res.data?.[0]?.embedding;
