@@ -252,8 +252,19 @@ export class InterviewLifecycleController {
   ) {
     await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
 
-    await this.prisma.interview.delete({ where: { id: interviewId } });
-    this.logger.log(`Deleted interview ${interviewId} (manual cleanup)`);
+    const result = await this.prisma.interview.deleteMany({
+      where: {
+        id: interviewId,
+        userId: req.user.userId,
+        status: 'IN_PROGRESS',
+        messages: { none: {} },
+        report: { is: null },
+      },
+    });
+    if (result.count !== 1) {
+      throw new ConflictException('仅允许删除尚未产生对话或评价的进行中空面试，请刷新记录后核对。');
+    }
+    this.logger.log(`Deleted empty interview ${interviewId} (manual cleanup)`);
     return { deleted: true, reason: 'manual_cleanup' };
   }
 

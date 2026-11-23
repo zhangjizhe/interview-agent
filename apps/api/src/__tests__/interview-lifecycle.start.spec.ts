@@ -1,5 +1,5 @@
 jest.mock('../modules/interview/services/question-confirmation.service', () => ({ QuestionConfirmationService: class {} }));
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 jest.mock('../modules/interview/services/resume-rag.service', () => ({
   ResumeRAGService: class ResumeRAGService {},
@@ -23,7 +23,7 @@ describe('InterviewLifecycleController start', () => {
   const prisma = {
     targetJob: { findFirst: jest.fn() },
     jobSkillRequirement: { findFirst: jest.fn() },
-    interview: { create: jest.fn() },
+    interview: { create: jest.fn(), findFirst: jest.fn(), deleteMany: jest.fn() },
   };
   const resumeRag = { searchByUser: jest.fn() };
   const usage = { assertInterviewAllowed: jest.fn(), recordInterviewStart: jest.fn(), createInterview: jest.fn() };
@@ -109,5 +109,27 @@ describe('InterviewLifecycleController start', () => {
       targetJobId: 'job-1',
     }, { user: { userId: 'user-1' } })).rejects.toThrow('quota exceeded');
     expect(prisma.interview.create).not.toHaveBeenCalled();
+  });
+
+  it('atomically deletes only empty in-progress owned rooms and rejects non-empty or completed rooms', async () => {
+    prisma.interview.findFirst.mockResolvedValue({ id: 'iv-empty', userId: 'user-1' });
+    prisma.interview.deleteMany.mockResolvedValueOnce({ count: 1 });
+
+    const deleted = await controller().deleteInterview('iv-empty', { user: { userId: 'user-1' } });
+    expect(deleted).toEqual({ deleted: true, reason: 'manual_cleanup' });
+    expect(prisma.interview.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: 'iv-empty',
+        userId: 'user-1',
+        status: 'IN_PROGRESS',
+        messages: { none: {} },
+        report: { is: null },
+      },
+    });
+
+    prisma.interview.deleteMany.mockResolvedValueOnce({ count: 0 });
+    await expect(
+      controller().deleteInterview('iv-empty', { user: { userId: 'user-1' } }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });
