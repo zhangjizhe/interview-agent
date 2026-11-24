@@ -1,5 +1,13 @@
 # Current state
 
+2026-11-25 真实 DeepSeek 引擎对照实测完成（`v1 multi` vs `v2 fast-dual`，预算上限 ¥3.00，实际总花费 **¥0.5007 CNY**，分支 `agent-lab`）：
+- **实测结果（同一 5 轮高级 AI Agent 全栈面试题面，直连真实 DeepSeek API 与本机 `interview-api:candidate-ca83c6f` + `interview-postgres` `session_costs`）**：
+  - **平均首字延迟 (TTFT)**：`34,449 ms` → **`1,430 ms`**（**-95.8%，提速 24.1×**，最快 `733 ms`）
+  - **平均单轮总耗时**：`46,053 ms` → **`9,698 ms`**（**-78.9%，提速 4.75×**）
+  - **5 轮总 LLM 调用 / Token / 费用**：`50 次 / 110,796 tokens / ¥0.4305` → **`10 次 / 14,530 tokens / ¥0.0703`**（调用 **-80%**、Token **-86.9%**、费用 **-83.7%**）
+  - **追问质量与流稳定性**：`v2 (fast-dual)` 5/5 轮均输出精炼深挖追问（无重复拼接），本机运行容器 `interview-api` 已切换为 `AGENT_ENGINE=fast-dual`。
+  - **诚实局限**：本轮实测观察到 `session_costs.promptCacheHits=0`，DeepSeek `prompt_cache_hit_tokens` 上报映射待后续排查；完整报告见 [BENCHMARK_V1_VS_V2_2026-11-25.md](../acceptance/BENCHMARK_V1_VS_V2_2026-11-25.md)。**整包产品仍保持 NOT_ACCEPTED / 未商用交付**。
+
 2026-11-24 Phase B 收口 + Phase A & Phase C（低延迟双轨面试引擎 + Agent Lab 闭环飞轮 + RunFeedback/Bad Case 队列）进展（分支 `agent-lab`，基于已合入 `main` 的 `3c4f80b`，未调用真实外部付费模型，未触碰 `.env`）：
 - **Phase B 已收口并合入主干**：
   - PR #81（`feat/security-circuit-breaker-95`）远端 GitHub Actions `Product verification` **5/5 全绿**并合入 `main`（`3c4f80b`）；`agent-lab` 已快进对齐 `3c4f80b` 并推送至 `origin/agent-lab`。
