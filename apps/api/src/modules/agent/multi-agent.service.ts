@@ -284,7 +284,9 @@ export class MultiAgentService implements OnModuleInit, OnModuleDestroy {
     let emittedText = ''; // 累加已 emit 的 token 文本（兜底对比用）
     let tokenHitCount = 0; // 调试：emit 的 token 数
     let messageChunkCount = 0; // 调试：收到的 chunk 数
-    const STREAM_WHITELIST = ['reviewer', 'respond_directly', 'executor'] as const;
+    // 仅放行面向候选人的终态回复节点（reviewer / respond_directly），
+    // 不把 executor 中间步骤草稿泄漏或重复拼接到候选人回复流中。
+    const STREAM_WHITELIST = ['reviewer', 'respond_directly'] as const;
     const producer = (async () => {
       try {
         await threadIdStorage.run({ threadId, userId }, async () => {

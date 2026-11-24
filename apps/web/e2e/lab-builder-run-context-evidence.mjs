@@ -6,7 +6,7 @@ export async function verifyBuilderStartContext(page, context, origin) {
   assert.equal(process.env.LAB_FIXTURE_SYNTHETIC, '1');
   assert.equal(origin, 'http://localhost:5176');
   const id = await page.locator('.builder-workspace > label select').inputValue();
-  const versionId = await page.locator('.builder-workspace select').nth(1).inputValue();
+  const versionId = await page.locator('.builder-agent-overview select').inputValue();
   const message = await page.getByLabel('测试输入', { exact: false }).inputValue();
   const path = `${origin}/api/agent-lab/agents/${id}/test-runs`;
   const before = await questionInputSnapshot();
@@ -45,7 +45,7 @@ export async function verifyBuilderStartContext(page, context, origin) {
     assert.equal(await page.locator('.builder-confirm input').isChecked(), true);
     assert.equal(await page.getByLabel('测试输入', { exact: false }).inputValue(), message);
     assert.equal(await page.locator('.builder-workspace > label select').inputValue(), id);
-    assert.equal(await page.locator('.builder-workspace select').nth(1).inputValue(), versionId);
+    assert.equal(await page.locator('.builder-agent-overview select').inputValue(), versionId);
     assert.equal(await page.getByText('草稿测试已排队，可查询状态或取消。', { exact: true }).count(), 0);
     assert.deepEqual(await questionInputSnapshot(), before);
   } finally { await page.unroute(path, broken); }
@@ -107,7 +107,7 @@ export async function verifyBuilderStartContext(page, context, origin) {
     await Promise.race([ready, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Actual reused start receipt missing')), 75000); })]);
     clearTimeout(timeout);
     assert.equal(await page.locator('.builder-workspace > label select').isEnabled(), false);
-    assert.equal(await page.locator('.builder-workspace select').nth(1).isEnabled(), false);
+    assert.equal(await page.locator('.builder-agent-overview select').isEnabled(), false);
     for (const name of ['新增 Agent / 工作流', '保存新版本草稿', '启动草稿测试', '准备新运行']) assert.equal(await page.getByRole('button', { name, exact: true }).isEnabled(), false);
     assert.equal(await page.getByLabel('测试输入', { exact: false }).isEnabled(), false);
     assert.equal(await page.locator('.builder-confirm input').isEnabled(), false);

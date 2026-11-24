@@ -1,5 +1,20 @@
 # Current state
 
+2026-11-24 安全加固、多 Agent 链路缺陷修复与隔离全链路验收（分支 `feat/security-circuit-breaker-95`，本机隔离验证通过，未替换生产容器，未触碰 `.env`/真实 Token）：
+- **修复两个真实多 Agent / 网关生产缺陷**：
+  1. `LlmGatewayChatModel.buildGatewayPayload`：修复 `withStructuredOutput` 传入纯对象 `{ role: 'system' | 'user' | 'assistant', content }` 时因缺少 `getType()`/`_getType()` 而静默降级为 `role: 'user'` 的缺陷，已回退读取 `m.role` 并补单测（`llm-gateway-chat-model.usage.spec.ts`）。
+  2. `LlmGatewayService.recordProviderFailure`：收紧熔断器语义，`400/422` 请求侧参数/契约校验错误不再触发进程级熔断，避免单个非法请求把整条 Provider 通道打挂，已补单测（`llm.gateway.circuit.spec.ts`）。
+  3. `MultiAgentService.stream`：将 `STREAM_WHITELIST` 从 `['reviewer', 'respond_directly', 'executor']` 收敛为 `['reviewer', 'respond_directly']`，消除 `executor` 中间步骤输出与 `reviewer` 终态回复重复拼接泄漏到候选人气泡的缺陷。
+- **P1 服务端幂等与测试/E2E 治理**：
+  - `InterviewLifecycleController.startInterview`（`POST /api/interview/start`）新增租户+用户隔离的 `Idempotency-Key` 原子防重、并发 `409` 拦截与结果回放（含单测 `interview-lifecycle.start.spec.ts`）。
+  - `LangfuseService` 改为延迟加载 SDK，修复全量 Jest 崩溃；对齐 `llm-gateway.fallback.spec.ts` DeepSeek 主备配额用例。
+  - 全部隔离 Playwright E2E（Lab MCP/Builder/Catalog/DataGovernance/SessionRevocation、Auth Email、Web `ia_auth_session_v1`、ResumesPage 核对流程、Golden Loop）与 `fixture-policy-browser.cjs` 统一账本计量断言已对齐新版 UI 与全量 Embedding 计量。
+  - `examples/portfolio-site/src/articles.json` 完成 16 篇薄弱工程文章深度重写，Node 22 构建与 36/36 单测通过，并已按 `publish.sh` 安全发布至本机 `127.0.0.1:8787`。
+- **本轮实际验证（2026-11-24，Node 20.20.2 + 隔离 Docker）**：
+  - `pnpm lint --max-warnings 0`、三端 `typecheck` 通过；5 个核心 Jest 套件 40/40 通过（前序全量 API Jest 124 套件/1338 用例、Web+Lab Vitest 48 文件/472 用例、PG 迁移恢复 42/42 用例通过）。
+  - 隔离 Docker 全量验证（`scripts/ci/verify-built-api.sh`，内部网络阻断外网 Provider，无 `.env`）：Built API smoke **136/136**、`verify-question-presentation-store` **45/45**、`verify-golden-interview.mjs`（DeepSeek `127.0.0.1:1` 熔断自动回退千问）、`lab-isolated-acceptance.mjs`、`auth-email-runtime.mjs`、`interview-policy-admission.mjs`（含 20 项 Web 策略/上传/超时/恢复子套件）、`golden-interview-loop.mjs`、Redis 故障恢复（`readiness 503/liveness 200` + `25/25` 并发就绪）、PostgreSQL dump/restore 等价性（13+1）与 Milvus/etcd/Qdrant 离线备份恢复演练 **全部 PASS**。
+  - **边界声明**：以上均为本地隔离合成 Provider/SMTP 验收，**整包产品仍保持 NOT_ACCEPTED / 未商用交付**；真实 Provider 质量/费用账单核对、真机设备与公网 HTTPS 生产部署仍为待办。
+
 2026-11-23 安全加固与架构收敛进展（分支 `feat/security-circuit-breaker-95`，未部署，未触碰 `.env`/真实 Token）：
 - **PR #74 阻塞已修复并推送**：`feat/lab-shell-mobile` 新增单文件提交 `e3c7525`（先展开 `details.mcp-scope` 再断言完整文案可见），已推至 `origin/feat/lab-shell-mobile` 等待远端 `Product verification` 全绿。
 - **双模型熔断兜底与主备路由**（`81ea23b`）：`LlmGatewayService` 实现千问 + DeepSeek 进程级 `CLOSED/OPEN/HALF_OPEN` 瞬态熔断与 `401/402/403/404` 永久隔离，默认主备切换为 DeepSeek 优先、千问热备（`LLM_PRIMARY_PROVIDER` / `LLM_CB_FAILURE_THRESHOLD` / `LLM_CB_COOLDOWN_MS` 已写入 `docker-compose.yml` 与 `.env.example`）；`MultiAgentService` 移除 `'qwen'` 硬编码并对齐定价目录 `deepseek-flash`。

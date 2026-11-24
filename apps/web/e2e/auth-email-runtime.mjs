@@ -29,7 +29,7 @@ try {
   assert.equal((await profile(first)).status(), 200);
 
   console.log('Auth fixture stage: authenticated password change');
-  await page.getByRole('button', { name: '修改密码', exact: true }).click();
+  await page.getByRole('button', { name: /修改密码/ }).click();
   const dialog = page.getByRole('dialog', { name: '修改密码' });
   const sending = postResponse(page, 'change-password/request');
   await dialog.getByRole('button', { name: '发送邮箱验证码', exact: true }).click();

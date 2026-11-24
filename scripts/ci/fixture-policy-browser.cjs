@@ -54,7 +54,10 @@ async function resumeUploadControl(mode) {
   const expected = { ...state.baseline, embedding: state.baseline.embedding + (afterFailure ? 1 : 2), chat: state.baseline.chat + (afterFailure ? 0 : 1) };
   if (mode !== 'resume-upload-cleanup') assert.deepEqual(current, expected);
   if (mode === 'resume-upload-failure') {
-    assert.equal(await prisma.usageLedger.count({ where: { userId: state.userId } }), 0);
+    // ResumeRAGService now routes embeddings through LlmGatewayService (unified UsageLedger),
+    // so the failed upload's 1 embedding call is truthfully metered as 1 LLM_CALL ledger entry.
+    const failedLedger = await prisma.usageLedger.findMany({ where: { userId: state.userId } });
+    assert.equal(failedLedger.length, 1); assert.equal(failedLedger[0].type, 'LLM_CALL'); assert.equal(failedLedger[0].units, 1);
     return { stats: current };
   }
   const client = await resumeClient();
@@ -70,7 +73,13 @@ async function resumeUploadControl(mode) {
     if (mode === 'resume-upload-inspect') return { rows: read.data, stats: current };
     if (mode === 'resume-upload-read') {
       const ledger = await prisma.usageLedger.findMany({ where: { userId: state.userId } });
-      assert.equal(ledger.length, 1); assert.equal(ledger[0].type, 'LLM_CALL'); assert.equal(ledger[0].units, 1);
+      // 2 metered embeddings (1 failed + 1 confirmed upload) + 1-2 chat reservations
+      // (1 direct backup or 1 HALF_OPEN primary probe + 1 backup fallback)
+      const embeddingRows = ledger.filter(row => row.metadata && typeof row.metadata === 'object' && row.metadata.task === 'embedding');
+      const chatRows = ledger.filter(row => !(row.metadata && typeof row.metadata === 'object' && row.metadata.task === 'embedding'));
+      assert.equal(embeddingRows.length, 2);
+      assert.ok(chatRows.length >= 1 && chatRows.length <= 2);
+      assert.ok(ledger.every(row => row.type === 'LLM_CALL' && row.units === 1));
       assert.equal(await prisma.run.count(), state.runs);
       state.verified = true; state.expected = expected;
       fs.writeFileSync(file, JSON.stringify(saved), { mode: 0o600 });

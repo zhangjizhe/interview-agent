@@ -145,4 +145,23 @@ describe('LlmGatewayService dual-provider circuit breaker & fallback', () => {
     expect(res.provider).toBe('qwen');
     expect(gateway.getProviderStatus().deepseek.enabled).toBe(false);
   });
+
+  it('does not trip process-wide circuit breaker on client payload errors (400/422)', async () => {
+    const validationErr = Object.assign(new Error('422 unprocessable entity'), { status: 422 });
+    const deepseekChat = jest.fn(async () => { throw validationErr; });
+    const { gateway } = buildGateway({ deepseekChat });
+
+    const runChat = () =>
+      tenantContext.run({ organizationId: 'org-1', userId: 'user-1' }, () =>
+        gateway.chat({ messages: [{ role: 'user', content: '测试' }], allowFallback: false }),
+      );
+
+    await expect(runChat()).rejects.toThrow('422 unprocessable entity');
+    await expect(runChat()).rejects.toThrow('422 unprocessable entity');
+    await expect(runChat()).rejects.toThrow('422 unprocessable entity');
+
+    expect(gateway.getProviderStatus().deepseek.enabled).toBe(true);
+    expect(gateway.getProviderStatus().deepseek.circuitState).toBe('CLOSED');
+    expect(gateway.getProviderStatus().deepseek.consecutiveFailures).toBe(0);
+  });
 });

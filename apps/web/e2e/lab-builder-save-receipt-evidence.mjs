@@ -40,8 +40,8 @@ export async function verifyBuilderSaveReceipt(page, context, origin) {
     await page.getByRole('button', { name: '运行编排', exact: true }).click();
     await page.getByRole('option', { name: 'browser-receipt-agent · browser-receipt-agent', exact: true }).waitFor({ state: 'attached' });
     await page.locator('.builder-workspace > label select').selectOption(id);
-    await page.locator('.builder-workspace select').nth(1).locator(`option[value="${versionId}"]`).waitFor({ state: 'attached' });
-    await page.locator('.builder-workspace select').nth(1).selectOption(versionId);
+    await page.locator('.builder-agent-overview select').locator(`option[value="${versionId}"]`).waitFor({ state: 'attached' });
+    await page.locator('.builder-agent-overview select').selectOption(versionId);
   };
   try {
     await page.getByRole('button', { name: '新增 Agent / 工作流', exact: true }).click();
@@ -62,7 +62,7 @@ export async function verifyBuilderSaveReceipt(page, context, origin) {
     await page.getByLabel('保存为版本', { exact: true }).fill('1.0.1');
     await page.locator('.builder-workspace form textarea[rows="6"]').fill('receipt-second');
     const saved = await corrupt(`/agent-lab/agents/${created.id}/versions`, '保存新版本草稿');
-    assert.equal(await page.locator('.builder-workspace select').nth(1).inputValue(), created.versions[0].id);
+    assert.equal(await page.locator('.builder-agent-overview select').inputValue(), created.versions[0].id);
     assert.equal(await page.locator('.builder-workspace form textarea[rows="6"]').inputValue(), 'receipt-second');
     const second = await read(created.id);
     const version = second.versions.find(item => item.id === saved.id);

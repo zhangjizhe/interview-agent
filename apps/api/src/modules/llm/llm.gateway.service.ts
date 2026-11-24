@@ -127,6 +127,11 @@ export class LlmGatewayService {
       this.disableProvider(name, 'Provider authentication, billing or model configuration failed');
       return;
     }
+    if (this.isClientPayloadError(err)) {
+      const cb = this.circuitBreakers.get(name);
+      if (cb) cb.halfOpenProbeInFlight = false;
+      return;
+    }
     const cb = this.circuitBreakers.get(name);
     if (!cb) return;
     cb.consecutiveFailures += 1;
@@ -184,6 +189,14 @@ export class LlmGatewayService {
   private isPermanentProviderError(err: any): boolean {
     const status = err?.status ?? err?.statusCode ?? err?.response?.status;
     return status === 401 || status === 402 || status === 403 || status === 404;
+  }
+
+  /**
+   * 请求侧参数/契约校验错误（400/422）不应触发进程级熔断，避免单个非法请求把整条 Provider 通道打挂
+   */
+  private isClientPayloadError(err: any): boolean {
+    const status = err?.status ?? err?.statusCode ?? err?.response?.status;
+    return status === 400 || status === 422;
   }
 
   /**

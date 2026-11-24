@@ -139,6 +139,7 @@ await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated
   await page.reload();
   await page.getByRole('button', { name: '登录', exact: true }).waitFor();
   await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated-fixture-password' });
+  await page.getByRole('button', { name: '控制中心', exact: true }).click();
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
   console.log('PASS browser first-release denial, twelve navigation headings, logout/reload/new login');
   await verifySessionRevocation(page, context, url);

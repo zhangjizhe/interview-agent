@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Langfuse } from 'langfuse';
+import type { Langfuse as LangfuseClient } from 'langfuse';
 import { shouldSampleWith } from './sampling.util';
 import { redactTelemetry } from './redact';
 type Generation = any;
@@ -19,7 +19,7 @@ type Generation = any;
 @Injectable()
 export class LangfuseService implements OnModuleInit {
   private readonly logger = new Logger(LangfuseService.name);
-  private client: Langfuse;
+  private client: LangfuseClient;
 
   // P1-6 修复：采样率配置
   private sampleRate = {
@@ -46,6 +46,8 @@ export class LangfuseService implements OnModuleInit {
       return;
     }
 
+    // 延迟加载 langfuse SDK，避免未配置可观测凭据（如离线单测）时触发 langfuse-core 顶层 dynamic import
+    const { Langfuse } = require('langfuse') as typeof import('langfuse');
     this.client = new Langfuse({
       publicKey,
       secretKey,

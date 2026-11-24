@@ -130,7 +130,7 @@ describe('LLM gateway failure boundaries (offline fault injection)', () => {
   });
   it('each fallback attempt requires a separate reservation', async () => {
     primary.chat.mockRejectedValue(new Error('provider failed'));
-    await gateway.chat(params);
+    await gateway.chat(params, 'qwen');
     expect(quota.reserveLlm).toHaveBeenCalledTimes(2);
   });
 });

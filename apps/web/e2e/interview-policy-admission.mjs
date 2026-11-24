@@ -34,7 +34,7 @@ try {
   const confirmed = await confirmedResponse.json(); assert.equal(confirmed.success, true); assert.equal(confirmed.questionProtocol, 'presentation/v1');
   const presented = confirmed.currentQuestion; assert.ok(presented && presented.state === 'OPEN');
   for (const key of ['presentationId', 'taskId', 'messageId', 'question']) assert.ok(typeof presented[key] === 'string' && presented[key].trim());
-  const token = await page.evaluate(() => localStorage.getItem('ia_access_token')); assert.ok(token);
+  const token = await page.evaluate(() => { try { const s = JSON.parse(localStorage.getItem('ia_auth_session_v1') || 'null'); if (s?.session?.accessToken) return s.session.accessToken; } catch {} return localStorage.getItem('ia_access_token'); }); assert.ok(token);
   const currentResponse = await page.request.get(`${origin}/api/interview/${data.interviewId}`, { headers: { Authorization: `Bearer ${token}` } });
   assert.equal(currentResponse.status(), 200); const current = await currentResponse.json();
   assert.equal(current.questionProtocol, 'presentation/v1'); assert.deepEqual(current.currentQuestion, presented);

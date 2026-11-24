@@ -272,10 +272,12 @@ export class LlmGatewayChatModel extends BaseChatModel {
     const gatewayMessages = messages.map((m) => {
       const content = typeof m.content === 'string' ? m.content : this.extractText(m.content);
       // LangChain v1.x: _getType() → getType() (private → public)
-      const mtype = m.getType ? m.getType() : (m as any)._getType?.();
+      // withStructuredOutput 直接传入纯对象 { role: 'system' | 'user' | 'assistant', content }，
+      // 必须回退读取 m.role，避免把 system prompt 误降级为 user 消息。
+      const mtype = m.getType ? m.getType() : ((m as any)._getType?.() ?? (m as any).role);
       if (mtype === 'system') return { role: 'system' as const, content };
-      if (mtype === 'human') return { role: 'user' as const, content };
-      if (mtype === 'ai') return { role: 'assistant' as const, content };
+      if (mtype === 'human' || mtype === 'user') return { role: 'user' as const, content };
+      if (mtype === 'ai' || mtype === 'assistant') return { role: 'assistant' as const, content };
       return { role: 'user' as const, content };
     });
 

@@ -47,7 +47,7 @@ describe('InterviewLifecycleController start', () => {
     prisma.interview.create.mockResolvedValue({ id: 'interview-1' });
   });
 
-  function controller() {
+  function controller(redis?: any) {
     return new InterviewLifecycleController(
       {} as any,
       {} as any,
@@ -57,6 +57,9 @@ describe('InterviewLifecycleController start', () => {
       {} as any,
       {} as any,
       usage as any,
+      {} as any,
+      {} as any,
+      redis,
     );
   }
 
@@ -130,6 +133,66 @@ describe('InterviewLifecycleController start', () => {
     prisma.interview.deleteMany.mockResolvedValueOnce({ count: 0 });
     await expect(
       controller().deleteInterview('iv-empty', { user: { userId: 'user-1' } }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('replays the existing owned interview on duplicate Idempotency-Key without recharging quota', async () => {
+    const store = new Map<string, string>();
+    const redisClient = {
+      set: jest.fn(async (key: string, value: string, _ex: string, _ttl: number, nx?: string) => {
+        if (nx === 'NX' && store.has(key)) return null;
+        store.set(key, value);
+        return 'OK';
+      }),
+      get: jest.fn(async (key: string) => store.get(key) ?? null),
+      del: jest.fn(async (key: string) => { store.delete(key); return 1; }),
+    };
+    const redis = { getClient: () => redisClient };
+    const dto = { userId: 'ignored', position: 'AI Agent Engineer', targetJobId: 'job-1' };
+    const req = { user: { userId: 'user-1' } };
+
+    const first = await controller(redis).startInterview(dto, req, 'idem-start-12345678');
+    expect(first.interviewId).toBe('interview-1');
+    expect(usage.createInterview).toHaveBeenCalledTimes(1);
+
+    prisma.interview.findFirst.mockResolvedValueOnce({ id: 'interview-1', userId: 'user-1', resumeConfirmed: false });
+    const replay = await controller(redis).startInterview(dto, req, 'idem-start-12345678');
+    expect(replay.interviewId).toBe('interview-1');
+    expect((replay as any).idempotentReplay).toBe(true);
+    expect(usage.createInterview).toHaveBeenCalledTimes(1);
+    expect(usage.assertInterviewAllowed).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects concurrent in-flight start, mismatched payload reuse, and malformed Idempotency-Key', async () => {
+    const store = new Map<string, string>();
+    const redisClient = {
+      set: jest.fn(async (key: string, value: string, _ex: string, _ttl: number, nx?: string) => {
+        if (nx === 'NX' && store.has(key)) return null;
+        store.set(key, value);
+        return 'OK';
+      }),
+      get: jest.fn(async (key: string) => store.get(key) ?? null),
+      del: jest.fn(async (key: string) => { store.delete(key); return 1; }),
+    };
+    const redis = { getClient: () => redisClient };
+    const req = { user: { userId: 'user-1' } };
+
+    // Malformed key
+    await expect(
+      controller(redis).startInterview({ userId: 'ignored', position: 'FE' }, req, 'bad key!'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    // Release pending lock on creation failure so retry succeeds
+    usage.assertInterviewAllowed.mockRejectedValueOnce(new BadRequestException('quota exceeded'));
+    await expect(
+      controller(redis).startInterview({ userId: 'ignored', position: 'FE', targetJobId: 'job-1' }, req, 'idem-retry-12345678'),
+    ).rejects.toThrow('quota exceeded');
+    expect(store.size).toBe(0);
+
+    // Mismatched payload reuse -> 409 Conflict
+    await controller(redis).startInterview({ userId: 'ignored', position: 'FE', targetJobId: 'job-1' }, req, 'idem-reuse-12345678');
+    await expect(
+      controller(redis).startInterview({ userId: 'ignored', position: 'BE', targetJobId: 'job-2' }, req, 'idem-reuse-12345678'),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 });
