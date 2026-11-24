@@ -10,6 +10,7 @@
  * - POST /api/tools/preferences  →  切换单个
  */
 import { useState } from 'react';
+import { getSession } from '../utils/auth';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -77,7 +78,7 @@ async function safeJson(res: Response): Promise<any> {
 export function ToolsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const userId = localStorage.getItem('ia_userId') || 'demo-user';
+  const userId = getSession()?.userId || '';
   const [keyword, setKeyword] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 

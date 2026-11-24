@@ -13,7 +13,7 @@ export async function verifyUnknownQuestion(page, data, control) {
     const confirmed = await confirmation; assert.equal(confirmed.status(), 201);
     await assertPresentedQuestion(page, fixture.interviewId, await confirmed.json());
     const unknown = JSON.parse(control('unknown-mark'));
-    const token = await page.evaluate(() => localStorage.getItem('ia_access_token')); assert.ok(token);
+    const token = await page.evaluate(() => { try { const s = JSON.parse(localStorage.getItem('ia_auth_session_v1') || 'null'); if (s?.session?.accessToken) return s.session.accessToken; } catch {} return localStorage.getItem('ia_access_token'); }); assert.ok(token);
     const get = async () => {
       const response = await page.request.get(`${origin}/api/interview/${fixture.interviewId}`, { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 });
       assert.equal(response.status(), 200); const value = await response.json();

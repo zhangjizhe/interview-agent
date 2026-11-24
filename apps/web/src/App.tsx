@@ -4,8 +4,12 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { AppShell } from './components/AppShell';
 import { HomePage } from './pages/HomePage';
 import { SettingsPage } from './pages/SettingsPage';
+import { PreparationLayout } from './components/PreparationLayout';
+import { JobsPage } from './pages/JobsPage';
+import { ResumesPage } from './pages/ResumesPage';
 import { initWebVitals } from './utils/web-vitals';
-import { getSession, saveSession } from './utils/auth';
+import { AUTH_SESSION_STORAGE_KEY, getSession, saveSession } from './utils/auth';
+import { AuthenticatedWorkspace } from './components/AuthenticatedWorkspace';
 
 // 安全 JSON 解析：当 API 返回非 JSON（如 502 的 nginx HTML 错误页）时兜底
 async function safeJson(res: Response): Promise<any> {
@@ -46,6 +50,7 @@ function PageSpinner() {
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState(getSession);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
@@ -58,12 +63,27 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    const forgetSecrets = () => { setPassword(''); setNewPassword(''); setCode(''); setChallengeId(''); };
+    const synchronize = () => {
+      forgetSecrets(); setError(''); setNotice('');
+      setSession(getSession()); setSessionEpoch(value => value + 1);
+    };
     const handleExpired = () => {
-      setError('登录已过期，请重新登录。');
-      setSession(null);
+      forgetSecrets(); setNotice(''); setError('登录已过期，请重新登录。');
+      setSession(null); setSessionEpoch(value => value + 1);
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === AUTH_SESSION_STORAGE_KEY || event.key === null
+        || (event.key === 'ia_access_token' && event.newValue === null)) synchronize();
     };
     window.addEventListener('ia:session-expired', handleExpired);
-    return () => window.removeEventListener('ia:session-expired', handleExpired);
+    window.addEventListener('ia:session-changed', synchronize);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('ia:session-expired', handleExpired);
+      window.removeEventListener('ia:session-changed', synchronize);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const requestRegistrationCode = async () => {
@@ -85,6 +105,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const acceptSession = (data: any) => {
     const next = { accessToken: data.accessToken, userId: data.userId, email: data.email, role: data.role };
     saveSession(next); setSession(next);
+    setPassword(''); setNewPassword(''); setCode(''); setChallengeId('');
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -142,7 +163,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }
   };
 
-  if (session) return <>{children}</>;
+  if (session) return <AuthenticatedWorkspace key={sessionEpoch}>{children}</AuthenticatedWorkspace>;
 
   return (
     <main className="studio-auth">
@@ -197,10 +218,15 @@ export default function App() {
           <Routes>
             <Route element={<AppShell />}>
               <Route path="/" element={<HomePage />} />
-              <Route path="/practice" element={<HomePage openPractice />} />
+              <Route path="/practice" element={<HomePage view="practice" />} />
               <Route path="/interviews" element={<HomePage view="interviews" />} />
               <Route path="/training" element={<TrainingPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/prepare" element={<PreparationLayout />}>
+                <Route index element={<Navigate to="resumes" replace />} />
+                <Route path="resumes" element={<ResumesPage />} />
+                <Route path="jobs" element={<JobsPage />} />
+              </Route>
               <Route path="/question-bank" element={<Navigate to="/" replace />} />
               <Route path="/tools" element={<Navigate to="/settings" replace />} />
               <Route path="/admin/mcp" element={<Navigate to="/" replace />} />

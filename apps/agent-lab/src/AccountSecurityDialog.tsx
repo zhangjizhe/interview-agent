@@ -1,7 +1,14 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { acquirePageScrollLock } from './page-scroll-lock';
 import { api } from './api';
 
 export function AccountSecurityDialog({ onClose }: { onClose: () => void }) {
+  const backdrop = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLElement>(null);
+  const pendingRef = useRef(false);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   const [challengeId, setChallengeId] = useState('');
   const [maskedEmail, setMaskedEmail] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -10,6 +17,50 @@ export function AccountSecurityDialog({ onClose }: { onClose: () => void }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
+  pendingRef.current = pending;
+  useEffect(() => {
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const releaseScroll = acquirePageScrollLock();
+    const root = document.querySelector('.lab-shell');
+    const wasInert = root?.hasAttribute('inert');
+    root?.setAttribute('inert', '');
+    dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !pendingRef.current) { event.preventDefault(); closeRef.current(); }
+      if (event.key === 'Tab') {
+        const controls = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)') ?? []).filter(element => element.getClientRects().length > 0);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    const viewport = window.visualViewport;
+    const fitVisibleViewport = () => {
+      // Embedded browsers may expose only window resize. Keep the dialog usable
+      // there too; transient invalid viewport readings must not collapse it.
+      const height = viewport?.height ?? window.innerHeight;
+      if (!Number.isFinite(height) || height <= 0) return;
+      const offsetTop = viewport?.offsetTop ?? 0;
+      backdrop.current?.style.setProperty('--lab-visible-height', `${height}px`);
+      backdrop.current?.style.setProperty('--lab-visible-top', `${Number.isFinite(offsetTop) ? Math.max(0, offsetTop) : 0}px`);
+    };
+    fitVisibleViewport();
+    viewport?.addEventListener('resize', fitVisibleViewport);
+    viewport?.addEventListener('scroll', fitVisibleViewport);
+    window.addEventListener('resize', fitVisibleViewport);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      releaseScroll();
+      viewport?.removeEventListener('resize', fitVisibleViewport);
+      viewport?.removeEventListener('scroll', fitVisibleViewport);
+      window.removeEventListener('resize', fitVisibleViewport);
+      if (!wasInert) root?.removeAttribute('inert');
+      if (trigger?.closest('.lab-navigation') && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches) root?.querySelector<HTMLButtonElement>('button[aria-controls=lab-navigation]')?.focus();
+      else if (trigger?.isConnected) trigger.focus();
+    };
+  }, []);
 
   const requestCode = async () => {
     setPending(true); setError(''); setNotice('');
@@ -32,8 +83,8 @@ export function AccountSecurityDialog({ onClose }: { onClose: () => void }) {
     finally { setPending(false); }
   };
 
-  return <div className="agent-security-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !pending) onClose(); }}>
-    <section className="agent-security-dialog" role="dialog" aria-modal="true" aria-labelledby="agent-security-title">
+  return createPortal(<div ref={backdrop} className="agent-security-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !pending) onClose(); }}>
+    <section ref={dialog} className="agent-security-dialog" role="dialog" aria-modal="true" aria-labelledby="agent-security-title">
       <button className="agent-command" type="button" onClick={onClose} disabled={pending}>关闭</button>
       <h2 id="agent-security-title">修改密码</h2>
       <p>需要当前密码和已验证邮箱验证码；修改后所有设备都将退出登录。</p>
@@ -47,5 +98,5 @@ export function AccountSecurityDialog({ onClose }: { onClose: () => void }) {
         <button className="text-command" type="button" onClick={requestCode} disabled={pending}>重新发送验证码</button>
       </form>}
     </section>
-  </div>;
+  </div>, document.body);
 }

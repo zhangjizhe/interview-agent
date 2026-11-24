@@ -7,7 +7,7 @@ export async function assertPresentedQuestion(page, interviewId, receipt) {
   assert.equal(receipt.success, true); assert.equal(receipt.questionProtocol, 'presentation/v1');
   const question = receipt.currentQuestion; assert.ok(question && question.state === 'OPEN');
   for (const key of ['presentationId', 'taskId', 'messageId', 'question']) assert.ok(typeof question[key] === 'string' && question[key].trim());
-  const token = await page.evaluate(() => localStorage.getItem('ia_access_token')); assert.ok(token);
+  const token = await page.evaluate(() => { try { const s = JSON.parse(localStorage.getItem('ia_auth_session_v1') || 'null'); if (s?.session?.accessToken) return s.session.accessToken; } catch {} return localStorage.getItem('ia_access_token'); }); assert.ok(token);
   const response = await page.request.get(`${origin}/api/interview/${interviewId}`, { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 });
   assert.equal(response.status(), 200); const current = await response.json();
   assert.equal(current.questionProtocol, 'presentation/v1'); assert.deepEqual(current.currentQuestion, question);

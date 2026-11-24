@@ -83,7 +83,7 @@ it('validates URL before sending, does not mutate while selecting a method, and 
   fireEvent.click(screen.getByRole('button', { name: '网页链接' })); metadata();
   fireEvent.change(screen.getByLabelText('网页地址'), { target: { value: 'javascript:alert(1)' } });
   fireEvent.click(screen.getByRole('button', { name: '开始导入' })); expect(screen.getByRole('alert')).toHaveTextContent('HTTP 或 HTTPS'); expect(transport).not.toHaveBeenCalled();
-  fireEvent.change(screen.getByLabelText('网页地址'), { target: { value: 'https://example.org/article' } }); fireEvent.click(screen.getByRole('button', { name: '开始导入' }));
+  fireEvent.change(screen.getByLabelText('网页地址'), { target: { value: 'https://example.org/article' } }); fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: '开始导入' }));
   expect(await screen.findByRole('status')).toHaveTextContent('没有生成可导入的题目'); expect(screen.getByRole('status')).toHaveTextContent('仍可能产生费用');
   expect(transport.mock.calls[0][0]).toBe('/api/interview/question-bank/import-url');
   expect(JSON.parse(transport.mock.calls[0][1].body)).toEqual({ position: '前端开发工程师', category: 'React 状态管理', level: 'P6', url: 'https://example.org/article' });
@@ -91,4 +91,16 @@ it('validates URL before sending, does not mutate while selecting a method, and 
 it('focuses the invalid field and exposes its invalid state for keyboard users', () => {
   mount(); fireEvent.click(screen.getByRole('button', { name: '开始导入' }));
   expect(screen.getByLabelText('目标岗位', { exact: true })).toHaveFocus(); expect(screen.getByLabelText('目标岗位', { exact: true })).toHaveAttribute('aria-invalid', 'true');
+});
+it('locks source changes after an unknown result until the user explicitly reviews it', async () => {
+  const transport = vi.fn().mockResolvedValue(new Response('{}', { status: 503 })); mount(transport); choose(); metadata();
+  fireEvent.click(screen.getByRole('button', { name: '开始导入' }));
+  await screen.findByRole('alert');
+  expect(screen.getByRole('button', { name: '网页链接' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '选择文件' })).toBeDisabled();
+  expect(screen.getByLabelText('目标岗位', { exact: true })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '已核对，重新确认导入' }));
+  expect(screen.getByRole('button', { name: '网页链接' })).toBeEnabled();
+  expect(screen.getByRole('checkbox')).not.toBeChecked();
+  expect(transport).toHaveBeenCalledTimes(1);
 });

@@ -29,8 +29,9 @@ export async function verifyDataGovernance(page, context, origin) {
   const edited = await editing; assert.equal(edited.status(), 200); const retained = await edited.json(); assert.equal(retained.revision, 2);
   await panel.getByRole('button', { name: '版本历史', exact: true }).click();
   await panel.getByRole('region', { name: '版本历史', exact: true }).getByText(/^版本 1 ·/).waitFor();
-  await page.reload(); await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: '数据治理', exact: true }).click();
+  await page.getByRole('heading', { name: '数据治理', exact: true, level: 1 }).waitFor();
   await page.getByRole('button', { name: new RegExp(collectionName) }).click();
   panel = page.getByRole('region', { name: `资料集合 ${collectionName}`, exact: true });
   await panel.getByText('版本 2', { exact: true }).waitFor();

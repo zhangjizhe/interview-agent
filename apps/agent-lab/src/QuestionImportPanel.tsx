@@ -45,7 +45,7 @@ export function QuestionImportPanel({ onImported, onBusy, positions = [] }: {
     return () => window.removeEventListener('beforeunload', warn);
   }, [pending]);
   const chooseFile = (candidate?: File) => {
-    if (submitting.current || !candidate) return;
+    if (submitting.current || unknown || !candidate) return;
     setReceipt(null); setConsent(false);
     if (!ACCEPTED.test(candidate.name)) { setFile(null); setError('请选择 PDF、Markdown（.md）或 TXT 文件；暂不支持 JSON、Word 和图片。'); return; }
     if (!candidate.size || candidate.size > MAX_FILE_SIZE) { setFile(null); setError('文件不能为空，且不能超过 10 MB。'); return; }
@@ -93,17 +93,17 @@ export function QuestionImportPanel({ onImported, onBusy, positions = [] }: {
   return <section className="qb-import" aria-labelledby="qb-import-title" aria-busy={pending}>
     <header className="qb-section-head"><div><h2 id="qb-import-title">导入题目</h2><p>先选择来源并归类，再开始解析。生成的题目将保存到当前组织的业务题库。</p></div><span className="qb-step-label">来源 → 归类 → 确认导入</span></header>
     <div className="qb-methods" role="group" aria-label="导入来源">
-      <button type="button" aria-pressed={method === 'file'} disabled={pending} onClick={() => { setMethod('file'); setError(''); setReceipt(null); }}><Upload size={16}/>本地文件</button>
-      <button type="button" aria-pressed={method === 'url'} disabled={pending} onClick={() => { setMethod('url'); setError(''); setReceipt(null); }}><Link2 size={16}/>网页链接</button>
+      <button type="button" aria-pressed={method === 'file'} disabled={pending || unknown} onClick={() => { setConsent(false); setMethod('file'); setError(''); setReceipt(null); }}><Upload size={16}/>本地文件</button>
+      <button type="button" aria-pressed={method === 'url'} disabled={pending || unknown} onClick={() => { setConsent(false); setMethod('url'); setError(''); setReceipt(null); }}><Link2 size={16}/>网页链接</button>
     </div>
     <form onSubmit={submit} noValidate>
-      <fieldset disabled={pending}><legend className="qb-sr-only">导入资料和题目归类</legend>
+      <fieldset disabled={pending || unknown}><legend className="qb-sr-only">导入资料和题目归类</legend>
         {method === 'file' ? <div className={`qb-dropzone${dragging ? ' is-dragging' : ''}`} onDragOver={event => { event.preventDefault(); if (!pending) setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={drop}>
           <Upload size={26} aria-hidden="true"/><strong>拖入文件，或手动选择</strong><p id="qb-file-help">PDF / Markdown / TXT · 每次一个文件 · 最大 10 MB</p>
           <input ref={input} id="qb-import-file" type="file" accept=".pdf,.md,.txt" aria-label="选择题库文件" aria-describedby="qb-file-help" onChange={event => { chooseFile(event.target.files?.[0]); event.target.value = ''; }} className="qb-file-input" />
           <button name="fileChoice" className="qb-button qb-secondary" type="button" onClick={() => input.current?.click()}>选择文件</button>
           {file && <div className="qb-file-receipt"><FileText size={18}/><span><strong>{file.name}</strong><small>{file.size < 1024 ? `${file.size} B` : `${(file.size / 1024).toFixed(1)} KB`} · 已选择，尚未上传</small></span><button type="button" className="qb-icon-button" aria-label="移除所选文件" onClick={() => { setFile(null); setReceipt(null); setConsent(false); }}><X size={16}/></button></div>}
-        </div> : <label className="qb-field">网页地址<input name="url" aria-label="网页地址" aria-describedby="qb-url-help" aria-invalid={invalid === 'url'} type="url" value={url} placeholder="https://example.com/technical-article" onChange={event => { setUrl(event.target.value); setReceipt(null); }} /><small id="qb-url-help">仅支持可公开访问的 HTTP / HTTPS 网页。</small></label>}
+        </div> : <label className="qb-field">网页地址<input name="url" aria-label="网页地址" aria-describedby="qb-url-help" aria-invalid={invalid === 'url'} type="url" value={url} placeholder="https://example.com/technical-article" onChange={event => { setUrl(event.target.value); setConsent(false); setReceipt(null); }} /><small id="qb-url-help">仅支持可公开访问的 HTTP / HTTPS 网页。</small></label>}
         <div className="qb-metadata">
           <label className="qb-field"><span className="qb-field-title">目标岗位 <span className="qb-required">必填</span></span><input name="position" aria-label="目标岗位" aria-describedby="qb-position-help" aria-invalid={invalid === 'position'} value={metadata.position} list="qb-import-positions" placeholder="例如：前端开发工程师" onChange={event => setMetadata({ ...metadata, position: event.target.value })}/><small id="qb-position-help">用于面试选题，与知识资料主题分开。</small></label>
           <datalist id="qb-import-positions">{[...new Set([...positions, '前端开发工程师', '后端开发工程师', 'AI Agent 工程师'])].filter(Boolean).map(value => <option key={value} value={value}/>)}</datalist>

@@ -46,3 +46,15 @@
 @media(max-width:800px) { .qb-section-head { flex-wrap:wrap; }.qb-metadata { grid-template-columns:1fr; }.qb-toolbar,.qb-import,.qb-workspace .qb-create { padding:18px; }.qb-header-actions { width:100%; }.qb-header-actions button { flex:1; }.qb-form-footer { flex-direction:column; align-items:stretch; }.qb-list-heading { align-items:flex-start; flex-wrap:wrap; }.qb-workspace .question-bank-row { padding:18px; }.qb-step-label { white-space:normal; } }
 .qb-maintenance .lab-command-form { display:flex; flex-direction:column; align-items:flex-start; gap:12px; }.qb-maintenance .lab-command-form h2 { margin:0; font-size:15px; }.qb-maintenance .lab-command-form p { margin:0; font-size:12px; line-height:1.8; color:#68727d; }.qb-maintenance .lab-command-form label { display:flex; align-items:flex-start; gap:8px; line-height:1.8; }.qb-maintenance input[type=checkbox] { width:16px; height:16px; min-height:16px; padding:0; margin:3px 0 0; flex-shrink:0; }
 .qb-field-title { display:flex; align-items:center; justify-content:space-between; gap:8px; }.qb-workspace [aria-invalid=true] { border-color:#bb4552!important; }.qb-workspace [aria-invalid=true]:focus-visible { outline-color:#bb4552; }
+.qb-local-controls { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.qb-local-controls label { display: grid; gap: 7px; font-size: 11px; color: var(--qb-muted); }
+.qb-local-controls label:first-child { flex: 1; min-width: 200px; }
+.qb-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--qb-muted); font-size: 11px; flex-wrap: wrap; }
+.qb-pagination > div { display: flex; gap: 8px; }
+.qb-workspace .question-bank-row h2 { font-size: 14px; font-weight: 550; line-height: 1.9; }
+.qb-workspace .question-bank-row { padding: 22px 24px; gap: 18px; }
+.qb-workspace .question-bank-row details { padding: 10px 13px; background: #f7f8fb; border: 1px solid #eceef4; border-radius: 7px; margin: 12px 0; }
+.qb-workspace .question-bank-row summary { cursor: pointer; color: #65538e; font-size: 11px; }
+.qb-workspace .question-bank-row details p { white-space: pre-wrap; font-size: 12px; line-height: 1.9; }
+.qb-workspace .qb-section-head { margin-bottom: 18px; }
+.qb-workspace .qb-help { padding-top: 12px; border-top: 1px solid #e9ebf1; }

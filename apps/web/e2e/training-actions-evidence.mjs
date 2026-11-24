@@ -10,7 +10,7 @@ export async function verifyTrainingActions(page, control) {
     const fixture = JSON.parse(control('training-prepare'));
     await page.goto(`${origin}/training`);
     await page.getByRole('heading', { name: '训练建议', exact: true }).waitFor();
-    const token = await page.evaluate(() => localStorage.getItem('ia_access_token')); assert.ok(token);
+    const token = await page.evaluate(() => { try { const s = JSON.parse(localStorage.getItem('ia_auth_session_v1') || 'null'); if (s?.session?.accessToken) return s.session.accessToken; } catch {} return localStorage.getItem('ia_access_token'); }); assert.ok(token);
     const read = async () => {
       const response = await page.context().request.get(`${origin}/api/interview/training-recommendations?targetJobId=${encodeURIComponent(fixture.targetJobId)}`, { headers: { Authorization: `Bearer ${token}` } });
       assert.equal(response.status(), 200); return response.json();

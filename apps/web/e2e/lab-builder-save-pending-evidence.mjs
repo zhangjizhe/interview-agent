@@ -52,10 +52,10 @@ export async function verifyBuilderSavePending(page, context, origin) {
     await page.screenshot({ path: '/tmp/lab-builder-save-pending.png', fullPage: true });
     release();
     await page.getByText('草稿已保存。正式版本未改变；请在下方选择保存的版本核验。', { exact: true }).waitFor();
-    await page.waitForFunction(id => document.querySelector('.builder-workspace select')?.value === id, actualSaved.id);
-    await page.waitForFunction(id => Array.from(document.querySelectorAll('.builder-workspace select')).some(select => select.value === id && !select.disabled), actualSaved.versions[0].id);
-    assert.equal(await page.locator('.builder-workspace select').nth(1).inputValue(), actualSaved.versions[0].id);
-    assert.equal(await page.locator('.builder-workspace select').nth(1).isEnabled(), true);
+    await page.waitForFunction(id => document.querySelector('.builder-workspace > label select')?.value === id, actualSaved.id);
+    await page.waitForFunction(id => Array.from(document.querySelectorAll('.builder-agent-overview select')).some(select => select.value === id && !select.disabled), actualSaved.versions[0].id);
+    assert.equal(await page.locator('.builder-agent-overview select').inputValue(), actualSaved.versions[0].id);
+    assert.equal(await page.locator('.builder-agent-overview select').isEnabled(), true);
     assert.equal(calls, 1);
     assert.deepEqual(await questionInputSnapshot(), before);
     console.log('PASS builder save pending: injected refusal retained draft, held actual201 freezes target/config, actual persisted IDs/prompt match, no model increment');

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { getSession, logoutSession } from '../utils/auth';
 import { acquireEvaluationRequest, confirmEvaluationRequest, requireEvaluationReceipt } from '../../../agent-lab/src/evaluation-receipt';
 import { Link, NavLink, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -125,7 +126,8 @@ function Metric({
 }
 
 function LabShell({ view, children }: { view: LabView; children: React.ReactNode }) {
-  const sessionUser = localStorage.getItem('ia_userId') || '当前用户';
+  const sessionUser = getSession()?.userId || '当前用户';
+  const [logoutError, setLogoutError] = useState('');
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
@@ -138,13 +140,12 @@ function LabShell({ view, children }: { view: LabView; children: React.ReactNode
             进入 Interview <ArrowUpRight className="h-4 w-4" />
           </Link>
           <div className="hidden items-center gap-3 border-l border-slate-200 pl-4 text-xs text-slate-500 sm:flex">
+            {logoutError && <p role="alert">{logoutError}</p>}
             <span className="max-w-32 truncate font-mono">{sessionUser}</span>
             <button
-              onClick={() => {
-                localStorage.removeItem('ia_access_token');
-                localStorage.removeItem('ia_userId');
-                localStorage.removeItem('ia_user_role');
-                window.location.href = '/';
+              onClick={async () => {
+                try { if (await logoutSession()) window.location.href = '/'; }
+                catch { setLogoutError('退出未确认，请稍后重试。'); }
               }}
               className="text-slate-500 hover:text-rose-700"
             >

@@ -38,8 +38,9 @@ export async function verifyQuestionCatalogEvidence(page, context, origin) {
   page.once('dialog', dialog => dialog.accept());
   await row.getByRole('button', { name: `删除题目：${input.question}`, exact: true }).click();
   await panel.getByText(/主数据：PostgreSQL · 0 题 · 待索引 0 题/).waitFor();
-  await page.reload(); await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: '题库治理', exact: true }).click();
+  await page.getByRole('heading', { name: '题库治理', exact: true, level: 1 }).waitFor();
   await maintenance.locator('summary').click();
   await page.getByRole('region', { name: '题库主数据与检索索引' }).getByText(/主数据：PostgreSQL · 0 题 · 待索引 0 题/).waitFor();
   console.log('PASS browser canonical question catalog: maintenance acknowledgment, real adoption without provider calls, one bounded embedding, PG version readback, soft-delete and reload');

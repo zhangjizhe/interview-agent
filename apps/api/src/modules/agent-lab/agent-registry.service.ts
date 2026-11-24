@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { getOrCreateOwnedWorkspace } from './workspace-access';
 import type { ConfiguredRuntimeService } from './configured-runtime.service';
 import {
@@ -152,6 +153,17 @@ export class AgentRegistryService {
         description: dto.description,
         type: dto.type,
       },
+    });
+  }
+
+  async archiveAgent(userId: string, agentId: string) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    await this.requireAgent(workspace.id, agentId);
+    // Preserve the current-version pointer, all versions and historical Runs.
+    return this.prisma.$transaction(async tx => {
+      const agent = await tx.agent.update({ where: { id: agentId }, data: { status: 'ARCHIVED' } });
+      await this.recordLifecycle(tx, userId, agent, 'ARCHIVE');
+      return agent;
     });
   }
 
@@ -336,14 +348,22 @@ export class AgentRegistryService {
       throw new ConflictException('只有已发布版本可以作为当前版本');
     }
 
-    await this.prisma.agent.update({
-      where: { id: agentId },
-      data: {
-        status: 'ACTIVE',
-        currentVersionId: version.id,
-      },
+    await this.prisma.$transaction(async tx => {
+      const agent = await tx.agent.update({ where: { id: agentId }, data: { status: 'ACTIVE', currentVersionId: version.id } });
+      await this.recordLifecycle(tx, userId, agent, 'ACTIVATE');
     });
     return version;
+  }
+
+  private async recordLifecycle(tx: any, actorId: string, agent: any, action: 'ARCHIVE' | 'ACTIVATE') {
+    const snapshot = { agentId: agent.id, action, currentVersionId: agent.currentVersionId ?? null };
+    await tx.decisionRecord.create({ data: {
+      organizationId: agent.organizationId, domain: DecisionDomain.AGENT_LAB,
+      decisionType: 'AGENT_LIFECYCLE', subjectType: 'AGENT', subjectId: agent.id,
+      agentId: agent.id, actorId, outcome: { status: agent.status },
+      ruleSetVersion: 'agent-lifecycle/v1', inputSnapshot: snapshot,
+      inputHash: createHash('sha256').update(JSON.stringify(snapshot)).digest('hex'),
+    } });
   }
 
   async bootstrapInterviewAgent(userId: string) {

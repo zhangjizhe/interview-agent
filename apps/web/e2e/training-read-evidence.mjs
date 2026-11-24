@@ -12,7 +12,7 @@ export async function verifyTrainingReads(page, control) {
   const writes = () => [...requestCounts].filter(([url]) => new URL(url).pathname !== '/api/metrics/vitals');
   const assertWrites = expected => assert.equal(writes().reduce((sum, [, count]) => sum + count, 0), expected, JSON.stringify([...requestCounts]));
   page.on('request', observe);
-  const token = await page.evaluate(() => localStorage.getItem('ia_access_token')); assert.ok(token);
+  const token = await page.evaluate(() => { try { const s = JSON.parse(localStorage.getItem('ia_auth_session_v1') || 'null'); if (s?.session?.accessToken) return s.session.accessToken; } catch {} return localStorage.getItem('ia_access_token'); }); assert.ok(token);
   const headers = { Authorization: `Bearer ${token}` };
   const readError = page.getByRole('alert').filter({ hasText: '训练建议暂时无法加载。' });
   const reload = page.getByRole('button', { name: '重新加载', exact: true });

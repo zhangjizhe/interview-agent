@@ -188,7 +188,7 @@ export function TrainingPage() {
     </div>;
   }
   if (!activeJob) {
-    return <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-slate-600">请先设置当前目标岗位。</div>;
+    return <div className="studio-page"><header className="studio-page-heading"><p className="studio-eyebrow">TRAIN / 定向训练</p><h1>训练建议</h1><p>训练来自正式面试中的技能证据，先明确准备方向。</p></header><section className="studio-card studio-empty"><CircleDot size={28} aria-hidden="true"/><h2>请先设置当前目标岗位。</h2><p>设置岗位后完成一次模拟面试，再根据评价生成可追溯的训练建议。</p><Link to="/prepare/jobs" className="studio-button primary">设置目标岗位</Link><Link to="/interviews" className="studio-button secondary">查看面试记录</Link></section></div>;
   }
 
   const recommendations = recommendationsQuery.data || [];

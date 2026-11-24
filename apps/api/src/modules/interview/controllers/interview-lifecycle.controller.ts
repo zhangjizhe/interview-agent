@@ -5,16 +5,20 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Logger,
+  Optional,
   Param,
   Post,
   Query,
   Req,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { InterviewAgentService } from '../../agent/interview-agent.service';
 import { MultiAgentService } from '../../agent/multi-agent.service';
 import { PrismaService } from '../../../infra/prisma/prisma.service';
+import { RedisService } from '../../../infra/redis/redis.service';
 import { MemoryService } from '../../memory/memory.service';
 import { ResumeRAGService } from '../services/resume-rag.service';
 import { EvaluationService } from '../services/evaluation.service';
@@ -22,6 +26,7 @@ import { TrainingService } from '../services/training.service';
 import { UsageService } from '../../llm/usage/usage.service';
 import type { ChatMessage } from '../../llm/providers/types';
 import { requireOwnedInterview } from '../../../common/ownership.util';
+import { tenantContext } from '../../organizations/tenant-context';
 import { QuestionPresentationService } from '../services/question-presentation.service';
 import { QuestionConfirmationService } from '../services/question-confirmation.service';
 
@@ -63,6 +68,7 @@ export class InterviewLifecycleController {
     private usage: UsageService,
     private questionConfirmation: QuestionConfirmationService,
     private questionPresentation: QuestionPresentationService,
+    @Optional() private redis?: RedisService,
   ) {}
 
   // ===== 静态路由（必须在 :interviewId 之前）=====
@@ -119,9 +125,12 @@ export class InterviewLifecycleController {
   }
 
   @Post('start')
-  async startInterview(@Body() dto: StartInterviewDto, @Req() req: any) {
+  async startInterview(
+    @Body() dto: StartInterviewDto,
+    @Req() req: any,
+    @Headers('idempotency-key') idempotencyKeyHeader?: string,
+  ) {
     const userId = req.user.userId;
-    await this.usage.assertInterviewAllowed(userId);
     const mode = dto.mode || 'FULL_SIMULATION';
     if (mode !== 'FULL_SIMULATION' && mode !== 'SKILL_PRACTICE') {
       throw new BadRequestException('Unsupported interview mode');
@@ -132,42 +141,99 @@ export class InterviewLifecycleController {
     if (dto.trainingRecommendationId && mode !== 'SKILL_PRACTICE') {
       throw new BadRequestException('Training retest requires skill practice mode');
     }
-    const resumes = await this.resumeRag.searchByUser(userId, 1).catch(() => []);
-    if (resumes.length === 0) {
-      throw new BadRequestException(
-        '请先上传简历（支持 .pdf / .md / .txt 格式）',
-      );
+
+    const rawIdemKey = idempotencyKeyHeader ?? req?.headers?.['idempotency-key'];
+    const idempotencyKey = typeof rawIdemKey === 'string' ? rawIdemKey.trim() : '';
+    if (rawIdemKey !== undefined && !/^[A-Za-z0-9:_-]{8,128}$/.test(idempotencyKey)) {
+      throw new BadRequestException('Idempotency-Key 格式无效，需为 8-128 位字母、数字、冒号、下划线或连字符');
     }
 
-    let targetJob: { id: string; title: string; level: string | null; profileVersion: number } | null = null;
-    if (dto.targetJobId) {
-      targetJob = await this.prisma.targetJob.findFirst({
-        where: { id: dto.targetJobId, userId },
-        select: { id: true, title: true, level: true, profileVersion: true },
-      });
-      if (!targetJob) {
-        throw new BadRequestException('Target job not found');
+    const redisClient = idempotencyKey ? this.redis?.getClient?.() : undefined;
+    const fingerprint = idempotencyKey
+      ? createHash('sha256')
+          .update(
+            JSON.stringify({
+              mode,
+              targetJobId: dto.targetJobId || null,
+              practiceSkillId: dto.practiceSkillId || null,
+              trainingRecommendationId: dto.trainingRecommendationId || null,
+              position: dto.targetJobId ? null : (dto.position || ''),
+              level: dto.targetJobId ? null : (dto.level || 'P5'),
+            }),
+          )
+          .digest('hex')
+          .slice(0, 32)
+      : '';
+    const orgId = tenantContext.getStore()?.organizationId || 'default';
+    const idemRedisKey = idempotencyKey ? `interview:start:idem:${orgId}:${userId}:${idempotencyKey}` : '';
+
+    if (redisClient && idemRedisKey) {
+      const acquired = await redisClient.set(idemRedisKey, `PENDING:${fingerprint}`, 'EX', 60, 'NX');
+      if (acquired !== 'OK') {
+        const existing = await redisClient.get(idemRedisKey);
+        if (existing === `PENDING:${fingerprint}`) {
+          throw new ConflictException('相同的面试创建请求正在处理中，请稍候刷新记录核对。');
+        }
+        const donePrefix = `DONE:${fingerprint}:`;
+        if (existing?.startsWith(donePrefix)) {
+          const existingInterviewId = existing.slice(donePrefix.length);
+          const existingInterview = await this.prisma.interview.findFirst({
+            where: { id: existingInterviewId, userId },
+          });
+          if (!existingInterview) {
+            throw new ConflictException('该 Idempotency-Key 对应的面试已失效或被删除，请使用新请求重试。');
+          }
+          const resumes = await this.resumeRag.searchByUser(userId, 1).catch(() => []);
+          return {
+            interviewId: existingInterview.id,
+            interview: existingInterview,
+            resume: resumes[0] || null,
+            resumeConfirmed: Boolean((existingInterview as any).resumeConfirmed),
+            idempotentReplay: true,
+          };
+        }
+        throw new ConflictException('Idempotency-Key 已被其他请求参数使用，请勿复用。');
       }
     }
 
-    let practiceSkillId: string | null = null;
-    if (mode === 'SKILL_PRACTICE') {
-      if (!targetJob || !dto.practiceSkillId) {
-        throw new BadRequestException('Skill practice requires a target job and selected skill');
+    try {
+      await this.usage.assertInterviewAllowed(userId);
+      const resumes = await this.resumeRag.searchByUser(userId, 1).catch(() => []);
+      if (resumes.length === 0) {
+        throw new BadRequestException(
+          '请先上传简历（支持 .pdf / .md / .txt 格式）',
+        );
       }
-      const requirement = await this.prisma.jobSkillRequirement.findFirst({
-        where: { targetJobId: targetJob.id, skillId: dto.practiceSkillId },
-        include: { skill: { select: { id: true, isActive: true } } },
-      });
-      if (!requirement?.skill.isActive) {
-        throw new BadRequestException('Selected skill is not available for this target job');
-      }
-      practiceSkillId = requirement.skillId;
-    }
 
-    const position = targetJob?.title || dto.position;
-    const level = targetJob?.level || dto.level || 'P5';
-    const interview = await this.usage.createInterview({
+      let targetJob: { id: string; title: string; level: string | null; profileVersion: number } | null = null;
+      if (dto.targetJobId) {
+        targetJob = await this.prisma.targetJob.findFirst({
+          where: { id: dto.targetJobId, userId },
+          select: { id: true, title: true, level: true, profileVersion: true },
+        });
+        if (!targetJob) {
+          throw new BadRequestException('Target job not found');
+        }
+      }
+
+      let practiceSkillId: string | null = null;
+      if (mode === 'SKILL_PRACTICE') {
+        if (!targetJob || !dto.practiceSkillId) {
+          throw new BadRequestException('Skill practice requires a target job and selected skill');
+        }
+        const requirement = await this.prisma.jobSkillRequirement.findFirst({
+          where: { targetJobId: targetJob.id, skillId: dto.practiceSkillId },
+          include: { skill: { select: { id: true, isActive: true } } },
+        });
+        if (!requirement?.skill.isActive) {
+          throw new BadRequestException('Selected skill is not available for this target job');
+        }
+        practiceSkillId = requirement.skillId;
+      }
+
+      const position = targetJob?.title || dto.position;
+      const level = targetJob?.level || dto.level || 'P5';
+      const interview = await this.usage.createInterview({
         userId,
         position,
         level,
@@ -177,27 +243,40 @@ export class InterviewLifecycleController {
         practiceSkillId,
         status: 'IN_PROGRESS',
         summary: resumes[0]?.name ? `候选：${resumes[0].name}` : null,
-    });
-    if (dto.trainingRecommendationId && practiceSkillId && targetJob) {
-      try {
-        await this.training.attachRetest(
-          userId,
-          dto.trainingRecommendationId,
-          interview.id,
-          targetJob.id,
-          practiceSkillId,
-        );
-      } catch (error) {
-        await this.usage.cancelFailedInterview(interview.id);
-        throw error;
+      });
+      if (dto.trainingRecommendationId && practiceSkillId && targetJob) {
+        try {
+          await this.training.attachRetest(
+            userId,
+            dto.trainingRecommendationId,
+            interview.id,
+            targetJob.id,
+            practiceSkillId,
+          );
+        } catch (error) {
+          await this.usage.cancelFailedInterview(interview.id);
+          throw error;
+        }
       }
+
+      if (redisClient && idemRedisKey) {
+        await redisClient.set(idemRedisKey, `DONE:${fingerprint}:${interview.id}`, 'EX', 900).catch(() => {
+          this.logger.warn(`Failed to persist start idempotency receipt for interview ${interview.id}`);
+        });
+      }
+
+      return {
+        interviewId: interview.id,
+        interview,
+        resume: resumes[0], // 简历摘要给前端展示确认面板
+        resumeConfirmed: false, // 强制用户点确认才开始面试
+      };
+    } catch (error) {
+      if (redisClient && idemRedisKey) {
+        await redisClient.del(idemRedisKey).catch(() => {});
+      }
+      throw error;
     }
-    return {
-      interviewId: interview.id,
-      interview,
-      resume: resumes[0], // 简历摘要给前端展示确认面板
-      resumeConfirmed: false, // 强制用户点确认才开始面试
-    };
   }
 
   /**
@@ -252,8 +331,19 @@ export class InterviewLifecycleController {
   ) {
     await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
 
-    await this.prisma.interview.delete({ where: { id: interviewId } });
-    this.logger.log(`Deleted interview ${interviewId} (manual cleanup)`);
+    const result = await this.prisma.interview.deleteMany({
+      where: {
+        id: interviewId,
+        userId: req.user.userId,
+        status: 'IN_PROGRESS',
+        messages: { none: {} },
+        report: { is: null },
+      },
+    });
+    if (result.count !== 1) {
+      throw new ConflictException('仅允许删除尚未产生对话或评价的进行中空面试，请刷新记录后核对。');
+    }
+    this.logger.log(`Deleted empty interview ${interviewId} (manual cleanup)`);
     return { deleted: true, reason: 'manual_cleanup' };
   }
 

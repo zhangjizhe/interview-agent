@@ -1,8 +1,10 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MilvusClient, DataType, MetricType, IndexType } from '@zilliz/milvus2-sdk-node';
 import OpenAI from 'openai';
 import { ChatMessage, Memory } from '../interfaces/memory-store.interface';
+import { LlmGatewayService } from '../../llm/llm.gateway.service';
+import { tenantContext } from '../../organizations/tenant-context';
 
 /**
  * 长期记忆 - 写真实接入 Milvus 向量数据库
@@ -18,7 +20,10 @@ export class MilvusLongTermMemory implements OnModuleInit {
   private readonly COLLECTION = 'interview_memories';
   private readonly VECTOR_DIM = 1024;
 
-  constructor(private config: ConfigService) {}
+  constructor(
+    private config: ConfigService,
+    @Optional() private llmGateway?: LlmGatewayService,
+  ) {}
 
   async onModuleInit() {
     const milvusUrl = this.config.get<string>('milvus.url') || 'http://localhost:19530';
@@ -150,9 +155,13 @@ export class MilvusLongTermMemory implements OnModuleInit {
   }
 
   private async embedText(text: string): Promise<number[]> {
+    const bounded = text.slice(0, 2048);
+    if (this.llmGateway && tenantContext.getStore()?.organizationId) {
+      return this.llmGateway.embedText(bounded);
+    }
     const res = await this.embedder.embeddings.create({
       model: 'text-embedding-v3',
-      input: text.slice(0, 2048),
+      input: bounded,
     });
     return res.data[0].embedding;
   }

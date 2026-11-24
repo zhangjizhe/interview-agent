@@ -1,13 +1,23 @@
 # Tasks
 
-2026-11-10。
+Current focused phase: preparation workflow product/design checkpoint completed locally. See ../acceptance/PREPARATION_PRODUCT_DESIGN_ACCEPTANCE.md. Final45 related tests and bounded browser/layout evidence pass for the documented versions; overall product remains NOT_ACCEPTED and is not delivered. Wait for the user before starting a different phase.
 
-- 当前：LAB-DATA-GOVERNANCE，资料类型/归属/显式ACL/版本绑定与撤权；隔离PG/HTTP42、API1283（47跳过）、Web385、runtime53及浏览器流程已有证据。专用PG备份恢复通过；完整自动Docker门和精确源码CI、PR合并/远端核对待完成。主体445d572已推送PR #72，后补选框样式，最终只认最新对应CI。见LAB_DATA_GOVERNANCE_WIP.md。
-- 已完成前序：PR #71，main19e911e默认Product5绿；题库UX、Trace与历史读取恢复。业务16与RAG142为独立来源，完整历史对账与服务长期稳定性仍待查。原API503候选未部署。
-- 原服务升级：目前5175/API保持旧镜像与全部卷；资料治理候选仅在隔离服务验证。升级须先备份/迁移，并处理原启动自动Embedding的成本门，不能直接重启未核费用。
-- 导入后续：同步提题API缺持久任务、任务ID/可恢复结果/服务端幂等与完整来源Run链；UI防重复不能替代后台能力。真实模型验收先核私有费用账本。
-- 下一阶段：统一简历入口，URL/文件通用提取与原文/分块/索引/检索追踪；现有题库导入不等同文章RAG。先在已验收ACL上接入，不自动迁移原资料归属。
-- 仍待完成：全平台设计系统/其余页面、共享连接门导航容错、稳定公网、旧Mac迁移、语义质量及全产品验收。整体NOT_ACCEPTED。
-- 范围外：独立实验Python CI42773289262的Playwright1.58.2/ubuntu26.04-x64安装失败，未计通过，另修运行环境。
+## Open prioritized work
 
-无新外部模型调用。历史未知费用保持未知；认证/网站/服务器迁移等无关WIP保留，禁止全库暂存。
+- P1 Reconcile reported nine-CNY / Kimi K3 consumption with Bailian/DashScope & Qwen platform API billing; exact date/model/amount & ApiKeyID statement remains missing. Local Nov18 records do not explain it; preserve unknown costs. Source-level direct embedding bypasses in `ResumeRAGService`, `KnowledgeBaseService`, and `MilvusLongTermMemory` were unified into `LlmGatewayService` on `feat/security-circuit-breaker-95` (`81ea23b`, undeployed); Node 20+ CI and container rollout remain pending. See ../acceptance/COST_RECONCILIATION_2026-11-18.md.
+
+- P1 Expand the commercial product/design inventory into route/state evidence for Interview, Lab and portfolio; reconcile old UI inventory. All declared critical journeys, visual/focus/keyboard/long/error states and required desktop/physical-device matrix must pass before delivery. Current design verdict remains NOT_ACCEPTED.
+
+- P1 Real owned preparation→question/answer→report/evidence→training/retest acceptance, model usage receipts and quality evaluation. Current account reads a resume but still needs a job; do not manufacture real evidence from fixtures.
+- P1 Resolve exact current security CI/dependency audit in an independent scope, then push/PR/merge only under the agreed gate. Last recorded CI43812962156 failed; not refreshed here.
+- P1 Historical resume/account/storage provenance; preserve existing rows and volumes. Earlier9-row aggregate under other scope remains unreconciled; current own resume read is now nonempty, not a data migration proof.
+- P1 Complete session isolation acceptance against the real server and release configuration. Candidate cache/snapshot/tab repair passed75 related tests and final-bundle synthetic two-tab verification; not deployed. Verify storage denial, old-bundle refresh/relogin/rollback and actual two-user backend behavior before closing this gate.
+- P1 Server idempotency/receipts for unknown start/report/upload/job outcomes. (Update 2026-11-23 `c6b1dcc` & 2026-11-24 on `feat/security-circuit-breaker-95`: backend atomic empty-room deletion on `DELETE /api/interview/:interviewId` and tenant/user-isolated `Idempotency-Key` protection on `POST /api/interview/start` are implemented & verified; remaining report/upload/job server idempotency receipts stay open.) Preparation now validates receipts and holds ambiguous job/upload outcomes for explicit read reconciliation; those client protections do not replace server contracts.
+- P1 Normal-session Lab ownership/grants, configured agents, evaluation report and Trace/lifecycle real data acceptance. This phase checked only Lab root availability.
+- P1 New-Mac/domain/HTTPS restricted deployment, safe backup/restore, access boundaries and restart verification. No public deployment acceptance.
+- P2 Complete resume archive/version selection/original files; candidate personal knowledge file/URL RAG with isolation and source/evaluation contracts. Current resume page exposes only existing bounded summary storage.
+- P2 Interview finish/exit UX and native alerts; report start/unknown-result flow across all entry points; lifecycle receipt consistency. No semantic cancellation/refund claims.
+- P2 Candidate skills/progress UI and comparable assessment/training improvement evidence; no invented score or efficacy.
+- P2 Physical Android/iPhone WeChat/mobile Chrome, OS keyboard and accessibility assistive-technology checks.
+
+Older open discoveries and chronology are retained without reclassifying them as done in archive/context-before-ux-audit-2026-11-18/TASKS.md. Use its task-specific pointers when resuming older work.

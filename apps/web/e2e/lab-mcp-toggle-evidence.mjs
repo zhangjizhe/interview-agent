@@ -15,12 +15,23 @@ export async function verifyMcpToggle(page, context, origin) {
   const original = await read();
   const server = original.servers.find(item => item.builtin && item.enabled && item.executable);
   assert.ok(server, 'An enabled executable builtin is required');
-  const row = page.locator('.mcp-row').filter({ has: page.getByRole('heading', { name: server.displayName || server.name, exact: true }) });
+  const row = page.locator('.mcp-tool-card').filter({ has: page.getByRole('heading', { name: server.displayName || server.name, exact: true }) });
+
+  const disableInProcess = async () => {
+    await row.getByRole('button', { name: '本进程关闭', exact: true }).click();
+    await row.getByRole('button', { name: '确认关闭', exact: true }).click();
+  };
+  const scopeDetails = page.locator('details.mcp-scope');
+  const scopeSummary = scopeDetails.locator('summary', { hasText: '操作范围与持久性' });
+  await scopeSummary.waitFor();
+  if ((await scopeDetails.getAttribute('open')) === null) {
+    await scopeSummary.click();
+  }
   await page.getByText('开关仅作用于当前 API 进程，会影响该进程服务的所有组织；不会同步其他实例。重新加载配置保留当前开关，API 重启后恢复配置文件默认值。关闭会阻止后续工具调用，不会取消已经开始的调用。', { exact: true }).waitFor();
   const path = `${origin}/api/admin/mcp-servers/toggle`;
   const failure = page.getByText('Synthetic MCP toggle refused', { exact: false });
   await page.route(path, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'Synthetic MCP toggle refused' }) }), { times: 1 });
-  await row.getByRole('button', { name: '本进程关闭', exact: true }).click();
+  await disableInProcess();
   await failure.waitFor();
   assert.equal((await read()).servers.find(item => item.name === server.name).enabled, true);
   assert.deepEqual(await questionInputSnapshot(), before);
@@ -36,7 +47,7 @@ export async function verifyMcpToggle(page, context, origin) {
   };
   await page.route(path, broken, { times: 1 });
   try {
-    await row.getByRole('button', { name: '本进程关闭', exact: true }).click();
+    await disableInProcess();
     await Promise.race([brokenFailure, page.getByText('MCP 开关结果未确认，请重新读取服务状态后核验。', { exact: false }).waitFor()]);
     assert.equal((await read()).servers.find(item => item.name === server.name).enabled, false);
     assert.equal(await page.getByText(`${server.name} 已在当前 API 进程关闭。`, { exact: true }).count(), 0);
@@ -74,7 +85,7 @@ export async function verifyMcpToggle(page, context, origin) {
   await page.route(path, held, { times: 1 });
   let timeout; let failed = false;
   try {
-    await row.getByRole('button', { name: '本进程关闭', exact: true }).click();
+    await disableInProcess();
     await Promise.race([ready, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('MCP toggle receipt missing')), 75000); })]);
     clearTimeout(timeout);
     assert.equal(await row.getByRole('button', { name: '处理中', exact: true }).isEnabled(), false);
@@ -85,7 +96,7 @@ export async function verifyMcpToggle(page, context, origin) {
     await row.getByRole('button', { name: '本进程启用', exact: true }).waitFor();
     await page.getByText(`${server.name} 已在当前 API 进程关闭。`, { exact: true }).waitFor();
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: '治理 MCP', exact: true }).click();
+    await page.getByRole('button', { name: 'MCP 与工具', exact: true }).click();
     await row.getByRole('button', { name: '本进程启用', exact: true }).waitFor();
     assert.equal((await read()).servers.find(item => item.name === server.name).enabled, false);
     const reloadResponse = page.waitForResponse(response => response.url() === `${origin}/api/admin/mcp-servers/reload` && response.request().method() === 'POST');
@@ -95,12 +106,12 @@ export async function verifyMcpToggle(page, context, origin) {
     await page.getByText('当前 API 进程的 MCP 配置已重新加载；运行时开关保持不变。', { exact: true }).waitFor();
     await row.getByRole('button', { name: '本进程启用', exact: true }).waitFor();
     assert.equal((await read()).servers.find(item => item.name === server.name).enabled, false);
-    const healthResponse = page.waitForResponse(response => response.url() === `${origin}/api/admin/mcp-servers/${server.name}/health`);
-    void healthResponse.catch(() => {});
-    await row.getByRole('button', { name: '健康检查', exact: true }).click();
-    const health = await healthResponse; assert.equal(health.status(), 200);
-    assert.equal((await health.json()).ok, false);
-    await page.getByText(`${server.name} 未通过检查：工具已被系统禁用`, { exact: true }).waitFor();
+    assert.equal(await row.getByRole('button', { name: `检查工具：${server.displayName || server.name}` }).isEnabled(), false);
+    const health = await context.request.get(`${origin}/api/admin/mcp-servers/${server.name}/health`, { headers });
+    assert.equal(health.status(), 200);
+    const healthBody = await health.json();
+    assert.equal(healthBody.ok, false);
+    assert.match(String(healthBody.error || ''), /禁用/);
     const enabledResponse = page.waitForResponse(response => response.url() === path && response.request().method() === 'POST');
     void enabledResponse.catch(() => {});
     await row.getByRole('button', { name: '本进程启用', exact: true }).click();

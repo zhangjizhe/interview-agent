@@ -49,4 +49,35 @@ describe('LlmGatewayChatModel usage evidence', () => {
       { provider: 'qwen', model: 'qwen-plus', promptTokens: 20, completionTokens: 7 },
     ]);
   });
+
+  it('preserves plain system/assistant/user roles in withStructuredOutput', async () => {
+    const gateway = {
+      chat: jest.fn().mockResolvedValue({
+        content: '{"intent":"mock_interview"}',
+        usage: { promptTokens: 12, completionTokens: 4 },
+        provider: 'qwen',
+        model: 'qwen-plus',
+        finishReason: 'stop',
+      }),
+    };
+    const model = new LlmGatewayChatModel({ llmGateway: gateway as any, provider: 'deepseek' });
+    const runnable = model.withStructuredOutput({ parse: (v: any) => v });
+    const out = await runnable.invoke([
+      { role: 'system', content: '你是一个意图分类器。' },
+      { role: 'assistant', content: '上一轮回复' },
+      { role: 'user', content: '开始面试' },
+    ]);
+
+    expect(out).toEqual({ intent: 'mock_interview' });
+    expect(gateway.chat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [
+          expect.objectContaining({ role: 'system', content: expect.stringContaining('你是一个意图分类器。') }),
+          { role: 'assistant', content: '上一轮回复' },
+          { role: 'user', content: '开始面试' },
+        ],
+      }),
+      'deepseek',
+    );
+  });
 });

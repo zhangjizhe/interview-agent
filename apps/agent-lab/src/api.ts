@@ -27,6 +27,10 @@ export async function api(path: string, init?: RequestInit) {
     localStorage.removeItem('ia_userId');
     window.dispatchEvent(new Event('ia:session-expired'));
   }
-  if (!response.ok) throw new Error(response.status === 401 ? '登录已过期，请重新登录。' : body.message || `HTTP ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(response.status === 401 ? '登录已过期，请重新登录。' : body.message || `HTTP ${response.status}`) as Error & { status: number };
+    error.status = response.status;
+    throw error;
+  }
   return body;
 }

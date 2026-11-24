@@ -26,7 +26,7 @@ try {
     const promise = waitPost(path); await action(); const response = await promise; assert.equal(response.status(), expected, path); return response.json();
   };
   const read = async path => {
-    const token = await page.evaluate(() => localStorage.getItem('ia_access_token')); assert.ok(token);
+    const token = await page.evaluate(() => { try { const s = JSON.parse(localStorage.getItem('ia_auth_session_v1') || 'null'); if (s?.session?.accessToken) return s.session.accessToken; } catch {} return localStorage.getItem('ia_access_token'); }); assert.ok(token);
     const response = await context.request.get(`${origin}/api${path}`, { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 });
     assert.equal(response.status(), 200, path); return response.json();
   };
@@ -34,27 +34,31 @@ try {
   const nav = name => page.getByRole('navigation', { name: '候选人导航', exact: true }).getByRole('link', { name, exact: true });
   const login = async () => {
     await completeEmailLogin(page, { userId, password });
-    await nav('岗位设置').waitFor();
+    await nav('资料准备').waitFor();
   };
   await page.goto(origin);
   const email = `${userId}@fixture.test`;
   const registration = await registerThroughEmailUI(page, { userId, password, email });
   assert.equal(registration.userId, userId); await page.getByRole('button', { name: '登录', exact: true }).waitFor(); await login();
-  await nav('岗位设置').click(); await page.getByRole('heading', { name: '创建目标岗位', exact: true }).waitFor();
-  const form = page.locator('form').filter({ has: page.getByRole('heading', { name: '创建目标岗位', exact: true }) });
-  await form.getByPlaceholder('例如：前端开发工程师').fill('Synthetic Frontend Engineer');
-  await form.getByPlaceholder('例如：P5').fill('P5');
-  await form.getByPlaceholder('粘贴职位描述，系统将提取岗位相关技能要求。').fill('React TypeScript frontend testing');
-  const job = await postFromUI('/interview/target-jobs', () => form.getByRole('button', { name: '保存岗位', exact: true }).click());
+  await nav('资料准备').click();
+  await page.getByRole('link', { name: '设置目标岗位', exact: true }).click();
+  await page.getByRole('button', { name: '创建目标岗位', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('heading', { name: '创建目标岗位', exact: true }).waitFor();
+  await dialog.getByPlaceholder('例如：前端开发工程师').fill('Synthetic Frontend Engineer');
+  await dialog.getByPlaceholder('例如：P5 / 高级').fill('P5');
+  await dialog.getByPlaceholder('粘贴招聘岗位的职责与要求').fill('React TypeScript frontend testing');
+  const job = await postFromUI('/interview/target-jobs', () => dialog.getByRole('button', { name: '保存岗位', exact: true }).click());
   assert.ok(job.id); assert.equal(job.profileVersion, 1);
   await page.getByRole('status').filter({ hasText: '岗位已创建并设为当前岗位' }).waitFor();
-  await nav('首页').click(); await page.locator('input[type=file]').waitFor({ state: 'attached' });
-  const uploaded = await postFromUI('/interview/upload-resume', () => page.locator('input[type=file]').setInputFiles({ name: 'synthetic-golden.txt', mimeType: 'text/plain', buffer: Buffer.from('Synthetic Golden Candidate\nReact TypeScript\nSynthetic frontend project') }));
-  assert.equal(uploaded.ragIngested, true); await page.getByRole('status').filter({ hasText: '简历已更新' }).waitFor();
-  await page.getByRole('complementary').getByRole('button', { name: '开始模拟面试', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: '开始模拟面试', exact: true });
-  await dialog.getByRole('button', { name: '完整模拟', exact: true }).click();
-  const started = await postFromUI('/interview/start', () => dialog.getByRole('button', { name: '开始面试', exact: true }).click());
+  await page.getByRole('link', { name: '检查简历', exact: true }).click();
+  await page.locator('input[type=file]').waitFor({ state: 'attached' });
+  await page.locator('input[type=file]').setInputFiles({ name: 'synthetic-golden.txt', mimeType: 'text/plain', buffer: Buffer.from('Synthetic Golden Candidate\nReact TypeScript\nSynthetic frontend project') });
+  const uploaded = await postFromUI('/interview/upload-resume', () => page.getByRole('button', { name: '上传并解析', exact: true }).click());
+  assert.equal(uploaded.ragIngested, true); await page.getByRole('status').filter({ hasText: '简历已解析并保存到个人简历库' }).waitFor();
+  await nav('练习').click();
+  await page.getByRole('button', { name: /完整模拟/ }).click();
+  const started = await postFromUI('/interview/start', () => page.getByRole('button', { name: '开始面试', exact: true }).click());
   assert.equal(started.interview.mode, 'FULL_SIMULATION'); assert.equal(started.interview.targetJobId, job.id);
   const runInterview = async (id, score) => {
     await page.waitForURL(url => url.pathname === `/interview/${id}`);
