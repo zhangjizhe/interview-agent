@@ -465,12 +465,62 @@ function ExperimentComposer({ runs, createExperiment }: {
   </section>;
 }
 
+export function PublishedVersionRollback() {
+  const queryClient = useQueryClient();
+  const [selectedAgentId, setSelectedAgentId] = useState('');
+  const [confirmVersionId, setConfirmVersionId] = useState('');
+  const [rollbackNotice, setRollbackNotice] = useState('');
+  const agents = useQuery<Array<{ id: string; key: string; name: string; status: string; currentVersionId?: string | null; currentVersion?: { id: string; version: string; status: string } | null }>>({
+    queryKey: ['lab-release-agents'],
+    retry: false,
+    queryFn: () => api('/agent-lab/agents'),
+  });
+  const versions = useQuery<Array<{ id: string; version: string; status: string; publishedAt?: string | null; createdAt: string }>>({
+    queryKey: ['lab-release-versions', selectedAgentId],
+    enabled: Boolean(selectedAgentId),
+    retry: false,
+    queryFn: () => api(`/agent-lab/agents/${encodeURIComponent(selectedAgentId)}/versions`),
+  });
+  const rollback = useMutation({
+    mutationFn: ({ agentId, versionId }: { agentId: string; versionId: string }) =>
+      api(`/agent-lab/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(versionId)}/activate`, { method: 'POST' }),
+    onSuccess: (activated: any) => {
+      setConfirmVersionId('');
+      setRollbackNotice(`已安全回滚当前生效版本至 ${activated?.version || '目标已发布版本'}（已写入审计记录，不调用模型）。`);
+      void queryClient.invalidateQueries({ queryKey: ['lab-release-agents'] });
+      void queryClient.invalidateQueries({ queryKey: ['lab-release-versions', selectedAgentId] });
+      void queryClient.invalidateQueries({ queryKey: ['lab-agents'] });
+    },
+  });
+  const activeAgent = agents.data?.find(a => a.id === selectedAgentId);
+  const historicalPublished = (versions.data ?? []).filter(
+    v => v.status === 'PUBLISHED' && v.id !== activeAgent?.currentVersionId && v.id !== activeAgent?.currentVersion?.id,
+  );
+  return <section className="lab-section" aria-label="已发布版本回滚">
+    <div className="lab-section-head"><div><h2>已发布版本回滚（秒级止血）</h2><p>仅允许切换到历史上已通过门禁的 PUBLISHED 版本；立即更新消费端生效快照并留痕审计，不触发模型调用。</p></div></div>
+    <label>选择 Agent<select value={selectedAgentId} onChange={event => { setSelectedAgentId(event.target.value); setConfirmVersionId(''); setRollbackNotice(''); rollback.reset(); }}><option value="">请选择需要检查回滚的 Agent</option>{agents.data?.map(agent => <option key={agent.id} value={agent.id}>{agent.name} · {agent.key}（当前：{agent.currentVersion?.version ?? '未发布'}）</option>)}</select></label>
+    {agents.isError && <p role="alert">{diagnosticText(agents.error instanceof Error ? agents.error.message : '无法读取 Agent 列表')}</p>}
+    {selectedAgentId && versions.isPending && <p role="status">正在读取历史发布版本…</p>}
+    {selectedAgentId && versions.isError && <p role="alert">{diagnosticText(versions.error instanceof Error ? versions.error.message : '无法读取版本列表')}</p>}
+    {selectedAgentId && !versions.isPending && !versions.isError && !historicalPublished.length && <p className="trace-muted">该 Agent 暂无其他可回滚的历史已发布版本。</p>}
+    {historicalPublished.length > 0 && <div className="lab-list">{historicalPublished.map(ver => <article className="lab-row" key={ver.id}>
+      <div><p>PUBLISHED · 历史可回滚版本</p><h3>{ver.version}</h3><p>发布时间：{ver.publishedAt ? new Date(ver.publishedAt).toLocaleString() : new Date(ver.createdAt).toLocaleString()}</p></div>
+      <div>{confirmVersionId === ver.id
+        ? <><button type="button" className="agent-command" disabled={rollback.isPending} onClick={() => rollback.mutate({ agentId: selectedAgentId, versionId: ver.id })}>{rollback.isPending ? '回滚中…' : '确认回滚'}</button><button type="button" disabled={rollback.isPending} onClick={() => setConfirmVersionId('')}>取消</button></>
+        : <button type="button" disabled={rollback.isPending} onClick={() => { setConfirmVersionId(ver.id); setRollbackNotice(''); rollback.reset(); }}>回滚到此版本</button>}</div>
+    </article>)}</div>}
+    {rollback.isError && <p role="alert">{diagnosticText(rollback.error instanceof Error ? rollback.error.message : '回滚失败')}</p>}
+    {rollbackNotice && <p role="status">{rollbackNotice}</p>}
+  </section>;
+}
+
 function ReleaseWorkspace({ runs, decisions, recordDecision }: {
   runs: LabRun[];
   decisions: LabDashboard['decisions'];
   recordDecision: { isPending: boolean; variables?: { runId: string }; mutate: (input: { runId: string; decision: string; rationaleCode: string }) => void };
 }) {
   return <div className="agent-page-grid">
+    <PublishedVersionRollback />
     <section className="lab-release-commands">{runs.length ? runs.map((run) => <DecisionCommand key={run.id} run={run} recordDecision={recordDecision} />) : <EmptyState title="尚无可决策运行" text="没有已导入运行" />}</section>
     {decisions.length ? <section className="lab-list">{decisions.map((decision) => <article className="lab-row" key={decision.id}><div><p className={`decision-${decision.decision.toLowerCase()}`}>{decision.decision}</p><h2>{decision.agent.agentKey} <span>{decision.agent.version}</span></h2><p>{decision.datasetVersion} · {new Date(decision.createdAt).toLocaleString()}</p></div><p className="lab-rationale">{decision.rationale}</p></article>)}</section> : <EmptyState title="尚无发布决策" text="没有已记录决策" />}
   </div>;

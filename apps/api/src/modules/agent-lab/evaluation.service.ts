@@ -13,6 +13,7 @@ import {
   CreateEvaluationDatasetCaseDto,
   CreateEvaluationDatasetDto,
   CreateEvaluatorDto,
+  PromoteRunToDatasetDto,
   RunEvaluationDto,
 } from './dto/agent.dto';
 import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-statistics';
@@ -251,6 +252,75 @@ export class EvaluationService {
       }
       throw error;
     }
+  }
+
+  private sanitizePromotedText(raw: string): string {
+    return raw
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
+      .replace(/\b(sk-[a-zA-Z0-9_-]{12,}|Bearer\s+[a-zA-Z0-9._-]{16,})\b/g, '[REDACTED_SECRET]')
+      .replace(/\b1[3-9]\d{9}\b/g, '[REDACTED_PHONE]')
+      .trim()
+      .slice(0, 4000);
+  }
+
+  /**
+   * 评测驱动飞轮核心闭环：将线上 Run / Bad Case 脱敏沉淀为指定未冻结 Dataset 的回归 Case。
+   * 严格复用 addDatasetCase 的冻结门禁、租户隔离与唯一键校验，不触发任何模型调用。
+   */
+  async promoteRunToDataset(
+    userId: string,
+    runId: string,
+    dto: PromoteRunToDatasetDto,
+  ) {
+    const run = await this.runtime.getRun(userId, runId);
+    const inputObj = run.input && typeof run.input === 'object' ? (run.input as Record<string, unknown>) : {};
+    const rawMessage = typeof inputObj.message === 'string'
+      ? inputObj.message
+      : typeof inputObj.question === 'string'
+        ? inputObj.question
+        : '';
+    const sanitizedMessage = this.sanitizePromotedText(rawMessage);
+    if (!sanitizedMessage) {
+      throw new BadRequestException('该 Run 缺少可复放的输入消息，无法沉淀为回归用例');
+    }
+
+    const fallbackSuffix = run.id.toLowerCase().replace(/[^a-z0-9]/g, '').slice(-10) || 'case';
+    const key = (dto.key?.trim() || `badcase-${fallbackSuffix}`).slice(0, 64);
+
+    const expectedKeywords = (dto.expectedKeywords || []).map(item => item.trim()).filter(Boolean).slice(0, 20);
+    const forbiddenKeywords = (dto.forbiddenKeywords || []).map(item => item.trim()).filter(Boolean).slice(0, 20);
+    const expectedOutput: Record<string, unknown> | undefined =
+      expectedKeywords.length || forbiddenKeywords.length
+        ? {
+            ...(expectedKeywords.length ? { mustInclude: expectedKeywords } : {}),
+            ...(forbiddenKeywords.length ? { mustNotInclude: forbiddenKeywords } : {}),
+          }
+        : undefined;
+
+    const input: Record<string, unknown> = { message: sanitizedMessage };
+    if (typeof inputObj.position === 'string' && inputObj.position.trim()) {
+      input.position = inputObj.position.trim().slice(0, 120);
+    }
+    if (typeof inputObj.level === 'string' && inputObj.level.trim()) {
+      input.level = inputObj.level.trim().slice(0, 32);
+    }
+
+    return this.addDatasetCase(userId, dto.datasetId, {
+      key,
+      input,
+      expectedOutput,
+      metadata: {
+        source: 'run-promotion',
+        sourceRunId: run.id,
+        sourceAgentId: run.agentId,
+        sourceAgentVersionId: run.agentVersionId,
+        sourceStatus: run.status,
+        sourceApplication: run.application ?? null,
+        promotedBy: userId,
+        promotedAt: new Date().toISOString(),
+        ...(dto.note?.trim() ? { note: this.sanitizePromotedText(dto.note).slice(0, 1000) } : {}),
+      },
+    });
   }
 
   async freezeDataset(userId: string, datasetId: string) {

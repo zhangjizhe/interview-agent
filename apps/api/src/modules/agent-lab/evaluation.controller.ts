@@ -6,6 +6,7 @@ import {
   CreateEvaluationDatasetCaseDto,
   CreateEvaluationDatasetDto,
   CreateEvaluatorDto,
+  PromoteRunToDatasetDto,
   StartEvaluationJobDto,
 } from './dto/agent.dto';
 
@@ -41,6 +42,15 @@ export class EvaluationController {
     @Body() dto: CreateEvaluationDatasetCaseDto,
   ) {
     return this.evaluations.addDatasetCase(req.user.userId, datasetId, dto);
+  }
+
+  @Post('runs/:runId/promote-to-dataset')
+  promoteRunToDataset(
+    @Req() req: any,
+    @Param('runId') runId: string,
+    @Body() dto: PromoteRunToDatasetDto,
+  ) {
+    return this.evaluations.promoteRunToDataset(req.user.userId, runId, dto);
   }
 
   @Post('datasets/:datasetId/freeze')

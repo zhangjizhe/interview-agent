@@ -1,11 +1,13 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsObject,
   IsOptional,
   IsString,
   IsInt,
   Max,
   Min,
+  MinLength,
   Matches,
   MaxLength,
   IsIn,
@@ -180,6 +182,34 @@ export class CreateEvaluationDatasetCaseDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;
+}
+
+export class PromoteRunToDatasetDto {
+  @IsString()
+  @MinLength(1)
+  datasetId!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(AGENT_KEY_PATTERN, {
+    message: 'key 必须以小写字母开头，仅包含小写字母、数字和连字符，长度为 2-64',
+  })
+  key?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  expectedKeywords?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  forbiddenKeywords?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  note?: string;
 }
 
 export class CreateEvaluatorDto {
