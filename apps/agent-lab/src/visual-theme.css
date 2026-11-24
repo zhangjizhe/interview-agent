@@ -132,6 +132,109 @@ h1, h2, h3 { letter-spacing: -.02em; }
 .text-command { color: var(--lab-primary) !important; }
 .agent-gate, .agent-loading { color: var(--lab-text); }
 
+/* Eval-Driven Flywheel, Dual-Model Gateway Strip & Version Rollback */
+.lab-section {
+  background: var(--lab-surface);
+  border: 1px solid var(--lab-border);
+  border-radius: 12px;
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+}
+.lab-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.lab-section-head h2 { margin: 0 0 6px; font-size: 18px; font-weight: 600; color: var(--lab-text); }
+.lab-section-head p { margin: 0; max-width: 780px; }
+.lab-flywheel-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.lab-flywheel-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  background: #fbfbf9;
+  border: 1px solid var(--lab-border);
+  border-radius: 10px;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.lab-flywheel-card:hover { border-color: #c5c9dc; background: #fff; }
+.lab-step-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lab-primary);
+  background: #eef0ff;
+}
+.lab-flywheel-card strong { font-size: 22px; font-weight: 650; color: var(--lab-text); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.lab-flywheel-card small { font-size: 12px; color: var(--lab-muted); line-height: 1.6; }
+.lab-flywheel-card button {
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 7px 12px;
+  font-size: 12px;
+  border-radius: 7px;
+  border: 1px solid #c9ccc8;
+  background: #fff;
+  color: var(--lab-text);
+  min-height: 34px;
+}
+.lab-flywheel-card button:hover:not(:disabled) { border-color: var(--lab-primary); color: var(--lab-primary); background: #f6f7ff; }
+.lab-gateway-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  background: var(--lab-surface);
+  border: 1px solid var(--lab-border);
+  border-radius: 10px;
+  font-size: 12px;
+}
+.lab-gateway-pills { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lab-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--lab-border);
+  background: #f7f8fa;
+  color: var(--lab-text);
+}
+.lab-pill-primary { background: #eef0ff; border-color: #c8cef7; color: var(--lab-primary); }
+.lab-pill-ok { background: #edf8f1; border-color: #b5d6c4; color: var(--lab-success); }
+.lab-pill-warn { background: #fff8e8; border-color: #e4d4aa; color: var(--lab-warning); }
+.lab-pill-danger { background: #fdf0f1; border-color: #e5bbc0; color: var(--lab-danger); }
+.lab-badcase-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.lab-select-field { display: grid; gap: 7px; max-width: 520px; font-size: 12px; font-weight: 500; color: #505b68; }
+.lab-rollback-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lab-rollback-actions button { min-height: 36px; padding: 7px 14px; border-radius: 7px; font-size: 12px; border: 1px solid #c9ccc8; background: #fff; color: var(--lab-text); }
+.lab-rollback-actions button.agent-command { background: var(--lab-danger); border-color: var(--lab-danger); color: #fff; }
+.lab-rollback-actions button.agent-command:hover:not(:disabled) { background: #9b2e37; }
+@media (max-width: 1120px) {
+  .lab-flywheel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .lab-flywheel-grid { grid-template-columns: 1fr; }
+  .lab-section { padding: 18px; }
+}
+
 @media (max-width: 900px) {
   .agent-shell { grid-template-columns: minmax(0, 1fr); }
   .agent-sidebar { position: relative; height: auto; padding: 12px 16px; overflow: visible; }

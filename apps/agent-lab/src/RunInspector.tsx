@@ -127,20 +127,22 @@ function Inspector({ runId, agentId, versionId, close }: { runId: string; agentI
           {showContent && <div className="trace-content"><h4>输入</h4><pre>{diagnosticJson(current.input)}</pre><h4>输出</h4><pre>{diagnosticJson(current.output)}</pre><h4>工具、路由与检索结果</h4><pre>{diagnosticJson(current.payload)}</pre></div>}
         </> : <p>选择事件以查看细节。</p>}</article></div>}
       <div className="trace-run-content">
-        <button type="button" aria-expanded={showRunContent} onClick={() => setShowRunContent(value => !value)}>查看运行输入与最终输出（过滤后的业务内容）</button>
-        <button type="button" aria-expanded={showPromote} onClick={() => { setShowPromote(value => !value); setPromoteFeedback(''); promote.reset(); }}>转入回归集</button>
-        <button type="button" disabled={submitFeedback.isPending} onClick={() => { setRatingNotice(''); submitFeedback.mutate('UP'); }}>标记正向 👍</button>
-        <button type="button" disabled={submitFeedback.isPending} onClick={() => { setRatingNotice(''); submitFeedback.mutate('DOWN'); }}>标记 Bad Case 👎</button>
+        <div className="trace-run-actions">
+          <button type="button" aria-expanded={showRunContent} onClick={() => setShowRunContent(value => !value)}>查看运行输入与最终输出（过滤后的业务内容）</button>
+          <button type="button" className="is-promote" aria-expanded={showPromote} onClick={() => { setShowPromote(value => !value); setPromoteFeedback(''); promote.reset(); }}>转入回归集</button>
+          <button type="button" disabled={submitFeedback.isPending} onClick={() => { setRatingNotice(''); submitFeedback.mutate('UP'); }}>标记正向 👍</button>
+          <button type="button" disabled={submitFeedback.isPending} onClick={() => { setRatingNotice(''); submitFeedback.mutate('DOWN'); }}>标记 Bad Case 👎</button>
+        </div>
         {submitFeedback.isError && <p role="alert">{diagnosticText(submitFeedback.error instanceof Error ? submitFeedback.error.message : '反馈记录失败')}</p>}
         {ratingNotice && <p role="status">{ratingNotice}</p>}
         {showRunContent && <div className="trace-content"><h4>运行输入</h4><pre>{diagnosticJson(data.input)}</pre><h4>最终输出</h4><pre>{diagnosticJson(data.output)}</pre></div>}
-        {showPromote && <section className="trace-content" aria-label="沉淀为回归用例">
+        {showPromote && <section className="trace-promote-panel" aria-label="沉淀为回归用例">
           <h4>将该 Run 脱敏沉淀为回归用例</h4>
           <p className="trace-muted">服务端将自动脱敏邮箱、手机号与常见密钥前缀；仅可写入未冻结的 Dataset，不调用任何模型。</p>
           {datasets.isPending && <p role="status">正在读取可用数据集…</p>}
           {datasets.isError && <p role="alert">数据集读取失败：{diagnosticText(datasets.error instanceof Error ? datasets.error.message : '读取失败')}</p>}
           {!datasets.isPending && !datasets.isError && !editableDatasets.length && <p>当前没有可编辑（未冻结）的数据集，请先在「评测」页新建数据集版本。</p>}
-          {editableDatasets.length > 0 && <form onSubmit={event => { event.preventDefault(); if (datasetId && !promote.isPending) promote.mutate(); }}>
+          {editableDatasets.length > 0 && <form className="trace-promote-form" onSubmit={event => { event.preventDefault(); if (datasetId && !promote.isPending) promote.mutate(); }}>
             <label>目标数据集<select required value={datasetId} onChange={event => setDatasetId(event.target.value)}><option value="">请选择未冻结数据集</option>{editableDatasets.map(ds => <option key={ds.id} value={ds.id}>{ds.name} · {ds.version}</option>)}</select></label>
             <label>用例 Key（可选）<input value={caseKey} onChange={event => setCaseKey(event.target.value)} placeholder="留空自动生成 badcase-xxxx" pattern="[a-z][a-z0-9-]{1,63}" /></label>
             <label>期望关键词（可选，逗号分隔）<input value={keywords} onChange={event => setKeywords(event.target.value)} placeholder="例如：熔断,降级,幂等" /></label>

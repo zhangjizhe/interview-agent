@@ -1,11 +1,20 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, Optional, Param, Post, Query, Req } from '@nestjs/common';
 import { Roles } from '../auth/roles.decorator';
+import { LlmGatewayService } from '../llm/llm.gateway.service';
 import { AgentLabService } from './agent-lab.service';
 
 @Controller('agent-lab')
 @Roles('ADMIN')
 export class AgentLabController {
-  constructor(private readonly agentLab: AgentLabService) {}
+  constructor(
+    private readonly agentLab: AgentLabService,
+    @Optional() private readonly llmGateway?: LlmGatewayService,
+  ) {}
+
+  @Get('gateway-status')
+  gatewayStatus() {
+    return this.llmGateway?.getRoutingSummary() ?? null;
+  }
 
   @Get('dashboard')
   dashboard() {
