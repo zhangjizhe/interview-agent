@@ -287,3 +287,23 @@ export class CreateConfiguredAgentDto extends CreateAgentDto {
   @Type(() => CreateAgentVersionDto)
   initialVersion!: CreateAgentVersionDto;
 }
+
+export class SubmitRunFeedbackDto {
+  @IsIn(['UP', 'DOWN'])
+  rating!: 'UP' | 'DOWN';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  comment?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  sourceApp?: string;
+}

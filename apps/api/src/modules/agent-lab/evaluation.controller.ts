@@ -1,5 +1,5 @@
 import { Roles } from '../auth/roles.decorator';
-import { Body, Controller, Get, HttpCode, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
 import { EvaluationService } from './evaluation.service';
 import { EvaluationJobsService } from './evaluation-jobs.service';
 import {
@@ -8,6 +8,7 @@ import {
   CreateEvaluatorDto,
   PromoteRunToDatasetDto,
   StartEvaluationJobDto,
+  SubmitRunFeedbackDto,
 } from './dto/agent.dto';
 
 @Controller('agent-lab')
@@ -51,6 +52,22 @@ export class EvaluationController {
     @Body() dto: PromoteRunToDatasetDto,
   ) {
     return this.evaluations.promoteRunToDataset(req.user.userId, runId, dto);
+  }
+
+  @Post('runs/:runId/feedback')
+  submitRunFeedback(
+    @Req() req: any,
+    @Param('runId') runId: string,
+    @Body() dto: SubmitRunFeedbackDto,
+  ) {
+    return this.evaluations.submitRunFeedback(req.user.userId, runId, dto);
+  }
+
+  @Get('bad-cases')
+  listBadCases(@Req() req: any, @Query('limit') limit?: string) {
+    const parsed = limit ? Number.parseInt(limit, 10) : 30;
+    const bounded = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 100) : 30;
+    return this.evaluations.listBadCases(req.user.userId, bounded);
   }
 
   @Post('datasets/:datasetId/freeze')

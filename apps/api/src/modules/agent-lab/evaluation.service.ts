@@ -15,6 +15,7 @@ import {
   CreateEvaluatorDto,
   PromoteRunToDatasetDto,
   RunEvaluationDto,
+  SubmitRunFeedbackDto,
 } from './dto/agent.dto';
 import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-statistics';
 import { EvaluationCancellationError } from './evaluation-job.errors';
@@ -305,7 +306,7 @@ export class EvaluationService {
       input.level = inputObj.level.trim().slice(0, 32);
     }
 
-    return this.addDatasetCase(userId, dto.datasetId, {
+    const created = await this.addDatasetCase(userId, dto.datasetId, {
       key,
       input,
       expectedOutput,
@@ -321,6 +322,130 @@ export class EvaluationService {
         ...(dto.note?.trim() ? { note: this.sanitizePromotedText(dto.note).slice(0, 1000) } : {}),
       },
     });
+    if (this.prisma.runFeedback?.updateMany && created?.id) {
+      await this.prisma.runFeedback.updateMany({
+        where: { runId: run.id, rating: 'DOWN', promotedCaseId: null },
+        data: { promotedCaseId: created.id },
+      });
+    }
+    return created;
+  }
+
+  /**
+   * 消费端 / 运维端向 Agent Lab 回传单次 Run 的 👍/👎 反馈。
+   * 仅校验 Run 归属并脱敏备注，不触发任何模型调用。
+   */
+  async submitRunFeedback(
+    userId: string,
+    runId: string,
+    dto: SubmitRunFeedbackDto,
+  ) {
+    const run = await this.runtime.getRun(userId, runId);
+    const sanitizedComment = dto.comment?.trim()
+      ? this.sanitizePromotedText(dto.comment).slice(0, 1000)
+      : null;
+    const category = dto.category?.trim() ? dto.category.trim().slice(0, 64) : null;
+    const sourceApp = dto.sourceApp?.trim()
+      ? dto.sourceApp.trim().slice(0, 64)
+      : run.application ?? 'agent-lab';
+
+    return this.prisma.runFeedback.create({
+      data: {
+        runId: run.id,
+        rating: dto.rating,
+        category,
+        comment: sanitizedComment,
+        sourceApp,
+        submittedByUserId: userId,
+      },
+    });
+  }
+
+  /**
+   * 聚合当前 Workspace 下的线上 Bad Case 待评审队列（包含 FAILED 运行与收到 DOWN 反馈的运行）。
+   * 全量基于真实持久化记录统计，未知或空态诚实返回 0 / []。
+   */
+  async listBadCases(userId: string, limit = 30) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    const runs = await this.prisma.run.findMany({
+      where: {
+        workspaceId: workspace.id,
+        OR: [
+          { status: 'FAILED' },
+          { feedbacks: { some: { rating: 'DOWN' } } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        agentId: true,
+        agentVersionId: true,
+        application: true,
+        status: true,
+        error: true,
+        latencyMs: true,
+        estimatedCost: true,
+        createdAt: true,
+        agent: { select: { id: true, key: true, name: true } },
+        agentVersion: { select: { id: true, version: true, status: true } },
+        feedbacks: {
+          where: { rating: 'DOWN' },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            rating: true,
+            category: true,
+            comment: true,
+            sourceApp: true,
+            promotedCaseId: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    const items = runs.map((run) => {
+      const promotedCaseId = run.feedbacks.find((fb) => fb.promotedCaseId)?.promotedCaseId ?? null;
+      const reasons: string[] = [];
+      if (run.status === 'FAILED') reasons.push('RUN_FAILED');
+      if (run.feedbacks.length > 0) reasons.push('USER_DOWNVOTED');
+      return {
+        runId: run.id,
+        agentId: run.agentId,
+        agentKey: run.agent?.key ?? run.agentId,
+        agentName: run.agent?.name ?? run.agentId,
+        agentVersionId: run.agentVersionId,
+        version: run.agentVersion?.version ?? null,
+        application: run.application ?? null,
+        status: run.status,
+        error: run.error ? this.sanitizePromotedText(run.error).slice(0, 300) : null,
+        latencyMs: run.latencyMs,
+        estimatedCost: run.estimatedCost,
+        createdAt: run.createdAt,
+        reasons,
+        downvoteCount: run.feedbacks.length,
+        latestFeedback: run.feedbacks[0] ?? null,
+        promotedCaseId,
+      };
+    });
+
+    const failedRuns = items.filter((item) => item.status === 'FAILED').length;
+    const downvotedRuns = items.filter((item) => item.downvoteCount > 0).length;
+    const promotedCount = items.filter((item) => Boolean(item.promotedCaseId)).length;
+    const pendingTriageCount = items.length - promotedCount;
+
+    return {
+      items,
+      summary: {
+        totalBadCases: items.length,
+        failedRuns,
+        downvotedRuns,
+        promotedCount,
+        pendingTriageCount,
+      },
+    };
   }
 
   async freezeDataset(userId: string, datasetId: string) {

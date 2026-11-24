@@ -35,6 +35,22 @@ function Inspector({ runId, agentId, versionId, close }: { runId: string; agentI
   const [keywords, setKeywords] = useState('');
   const [note, setNote] = useState('');
   const [promoteFeedback, setPromoteFeedback] = useState('');
+  const [ratingNotice, setRatingNotice] = useState('');
+  const submitFeedback = useMutation({
+    mutationFn: (rating: 'UP' | 'DOWN') =>
+      api(`/agent-lab/runs/${encodeURIComponent(runId)}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating, sourceApp: 'agent-lab' }),
+      }),
+    onSuccess: (_res, rating) => {
+      setRatingNotice(
+        rating === 'DOWN'
+          ? '已标记为 Bad Case（👎），已进入待评审队列（不调用模型）。'
+          : '已记录正向反馈（👍）（不调用模型）。',
+      );
+    },
+  });
   const datasets = useQuery<Array<{ id: string; name: string; version: string; frozenAt?: string | null }>>({
     queryKey: ['lab-datasets-for-promote'],
     enabled: showPromote,
@@ -113,6 +129,10 @@ function Inspector({ runId, agentId, versionId, close }: { runId: string; agentI
       <div className="trace-run-content">
         <button type="button" aria-expanded={showRunContent} onClick={() => setShowRunContent(value => !value)}>查看运行输入与最终输出（过滤后的业务内容）</button>
         <button type="button" aria-expanded={showPromote} onClick={() => { setShowPromote(value => !value); setPromoteFeedback(''); promote.reset(); }}>转入回归集</button>
+        <button type="button" disabled={submitFeedback.isPending} onClick={() => { setRatingNotice(''); submitFeedback.mutate('UP'); }}>标记正向 👍</button>
+        <button type="button" disabled={submitFeedback.isPending} onClick={() => { setRatingNotice(''); submitFeedback.mutate('DOWN'); }}>标记 Bad Case 👎</button>
+        {submitFeedback.isError && <p role="alert">{diagnosticText(submitFeedback.error instanceof Error ? submitFeedback.error.message : '反馈记录失败')}</p>}
+        {ratingNotice && <p role="status">{ratingNotice}</p>}
         {showRunContent && <div className="trace-content"><h4>运行输入</h4><pre>{diagnosticJson(data.input)}</pre><h4>最终输出</h4><pre>{diagnosticJson(data.output)}</pre></div>}
         {showPromote && <section className="trace-content" aria-label="沉淀为回归用例">
           <h4>将该 Run 脱敏沉淀为回归用例</h4>

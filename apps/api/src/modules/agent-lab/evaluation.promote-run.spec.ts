@@ -23,6 +23,13 @@ describe('EvaluationService.promoteRunToDataset (Bad Case -> Regression Case)', 
       evaluationCase: {
         create: overrides?.createCase ?? jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'case-1', ...data })),
       },
+      runFeedback: {
+        create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'fb-1', ...data })),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      run: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     const runtime: any = {
       getRun: jest.fn().mockImplementation(async () => {
@@ -101,5 +108,94 @@ describe('EvaluationService.promoteRunToDataset (Bad Case -> Regression Case)', 
     await expect(
       service.promoteRunToDataset('admin-1', 'foreign-run', { datasetId: 'ds-1' }),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('stamps promotedCaseId on unpromoted DOWN feedbacks when promoting a run', async () => {
+    const { service, prisma } = buildService();
+    await service.promoteRunToDataset('admin-1', 'cmwuk37ph03innjz7m1iv0rbw', {
+      datasetId: 'ds-1',
+    });
+    expect(prisma.runFeedback.updateMany).toHaveBeenCalledWith({
+      where: { runId: 'cmwuk37ph03innjz7m1iv0rbw', rating: 'DOWN', promotedCaseId: null },
+      data: { promotedCaseId: 'case-1' },
+    });
+  });
+
+  it('submits sanitized consumer/operator feedback for a persisted Run', async () => {
+    const { service, prisma } = buildService();
+    const fb = await service.submitRunFeedback('user-1', 'cmwuk37ph03innjz7m1iv0rbw', {
+      rating: 'DOWN',
+      category: 'shallow_followup',
+      comment: '追问太浅，联系 user@example.com sk-token1234567890',
+    });
+    expect(fb.id).toBe('fb-1');
+    const createdData = prisma.runFeedback.create.mock.calls[0][0].data;
+    expect(createdData).toMatchObject({
+      runId: 'cmwuk37ph03innjz7m1iv0rbw',
+      rating: 'DOWN',
+      category: 'shallow_followup',
+      sourceApp: 'interview',
+      submittedByUserId: 'user-1',
+    });
+    expect(createdData.comment).toContain('[REDACTED_EMAIL]');
+    expect(createdData.comment).toContain('[REDACTED_SECRET]');
+    expect(createdData.comment).not.toContain('user@example.com');
+  });
+
+  it('aggregates failed and downvoted runs into the Bad Case triage queue', async () => {
+    const { service, prisma } = buildService();
+    prisma.run.findMany.mockResolvedValue([
+      {
+        id: 'run-fail-1',
+        agentId: 'agent-1',
+        agentVersionId: 'ver-1',
+        application: 'interview',
+        status: 'FAILED',
+        error: 'upstream error for ops@example.com',
+        latencyMs: 5100,
+        estimatedCost: 0.002,
+        createdAt: new Date('2026-11-24T12:00:00Z'),
+        agent: { id: 'agent-1', key: 'interview-coach', name: 'AI 面试官' },
+        agentVersion: { id: 'ver-1', version: '2.0.0', status: 'PUBLISHED' },
+        feedbacks: [],
+      },
+      {
+        id: 'run-down-2',
+        agentId: 'agent-1',
+        agentVersionId: 'ver-1',
+        application: 'portfolio-assistant',
+        status: 'COMPLETED',
+        error: null,
+        latencyMs: 1200,
+        estimatedCost: 0.001,
+        createdAt: new Date('2026-11-24T12:05:00Z'),
+        agent: { id: 'agent-1', key: 'interview-coach', name: 'AI 面试官' },
+        agentVersion: { id: 'ver-1', version: '2.0.0', status: 'PUBLISHED' },
+        feedbacks: [
+          {
+            id: 'fb-2',
+            rating: 'DOWN',
+            category: 'hallucination',
+            comment: '编造了不存在的参数',
+            sourceApp: 'portfolio-assistant',
+            promotedCaseId: 'case-already-promoted',
+            createdAt: new Date('2026-11-24T12:06:00Z'),
+          },
+        ],
+      },
+    ]);
+
+    const result = await service.listBadCases('admin-1', 20);
+    expect(result.summary).toEqual({
+      totalBadCases: 2,
+      failedRuns: 1,
+      downvotedRuns: 1,
+      promotedCount: 1,
+      pendingTriageCount: 1,
+    });
+    expect(result.items[0].reasons).toEqual(['RUN_FAILED']);
+    expect(result.items[0].error).toContain('[REDACTED_EMAIL]');
+    expect(result.items[1].reasons).toEqual(['USER_DOWNVOTED']);
+    expect(result.items[1].promotedCaseId).toBe('case-already-promoted');
   });
 });

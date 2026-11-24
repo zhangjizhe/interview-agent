@@ -1,15 +1,19 @@
 # Current state
 
-2026-11-24 Phase B 收口 + Phase A（低延迟双轨面试引擎 + Agent Lab 闭环飞轮）进展（分支 `agent-lab`，基于已合入 `main` 的 `3c4f80b`，未调用真实外部付费模型，未触碰 `.env`）：
+2026-11-24 Phase B 收口 + Phase A & Phase C（低延迟双轨面试引擎 + Agent Lab 闭环飞轮 + RunFeedback/Bad Case 队列）进展（分支 `agent-lab`，基于已合入 `main` 的 `3c4f80b`，未调用真实外部付费模型，未触碰 `.env`）：
 - **Phase B 已收口并合入主干**：
   - PR #81（`feat/security-circuit-breaker-95`）远端 GitHub Actions `Product verification` **5/5 全绿**并合入 `main`（`3c4f80b`）；`agent-lab` 已快进对齐 `3c4f80b` 并推送至 `origin/agent-lab`。
-  - 本机运行容器 `interview-api`（`:3001`）、`interview-web`（`:5173`）、`interview-agent-lab`（`:5175`）已保留回滚镜像标签（`rollback-2026-11-24`）并无损升级至 `candidate-992c0af`；`interview-postgres` `_prisma_migrations` 核对已同步至最新迁移 `20261105000000_lab_data_governance`。
-- **Phase A 源码已核对与本轮实际验证**：
+  - 本机运行容器 `interview-api`（`:3001`）、`interview-web`（`:5173`）、`interview-agent-lab`（`:5175`）已保留回滚镜像标签（`rollback-2026-11-24`）。
+- **Phase A（已提交 `41f85d4`）**：
   1. **A1 低延迟双轨面试引擎 `v2 (fast-dual)`**：`apps/api/src/modules/agent/interview-agent.service.ts` 新增 `AGENT_ENGINE=fast-dual` 单次直出流式热路径（三层深挖 Prompt + Langfuse `agent.fast_dual.hot_path` TTFT/流耗时观测 + 复用持久化任务队列与记忆），默认引擎仍保持 `multi` 零回归；新增单测 `apps/api/src/__tests__/interview-agent.fast-dual.spec.ts`。
-  2. **A2 Agent Lab 一键 Bad Case 沉淀回归集**：新增 `POST /api/agent-lab/runs/:runId/promote-to-dataset`（`evaluation.controller.ts` / `evaluation.service.ts` / `agent.dto.ts`），服务端自动脱敏邮箱、手机号与常见密钥前缀并写入来源元数据，复用未冻结与防重校验；`apps/agent-lab/src/RunInspector.tsx` 新增「转入回归集」交互面板；补齐 API 单测 `evaluation.promote-run.spec.ts` 与前端单测 `agent-lab-phase-a-flywheel.test.tsx`。
-  3. **A3 Agent Lab 历史已发布版本秒级回滚**：`apps/agent-lab/src/main.tsx` 在发布页新增 `PublishedVersionRollback` 组件，二次确认后调用 `POST /api/agent-lab/agents/:agentId/versions/:versionId/activate` 切换历史 `PUBLISHED` 版本并写审计记录；补齐前端单测 `agent-lab-phase-a-flywheel.test.tsx`。
-  4. **本轮验证结果（Node 20.20.2）**：`pnpm lint --max-warnings 0`、`pnpm typecheck`（三端）、`pnpm build`（三端）、API 全量 Jest **124 套件 / 1341 用例** + `cache.spec.ts` **22/22**、Web/Lab 全量 Vitest **49 套件 / 474 用例**全部通过。
-  5. **边界声明**：以上为本地单元测试与编译验证，**整包产品仍保持 NOT_ACCEPTED / 未商用交付**；真实 DeepSeek + Qwen 的 `v1 (multi)` vs `v2 (fast-dual)` 延迟/质量/费用对照评测待用户确认额度与预算上限后执行。
+  2. **A2 Agent Lab 一键 Bad Case 沉淀回归集**：新增 `POST /api/agent-lab/runs/:runId/promote-to-dataset`（`evaluation.controller.ts` / `evaluation.service.ts` / `agent.dto.ts`），服务端自动脱敏邮箱、手机号与常见密钥前缀并写入来源元数据，复用未冻结与防重校验；`apps/agent-lab/src/RunInspector.tsx` 新增「转入回归集」交互面板。
+  3. **A3 Agent Lab 历史已发布版本秒级回滚**：`apps/agent-lab/src/main.tsx` 在发布页新增 `PublishedVersionRollback` 组件，二次确认后调用 `POST /api/agent-lab/agents/:agentId/versions/:versionId/activate` 切换历史 `PUBLISHED` 版本并写审计记录。
+- **Phase C（RunFeedback 反馈表 + Bad Case 待评审队列 + 4 步演进飞轮驾驶舱）**：
+  1. **Prisma Schema 与本地数据库同步**：新增 `FeedbackRating` 枚举与多租户隔离的 `RunFeedback` 表（复合外键 `(runId, organizationId) -> runs(id, organizationId)`），迁移 `20261124000000_run_feedback_triage` 已通过 `prisma migrate deploy` 应用至本机 `interview-postgres`（数据库 `interview`）。
+  2. **后端闭环 API**：新增 `POST /api/agent-lab/runs/:runId/feedback`（脱敏落库 👍/👎 反馈）与 `GET /api/agent-lab/bad-cases`（真实聚合 `FAILED` 与 `DOWN` 反馈运行及待评审/已沉淀计数）；`promoteRunToDataset` 沉淀成功后自动回填关联 `DOWN` 反馈的 `promotedCaseId`。
+  3. **Lab 前端飞轮工作台**：`RunInspector.tsx` 新增快捷「标记正向 👍 / 标记 Bad Case 👎」按钮；`apps/agent-lab/src/main.tsx` 总览页新增 `BadCaseFlywheelPanel`（4 步评测驱动演进飞轮 + Bad Case 待评审列表 + 一键内联打开 `RunInspector` 转入回归集）。
+  4. **本轮验证结果（Node 20.20.2）**：`pnpm lint --max-warnings 0`、`pnpm typecheck`（三端）、`pnpm build`（三端）、API 全量 Jest **124 套件 / 1344 用例** + `cache.spec.ts` **22/22**、Web/Lab 全量 Vitest **49 套件 / 475 用例**全部通过。
+  5. **边界声明**：以上为本地单元测试、编译与迁移同步验证，**整包产品仍保持 NOT_ACCEPTED / 未商用交付**；真实 DeepSeek + Qwen 的 `v1 (multi)` vs `v2 (fast-dual)` 延迟/质量/费用对照评测待用户确认额度与预算上限后执行。
 
 2026-11-24 安全加固、多 Agent 链路缺陷修复与隔离全链路验收（分支 `feat/security-circuit-breaker-95`，已合入 `main` `3c4f80b`）：
 - **修复两个真实多 Agent / 网关生产缺陷**：

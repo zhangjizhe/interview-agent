@@ -5,6 +5,7 @@ import { KnowledgeLibraryPanel } from './KnowledgeLibraryPanel';
 import { DataGovernanceWorkspace } from './DataGovernanceWorkspace';
 import { toggleMcpServer, readMcpServers, reloadMcpServers } from './mcp-controls';
 import { RuntimeTraceWorkspace } from './RuntimeTraceWorkspace';
+import { RunInspector } from './RunInspector';
 import { AgentBuilderWorkspace } from './AgentBuilderWorkspace';
 import { AccountSecurityDialog } from './AccountSecurityDialog';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -321,7 +322,7 @@ export function ControlCenter() {
         {workspaceLoading && !workspaceError && <section className="lab-state-card" role="status"><RefreshCw size={22} className="spin"/><h2>正在读取工作区</h2><p>正在连接此页面需要的服务，请稍候。</p></section>}
         {workspaceError && <section className="lab-state-card lab-state-error" role="alert"><ShieldAlert size={24}/><h2>此页面的数据暂时不可用</h2><p>{workspaceError.message}</p><button className="agent-command" onClick={() => { for (const query of dependencies) void query.refetch(); }} disabled={dependencies.some(query => query.isFetching)}>重试读取</button><small>你仍可以通过导航访问其他工作区。</small></section>}
         {!workspaceLoading && !workspaceError && <>
-        {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} />}
+        {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} onNavigate={(next) => setView(next)} />}
         {view === 'runtime' && <AgentBuilderWorkspace onBusyChange={setWorkspaceBusy} onDirtyChange={setUnsavedChanges} />}
         {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} checks={mcpChecks} operationBusy={readMcpState.isPending || reload.isPending} />}
         {view === 'data' && <DataGovernanceWorkspace />}
@@ -377,7 +378,99 @@ export function ControlCenter() {
   );
 }
 
-function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void }) {
+type BadCaseItem = {
+  runId: string;
+  agentId: string;
+  agentKey: string;
+  agentName: string;
+  agentVersionId: string;
+  version?: string | null;
+  application?: string | null;
+  status: string;
+  error?: string | null;
+  latencyMs?: number | null;
+  createdAt: string;
+  reasons: string[];
+  downvoteCount: number;
+  latestFeedback?: { category?: string | null; comment?: string | null; sourceApp?: string | null } | null;
+  promotedCaseId?: string | null;
+};
+
+type BadCaseQueueResponse = {
+  items: BadCaseItem[];
+  summary: {
+    totalBadCases: number;
+    failedRuns: number;
+    downvotedRuns: number;
+    promotedCount: number;
+    pendingTriageCount: number;
+  };
+};
+
+export function BadCaseFlywheelPanel({ onNavigate }: { onNavigate?: (view: 'trace' | 'evolution' | 'release') => void }) {
+  const [inspecting, setInspecting] = useState<BadCaseItem | null>(null);
+  const badCases = useQuery<BadCaseQueueResponse>({
+    queryKey: ['lab-bad-cases-queue'],
+    retry: false,
+    queryFn: () => api('/agent-lab/bad-cases?limit=20'),
+  });
+  const summary = badCases.data?.summary;
+  const items = badCases.data?.items ?? [];
+  return <section className="lab-section" aria-label="评测驱动演进飞轮与 Bad Case 待评审队列">
+    <div className="lab-section-head">
+      <div>
+        <h2>评测驱动演进飞轮（Eval-Driven Flywheel）</h2>
+        <p>消费端运行与 👎 反馈自动汇聚至此 → 脱敏沉淀为回归用例 → 门禁评测对比 → 灰度发布或秒级回滚。</p>
+      </div>
+    </div>
+    <div className="lab-summary-grid">
+      <article>
+        <span>① Bad Case 捕获</span>
+        <strong>{summary ? `${summary.pendingTriageCount} 待评审` : '读取中'}</strong>
+        <small>{summary ? `失败运行 ${summary.failedRuns} · 踩反馈 ${summary.downvotedRuns}` : '仅统计真实持久化运行'}</small>
+        {onNavigate && <button type="button" className="quiet" onClick={() => onNavigate('trace')}>打开 Trace 排障</button>}
+      </article>
+      <article>
+        <span>② 沉淀回归集</span>
+        <strong>{summary ? `${summary.promotedCount} 已沉淀` : '—'}</strong>
+        <small>点击下方任意 Bad Case 一键脱敏转入未冻结 Dataset</small>
+      </article>
+      <article>
+        <span>③ 门禁评测对比</span>
+        <strong>受控对比</strong>
+        <small>同 Dataset / 同断言契约跑出 v1 vs v2 差异证据</small>
+        {onNavigate && <button type="button" className="quiet" onClick={() => onNavigate('evolution')}>前往评测门禁</button>}
+      </article>
+      <article>
+        <span>④ 发布与秒级回滚</span>
+        <strong>可回滚</strong>
+        <small>支持切回任意历史 PUBLISHED 版本并写审计记录</small>
+        {onNavigate && <button type="button" className="quiet" onClick={() => onNavigate('release')}>前往发布与回滚</button>}
+      </article>
+    </div>
+    {badCases.isError && <p className="trace-muted">Bad Case 队列暂未就绪（不影响其他控制面操作）。</p>}
+    {!badCases.isPending && !badCases.isError && items.length === 0 && (
+      <p className="trace-muted">当前无待评审的失败运行或 👎 反馈记录。</p>
+    )}
+    {items.length > 0 && <div className="lab-list" aria-label="Bad Case 待评审列表">
+      {items.map((item) => <article className="lab-row" key={item.runId}>
+        <div>
+          <p>{item.reasons.map(r => r === 'RUN_FAILED' ? '运行失败' : '消费端 👎').join(' · ')} · {item.promotedCaseId ? '已沉淀回归集' : '待评审'}</p>
+          <h3>{item.agentName} <span>{item.version ?? '未知版本'}</span></h3>
+          <p>{item.application ?? '未标注应用'} · <code>{item.runId}</code> · {new Date(item.createdAt).toLocaleString()}</p>
+          {item.latestFeedback?.comment && <p className="lab-rationale">反馈：{item.latestFeedback.comment}</p>}
+          {!item.latestFeedback?.comment && item.error && <p className="lab-rationale">错误：{item.error}</p>}
+        </div>
+        <div>
+          <button type="button" onClick={() => setInspecting(item)}>排查并转回归集</button>
+        </div>
+      </article>)}
+    </div>}
+    {inspecting && <RunInspector runId={inspecting.runId} agentId={inspecting.agentId} versionId={inspecting.agentVersionId} close={() => setInspecting(null)} />}
+  </section>;
+}
+
+function Overview({ data, lab, onRuntime, onMcp, onNavigate }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void; onNavigate?: (view: 'trace' | 'evolution' | 'release') => void }) {
   const latestDecision = lab.decisions[0];
   return <div className="agent-page-grid">
     <section className="agent-hero">
@@ -386,6 +479,7 @@ function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: numbe
       <p>合成基准：Golden Dataset {lab.dataset.version}，格式校验覆盖 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。录制指标用于回放与工程验证；当前业务版本的质量结论见受控自进化证据。</p>
       <div className="agent-hero-actions"><button onClick={onRuntime}><Workflow size={16}/>查看编排</button><button className="quiet" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button></div>
     </section>
+    <BadCaseFlywheelPanel onNavigate={onNavigate} />
     <section className="agent-metric-grid">
       <article><span>MCP 服务</span><strong>{data.runningCount} / {data.count}</strong><small>已启用且执行绑定就绪</small></article>
       <article><span>运行编排</span><strong>受控</strong><small>阶段可见，内部推理不可见</small></article>

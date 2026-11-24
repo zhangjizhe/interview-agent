@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RunInspector } from '../../agent-lab/src/RunInspector';
-import { PublishedVersionRollback } from '../../agent-lab/src/main';
+import { BadCaseFlywheelPanel, PublishedVersionRollback } from '../../agent-lab/src/main';
 
 const clients: QueryClient[] = [];
 
@@ -164,5 +164,82 @@ describe('Phase A Lab Flywheel UI', () => {
 
     const activateCall = calls.find((c) => c.method === 'POST');
     expect(activateCall?.url).toContain('/agent-lab/agents/agent-interview/versions/ver-1/activate');
+  });
+
+  it('submits quick DOWN feedback from RunInspector and renders BadCaseFlywheelPanel triage queue', async () => {
+    const calls = stubApi((url, init) => {
+      if (url.includes('/agent-lab/bad-cases')) {
+        return {
+          items: [
+            {
+              runId: 'run-triage-1',
+              agentId: 'agent-1',
+              agentKey: 'interview-coach',
+              agentName: 'AI 面试官',
+              agentVersionId: 'ver-1',
+              version: '2.0.0',
+              application: 'interview',
+              status: 'FAILED',
+              error: 'timeout',
+              createdAt: '2026-11-24T12:00:00Z',
+              reasons: ['RUN_FAILED', 'USER_DOWNVOTED'],
+              downvoteCount: 1,
+              latestFeedback: { comment: '追问停在表面', sourceApp: 'interview' },
+              promotedCaseId: null,
+            },
+          ],
+          summary: {
+            totalBadCases: 1,
+            failedRuns: 1,
+            downvotedRuns: 1,
+            promotedCount: 0,
+            pendingTriageCount: 1,
+          },
+        };
+      }
+      if (url.endsWith('/agent-lab/runs/run-triage-1')) {
+        return {
+          id: 'run-triage-1',
+          agentId: 'agent-1',
+          agentVersionId: 'ver-1',
+          status: 'FAILED',
+          error: 'timeout',
+          latencyMs: 3200,
+          estimatedCost: null,
+          agentVersion: { version: '2.0.0' },
+        };
+      }
+      if (url.endsWith('/agent-lab/runs/run-triage-1/trace')) {
+        return [];
+      }
+      if (url.endsWith('/agent-lab/runs/run-triage-1/feedback') && init?.method === 'POST') {
+        return { id: 'fb-99', rating: 'DOWN' };
+      }
+      return [];
+    });
+
+    const onNavigate = vi.fn();
+    renderWithQuery(<BadCaseFlywheelPanel onNavigate={onNavigate} />);
+
+    expect(await screen.findByText('1 待评审')).toBeInTheDocument();
+    expect(screen.getByText(/追问停在表面/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '前往发布与回滚' }));
+    expect(onNavigate).toHaveBeenCalledWith('release');
+
+    fireEvent.click(screen.getByRole('button', { name: '排查并转回归集' }));
+    const downBtn = await screen.findByRole('button', { name: '标记 Bad Case 👎' });
+    fireEvent.click(downBtn);
+
+    expect(
+      await screen.findByText(/已标记为 Bad Case（👎），已进入待评审队列/),
+    ).toBeInTheDocument();
+
+    const fbCall = calls.find((c) => c.method === 'POST' && c.url.includes('/feedback'));
+    expect(fbCall).toBeDefined();
+    expect(JSON.parse(fbCall?.body ?? '{}')).toEqual({
+      rating: 'DOWN',
+      sourceApp: 'agent-lab',
+    });
   });
 });

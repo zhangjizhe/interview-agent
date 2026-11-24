@@ -40,6 +40,7 @@ model Organization {
   agentRecords Agent[]
   agentVersionRecords AgentVersion[]
   runRecords Run[]
+  runFeedbackRecords RunFeedback[]
   traceEventRecords TraceEvent[]
   decisionRecordRecords DecisionRecord[]
   factAssertionRecords FactAssertion[]
@@ -486,6 +487,7 @@ model Run {
   evaluationResults EvaluationResult[]
   toolApprovals ToolApproval[]
   applicationRuns ApplicationRun[]
+  feedbacks      RunFeedback[]
 
   @@unique([workspaceId, requestKey])
   @@index([status, heartbeatAt])
@@ -495,6 +497,31 @@ model Run {
   @@index([externalRunId])
   @@index([parentRunId, createdAt])
   @@map("runs")
+}
+
+enum FeedbackRating {
+  UP
+  DOWN
+}
+
+model RunFeedback {
+  id                String         @id @default(cuid())
+  organizationId    String         @default("default-organization")
+  organization      Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  runId             String
+  run               Run            @relation(fields: [runId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  rating            FeedbackRating
+  category          String?
+  comment           String?        @db.Text
+  sourceApp         String?
+  submittedByUserId String?
+  promotedCaseId    String?
+  createdAt         DateTime       @default(now())
+
+  @@unique([id, organizationId])
+  @@index([organizationId, rating, createdAt])
+  @@index([runId, createdAt])
+  @@map("run_feedbacks")
 }
 
 model TraceEvent {
