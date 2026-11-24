@@ -15,7 +15,7 @@ export async function verifyMcpToggle(page, context, origin) {
   const original = await read();
   const server = original.servers.find(item => item.builtin && item.enabled && item.executable);
   assert.ok(server, 'An enabled executable builtin is required');
-  const row = page.locator('.mcp-row').filter({ has: page.getByRole('heading', { name: server.displayName || server.name, exact: true }) });
+  const row = page.locator('.mcp-tool-card').filter({ has: page.getByRole('heading', { name: server.displayName || server.name, exact: true }) });
 
   const disableInProcess = async () => {
     await row.getByRole('button', { name: '本进程关闭', exact: true }).click();
@@ -106,12 +106,12 @@ export async function verifyMcpToggle(page, context, origin) {
     await page.getByText('当前 API 进程的 MCP 配置已重新加载；运行时开关保持不变。', { exact: true }).waitFor();
     await row.getByRole('button', { name: '本进程启用', exact: true }).waitFor();
     assert.equal((await read()).servers.find(item => item.name === server.name).enabled, false);
-    const healthResponse = page.waitForResponse(response => response.url() === `${origin}/api/admin/mcp-servers/${server.name}/health`);
-    void healthResponse.catch(() => {});
-    await row.getByRole('button', { name: `检查工具：${server.displayName || server.name}` }).click();
-    const health = await healthResponse; assert.equal(health.status(), 200);
-    assert.equal((await health.json()).ok, false);
-    await page.getByText(`${server.name} 未通过检查：工具已被系统禁用`, { exact: true }).waitFor();
+    assert.equal(await row.getByRole('button', { name: `检查工具：${server.displayName || server.name}` }).isEnabled(), false);
+    const health = await context.request.get(`${origin}/api/admin/mcp-servers/${server.name}/health`, { headers });
+    assert.equal(health.status(), 200);
+    const healthBody = await health.json();
+    assert.equal(healthBody.ok, false);
+    assert.match(String(healthBody.error || ''), /禁用/);
     const enabledResponse = page.waitForResponse(response => response.url() === path && response.request().method() === 'POST');
     void enabledResponse.catch(() => {});
     await row.getByRole('button', { name: '本进程启用', exact: true }).click();

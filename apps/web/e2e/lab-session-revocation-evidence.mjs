@@ -28,6 +28,7 @@ export async function verifySessionRevocation(page, context, origin) {
   assert.deepEqual(await questionInputSnapshot(), before);
   await page.reload();
   await completeEmailLogin(page, { userId: 'fixture-ci-admin', password: 'isolated-fixture-password' });
+  await page.getByRole('button', { name: '控制中心', exact: true }).click();
   await page.getByRole('heading', { name: '控制中心', exact: true, level: 1 }).waitFor();
   const newToken = await page.evaluate(() => localStorage.getItem('ia_access_token'));
   assert.ok(newToken);

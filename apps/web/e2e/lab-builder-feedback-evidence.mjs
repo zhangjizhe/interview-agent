@@ -17,13 +17,13 @@ export async function verifyBuilderFeedback(page, context, origin) {
   };
   const select = async versionId => {
     await agentSelect.selectOption(id);
-    const versionSelect = page.locator('.builder-workspace select').nth(1);
+    const versionSelect = page.locator('.builder-agent-overview select');
     await versionSelect.locator(`option[value="${versionId}"]`).waitFor({ state: 'attached' });
     await versionSelect.selectOption(versionId);
   };
   for (const [index, action] of ['version', 'agent', 'new', 'failure'].entries()) {
     const submitted = `1.0.${index + 2}`;
-    const previous = await page.locator('.builder-workspace select').nth(1).inputValue();
+    const previous = await page.locator('.builder-agent-overview select').inputValue();
     await page.getByLabel('保存为版本', { exact: true }).fill(submitted);
     const savedResponse = page.waitForResponse(response => new URL(response.url()).pathname === `/api/agent-lab/agents/${id}/versions` && response.request().method() === 'POST');
     void savedResponse.catch(() => {});
@@ -34,7 +34,7 @@ export async function verifyBuilderFeedback(page, context, origin) {
     const actual = await read();
     assert.ok(actual.versions.some(row => row.id === saved.id && row.agentId === id && row.version === submitted && row.status === 'DRAFT'));
     assert.equal(actual.currentVersion, null);
-    if (action === 'version') await page.locator('.builder-workspace select').nth(1).selectOption(previous);
+    if (action === 'version') await page.locator('.builder-agent-overview select').selectOption(previous);
     if (action === 'agent') { await agentSelect.selectOption(''); assert.equal(await success.count(), 0); await select(saved.id); }
     if (action === 'new') { await page.getByRole('button', { name: '新增 Agent / 工作流', exact: true }).click(); assert.equal(await success.count(), 0); await select(saved.id); }
     if (action === 'failure') {
@@ -58,16 +58,17 @@ export async function verifyBuilderFeedback(page, context, origin) {
       await failure.waitFor();
     }
     await page.waitForFunction(() => !document.querySelector('.builder-workspace > label select').disabled);
-    const selectedVersion = await page.locator('.builder-workspace select').nth(1).inputValue();
+    const selectedVersion = await page.locator('.builder-agent-overview select').inputValue();
     const count = (await read()).versions.length;
-    if (action === 'version') await page.locator('.builder-workspace select').nth(1).selectOption(selectedVersion);
-    if (action === 'agent') await agentSelect.selectOption('');
-    if (action === 'new') await page.getByRole('button', { name: '新增 Agent / 工作流', exact: true }).click();
+    const acceptDirtyConfirm = () => page.once('dialog', dialog => dialog.accept());
+    if (action === 'version') { acceptDirtyConfirm(); await page.locator('.builder-agent-overview select').selectOption(selectedVersion); }
+    if (action === 'agent') { acceptDirtyConfirm(); await agentSelect.selectOption(''); }
+    if (action === 'new') { acceptDirtyConfirm(); await page.getByRole('button', { name: '新增 Agent / 工作流', exact: true }).click(); }
     assert.equal(await failure.count(), 0);
     assert.equal((await read()).versions.length, count);
     assert.deepEqual(await questionInputSnapshot(), before);
     await select(selectedVersion);
-    await page.getByLabel('保存为版本', { exact: true }).fill('1.0.6');
+    if (action !== 'new') await page.getByLabel('保存为版本', { exact: true }).fill('1.0.6');
   }
   console.log('PASS completed save failure ownership: version/agent/new context transitions clear old error, no persisted version or provider/ledger increments');
   console.log('PASS saved feedback ownership: actual persisted drafts, version/agent/new switches and injected next-save503 clear prior success, zero model increment');

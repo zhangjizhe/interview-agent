@@ -13,7 +13,7 @@ export async function verifyBuilderCancellation(page, context, origin, previous)
   assert.equal(agentResponse.status(), 200);
   const definition = (await agentResponse.json()).versions.find(item => item.version === '1.0.0');
   assert.ok(definition);
-  const versions = page.locator('.builder-workspace select').nth(1);
+  const versions = page.locator('.builder-agent-overview select');
   await versions.selectOption(definition.id);
   assert.equal(await page.getByRole('heading', { name: `运行 ${previous.id}`, exact: true }).count(), 0);
   await page.getByRole('button', { name: `${previous.id} · COMPLETED`, exact: true }).click();
@@ -134,7 +134,7 @@ export async function verifyBuilderCancellation(page, context, origin, previous)
     let terminal;
     const finish = Date.now() + 30000;
     do { terminal = await read(); if (terminal.status === 'CANCELLED') break; assert.ok(Date.now() < finish, 'Cancelled run did not settle'); await page.waitForTimeout(100); } while (true);
-    await page.getByRole('region', { name: `Run ${terminal.id} 详情`, exact: true }).locator('.trace-status').filter({ hasText: /^状态：CANCELLED ·/ }).waitFor();
+    await page.getByRole('region', { name: `Run ${terminal.id} 详情`, exact: true }).locator('.trace-status').filter({ hasText: /^(状态：CANCELLED ·|已取消)/ }).waitFor();
     const after = await questionInputSnapshot();
     assert.equal(after.provider.chat, before.provider.chat + 1);
     assert.equal(after.ledger, before.ledger + 1);
