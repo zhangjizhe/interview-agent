@@ -1,5 +1,12 @@
 # Current state
 
+2026-11-25 架构升级收口（DeepSeek 缓存命中统计修复 + 消费端 👍/👎 反馈回流 + 一键发布脚本 + 66 篇工程实践文章全量 5 段式升级，分支 `agent-lab`）：
+- **DeepSeek / 千问 Prompt Cache 命中计量修复**：`deepseek.provider.ts` 与 `qwen.provider.ts` 在流式/非流式响应中提取 `prompt_cache_hit_tokens` 与 `prompt_tokens_details.cached_tokens` 并透传 `cachedTokens`，`prompt-cache.strategy.ts` 的 `extractCacheUsage` 完成归一化（补齐 `cache.spec.ts` 断言）。
+- **消费端 → Agent Lab 实时反馈闭环**：`interview-flow.controller.ts` 新增 `POST /api/interview/:interviewId/feedback`（`requireOwnedInterview` 归属校验 + 服务端 PII/密钥脱敏 + 写入 `run_feedbacks`）；`apps/web` 的 `ChatBubble.tsx` 与 `InterviewPage.tsx` 接入「有帮助 👍 / 待改进 👎」非阻塞反馈按钮并直连 Agent Lab 飞轮 Bad Case 队列。
+- **一键安全发布脚本**：新增 `scripts/deploy/deploy-mac.sh`（拉取 `origin/agent-lab` → 打回滚镜像标签 → 重建重启不碰数据卷 → 执行 `prisma migrate deploy` → 30s 健康探活与 200/404/401 边缘校验）。
+- **个人作品集文章全量升级**：全部 66 篇现代工程实践文章（`id=12~77`）完成 5 段式架构重写（背景现场 → 根因思考 → Before/After 代码 → 选型对比 → 架构角色+降级矩阵+迁移自检），11 篇 2020 历史归档原文（`id=1~11`）按 `portfolio-source.integrity.spec.ts` 契约保持逐字节完整一致。
+- **本轮全量验证**：`pnpm lint --max-warnings 0`、三端 `typecheck`/`build`、个人站 36/36 单测、API Jest **124/1345** + `cache.spec.ts` **22/22**、Web/Lab Vitest **49/476** 全部通过。**整包产品仍诚实保持 NOT_ACCEPTED**。
+
 2026-11-25 真实 DeepSeek 引擎对照实测完成（`v1 multi` vs `v2 fast-dual`，预算上限 ¥3.00，实际总花费 **¥0.5007 CNY**，分支 `agent-lab`）：
 - **实测结果（同一 5 轮高级 AI Agent 全栈面试题面，直连真实 DeepSeek API 与本机 `interview-api:candidate-ca83c6f` + `interview-postgres` `session_costs`）**：
   - **平均首字延迟 (TTFT)**：`34,449 ms` → **`1,430 ms`**（**-95.8%，提速 24.1×**，最快 `733 ms`）

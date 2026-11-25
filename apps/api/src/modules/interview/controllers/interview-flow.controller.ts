@@ -411,4 +411,51 @@ export class InterviewFlowController {
       });
     }
   }
+
+  /**
+   * 候选人消费端 👍/👎 反馈回流到 Agent Lab Bad Case 队列（零模型调用、租户隔离、服务端脱敏）。
+   */
+  @Post(':interviewId/feedback')
+  async submitCandidateFeedback(
+    @Param('interviewId') interviewId: string,
+    @Body() body: { rating?: string; category?: string; comment?: string },
+    @Req() req: any,
+  ) {
+    const rating = body?.rating === 'UP' ? 'UP' : body?.rating === 'DOWN' ? 'DOWN' : null;
+    if (!rating) {
+      throw new HttpException('rating 仅支持 UP 或 DOWN', HttpStatus.BAD_REQUEST);
+    }
+    await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
+    const latestRun = await this.prisma.run.findFirst({
+      where: { externalRunId: interviewId, application: 'interview' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!latestRun) {
+      return { recorded: false, reason: 'no_linked_run' };
+    }
+    const sanitizedComment = typeof body.comment === 'string' && body.comment.trim()
+      ? body.comment
+          .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
+          .replace(/\b(sk-[a-zA-Z0-9_-]{12,}|Bearer\s+[a-zA-Z0-9._-]{16,})\b/g, '[REDACTED_SECRET]')
+          .replace(/\b1[3-9]\d{9}\b/g, '[REDACTED_PHONE]')
+          .trim()
+          .slice(0, 500)
+      : null;
+    const category = typeof body.category === 'string' && body.category.trim()
+      ? body.category.trim().slice(0, 64)
+      : null;
+    const created = await this.prisma.runFeedback.create({
+      data: {
+        runId: latestRun.id,
+        rating,
+        category,
+        comment: sanitizedComment,
+        sourceApp: 'interview-web',
+        submittedByUserId: req.user.userId,
+      },
+      select: { id: true, runId: true, rating: true, createdAt: true },
+    });
+    return { recorded: true, feedback: created };
+  }
 }

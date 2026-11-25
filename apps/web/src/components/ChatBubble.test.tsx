@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { ChatBubble } from './ChatBubble';
 
 describe('ChatBubble', () => {
@@ -54,5 +54,12 @@ describe('ChatBubble', () => {
     const bubble = container.querySelector('.whitespace-pre-wrap');
     expect(bubble).not.toBeNull();
     expect(bubble?.textContent).toBe(multiline);
+  });
+
+  it('renders consumer feedback buttons on completed assistant bubbles and notifies caller', () => {
+    const onFeedback = vi.fn();
+    render(<ChatBubble role="assistant" content="请展开聊聊熔断器冷却窗口" streaming={false} onFeedback={onFeedback} />);
+    fireEvent.click(screen.getByRole('button', { name: '反馈这轮追问待改进' }));
+    expect(onFeedback).toHaveBeenCalledWith('DOWN');
   });
 });

@@ -48,11 +48,19 @@ export class DeepseekProvider extends BaseLLMProvider {
       } as any);
 
       const choice = response.choices[0];
+      const rawUsage = response.usage as any;
+      const cachedTokens =
+        typeof rawUsage?.prompt_cache_hit_tokens === 'number'
+          ? rawUsage.prompt_cache_hit_tokens
+          : typeof rawUsage?.prompt_tokens_details?.cached_tokens === 'number'
+            ? rawUsage.prompt_tokens_details.cached_tokens
+            : 0;
       return {
         content: choice.message.content || '',
         usage: {
           promptTokens: response.usage?.prompt_tokens || 0,
           completionTokens: response.usage?.completion_tokens || 0,
+          ...(cachedTokens > 0 ? { cachedTokens } : {}),
         },
         finishReason: choice.finish_reason || 'stop',
         model: response.model,
@@ -87,12 +95,20 @@ export class DeepseekProvider extends BaseLLMProvider {
           yield { finishReason: chunk.choices[0].finish_reason as any };
         }
         if (chunk.usage) {
+          const rawUsage = chunk.usage as any;
+          const cachedTokens =
+            typeof rawUsage?.prompt_cache_hit_tokens === 'number'
+              ? rawUsage.prompt_cache_hit_tokens
+              : typeof rawUsage?.prompt_tokens_details?.cached_tokens === 'number'
+                ? rawUsage.prompt_tokens_details.cached_tokens
+                : 0;
           yield {
             provider: this.name,
             model: chunk.model || this.defaultModel,
             usage: {
               promptTokens: chunk.usage.prompt_tokens,
               completionTokens: chunk.usage.completion_tokens,
+              ...(cachedTokens > 0 ? { cachedTokens } : {}),
             },
           };
         }

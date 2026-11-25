@@ -217,11 +217,24 @@ export function buildPromptCacheContext(params: {
 export function extractCacheUsage(rawUsage: any): ProviderCacheUsage {
   if (!rawUsage) return { cachedTokens: 0, totalPromptTokens: 0 };
 
+  // Normalized internal usage: cachedTokens
+  const normalized = rawUsage.cachedTokens;
+  // DeepSeek: prompt_cache_hit_tokens
+  const ds = rawUsage.prompt_cache_hit_tokens;
   // OpenAI / Qwen / DeepSeek：prompt_tokens_details.cached_tokens
   const oa = rawUsage.prompt_tokens_details?.cached_tokens;
-  // Anthropic:cache_read_input_tokens
+  // Anthropic: cache_read_input_tokens
   const ant = rawUsage.cache_read_input_tokens;
-  const cached = typeof oa === 'number' ? oa : typeof ant === 'number' ? ant : 0;
+  const cached =
+    typeof normalized === 'number'
+      ? normalized
+      : typeof ds === 'number'
+        ? ds
+        : typeof oa === 'number'
+          ? oa
+          : typeof ant === 'number'
+            ? ant
+            : 0;
 
   const total =
     rawUsage.prompt_tokens ??

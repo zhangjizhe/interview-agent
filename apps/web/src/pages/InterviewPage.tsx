@@ -89,12 +89,31 @@ export function InterviewPage() {
   const currentInterviewId = useRef(interviewId);
   currentInterviewId.current = interviewId;
   const [confirmationError, setConfirmationError] = useState('');
+  const [messageFeedback, setMessageFeedback] = useState<Record<number, 'UP' | 'DOWN'>>({});
+  const handleMessageFeedback = async (index: number, rating: 'UP' | 'DOWN') => {
+    if (!interviewId || messageFeedback[index]) return;
+    setMessageFeedback((prev) => ({ ...prev, [index]: rating }));
+    try {
+      const token = getSession()?.accessToken;
+      await fetch(`/api/interview/${encodeURIComponent(interviewId)}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ rating }),
+      });
+    } catch {
+      // Non-blocking feedback: keep interview flow uninterrupted
+    }
+  };
   useEffect(() => {
     confirmationMounted.current = true;
     confirmationAttempt.current += 1;
     confirmPending.current = false;
     setConfirming(false);
     setConfirmationError('');
+    setMessageFeedback({});
     return () => {
       confirmationMounted.current = false;
       confirmationAttempt.current += 1;
@@ -865,6 +884,12 @@ export function InterviewPage() {
                     role={msg.role}
                     content={msg.content}
                     streaming={msg.streaming}
+                    feedback={messageFeedback[i] ?? null}
+                    onFeedback={
+                      msg.role === 'assistant' && interviewId && !isReadOnly
+                        ? (rating) => { void handleMessageFeedback(i, rating); }
+                        : undefined
+                    }
                   />
                 ))}
                 {/* 候选人只看到复核状态，不暴露内部评分或操作信息。 */}
