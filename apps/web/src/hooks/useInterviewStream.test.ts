@@ -87,6 +87,23 @@ describe('useInterviewStream', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('fails fast on non-retryable 429 status without burning backoff retries and surfaces server detail', async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: false,
+      status: 429,
+      body: null,
+      json: async () => ({ message: '请求过于频繁，请稍后重试' }),
+    } as unknown as Response);
+    const { result } = renderHook(() => useInterviewStream('session-rate-limit'));
+    await act(async () => {
+      await result.current.send('session-rate-limit', 'synthetic-user', 'answer', 'presentation-rl');
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(useInterviewStore.getState().error).toBe('请求过于频繁，请稍后重试');
+    expect(useInterviewStore.getState().streaming).toBe(false);
+    expect(useInterviewStore.getState().reconnecting).toBe(false);
+  });
+
   describe('SSE Event Types', () => {
     it('should define valid SSE event types', () => {
       const validEventTypes = [

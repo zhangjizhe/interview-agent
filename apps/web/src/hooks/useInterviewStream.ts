@@ -113,13 +113,31 @@ export function useInterviewStream(sessionId?: string): UseInterviewStreamReturn
 
             const res = await fetch(`/api/interview/${interviewId}/message`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                Accept: 'text/event-stream',
+              },
               body: JSON.stringify({ userId, content, clientMessageId, operation: 'ANSWER', presentationId }),
               signal: controller.signal,
             });
 
             if (!res.ok || !res.body) {
-              throw new Error(`HTTP ${res.status}`);
+              let detail = `HTTP ${res.status}`;
+              try {
+                const payload = await res.json();
+                if (typeof payload?.message === 'string' && payload.message.trim()) {
+                  detail = payload.message;
+                } else if (typeof payload?.error === 'string' && payload.error.trim()) {
+                  detail = payload.error;
+                }
+              } catch {
+                // Ignore non-JSON error body
+              }
+              const httpError = new Error(detail) as Error & { nonRetryable?: boolean };
+              if ([400, 401, 403, 404, 422, 429].includes(res.status)) {
+                httpError.nonRetryable = true;
+              }
+              throw httpError;
             }
             if (!isCurrentRequest()) return;
 
@@ -193,6 +211,9 @@ export function useInterviewStream(sessionId?: string): UseInterviewStreamReturn
             }
             clearStreamIdleTimer();
             lastError = err as Error;
+            if ((err as Error & { nonRetryable?: boolean }).nonRetryable) {
+              break;
+            }
             // P2-15 修复：移除 console.error 调试残留，错误由外层 lastError + appendAgentEvent 处理
             if (attempt < MAX_RETRIES) {
               store.forceRender();
