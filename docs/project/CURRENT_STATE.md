@@ -1,5 +1,11 @@
 # Current state
 
+2026-11-25 双消费端 SSE 流式对话与稳定性加固（分支 `agent-lab`，`ce170e2`）：
+- **个人网站 ↔ Agent Lab 真 SSE 协商与流式消费**：`examples/portfolio-site/src/agent-lab.mjs` 新增 `Accept: text/event-stream, application/json` 协议协商，收到 `text/event-stream` 时通过 `readSSE` 实时消费 `portfolio-assistant/stream-v1`（严格校验 `meta` 契约、来源白名单、12,000 字上限、终态/可重试错误区分及防截断校验），同时对 JSON `REFUSED`/`COMPLETED` 及旧版 `202 + ticket` 轮询保持零破坏兼容。
+- **个人网站后端 SSE 稳定性加固**：`apps/api/src/modules/portfolio-assistant/portfolio-assistant.controller.ts` 新增 10 秒 `: ping` 保活心跳、`status` 帧去重（消除每 200ms 刷屏重复状态）与 `writableEnded`/`destroyed` 断连写入守卫（`portfolio-stream.controller.spec.ts` 补齐去重单测）。
+- **面试平台 SSE 断连保护与快速失败**：`apps/api/src/modules/interview/controllers/interview-flow.controller.ts` 新增 `clientDisconnected`/`isStreamClosed` 守卫与 `drain`/`close` 双向清理，客户端中途断开不再导致写入异常或挂起，同时继续安全落库以便重连幂等回放；`apps/web/src/hooks/useInterviewStream.ts` 显式携带 `Accept: text/event-stream`，遇到 `400/401/403/404/422/429` 确定性错误时快速失败并透出服务端文案。
+- **本轮单测与构建验证**：`examples/portfolio-site` 构建 + **38/38** Node 22 测试、API `portfolio-stream.controller.spec.ts` + `interview-flow.replay.spec.ts` **8/8**、Web `useInterviewStream.test.ts` **13/13**、`pnpm lint`、`api`/`web` `typecheck` & `build` 全部 PASS。**整包产品仍诚实保持 NOT_ACCEPTED**。
+
 2026-11-25 架构升级收口（DeepSeek 缓存命中统计修复 + 消费端 👍/👎 反馈回流 + 一键发布脚本 + 66 篇工程实践文章全量 5 段式升级，分支 `agent-lab`）：
 - **DeepSeek / 千问 Prompt Cache 命中计量修复**：`deepseek.provider.ts` 与 `qwen.provider.ts` 在流式/非流式响应中提取 `prompt_cache_hit_tokens` 与 `prompt_tokens_details.cached_tokens` 并透传 `cachedTokens`，`prompt-cache.strategy.ts` 的 `extractCacheUsage` 完成归一化（补齐 `cache.spec.ts` 断言）。
 - **消费端 → Agent Lab 实时反馈闭环**：`interview-flow.controller.ts` 新增 `POST /api/interview/:interviewId/feedback`（`requireOwnedInterview` 归属校验 + 服务端 PII/密钥脱敏 + 写入 `run_feedbacks`）；`apps/web` 的 `ChatBubble.tsx` 与 `InterviewPage.tsx` 接入「有帮助 👍 / 待改进 👎」非阻塞反馈按钮并直连 Agent Lab 飞轮 Bad Case 队列。
