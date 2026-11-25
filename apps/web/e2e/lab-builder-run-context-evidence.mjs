@@ -106,6 +106,10 @@ export async function verifyBuilderStartContext(page, context, origin) {
     await page.getByRole('button', { name: '启动草稿测试', exact: true }).click();
     await Promise.race([ready, new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Actual reused start receipt missing')), 75000); })]);
     clearTimeout(timeout);
+    // The intercepted request can arrive before React Query's batched observer
+    // notification commits. Keep the receipt held while waiting for the visible
+    // pending state; every freeze assertion below still runs before release.
+    await page.waitForFunction(() => document.querySelector('.builder-workspace > label select')?.disabled === true);
     assert.equal(await page.locator('.builder-workspace > label select').isEnabled(), false);
     assert.equal(await page.locator('.builder-agent-overview select').isEnabled(), false);
     for (const name of ['新增 Agent / 工作流', '保存新版本草稿', '启动草稿测试', '准备新运行']) assert.equal(await page.getByRole('button', { name, exact: true }).isEnabled(), false);
