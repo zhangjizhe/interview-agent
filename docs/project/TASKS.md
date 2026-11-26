@@ -1,6 +1,6 @@
 # Tasks
 
-- Active P1: Nov25 exact-source CI repair, reviewed push/PR, safe redeployment of Gemini updates, public content/security verification and rollback evidence. See ../acceptance/REDEPLOY_2026-11-25.md.
+- Active P1 (partially closed Nov26): exact-source CI repair and supervised article content release are done on the Intel Mac native 8787 at 1f7d190 with green push/PR CI, backup and rollback evidence. Still open: public tunnel hostname + public article hash/route verification, single-primary decision, development Mac 8787 parity, separate hosted Site refresh, and the PR82 merge decision. See ../acceptance/REDEPLOY_ARTICLES_2026-11-26.md and ../acceptance/REDEPLOY_2026-11-25.md.
 - P1: Deploy script advertises rollback but only prints instructions; replace with a pinned, verified release workflow before unattended use. Current release must be supervised.
 - P1: Intel server currently contains old rehearsal state; complete drain/fresh backup/restore/state inventory and single-primary cutover before calling server migration complete.
 - Deferred P1: Nov19 supplier cost reconciliation remains UNRECONCILED; actual bill differs from Nov18 local range. No invented attribution or zero-cost assumption.

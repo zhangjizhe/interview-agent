@@ -11,3 +11,15 @@ Status IN_PROGRESS. User requested publishing updated articles. Canonical tracke
 ## Required before release
 
 Matching green CI; reproducible artifact and credential scan; protected static/config backups; candidate/public article hash and route checks; security parity and browser. Keep two-host tunnel consistency explicit. No paid model call this round and no commercial acceptance claim.
+
+## Nov26 supervised release (continuation after CI green)
+
+Status: content release COMPLETED for the remote Intel Mac native 8787 only. Whole product NOT_ACCEPTED.
+
+- Matching green CI: push run 45734426232 was rerun and completed success (docker-build-test 17m36s, ci-summary pass); PR run 45734433784 success. All 10 PR82 checks pass, mergeStateStatus CLEAN, head 1f7d1900b117050adb83a4f3243bca9bf0b719c5. PR82 left open, unmerged.
+- Access: UU Remote daemons were confirmed alive on the Intel Mac. Per the 2026-11-18 agreement, UU is a desktop maintenance entry only; all release actions used the pinned SSH alias `buildserver` with a restricted user. No root login and no GUI automation were used.
+- Candidate `~/deploy/article-release-1f7d190`: articles.json ac5d3efa… (77), site-html.mjs fb5e1167…. Credential-shape scan of the candidate source found no token/key literals; the candidate ran on 17887 without `.env`.
+- dist: rebuilt in an isolated copy with the deployed runtime build.mjs and is byte-identical to the candidate (5ee9843b…, 77 embedded articles). The `Built 11 articles` line is a stale hardcoded log string in that older build script, not stale data; the current repo build.mjs reports 77 (f85ef837…, saved under `reproducible-dist/`). No dist replacement was required.
+- Cutover `cutover.sh`: replaced only `src/articles.json` and `src/site-html.mjs`, preserved file modes, `.env`, data volumes and every other runtime file, and restarted the launchd job `com.interviewagent.portfolio-site`. Backup `before-20261126-101437/` holds the old hashes (40f46f6e… / 67527d02…), `.env` and health snapshot; `rollback.sh` restores them.
+- Independent post-cutover checks: live hashes ac5d3efa… / fb5e1167…; health articles 77; GET / 200 (883314 bytes); /api/nope 404; CSP, x-content-type-options and cache-control present; `.env` byte-identical; launchd job alive.
+- Boundaries: development Mac native 8787 deliberately untouched per user decision. The named tunnel container `interview-portfolio-named-tunnel` does run on this Intel Mac, but its public hostname cannot be determined locally, so the public tunnel path was NOT verified. The separately hosted Site still serves the older ~125KB page and is a different deployment path, out of scope. No PR merge, no main change, no paid model call, no commercial acceptance claim.
