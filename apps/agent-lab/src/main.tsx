@@ -5,6 +5,7 @@ import { KnowledgeLibraryPanel } from './KnowledgeLibraryPanel';
 import { DataGovernanceWorkspace } from './DataGovernanceWorkspace';
 import { toggleMcpServer, readMcpServers, reloadMcpServers } from './mcp-controls';
 import { RuntimeTraceWorkspace } from './RuntimeTraceWorkspace';
+import { RunInspector } from './RunInspector';
 import { AgentBuilderWorkspace } from './AgentBuilderWorkspace';
 import { AccountSecurityDialog } from './AccountSecurityDialog';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -321,7 +322,7 @@ export function ControlCenter() {
         {workspaceLoading && !workspaceError && <section className="lab-state-card" role="status"><RefreshCw size={22} className="spin"/><h2>正在读取工作区</h2><p>正在连接此页面需要的服务，请稍候。</p></section>}
         {workspaceError && <section className="lab-state-card lab-state-error" role="alert"><ShieldAlert size={24}/><h2>此页面的数据暂时不可用</h2><p>{workspaceError.message}</p><button className="agent-command" onClick={() => { for (const query of dependencies) void query.refetch(); }} disabled={dependencies.some(query => query.isFetching)}>重试读取</button><small>你仍可以通过导航访问其他工作区。</small></section>}
         {!workspaceLoading && !workspaceError && <>
-        {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} />}
+        {view === 'overview' && <Overview data={data} lab={labData} onRuntime={() => setView('runtime')} onMcp={() => setView('mcp')} onNavigate={(next) => setView(next)} />}
         {view === 'runtime' && <AgentBuilderWorkspace onBusyChange={setWorkspaceBusy} onDirtyChange={setUnsavedChanges} />}
         {view === 'mcp' && <McpWorkspace data={data} health={health} toggle={toggle} checks={mcpChecks} operationBusy={readMcpState.isPending || reload.isPending} />}
         {view === 'data' && <DataGovernanceWorkspace />}
@@ -377,7 +378,148 @@ export function ControlCenter() {
   );
 }
 
-function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void }) {
+type BadCaseItem = {
+  runId: string;
+  agentId: string;
+  agentKey: string;
+  agentName: string;
+  agentVersionId: string;
+  version?: string | null;
+  application?: string | null;
+  status: string;
+  error?: string | null;
+  latencyMs?: number | null;
+  createdAt: string;
+  reasons: string[];
+  downvoteCount: number;
+  latestFeedback?: { category?: string | null; comment?: string | null; sourceApp?: string | null } | null;
+  promotedCaseId?: string | null;
+};
+
+type BadCaseQueueResponse = {
+  items: BadCaseItem[];
+  summary: {
+    totalBadCases: number;
+    failedRuns: number;
+    downvotedRuns: number;
+    promotedCount: number;
+    pendingTriageCount: number;
+  };
+};
+
+type GatewayRoutingSummary = {
+  configuredPrimary: string;
+  fallbackProvider: string;
+  primaryExplicit: boolean;
+  agentEngine: string;
+  providers: Record<string, { enabled: boolean; circuitState: string; consecutiveFailures: number; totalTrips: number; totalFallbacks: number }>;
+};
+
+function GatewayRoutingStrip() {
+  const gateway = useQuery<GatewayRoutingSummary | null>({
+    queryKey: ['lab-gateway-status'],
+    retry: false,
+    queryFn: () => api('/agent-lab/gateway-status'),
+  });
+  if (!gateway.data) return null;
+  const { configuredPrimary, fallbackProvider, agentEngine, providers } = gateway.data;
+  const providerPillClass = (name: string) => {
+    const info = providers[name];
+    if (!info || !info.enabled) return 'lab-pill lab-pill-danger';
+    if (info.circuitState === 'OPEN') return 'lab-pill lab-pill-danger';
+    if (info.circuitState === 'HALF_OPEN') return 'lab-pill lab-pill-warn';
+    return 'lab-pill lab-pill-ok';
+  };
+  return <section className="lab-gateway-bar" aria-label="双模型路由与引擎状态">
+    <div className="lab-gateway-pills">
+      <span className="lab-pill lab-pill-primary">主路由：{configuredPrimary.toUpperCase()}</span>
+      <span className="lab-pill">热备：{fallbackProvider.toUpperCase()}</span>
+      <span className="lab-pill">面试引擎：{agentEngine}</span>
+    </div>
+    <div className="lab-gateway-pills">
+      {Object.entries(providers).map(([name, info]) => (
+        <span key={name} className={providerPillClass(name)}>
+          {name.toUpperCase()} · {!info.enabled ? '已隔离' : info.circuitState}
+          {info.totalFallbacks > 0 ? `（降级 ${info.totalFallbacks}）` : ''}
+        </span>
+      ))}
+    </div>
+  </section>;
+}
+
+export function BadCaseFlywheelPanel({ onNavigate }: { onNavigate?: (view: 'trace' | 'evolution' | 'release') => void }) {
+  const [inspecting, setInspecting] = useState<BadCaseItem | null>(null);
+  const badCases = useQuery<BadCaseQueueResponse>({
+    queryKey: ['lab-bad-cases-queue'],
+    retry: false,
+    queryFn: () => api('/agent-lab/bad-cases?limit=20'),
+  });
+  const summary = badCases.data?.summary;
+  const items = badCases.data?.items ?? [];
+  return <section className="lab-section" aria-label="评测驱动演进飞轮与 Bad Case 待评审队列">
+    <div className="lab-section-head">
+      <div>
+        <h2>评测驱动演进飞轮（Eval-Driven Flywheel）</h2>
+        <p>消费端运行与 👎 反馈自动汇聚至此 → 脱敏沉淀为回归用例 → 门禁评测对比 → 灰度发布或秒级回滚。</p>
+      </div>
+    </div>
+    <div className="lab-flywheel-grid">
+      <article className="lab-flywheel-card">
+        <span className="lab-step-badge">STEP 1 · 捕获</span>
+        <strong>{summary ? `${summary.pendingTriageCount} 待评审` : '读取中'}</strong>
+        <small>{summary ? `失败运行 ${summary.failedRuns} · 踩反馈 ${summary.downvotedRuns}` : '仅统计真实持久化运行'}</small>
+        {onNavigate && <button type="button" onClick={() => onNavigate('trace')}>打开 Trace 排障</button>}
+      </article>
+      <article className="lab-flywheel-card">
+        <span className="lab-step-badge">STEP 2 · 沉淀</span>
+        <strong>{summary ? `${summary.promotedCount} 已沉淀` : '—'}</strong>
+        <small>点击下方任意 Bad Case 一键脱敏转入未冻结 Dataset</small>
+      </article>
+      <article className="lab-flywheel-card">
+        <span className="lab-step-badge">STEP 3 · 评测</span>
+        <strong>受控对比</strong>
+        <small>同 Dataset / 同断言契约跑出 v1 vs v2 差异证据</small>
+        {onNavigate && <button type="button" onClick={() => onNavigate('evolution')}>前往评测门禁</button>}
+      </article>
+      <article className="lab-flywheel-card">
+        <span className="lab-step-badge">STEP 4 · 发布</span>
+        <strong>秒级回滚</strong>
+        <small>支持切回任意历史 PUBLISHED 版本并写审计记录</small>
+        {onNavigate && <button type="button" onClick={() => onNavigate('release')}>前往发布与回滚</button>}
+      </article>
+    </div>
+    {badCases.isError && <p className="trace-muted">Bad Case 队列暂未就绪（不影响其他控制面操作）。</p>}
+    {!badCases.isPending && !badCases.isError && items.length === 0 && (
+      <p className="trace-muted">当前无待评审的失败运行或 👎 反馈记录。</p>
+    )}
+    {items.length > 0 && <div className="lab-list" aria-label="Bad Case 待评审列表">
+      {items.map((item) => <article className="lab-row" key={item.runId}>
+        <div>
+          <div className="lab-badcase-tags">
+            {item.reasons.map(r => (
+              <span key={r} className={r === 'RUN_FAILED' ? 'lab-pill lab-pill-danger' : 'lab-pill lab-pill-warn'}>
+                {r === 'RUN_FAILED' ? '运行失败' : '消费端 👎'}
+              </span>
+            ))}
+            <span className={item.promotedCaseId ? 'lab-pill lab-pill-ok' : 'lab-pill lab-pill-primary'}>
+              {item.promotedCaseId ? '已沉淀回归集' : '待评审'}
+            </span>
+          </div>
+          <h3>{item.agentName} <span>{item.version ?? '未知版本'}</span></h3>
+          <p>{item.application ?? '未标注应用'} · <code>{item.runId}</code> · {new Date(item.createdAt).toLocaleString()}</p>
+          {item.latestFeedback?.comment && <p className="lab-rationale">反馈：{item.latestFeedback.comment}</p>}
+          {!item.latestFeedback?.comment && item.error && <p className="lab-rationale">错误：{item.error}</p>}
+        </div>
+        <div className="lab-rollback-actions">
+          <button type="button" onClick={() => setInspecting(item)}>排查并转回归集</button>
+        </div>
+      </article>)}
+    </div>}
+    {inspecting && <RunInspector runId={inspecting.runId} agentId={inspecting.agentId} versionId={inspecting.agentVersionId} close={() => setInspecting(null)} />}
+  </section>;
+}
+
+function Overview({ data, lab, onRuntime, onMcp, onNavigate }: { data: { runningCount: number; count: number }; lab: LabDashboard; onRuntime: () => void; onMcp: () => void; onNavigate?: (view: 'trace' | 'evolution' | 'release') => void }) {
   const latestDecision = lab.decisions[0];
   return <div className="agent-page-grid">
     <section className="agent-hero">
@@ -386,6 +528,8 @@ function Overview({ data, lab, onRuntime, onMcp }: { data: { runningCount: numbe
       <p>合成基准：Golden Dataset {lab.dataset.version}，格式校验覆盖 {lab.dataset.caseCount} 个 Case 和 {lab.dataset.responseCount} 个回答。录制指标用于回放与工程验证；当前业务版本的质量结论见受控自进化证据。</p>
       <div className="agent-hero-actions"><button onClick={onRuntime}><Workflow size={16}/>查看编排</button><button className="quiet" onClick={onMcp}><SlidersHorizontal size={16}/>治理 MCP</button></div>
     </section>
+    <GatewayRoutingStrip />
+    <BadCaseFlywheelPanel onNavigate={onNavigate} />
     <section className="agent-metric-grid">
       <article><span>MCP 服务</span><strong>{data.runningCount} / {data.count}</strong><small>已启用且执行绑定就绪</small></article>
       <article><span>运行编排</span><strong>受控</strong><small>阶段可见，内部推理不可见</small></article>
@@ -465,12 +609,62 @@ function ExperimentComposer({ runs, createExperiment }: {
   </section>;
 }
 
+export function PublishedVersionRollback() {
+  const queryClient = useQueryClient();
+  const [selectedAgentId, setSelectedAgentId] = useState('');
+  const [confirmVersionId, setConfirmVersionId] = useState('');
+  const [rollbackNotice, setRollbackNotice] = useState('');
+  const agents = useQuery<Array<{ id: string; key: string; name: string; status: string; currentVersionId?: string | null; currentVersion?: { id: string; version: string; status: string } | null }>>({
+    queryKey: ['lab-release-agents'],
+    retry: false,
+    queryFn: () => api('/agent-lab/agents'),
+  });
+  const versions = useQuery<Array<{ id: string; version: string; status: string; publishedAt?: string | null; createdAt: string }>>({
+    queryKey: ['lab-release-versions', selectedAgentId],
+    enabled: Boolean(selectedAgentId),
+    retry: false,
+    queryFn: () => api(`/agent-lab/agents/${encodeURIComponent(selectedAgentId)}/versions`),
+  });
+  const rollback = useMutation({
+    mutationFn: ({ agentId, versionId }: { agentId: string; versionId: string }) =>
+      api(`/agent-lab/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(versionId)}/activate`, { method: 'POST' }),
+    onSuccess: (activated: any) => {
+      setConfirmVersionId('');
+      setRollbackNotice(`已安全回滚当前生效版本至 ${activated?.version || '目标已发布版本'}（已写入审计记录，不调用模型）。`);
+      void queryClient.invalidateQueries({ queryKey: ['lab-release-agents'] });
+      void queryClient.invalidateQueries({ queryKey: ['lab-release-versions', selectedAgentId] });
+      void queryClient.invalidateQueries({ queryKey: ['lab-agents'] });
+    },
+  });
+  const activeAgent = agents.data?.find(a => a.id === selectedAgentId);
+  const historicalPublished = (versions.data ?? []).filter(
+    v => v.status === 'PUBLISHED' && v.id !== activeAgent?.currentVersionId && v.id !== activeAgent?.currentVersion?.id,
+  );
+  return <section className="lab-section" aria-label="已发布版本回滚">
+    <div className="lab-section-head"><div><h2>已发布版本回滚（秒级止血）</h2><p>仅允许切换到历史上已通过门禁的 PUBLISHED 版本；立即更新消费端生效快照并留痕审计，不触发模型调用。</p></div></div>
+    <label className="lab-select-field">选择 Agent<select value={selectedAgentId} onChange={event => { setSelectedAgentId(event.target.value); setConfirmVersionId(''); setRollbackNotice(''); rollback.reset(); }}><option value="">请选择需要检查回滚的 Agent</option>{agents.data?.map(agent => <option key={agent.id} value={agent.id}>{agent.name} · {agent.key}（当前：{agent.currentVersion?.version ?? '未发布'}）</option>)}</select></label>
+    {agents.isError && <p role="alert">{diagnosticText(agents.error instanceof Error ? agents.error.message : '无法读取 Agent 列表')}</p>}
+    {selectedAgentId && versions.isPending && <p role="status">正在读取历史发布版本…</p>}
+    {selectedAgentId && versions.isError && <p role="alert">{diagnosticText(versions.error instanceof Error ? versions.error.message : '无法读取版本列表')}</p>}
+    {selectedAgentId && !versions.isPending && !versions.isError && !historicalPublished.length && <p className="trace-muted">该 Agent 暂无其他可回滚的历史已发布版本。</p>}
+    {historicalPublished.length > 0 && <div className="lab-list">{historicalPublished.map(ver => <article className="lab-row" key={ver.id}>
+      <div><div className="lab-badcase-tags"><span className="lab-pill lab-pill-ok">PUBLISHED</span><span className="lab-pill">历史可回滚版本</span></div><h3>{ver.version}</h3><p>发布时间：{ver.publishedAt ? new Date(ver.publishedAt).toLocaleString() : new Date(ver.createdAt).toLocaleString()}</p></div>
+      <div className="lab-rollback-actions">{confirmVersionId === ver.id
+        ? <><button type="button" className="agent-command" disabled={rollback.isPending} onClick={() => rollback.mutate({ agentId: selectedAgentId, versionId: ver.id })}>{rollback.isPending ? '回滚中…' : '确认回滚'}</button><button type="button" disabled={rollback.isPending} onClick={() => setConfirmVersionId('')}>取消</button></>
+        : <button type="button" disabled={rollback.isPending} onClick={() => { setConfirmVersionId(ver.id); setRollbackNotice(''); rollback.reset(); }}>回滚到此版本</button>}</div>
+    </article>)}</div>}
+    {rollback.isError && <p role="alert">{diagnosticText(rollback.error instanceof Error ? rollback.error.message : '回滚失败')}</p>}
+    {rollbackNotice && <p role="status">{rollbackNotice}</p>}
+  </section>;
+}
+
 function ReleaseWorkspace({ runs, decisions, recordDecision }: {
   runs: LabRun[];
   decisions: LabDashboard['decisions'];
   recordDecision: { isPending: boolean; variables?: { runId: string }; mutate: (input: { runId: string; decision: string; rationaleCode: string }) => void };
 }) {
   return <div className="agent-page-grid">
+    <PublishedVersionRollback />
     <section className="lab-release-commands">{runs.length ? runs.map((run) => <DecisionCommand key={run.id} run={run} recordDecision={recordDecision} />) : <EmptyState title="尚无可决策运行" text="没有已导入运行" />}</section>
     {decisions.length ? <section className="lab-list">{decisions.map((decision) => <article className="lab-row" key={decision.id}><div><p className={`decision-${decision.decision.toLowerCase()}`}>{decision.decision}</p><h2>{decision.agent.agentKey} <span>{decision.agent.version}</span></h2><p>{decision.datasetVersion} · {new Date(decision.createdAt).toLocaleString()}</p></div><p className="lab-rationale">{decision.rationale}</p></article>)}</section> : <EmptyState title="尚无发布决策" text="没有已记录决策" />}
   </div>;

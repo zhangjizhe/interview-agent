@@ -164,4 +164,27 @@ describe('LlmGatewayService dual-provider circuit breaker & fallback', () => {
     expect(gateway.getProviderStatus().deepseek.circuitState).toBe('CLOSED');
     expect(gateway.getProviderStatus().deepseek.consecutiveFailures).toBe(0);
   });
+
+  it('strictly honors explicit LLM_PRIMARY_PROVIDER=qwen even on coding prompts and reports routing summary', async () => {
+    process.env.LLM_PRIMARY_PROVIDER = 'qwen';
+    process.env.AGENT_ENGINE = 'fast-dual';
+    const { gateway, qwen, deepseek } = buildGateway();
+
+    const res = await tenantContext.run({ organizationId: 'org-1', userId: 'user-1' }, () =>
+      gateway.chat({ messages: [{ role: 'user', content: '请用代码实现一个 LRU 算法' }] }),
+    );
+    expect(res.provider).toBe('qwen');
+    expect(qwen.chat).toHaveBeenCalledTimes(1);
+    expect(deepseek.chat).not.toHaveBeenCalled();
+
+    const summary = gateway.getRoutingSummary();
+    expect(summary).toMatchObject({
+      configuredPrimary: 'qwen',
+      fallbackProvider: 'deepseek',
+      primaryExplicit: true,
+      agentEngine: 'fast-dual',
+    });
+    expect(summary.providers.qwen.circuitState).toBe('CLOSED');
+    expect(summary.providers.deepseek.circuitState).toBe('CLOSED');
+  });
 });

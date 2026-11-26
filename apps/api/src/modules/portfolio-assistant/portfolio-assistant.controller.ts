@@ -17,18 +17,34 @@ export class PortfolioAssistantController {
     }
     response.status(200).set({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store, no-transform', 'X-Accel-Buffering': 'no' });
     response.flushHeaders();
-    let disconnected = false, sent = '';
+    let disconnected = false, sent = '', lastStatus = '';
     const close = () => { disconnected = true; };
     response.once('close', close);
-    const emit = async (event: string, data: unknown) => {
-      if (disconnected) return;
-      if (!response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)) {
+    const isClosed = () => disconnected || Boolean(response.writableEnded) || Boolean(response.destroyed);
+    const writeRaw = async (frame: string) => {
+      if (isClosed()) return;
+      if (!response.write(frame)) {
         await new Promise<void>(resolve => {
           const finish = () => { response.off('drain', finish); response.off('close', finish); resolve(); };
           response.once('drain', finish); response.once('close', finish);
         });
       }
+      (response as any).flush?.();
     };
+    const emit = async (event: string, data: unknown) => {
+      await writeRaw(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+    const heartbeat = setInterval(() => {
+      if (!isClosed()) {
+        try {
+          response.write(': ping\n\n');
+          (response as any).flush?.();
+        } catch {
+          disconnected = true;
+        }
+      }
+    }, 10_000);
+    heartbeat.unref?.();
     const append = async (value: { answer: string; sources: Array<{ title: string; href: string }> }) => {
       if (!value.answer.startsWith(sent)) throw new Error('Public stream projection changed');
       await emit('sources', { items: value.sources.map(s => ({ title: s.title, url: s.href })) });
@@ -40,7 +56,7 @@ export class PortfolioAssistantController {
       const ticket = 'ticket' in result ? result.ticket : undefined;
       if (!ticket) throw new Error('Missing public ticket');
       const deadline = Date.now() + 45000;
-      while (!disconnected && Date.now() < deadline) {
+      while (!isClosed() && Date.now() < deadline) {
         const state = await this.assistant.answer(ticket);
         if (state.status === 'COMPLETED') {
           if (typeof state.answer !== 'string' || !Array.isArray(state.sources)) throw new Error('Missing completed answer');
@@ -53,15 +69,19 @@ export class PortfolioAssistantController {
         }
         const partial = await this.assistant.streamSnapshot(ticket);
         if (partial) await append(partial);
-        await emit('status', { status: state.status });
+        if (state.status !== lastStatus) {
+          lastStatus = state.status;
+          await emit('status', { status: state.status });
+        }
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-      if (!disconnected) await emit('error', { terminal: false });
+      if (!isClosed()) await emit('error', { terminal: false });
     } catch {
       await emit('error', { terminal: true });
     } finally {
+      clearInterval(heartbeat);
       response.off('close', close);
-      response.end();
+      if (!response.writableEnded && !response.destroyed) response.end();
     }
   }
   @Get('answers/:ticket')

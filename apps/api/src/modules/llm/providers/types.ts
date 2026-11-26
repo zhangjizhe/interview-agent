@@ -29,7 +29,7 @@ export interface ChatParams {
 export interface StreamChunk {
   content?: string;
   finishReason?: 'stop' | 'length' | 'tool_calls' | 'error';
-  usage?: { promptTokens: number; completionTokens: number };
+  usage?: { promptTokens: number; completionTokens: number; cachedTokens?: number };
   provider?: string;
   model?: string;
   toolCall?: {
@@ -51,7 +51,7 @@ export interface StreamChunk {
 
 export interface ChatResponse {
   content: string;
-  usage: { promptTokens: number; completionTokens: number };
+  usage: { promptTokens: number; completionTokens: number; cachedTokens?: number };
   finishReason: string;
   model: string;
   provider: string;

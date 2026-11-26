@@ -1,19 +1,24 @@
 import { memo } from 'react';
-import { Bot, User as UserIcon, Loader2 } from 'lucide-react';
+import { Bot, User as UserIcon, Loader2, ThumbsUp, ThumbsDown } from 'lucide-react';
 
 interface ChatBubbleProps {
   role: 'user' | 'assistant';
   content: string;
   streaming?: boolean;
+  feedback?: 'UP' | 'DOWN' | null;
+  onFeedback?: (rating: 'UP' | 'DOWN') => void;
 }
 
 export const ChatBubble = memo(function ChatBubble({
   role,
   content,
   streaming,
+  feedback,
+  onFeedback,
 }: ChatBubbleProps) {
   const isUser = role === 'user';
   const showThinkingPlaceholder = streaming && !content;
+  const showFeedbackActions = !isUser && !streaming && Boolean(content) && Boolean(onFeedback);
 
   return (
     <div className={`flex gap-2 md:gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -46,10 +51,49 @@ export const ChatBubble = memo(function ChatBubble({
             </span>
           </span>
         ) : (
-          content
+          showFeedbackActions ? <span>{content}</span> : content
         )}
         {streaming && content && (
           <span className="inline-block w-1.5 h-4 bg-blue-500 ml-0.5 animate-pulse align-middle" />
+        )}
+        {showFeedbackActions && (
+          <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-400">
+            <button
+              type="button"
+              aria-label="觉得这轮追问有帮助"
+              aria-pressed={feedback === 'UP'}
+              disabled={Boolean(feedback)}
+              onClick={() => onFeedback?.('UP')}
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${
+                feedback === 'UP'
+                  ? 'text-emerald-600 bg-emerald-50 font-medium'
+                  : 'hover:text-slate-700 hover:bg-slate-50 disabled:opacity-40'
+              }`}
+            >
+              <ThumbsUp className="w-3 h-3" />
+              <span>有帮助</span>
+            </button>
+            <button
+              type="button"
+              aria-label="反馈这轮追问待改进"
+              aria-pressed={feedback === 'DOWN'}
+              disabled={Boolean(feedback)}
+              onClick={() => onFeedback?.('DOWN')}
+              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${
+                feedback === 'DOWN'
+                  ? 'text-amber-700 bg-amber-50 font-medium'
+                  : 'hover:text-slate-700 hover:bg-slate-50 disabled:opacity-40'
+              }`}
+            >
+              <ThumbsDown className="w-3 h-3" />
+              <span>待改进</span>
+            </button>
+            {feedback && (
+              <span className="text-[11px] text-slate-400" role="status">
+                {feedback === 'DOWN' ? '已同步至评测改进队列' : '感谢反馈'}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>

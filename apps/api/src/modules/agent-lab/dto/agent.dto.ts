@@ -1,11 +1,13 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsObject,
   IsOptional,
   IsString,
   IsInt,
   Max,
   Min,
+  MinLength,
   Matches,
   MaxLength,
   IsIn,
@@ -182,6 +184,34 @@ export class CreateEvaluationDatasetCaseDto {
   metadata?: Record<string, unknown>;
 }
 
+export class PromoteRunToDatasetDto {
+  @IsString()
+  @MinLength(1)
+  datasetId!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(AGENT_KEY_PATTERN, {
+    message: 'key 必须以小写字母开头，仅包含小写字母、数字和连字符，长度为 2-64',
+  })
+  key?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  expectedKeywords?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  forbiddenKeywords?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  note?: string;
+}
+
 export class CreateEvaluatorDto {
   @IsString()
   @Matches(AGENT_KEY_PATTERN, {
@@ -256,4 +286,24 @@ export class CreateConfiguredAgentDto extends CreateAgentDto {
   @ValidateNested()
   @Type(() => CreateAgentVersionDto)
   initialVersion!: CreateAgentVersionDto;
+}
+
+export class SubmitRunFeedbackDto {
+  @IsIn(['UP', 'DOWN'])
+  rating!: 'UP' | 'DOWN';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  comment?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  sourceApp?: string;
 }

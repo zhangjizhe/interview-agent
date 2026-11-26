@@ -47,4 +47,14 @@ describe('public SSE delivery lifecycle', () => {
       expect(h.frames.at(-1)).toEqual({ event: 'error', data: { terminal: true } });
     }
   });
+  it('deduplicates repeated RUNNING status frames across consecutive poll ticks', async () => {
+    const h = harness();
+    h.assistant.answer.mockReset()
+      .mockResolvedValueOnce({ status: 'RUNNING' })
+      .mockResolvedValueOnce({ status: 'RUNNING' })
+      .mockResolvedValue({ status: 'COMPLETED', ...facts });
+    await h.controller.chat({}, h.request, h.response);
+    expect(h.frames.filter(f => f.event === 'status')).toEqual([{ event: 'status', data: { status: 'RUNNING' } }]);
+    expect(h.frames.at(-1)).toEqual({ event: 'done', data: { status: 'COMPLETED' } });
+  });
 });

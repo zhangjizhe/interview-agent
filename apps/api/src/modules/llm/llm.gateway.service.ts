@@ -161,15 +161,21 @@ export class LlmGatewayService {
       return this.providers.get(preferred)!;
     }
 
-    const configuredPrimary: LLMProviderName = process.env.LLM_PRIMARY_PROVIDER === 'qwen' ? 'qwen' : 'deepseek';
+    const rawPrimary = process.env.LLM_PRIMARY_PROVIDER?.trim().toLowerCase();
+    const explicitPrimary: LLMProviderName | null =
+      rawPrimary === 'qwen' ? 'qwen' : rawPrimary === 'deepseek' ? 'deepseek' : null;
+    const configuredPrimary: LLMProviderName = explicitPrimary ?? 'deepseek';
     const lastMessage = params.messages[params.messages.length - 1]?.content || '';
     const isCoding =
       /代码|code|implement|算法|function|class|实现|写一个/i.test(lastMessage) ||
       params.tools?.some((t) => t.function.name.includes('code'));
 
-    const primaryOrder: LLMProviderName[] = isCoding
-      ? ['deepseek', 'qwen']
-      : [configuredPrimary, this.fallbackMap.get(configuredPrimary) || 'qwen'];
+    // 显式配置了 LLM_PRIMARY_PROVIDER 时严格按配置优先；未显式指定时代码类问题优先 DeepSeek
+    const primaryOrder: LLMProviderName[] = explicitPrimary
+      ? [explicitPrimary, this.fallbackMap.get(explicitPrimary) || (explicitPrimary === 'qwen' ? 'deepseek' : 'qwen')]
+      : isCoding
+        ? ['deepseek', 'qwen']
+        : [configuredPrimary, this.fallbackMap.get(configuredPrimary) || 'qwen'];
 
     for (const candidate of primaryOrder) {
       if (this.isProviderRoutable(candidate)) {
@@ -254,6 +260,35 @@ export class LlmGatewayService {
       };
     }
     return out;
+  }
+
+  /**
+   * 供 Agent Lab 控制面只读展示当前双模型主备路由、引擎模式与熔断状态（不含任何密钥或敏感字段）。
+   */
+  getRoutingSummary() {
+    const rawPrimary = process.env.LLM_PRIMARY_PROVIDER?.trim().toLowerCase();
+    const configuredPrimary: LLMProviderName = rawPrimary === 'qwen' ? 'qwen' : 'deepseek';
+    const fallbackProvider: LLMProviderName = configuredPrimary === 'qwen' ? 'deepseek' : 'qwen';
+    const agentEngine = process.env.AGENT_ENGINE?.trim().toLowerCase() || 'multi';
+    const providers = this.getProviderStatus();
+    return {
+      configuredPrimary,
+      fallbackProvider,
+      primaryExplicit: rawPrimary === 'qwen' || rawPrimary === 'deepseek',
+      agentEngine,
+      providers: Object.fromEntries(
+        Object.entries(providers).map(([name, info]) => [
+          name,
+          {
+            enabled: info.enabled,
+            circuitState: info.circuitState,
+            consecutiveFailures: info.consecutiveFailures,
+            totalTrips: info.totalTrips,
+            totalFallbacks: info.totalFallbacks,
+          },
+        ]),
+      ),
+    };
   }
 
   getConfiguredModels() {

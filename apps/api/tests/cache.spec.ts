@@ -119,6 +119,20 @@ test('extractCacheUsage: OpenAI / Anthropic 字段归一化', () => {
   });
   assert.equal(ant.cachedTokens, 500);
 
+  const ds = extractCacheUsage({
+    prompt_tokens: 1200,
+    prompt_cache_hit_tokens: 896,
+  });
+  assert.equal(ds.cachedTokens, 896);
+  assert.equal(ds.totalPromptTokens, 1200);
+
+  const norm = extractCacheUsage({
+    promptTokens: 900,
+    cachedTokens: 640,
+  });
+  assert.equal(norm.cachedTokens, 640);
+  assert.equal(norm.totalPromptTokens, 900);
+
   const none = extractCacheUsage({});
   assert.equal(none.cachedTokens, 0);
 });

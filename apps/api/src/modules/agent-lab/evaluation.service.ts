@@ -13,7 +13,9 @@ import {
   CreateEvaluationDatasetCaseDto,
   CreateEvaluationDatasetDto,
   CreateEvaluatorDto,
+  PromoteRunToDatasetDto,
   RunEvaluationDto,
+  SubmitRunFeedbackDto,
 } from './dto/agent.dto';
 import { buildStratifiedEvaluationEvidence } from '../inference/evaluation-statistics';
 import { EvaluationCancellationError } from './evaluation-job.errors';
@@ -251,6 +253,199 @@ export class EvaluationService {
       }
       throw error;
     }
+  }
+
+  private sanitizePromotedText(raw: string): string {
+    return raw
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
+      .replace(/\b(sk-[a-zA-Z0-9_-]{12,}|Bearer\s+[a-zA-Z0-9._-]{16,})\b/g, '[REDACTED_SECRET]')
+      .replace(/\b1[3-9]\d{9}\b/g, '[REDACTED_PHONE]')
+      .trim()
+      .slice(0, 4000);
+  }
+
+  /**
+   * 评测驱动飞轮核心闭环：将线上 Run / Bad Case 脱敏沉淀为指定未冻结 Dataset 的回归 Case。
+   * 严格复用 addDatasetCase 的冻结门禁、租户隔离与唯一键校验，不触发任何模型调用。
+   */
+  async promoteRunToDataset(
+    userId: string,
+    runId: string,
+    dto: PromoteRunToDatasetDto,
+  ) {
+    const run = await this.runtime.getRun(userId, runId);
+    const inputObj = run.input && typeof run.input === 'object' ? (run.input as Record<string, unknown>) : {};
+    const rawMessage = typeof inputObj.message === 'string'
+      ? inputObj.message
+      : typeof inputObj.question === 'string'
+        ? inputObj.question
+        : '';
+    const sanitizedMessage = this.sanitizePromotedText(rawMessage);
+    if (!sanitizedMessage) {
+      throw new BadRequestException('该 Run 缺少可复放的输入消息，无法沉淀为回归用例');
+    }
+
+    const fallbackSuffix = run.id.toLowerCase().replace(/[^a-z0-9]/g, '').slice(-10) || 'case';
+    const key = (dto.key?.trim() || `badcase-${fallbackSuffix}`).slice(0, 64);
+
+    const expectedKeywords = (dto.expectedKeywords || []).map(item => item.trim()).filter(Boolean).slice(0, 20);
+    const forbiddenKeywords = (dto.forbiddenKeywords || []).map(item => item.trim()).filter(Boolean).slice(0, 20);
+    const expectedOutput: Record<string, unknown> | undefined =
+      expectedKeywords.length || forbiddenKeywords.length
+        ? {
+            ...(expectedKeywords.length ? { mustInclude: expectedKeywords } : {}),
+            ...(forbiddenKeywords.length ? { mustNotInclude: forbiddenKeywords } : {}),
+          }
+        : undefined;
+
+    const input: Record<string, unknown> = { message: sanitizedMessage };
+    if (typeof inputObj.position === 'string' && inputObj.position.trim()) {
+      input.position = inputObj.position.trim().slice(0, 120);
+    }
+    if (typeof inputObj.level === 'string' && inputObj.level.trim()) {
+      input.level = inputObj.level.trim().slice(0, 32);
+    }
+
+    const created = await this.addDatasetCase(userId, dto.datasetId, {
+      key,
+      input,
+      expectedOutput,
+      metadata: {
+        source: 'run-promotion',
+        sourceRunId: run.id,
+        sourceAgentId: run.agentId,
+        sourceAgentVersionId: run.agentVersionId,
+        sourceStatus: run.status,
+        sourceApplication: run.application ?? null,
+        promotedBy: userId,
+        promotedAt: new Date().toISOString(),
+        ...(dto.note?.trim() ? { note: this.sanitizePromotedText(dto.note).slice(0, 1000) } : {}),
+      },
+    });
+    if (this.prisma.runFeedback?.updateMany && created?.id) {
+      await this.prisma.runFeedback.updateMany({
+        where: { runId: run.id, rating: 'DOWN', promotedCaseId: null },
+        data: { promotedCaseId: created.id },
+      });
+    }
+    return created;
+  }
+
+  /**
+   * 消费端 / 运维端向 Agent Lab 回传单次 Run 的 👍/👎 反馈。
+   * 仅校验 Run 归属并脱敏备注，不触发任何模型调用。
+   */
+  async submitRunFeedback(
+    userId: string,
+    runId: string,
+    dto: SubmitRunFeedbackDto,
+  ) {
+    const run = await this.runtime.getRun(userId, runId);
+    const sanitizedComment = dto.comment?.trim()
+      ? this.sanitizePromotedText(dto.comment).slice(0, 1000)
+      : null;
+    const category = dto.category?.trim() ? dto.category.trim().slice(0, 64) : null;
+    const sourceApp = dto.sourceApp?.trim()
+      ? dto.sourceApp.trim().slice(0, 64)
+      : run.application ?? 'agent-lab';
+
+    return this.prisma.runFeedback.create({
+      data: {
+        runId: run.id,
+        rating: dto.rating,
+        category,
+        comment: sanitizedComment,
+        sourceApp,
+        submittedByUserId: userId,
+      },
+    });
+  }
+
+  /**
+   * 聚合当前 Workspace 下的线上 Bad Case 待评审队列（包含 FAILED 运行与收到 DOWN 反馈的运行）。
+   * 全量基于真实持久化记录统计，未知或空态诚实返回 0 / []。
+   */
+  async listBadCases(userId: string, limit = 30) {
+    const workspace = await this.getOrCreateDefaultWorkspace(userId);
+    const runs = await this.prisma.run.findMany({
+      where: {
+        workspaceId: workspace.id,
+        OR: [
+          { status: 'FAILED' },
+          { feedbacks: { some: { rating: 'DOWN' } } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        agentId: true,
+        agentVersionId: true,
+        application: true,
+        status: true,
+        error: true,
+        latencyMs: true,
+        estimatedCost: true,
+        createdAt: true,
+        agent: { select: { id: true, key: true, name: true } },
+        agentVersion: { select: { id: true, version: true, status: true } },
+        feedbacks: {
+          where: { rating: 'DOWN' },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            rating: true,
+            category: true,
+            comment: true,
+            sourceApp: true,
+            promotedCaseId: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    const items = runs.map((run) => {
+      const promotedCaseId = run.feedbacks.find((fb) => fb.promotedCaseId)?.promotedCaseId ?? null;
+      const reasons: string[] = [];
+      if (run.status === 'FAILED') reasons.push('RUN_FAILED');
+      if (run.feedbacks.length > 0) reasons.push('USER_DOWNVOTED');
+      return {
+        runId: run.id,
+        agentId: run.agentId,
+        agentKey: run.agent?.key ?? run.agentId,
+        agentName: run.agent?.name ?? run.agentId,
+        agentVersionId: run.agentVersionId,
+        version: run.agentVersion?.version ?? null,
+        application: run.application ?? null,
+        status: run.status,
+        error: run.error ? this.sanitizePromotedText(run.error).slice(0, 300) : null,
+        latencyMs: run.latencyMs,
+        estimatedCost: run.estimatedCost,
+        createdAt: run.createdAt,
+        reasons,
+        downvoteCount: run.feedbacks.length,
+        latestFeedback: run.feedbacks[0] ?? null,
+        promotedCaseId,
+      };
+    });
+
+    const failedRuns = items.filter((item) => item.status === 'FAILED').length;
+    const downvotedRuns = items.filter((item) => item.downvoteCount > 0).length;
+    const promotedCount = items.filter((item) => Boolean(item.promotedCaseId)).length;
+    const pendingTriageCount = items.length - promotedCount;
+
+    return {
+      items,
+      summary: {
+        totalBadCases: items.length,
+        failedRuns,
+        downvotedRuns,
+        promotedCount,
+        pendingTriageCount,
+      },
+    };
   }
 
   async freezeDataset(userId: string, datasetId: string) {

@@ -117,3 +117,64 @@ test('follow-up context includes at most two user questions, excludes assistant 
   assert.equal(value.question,'具体讲讲接入工作');assert.equal(value.previous.length,2);assert.ok(!r.message.includes('ignore'));assert.ok(!r.message.includes('old discarded'));
   const long=validateLabRequest({messages:[...messages.slice(0,-1),{role:'user',content:'这个'+ '问'.repeat(498)}],requestKey:key});assert.ok(long.message.length<=500);assert.ok(new TextEncoder().encode(long.message).length<=1500);
 });
+
+test('Lab adapter consumes real SSE streaming with incremental deltas and source allowlist validation',async()=>{
+  const sseBody=[
+    'event: meta\ndata: {"contractVersion":"portfolio-assistant/stream-v1"}\n\n',
+    ': ping\n\n',
+    'event: status\ndata: {"status":"RUNNING"}\n\n',
+    'event: sources\ndata: {"items":[{"title":"Promise历史笔记","url":"#article/6"}]}\n\n',
+    'event: delta\ndata: {"text":"第一段流式内容"}\n\n',
+    'event: delta\ndata: {"text":"，第二段增量追写"}\n\n',
+    'event: done\ndata: {"status":"COMPLETED"}\n\n',
+  ].join('');
+  const events=[];let capturedHeaders=null;
+  await runLabAgent({
+    request:input,
+    config,
+    signal:new AbortController().signal,
+    emit:(event,data)=>events.push({event,data}),
+    fetcher:async(_url,init)=>{
+      capturedHeaders=init.headers;
+      return new Response(sseBody,{status:200,headers:{'Content-Type':'text/event-stream; charset=utf-8'}});
+    },
+  });
+  assert.match(capturedHeaders.Accept,/text\/event-stream/);
+  assert.deepEqual(events.filter(e=>e.event==='delta').map(e=>e.data.text),['第一段流式内容','，第二段增量追写']);
+  assert.deepEqual(events.find(e=>e.event==='sources').data.items,[{title:'Promise历史笔记',url:'#article/6'}]);
+  assert.equal(events.at(-1).event,'done');
+  assert.equal(events.at(-1).data.status,'COMPLETED');
+});
+
+test('Lab SSE stream rejects disallowed source links, terminal errors and truncated streams without emitting done',async()=>{
+  const badSourceStream=[
+    'event: meta\ndata: {"contractVersion":"portfolio-assistant/stream-v1"}\n\n',
+    'event: sources\ndata: {"items":[{"title":"Evil","url":"https://evil.example"}]}\n\n',
+    'event: delta\ndata: {"text":"should not complete"}\n\n',
+    'event: done\ndata: {"status":"COMPLETED"}\n\n',
+  ].join('');
+  const events1=[];
+  await assert.rejects(runLabAgent({
+    request:input,config,signal:new AbortController().signal,emit:(e,d)=>events1.push({e,d}),
+    fetcher:async()=>new Response(badSourceStream,{status:200,headers:{'Content-Type':'text/event-stream'}}),
+  }),/公开来源/);
+  assert.equal(events1.some(x=>x.e==='done'),false);
+
+  const terminalErrorStream=[
+    'event: meta\ndata: {"contractVersion":"portfolio-assistant/stream-v1"}\n\n',
+    'event: error\ndata: {"terminal":true}\n\n',
+  ].join('');
+  await assert.rejects(runLabAgent({
+    request:input,config,signal:new AbortController().signal,emit(){},
+    fetcher:async()=>new Response(terminalErrorStream,{status:200,headers:{'Content-Type':'text/event-stream'}}),
+  }),err=>err.terminal===true&&/可能已产生费用/.test(err.message));
+
+  const truncatedStream=[
+    'event: meta\ndata: {"contractVersion":"portfolio-assistant/stream-v1"}\n\n',
+    'event: delta\ndata: {"text":"半截回答"}\n\n',
+  ].join('');
+  await assert.rejects(runLabAgent({
+    request:input,config,signal:new AbortController().signal,emit(){},
+    fetcher:async()=>new Response(truncatedStream,{status:200,headers:{'Content-Type':'text/event-stream'}}),
+  }),/提前中断/);
+});

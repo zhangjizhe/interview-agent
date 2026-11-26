@@ -191,17 +191,45 @@ export class InterviewFlowController {
     res.flushHeaders();
     // 图编排和模型首 token 可能超过几十秒。用轻量 SSE 心跳保持连接，
     // 防止前端把“仍在处理”误判成断流。
+    let clientDisconnected = false;
+    const isStreamClosed = () => clientDisconnected || Boolean(res.writableEnded) || Boolean(res.destroyed);
     const writeHeartbeat = () => {
-      if (res.writableEnded) return;
-      res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
-      (res as any).flush?.();
+      if (isStreamClosed()) return;
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
+        (res as any).flush?.();
+      } catch {
+        clientDisconnected = true;
+      }
     };
     // Emit once immediately so the client and any intermediary know the stream
     // is active before expensive interview setup starts.
     writeHeartbeat();
     const heartbeat = setInterval(writeHeartbeat, 15_000);
+    heartbeat.unref?.();
     const stopHeartbeat = () => clearInterval(heartbeat);
-    res.once('close', stopHeartbeat);
+    const onClose = () => {
+      clientDisconnected = true;
+      stopHeartbeat();
+    };
+    res.once?.('close', onClose);
+    const finishStream = async (finalFrame?: string) => {
+      stopHeartbeat();
+      res.off?.('close', onClose);
+      if (isStreamClosed()) return;
+      await new Promise<void>((resolve) => {
+        try {
+          if (finalFrame) {
+            res.write(finalFrame);
+            (res as any).flush?.();
+          }
+          res.end(() => resolve());
+        } catch {
+          clientDisconnected = true;
+          resolve();
+        }
+      });
+    };
 
     // R-P2-20 修复：user message 长度上限 10000 字符（约 2000-3000 tokens）。
     // 原 Prisma @db.Text 无限制，恶意用户可发超长消息导致 DB / LLM 上下文压力。
@@ -244,9 +272,26 @@ export class InterviewFlowController {
     }
 
     const writeEvent = (event: object) => {
-      const ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
-      (res as any).flush?.();
-      if (!ok) return new Promise<void>((r) => res.once('drain', r));
+      if (isStreamClosed()) return Promise.resolve();
+      let ok = true;
+      try {
+        ok = res.write(`data: ${JSON.stringify(event)}\n\n`);
+        (res as any).flush?.();
+      } catch {
+        clientDisconnected = true;
+        return Promise.resolve();
+      }
+      if (!ok) {
+        return new Promise<void>((resolve) => {
+          const finish = () => {
+            res.off?.('drain', finish);
+            res.off?.('close', finish);
+            resolve();
+          };
+          res.once?.('drain', finish);
+          res.once?.('close', finish);
+        });
+      }
       return Promise.resolve();
     };
 
@@ -292,12 +337,7 @@ export class InterviewFlowController {
     }
     if (claim.state === 'replay') {
       await writeEvent({ type: 'token', content: claim.content });
-      await new Promise<void>((resolve) => {
-        res.write('data: [DONE]\n\n');
-        (res as any).flush?.();
-        stopHeartbeat();
-        res.end(() => resolve());
-      });
+      await finishStream('data: [DONE]\n\n');
       return;
     }
     const candidateMessage = claim.message;
@@ -383,13 +423,8 @@ export class InterviewFlowController {
       // 2026-06-23 修复：等 [DONE] 真正 flush 到 TCP 再 res.end()
       // 之前的 res.end() 是异步的,不等 res.write 完成,客户端可能 fetch done=true
       // 早于 [DONE] 到达,前端 setStreaming(false) 路径失效,按钮一直 loading。
-      // 现在用 Promise 包装 res.end(),等 socket 真正关闭。
-      await new Promise<void>((resolve) => {
-        res.write('data: [DONE]\n\n');
-        (res as any).flush?.();
-        stopHeartbeat();
-        res.end(() => resolve());
-      });
+      // 现在用 Promise 包装 res.end(),等 socket 真正关闭（断连时自动安全跳过）。
+      await finishStream('data: [DONE]\n\n');
     } catch (err: any) {
       if (answerClaim) {
         if (dispatchStarted) {
@@ -402,13 +437,55 @@ export class InterviewFlowController {
         await this.streamDelivery.releaseUnansweredMessage(candidateMessage.id).catch(() => undefined);
       }
       if (labRunId) await this.interviewLab.failTurn(labRunId, err).catch(() => undefined);
-      // 错误路径也要等 flush 完成
-      await new Promise<void>((resolve) => {
-        res.write(`data: ${JSON.stringify({ type: 'error', error: tenantContext.getStore()?.quotaFailure?.message || '当前回答暂时无法处理，请稍后重试。', ...(tenantContext.getStore()?.quotaFailure ? { code: tenantContext.getStore()!.quotaFailure!.code } : {}) })}\n\n`);
-        (res as any).flush?.();
-        stopHeartbeat();
-        res.end(() => resolve());
-      });
+      // 错误路径也要等 flush 完成（客户端已断开时安全跳过）
+      await finishStream(`data: ${JSON.stringify({ type: 'error', error: tenantContext.getStore()?.quotaFailure?.message || '当前回答暂时无法处理，请稍后重试。', ...(tenantContext.getStore()?.quotaFailure ? { code: tenantContext.getStore()!.quotaFailure!.code } : {}) })}\n\n`);
     }
+  }
+
+  /**
+   * 候选人消费端 👍/👎 反馈回流到 Agent Lab Bad Case 队列（零模型调用、租户隔离、服务端脱敏）。
+   */
+  @Post(':interviewId/feedback')
+  async submitCandidateFeedback(
+    @Param('interviewId') interviewId: string,
+    @Body() body: { rating?: string; category?: string; comment?: string },
+    @Req() req: any,
+  ) {
+    const rating = body?.rating === 'UP' ? 'UP' : body?.rating === 'DOWN' ? 'DOWN' : null;
+    if (!rating) {
+      throw new HttpException('rating 仅支持 UP 或 DOWN', HttpStatus.BAD_REQUEST);
+    }
+    await requireOwnedInterview(this.prisma, interviewId, req.user.userId);
+    const latestRun = await this.prisma.run.findFirst({
+      where: { externalRunId: interviewId, application: 'interview' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!latestRun) {
+      return { recorded: false, reason: 'no_linked_run' };
+    }
+    const sanitizedComment = typeof body.comment === 'string' && body.comment.trim()
+      ? body.comment
+          .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
+          .replace(/\b(sk-[a-zA-Z0-9_-]{12,}|Bearer\s+[a-zA-Z0-9._-]{16,})\b/g, '[REDACTED_SECRET]')
+          .replace(/\b1[3-9]\d{9}\b/g, '[REDACTED_PHONE]')
+          .trim()
+          .slice(0, 500)
+      : null;
+    const category = typeof body.category === 'string' && body.category.trim()
+      ? body.category.trim().slice(0, 64)
+      : null;
+    const created = await this.prisma.runFeedback.create({
+      data: {
+        runId: latestRun.id,
+        rating,
+        category,
+        comment: sanitizedComment,
+        sourceApp: 'interview-web',
+        submittedByUserId: req.user.userId,
+      },
+      select: { id: true, runId: true, rating: true, createdAt: true },
+    });
+    return { recorded: true, feedback: created };
   }
 }
