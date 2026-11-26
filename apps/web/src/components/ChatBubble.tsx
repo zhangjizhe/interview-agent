@@ -51,7 +51,7 @@ export const ChatBubble = memo(function ChatBubble({
             </span>
           </span>
         ) : (
-          content
+          showFeedbackActions ? <span>{content}</span> : content
         )}
         {streaming && content && (
           <span className="inline-block w-1.5 h-4 bg-blue-500 ml-0.5 animate-pulse align-middle" />

@@ -1,9 +1,9 @@
 # Active task
 
-2026-11-25 — Deploy and synchronize the Gemini updates (copy, documentation, articles and application changes), explicitly requested by the user.
+2026-11-26 — User explicitly requested redeployment of updated articles, continuing the supervised Gemini release.
 
-Source pin before release repair: agent-lab dfcf429c9c98ffa140bbeb398b341f8d0559a2f6; origin/agent-lab matches. Origin/main is 3c4f80b. Only unrelated untracked .workbuddy remains excluded.
+Canonical article source is the tracked examples/portfolio-site/src/articles.json; its hash differs from both native published copies. Preserve article routes/dates, runtime secrets, original data volumes and rollback. Do not publish arbitrary uncommitted workspace or .workbuddy.
 
-Gate: fix the actual latest CI blocker, retain assertions, verify reviewed source and credentials/security parity, then push exact changes and require matching green CI before release/merge. Preserve data, runtime secrets and rollback. Whole product remains NOT_ACCEPTED. No paid model replay is authorized merely by deployment.
+PR82 at420857a remained red: Builder pending test passed after repair; Golden Interview now failed because completed ChatBubble direct text shares its node with new feedback controls. Separate answer text from controls without weakening the exact-text/persistence assertions; require new matching green push/PR CI before release. Portfolio77 build/38 tests and Bubble8 tests passed this round; root lint/Web types passed.
 
-Evidence and live deployment inventory: ../acceptance/REDEPLOY_2026-11-25.md. Previous cost-audit task is deferred, not resolved; archived context: archive/release-before-nov25/.
+Original server API restarted on its original image after checking zero pending Runs/tasks; readiness200. No candidate app deployed yet. See ../acceptance/REDEPLOY_2026-11-25.md and REDEPLOY_ARTICLES_2026-11-26.md. Whole product remains NOT_ACCEPTED.
