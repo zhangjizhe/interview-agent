@@ -1,5 +1,7 @@
 # Thread handoff
 
+2026-11-27: portfolio public-cache work is on `cursor/portfolio-public-cache-a73f`, parent `fix/portfolio-timeline-alignment` at 1b7d250. Do not fold it into PRs #82, #80, #74, or #77, and do not deploy it from this change. Homepage catalog is inline; bodies are `GET /articles/:id.js`. Generated `src/site-html.mjs`, `dist/`, and `preview/` stay untracked and must be rebuilt with `npm run build`.
+
 Active: user-requested Nov25 redeployment of Gemini code/copy/articles. See ACTIVE_TASK.md and ../acceptance/REDEPLOY_2026-11-25.md.
 
 Use agent-lab; initial pin dfcf429 matches remote. Never stage unrelated .workbuddy, private runtime files or logs. Latest CI45531537241 failed only isolated Builder browser pending lock at lab-builder-run-context-evidence.mjs:109. Source disables the selector through start.isPending; wait for batched rendered state before asserting, keeping held receipt and all freeze checks.78 component tests passed; fresh browser proof pending.

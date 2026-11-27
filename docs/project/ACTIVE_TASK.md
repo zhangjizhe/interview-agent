@@ -1,5 +1,7 @@
 # Active task
 
+2026-11-27 — Public portfolio payload and cache headers on `cursor/portfolio-public-cache-a73f`, based on `fix/portfolio-timeline-alignment` (1b7d250). Homepage inlines the catalog only; article HTML loads from `/articles/:id.js`. Not deployed and not mixed into PRs #82, #80, #74, or #77. Live `zhezone.cn` still serves the previous release until a separate supervised publish.
+
 2026-11-26 — User explicitly requested redeployment of updated articles, continuing the supervised Gemini release.
 
 Canonical article source is the tracked examples/portfolio-site/src/articles.json; its hash differs from both native published copies. Preserve article routes/dates, runtime secrets, original data volumes and rollback. Do not publish arbitrary uncommitted workspace or .workbuddy.

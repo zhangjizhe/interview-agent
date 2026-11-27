@@ -1,6 +1,12 @@
 # 当前变更摘要
 
-更新：2026-10-09。历史流水与既有本地补充[归档](archive/release-readiness-2026-10-08/CHANGELOG.md)。
+更新：2026-11-27。历史流水与既有本地补充[归档](archive/release-readiness-2026-10-08/CHANGELOG.md)。
+
+## PORTFOLIO-PUBLIC-CACHE
+
+- 个人站首页不再内联 77 篇全文。目录留在页面内，正文由 `/articles/:id.js` 按需读取。公开 HTML 与正文文档改为可缓存；聊天、SSE、健康检查和搜索仍是 `no-store`。本分支本地测量与浏览器检查已做，未部署，线上 `zhezone.cn` 未变。
+
+更新：2026-10-09 的原摘要保留如下。
 
 ## PRODUCT-REACCEPTANCE-1
 
