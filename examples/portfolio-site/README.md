@@ -54,17 +54,19 @@ Lab 的 Redis 限额、每日准入上限和真实 Gateway 额度仍是主要边
 ## 结构与构建
 
 - `src/base.html`：首页、作品、简历基础内容。
-- `src/extra.html`、`src/client.mjs`：文章与助手界面。
+- `src/extra.html`、`src/client.mjs`：文章与助手界面。首页只内联目录（标识、标题、日期、分类、摘要、阅读时间）；打开文章时再请求正文。
 - `src/agent-lab.mjs`：Lab 合同、服务端提交/轮询、来源与失败校验。
-- `src/app.mjs`：服务路由、请求校验、基础限流与 SSE。
-- `src/articles.json`：清洗后的历史文章。
+- `src/app.mjs`：服务路由、请求校验、基础限流与 SSE。公开首页使用可缓存响应头；`/articles/:id.js` 返回单篇 JSON 正文。`/api/chat`、SSE、`/api/health`、`/api/search` 保持 `Cache-Control: no-store`。
+- `src/articles.json`：清洗后的历史文章。服务端检索和直连助手仍使用全文；页面内搜索只匹配标题、摘要和分类。
 - `src/agent.mjs`、`src/sse.mjs`：兼容旧只读工具 Agent 与 SSE 解析。
-- `scripts/build.mjs`：构建独立 HTML 与自包含 Worker；`src/site-html.mjs`、`dist/`、`preview/index.html` 为生成文件。
+- `scripts/build.mjs`：构建独立 HTML 与自包含 Worker；`src/site-html.mjs`、`dist/`、`preview/index.html` 为生成文件。离线预览额外内联 `ARTICLE_BODIES`，公网 HTML 不包含正文。
+
+文章地址使用 `.js` 后缀，是因为 Cloudflare 默认只按扩展名决定缓存资格，不含扩展名的 HTML 和 JSON 不会进入默认边缘缓存。响应体仍是 JSON，并带 `nosniff`。首页同时返回 `Cache-Control: public, max-age=300` 与 `Cloudflare-CDN-Cache-Control: public, max-age=86400, stale-while-revalidate=604800`。按 Cloudflare 文档，无扩展名的 HTML 在没有 Cache Rule 把该路径标为 Eligible for cache 之前，边缘状态仍可能是 DYNAMIC；去掉 `no-store` 后，这条规则才不会因源站指令变成 BYPASS。
 
 旧模型适配器只在显式 `ASSISTANT_MODE=direct` 时启用，用于既有私有开发与兼容测试，不能当成已经进入 Lab 围栏和预算控制。仅配置 `MODEL_*` 不会自动启用它。
 
 ## 本次验证边界
 
-本轮 `npm test` 有 33 项 Node 检查，覆盖协议、文章、工具、错误、取消、限流、Worker、固定 Lab 接入、提交/轮询、拒答、不回退、技术引用白名单及有界追问。它们使用明确的协议模拟器，不能证明新复制模板已接通目标 Lab。作者部署另有 30 次真实 Qwen 输出合同评测、实际输出校验和线上三个问题的验收，记录在上述验收文档；这些证据不代表全产品或全面语义质量通过。
+本轮 `npm test` 有 41 项 Node 检查，覆盖协议、文章、工具、错误、取消、限流、Worker、固定 Lab 接入、提交/轮询、拒答、不回退、技术引用白名单、有界追问，以及公开页面缓存头和按篇正文。它们使用明确的协议模拟器，不能证明新复制模板已接通目标 Lab。作者部署另有 30 次真实 Qwen 输出合同评测、实际输出校验和线上三个问题的验收，记录在上述验收文档；这些证据不代表全产品或全面语义质量通过。
 
 本次仅修改本地项目，不注册新 Site、不改变 `.openai/hosting.json` 中的项目身份或受众、不调用远程部署。目标 Lab 的实际 HTTP、Redis、数据库与浏览器联调由接入环境另行验证。

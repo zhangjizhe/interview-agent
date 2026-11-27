@@ -1,5 +1,7 @@
 # 当前决策索引
 
+2026-11-27：个人站公开首页和单篇正文可以缓存；`/api/chat`、SSE、`/api/health`、`/api/search` 保持 `Cache-Control: no-store`。正文不进首屏 HTML。文章 URL 使用 `.js` 后缀以匹配 Cloudflare 默认按扩展名缓存的资格，响应体仍是 JSON。这不代替线上 Cache Rule，也未部署。
+
 2026-11-19：准备流程只以匹配ID/状态的回执显示成功；网络/服务/格式未知结果保留标记，不把超时称取消，不自动重写。核对须成功GET和显式确认，弹窗内能检查已读内容而不丢草稿。确认后的缓存更新与后台核对分开，避免GET拖住焦点；前端锁不冒充服务端幂等。无后端架构替换。详见../acceptance/PREPARATION_PRODUCT_DESIGN_ACCEPTANCE.md。
 
 2026-11-18：产品/设计/声明支持设备/发布恢复必须全部有对应版本证据才交付；本地测试和截图不能豁免真实闭环或实机。Web按认证会话持有私有缓存，一条JSON发布完整会话，拒绝四字段后写标记的伪原子方案。旧字段兼容只读到首次snapshot，退出tombstone防止复活；保持既有服务端鉴权与Lab隔离。候选未部署，升级/回滚需刷新重新登录验证。见../acceptance/COMMERCIAL_PRODUCT_DESIGN_GATE.md和SESSION_CACHE_ISOLATION.md。
